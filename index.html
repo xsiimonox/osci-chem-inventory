@@ -2,104 +2,311 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bestand</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OSCI Motion Tracker</title>
     <link rel="manifest" href="manifest.json">
     <style>
         body {
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
             padding: 20px;
-            max-width: 500px;
-            margin: auto;
+            background: linear-gradient(135deg, #000000 0%, #4a4a4a 100%);
+            background-attachment: fixed;
+            color: #ffffff;
+            min-height: 100vh;
+            box-sizing: border-box;
         }
-        .item-card {
-            background: white;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        h1, h2, h3 { font-weight: 300; letter-spacing: 1px; margin-top: 0; }
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .flex-row {
+        .tabs {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
+            overflow-x: auto;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            scrollbar-width: none;
         }
-        input {
-            width: 60px;
-            padding: 5px;
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            padding: 8px 16px;
             margin-right: 10px;
-        }
-        button {
-            padding: 6px 12px;
-            background-color: #007aff;
-            color: white;
-            border: none;
-            border-radius: 4px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.1);
+            white-space: nowrap;
+            color: #ccc;
+            font-size: 14px;
             cursor: pointer;
         }
+        .tab.active {
+            background: #ffffff;
+            color: #000000;
+            font-weight: 600;
+        }
+        select, input {
+            width: 100%;
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.3);
+            color: #ffffff;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        select option { background: #222; color: white; }
+        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:active { opacity: 0.8; }
+        .btn-add { background: #4CAF50; color: white; }
+        .btn-sub { background: #f44336; color: white; width: 100%; margin-top: 10px; }
+        .btn-tool { background: #2196F3; color: white; width: 100%; margin-top: 10px; }
+        
+        .inventory-list { margin-top: 10px; }
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .inventory-item:last-child { border-bottom: none; }
+        .item-name { font-size: 15px; }
+        .item-amount { font-weight: bold; font-family: monospace; font-size: 16px; }
+        .low-stock { color: #ff9800; }
+        
+        /* Verstecktes Dateieingabefeld für den Import */
+        #fileInput { display: none; }
     </style>
 </head>
 <body>
 
-    <h2>Mein Bestand</h2>
-    <div id="liste"></div>
+    <h1>OSCI Motion</h1>
+    
+    <div class="tabs" id="categoryTabs">
+        <div class="tab active" onclick="setCategory('C&R Produkte')">C&R Produkte</div>
+        <div class="tab" onclick="setCategory('Makro Elements')">Makro Elements</div>
+        <div class="tab" onclick="setCategory('Nutrition Elements')">Nutrition Elements</div>
+        <div class="tab" onclick="setCategory('Trace Elements')">Trace Elements</div>
+    </div>
+
+    <div class="card">
+        <h2>Aktion durchführen</h2>
+        <select id="productSelect" onchange="updateUI()"></select>
+        
+        <div style="margin-top: 20px;">
+            <label style="font-size: 12px; color: #aaa;">EINLAGERN (Feste Gebinde)</label>
+            <div id="addButtons" class="btn-group"></div>
+        </div>
+
+        <div style="margin-top: 25px;">
+            <label style="font-size: 12px; color: #aaa;">AUSLAGERN (Verbrauch in ml)</label>
+            <input type="number" id="consumeAmount" placeholder="z.B. 12.5" step="0.1" min="0.1">
+            <button class="btn-sub" onclick="consumeStock()">Verbrauch buchen</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Aktueller Bestand</h2>
+        <div id="inventoryList" class="inventory-list"></div>
+    </div>
+
+    <div class="card">
+        <h2>Datenverwaltung</h2>
+        <p style="font-size: 12px; color: #ccc;">Sichere deinen Bestand als Datei oder lade ein Backup wieder ein.</p>
+        <button class="btn-tool" onclick="exportData()">⬇️ Bestand als .txt exportieren</button>
+        <button class="btn-tool" onclick="document.getElementById('fileInput').click()" style="background: #607D8B;">⬆️ Bestand aus .txt importieren</button>
+        <input type="file" id="fileInput" accept=".txt" onchange="importData(event)">
+    </div>
 
     <script>
-        // 1. Daten aus dem lokalen Speicher laden oder Standardwerte setzen
-        let bestand = JSON.parse(localStorage.getItem('meinBestand')) || [
-            { id: 1, name: 'Fluor (F)', menge: 500, einheit: 'ml' },
-            { id: 2, name: 'Mangan (Mn)', menge: 250, einheit: 'ml' }
+        // Produktdatenbank mit Kategorien
+        const productDB = [
+            // C&R Produkte
+            { id: 'srcl2', name: 'Strontiumchlorid (SrCl2)', sizes: [100, 1000], cat: 'C&R Produkte' },
+            { id: 'mgso4', name: 'Magnesiumsulfat (MgSO4)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'mgcl2', name: 'Magnesiumchlorid (MgCl2)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'kbr', name: 'Kaliumbromid (KBr)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'cacl2', name: 'Calciumchlorid (CaCl2)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'kcl', name: 'Kaliumchlorid (KCl)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'naf', name: 'Natriumfluorid (NaF)', sizes: [5000], cat: 'C&R Produkte' },
+            { id: 'b', name: 'Bor (B)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'nacl', name: 'Natriumchlorid (NaCl)', sizes: [5000, 10000], cat: 'C&R Produkte' },
+            { id: 'k2so4', name: 'Kaliumsulfat (K2SO4)', sizes: [1000, 5000], cat: 'C&R Produkte' },
+            { id: 'na2so4', name: 'Natriumsulfat (Na2SO4)', sizes: [5000], cat: 'C&R Produkte' },
+            
+            // Makro Elements
+            { id: 'ca', name: 'Calcium', sizes: [5000], cat: 'Makro Elements' },
+            { id: 'kh_nacht', name: 'KH Nacht', sizes: [5000], cat: 'Makro Elements' },
+            { id: 'kh_tag', name: 'KH Tag', sizes: [10000], cat: 'Makro Elements' },
+            { id: 'mg', name: 'Magnesium', sizes: [5000], cat: 'Makro Elements' },
+
+            // Nutrition Elements
+            { id: 'c', name: 'Kohlenstoff (C)', sizes: [1000], cat: 'Nutrition Elements' },
+            { id: 'la', name: 'Lanthan (La)', sizes: [1000], cat: 'Nutrition Elements' },
+            { id: 'p', name: 'Phosphor (P)', sizes: [1000], cat: 'Nutrition Elements' },
+            { id: 'n', name: 'Stickstoff (N)', sizes: [1000], cat: 'Nutrition Elements' },
+
+            // Trace Elements
+            { id: 'ba', name: 'Barium (Ba)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'cr', name: 'Chrom (Cr)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'co', name: 'Cobalt (Co)', sizes: [1000], cat: 'Trace Elements' },
+            { id: 'fe', name: 'Eisen (Fe)', sizes: [100], cat: 'Trace Elements' },
+            { id: 'cu', name: 'Kupfer (Cu)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'li', name: 'Lithium (Li)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'zn', name: 'Zink (Zn)', sizes: [100], cat: 'Trace Elements' },
+            { id: 'mn', name: 'Mangan (Mn)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'ni', name: 'Nickel (Ni)', sizes: [1000], cat: 'Trace Elements' },
+            { id: 'mo', name: 'Molybdän (Mo)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'f', name: 'Fluor (F)', sizes: [100], cat: 'Trace Elements' },
+            { id: 'i', name: 'Iod (I)', sizes: [30, 100], cat: 'Trace Elements' },
+            { id: 'se', name: 'Selen (Se)', sizes: [100], cat: 'Trace Elements' },
+            { id: 'v', name: 'Vanadium (V)', sizes: [30, 100], cat: 'Trace Elements' }
         ];
 
-        // 2. Funktion zum Speichern der Daten auf dem Gerät
-        function datenSpeichern() {
-            localStorage.setItem('meinBestand', JSON.stringify(bestand));
-            listeRendern();
+        let stockData = JSON.parse(localStorage.getItem('osciStock')) || {};
+        let currentCategory = 'C&R Produkte';
+        
+        // Initialisiere fehlende Produkte
+        productDB.forEach(p => {
+            if (stockData[p.id] === undefined) stockData[p.id] = 0;
+        });
+
+        function saveData() {
+            localStorage.setItem('osciStock', JSON.stringify(stockData));
+            renderInventory();
         }
 
-        // 3. Funktion zum Abziehen von Verbrauch
-        function verbrauchBuchen(id) {
-            const inputField = document.getElementById(`input-${id}`);
-            const verbrauch = parseFloat(inputField.value);
+        function setCategory(cat) {
+            currentCategory = cat;
             
-            if (!isNaN(verbrauch) && verbrauch > 0) {
-                const item = bestand.find(i => i.id === id);
-                item.menge -= verbrauch;
-                inputField.value = ''; // Eingabefeld leeren
-                datenSpeichern();
-            }
+            // Tabs visuell updaten
+            const tabs = document.querySelectorAll('.tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+                if(tab.innerText === cat) tab.classList.add('active');
+            });
+
+            // Dropdown filtern
+            const select = document.getElementById('productSelect');
+            select.innerHTML = '';
+            
+            const filteredProducts = productDB.filter(p => p.cat === cat);
+            filteredProducts.forEach(p => {
+                let option = document.createElement('option');
+                option.value = p.id;
+                option.textContent = p.name;
+                select.appendChild(option);
+            });
+            
+            updateUI();
+            renderInventory();
         }
 
-        // 4. Anzeige aufbauen
-        function listeRendern() {
-            const container = document.getElementById('liste');
-            container.innerHTML = '';
+        function updateUI() {
+            const selectedId = document.getElementById('productSelect').value;
+            const product = productDB.find(p => p.id === selectedId);
+            if(!product) return;
 
-            bestand.forEach(item => {
-                container.innerHTML += `
-                    <div class="item-card">
-                        <div class="flex-row">
-                            <h3>${item.name}</h3>
-                            <strong>${item.menge} ${item.einheit}</strong>
-                        </div>
-                        <div class="flex-row" style="margin-top: 10px;">
-                            <input type="number" id="input-${item.id}" placeholder="Menge">
-                            <button onclick="verbrauchBuchen(${item.id})">Verbrauchen</button>
-                        </div>
+            const btnContainer = document.getElementById('addButtons');
+            btnContainer.innerHTML = '';
+            product.sizes.forEach(size => {
+                let btn = document.createElement('button');
+                btn.className = 'btn-add';
+                btn.textContent = `+ ${size} ml`;
+                btn.onclick = () => addStock(product.id, size);
+                btnContainer.appendChild(btn);
+            });
+        }
+
+        function addStock(id, amount) {
+            stockData[id] += amount;
+            saveData();
+        }
+
+        function consumeStock() {
+            const selectedId = document.getElementById('productSelect').value;
+            const inputField = document.getElementById('consumeAmount');
+            const amount = parseFloat(inputField.value);
+
+            if (isNaN(amount) || amount <= 0) return;
+
+            stockData[selectedId] = Math.round((stockData[selectedId] - amount) * 10) / 10;
+            if (stockData[selectedId] < 0) stockData[selectedId] = 0;
+            
+            inputField.value = '';
+            saveData();
+        }
+
+        function renderInventory() {
+            const list = document.getElementById('inventoryList');
+            list.innerHTML = '';
+
+            const filteredProducts = productDB.filter(p => p.cat === currentCategory);
+
+            filteredProducts.forEach(p => {
+                const amount = stockData[p.id];
+                const isLow = amount < (p.sizes[0] / 2); // Dynamische Warnschwelle
+                
+                list.innerHTML += `
+                    <div class="inventory-item">
+                        <div class="item-name">${p.name}</div>
+                        <div class="item-amount ${isLow && amount > 0 ? 'low-stock' : ''}">${amount} ml</div>
                     </div>
                 `;
             });
         }
 
-        // Service Worker registrieren (notwendig für PWAs)
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
+        // ---- EXPORT & IMPORT LOGIK ----
+        function exportData() {
+            const dataStr = JSON.stringify(stockData, null, 2);
+            const dataUri = 'data:text/plain;charset=utf-8,'+ encodeURIComponent(dataStr);
+            const exportName = 'osci_bestand.txt';
+
+            let linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportName);
+            document.body.appendChild(linkElement);
+            linkElement.click();
+            document.body.removeChild(linkElement);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    stockData = { ...stockData, ...importedData }; // Fügt Daten zusammen
+                    saveData();
+                    alert('Daten erfolgreich importiert!');
+                } catch (err) {
+                    alert('Fehler beim Lesen. Bitte wähle eine gültige OSCI Backup-Datei (.txt) aus.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset Input
         }
 
         // Start
-        listeRendern();
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+        }
+        setCategory('C&R Produkte'); // Initiale Kategorie setzen
     </script>
 </body>
 </html>
