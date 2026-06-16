@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bestand</title>
+    <link rel="manifest" href="manifest.json">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            padding: 20px;
+            max-width: 500px;
+            margin: auto;
+        }
+        .item-card {
+            background: white;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .flex-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        input {
+            width: 60px;
+            padding: 5px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 6px 12px;
+            background-color: #007aff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Mein Bestand</h2>
+    <div id="liste"></div>
+
+    <script>
+        // 1. Daten aus dem lokalen Speicher laden oder Standardwerte setzen
+        let bestand = JSON.parse(localStorage.getItem('meinBestand')) || [
+            { id: 1, name: 'Fluor (F)', menge: 500, einheit: 'ml' },
+            { id: 2, name: 'Mangan (Mn)', menge: 250, einheit: 'ml' }
+        ];
+
+        // 2. Funktion zum Speichern der Daten auf dem Gerät
+        function datenSpeichern() {
+            localStorage.setItem('meinBestand', JSON.stringify(bestand));
+            listeRendern();
+        }
+
+        // 3. Funktion zum Abziehen von Verbrauch
+        function verbrauchBuchen(id) {
+            const inputField = document.getElementById(`input-${id}`);
+            const verbrauch = parseFloat(inputField.value);
+            
+            if (!isNaN(verbrauch) && verbrauch > 0) {
+                const item = bestand.find(i => i.id === id);
+                item.menge -= verbrauch;
+                inputField.value = ''; // Eingabefeld leeren
+                datenSpeichern();
+            }
+        }
+
+        // 4. Anzeige aufbauen
+        function listeRendern() {
+            const container = document.getElementById('liste');
+            container.innerHTML = '';
+
+            bestand.forEach(item => {
+                container.innerHTML += `
+                    <div class="item-card">
+                        <div class="flex-row">
+                            <h3>${item.name}</h3>
+                            <strong>${item.menge} ${item.einheit}</strong>
+                        </div>
+                        <div class="flex-row" style="margin-top: 10px;">
+                            <input type="number" id="input-${item.id}" placeholder="Menge">
+                            <button onclick="verbrauchBuchen(${item.id})">Verbrauchen</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        // Service Worker registrieren (notwendig für PWAs)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        // Start
+        listeRendern();
+    </script>
+</body>
+</html>
