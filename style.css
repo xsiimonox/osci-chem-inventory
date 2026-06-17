@@ -1,197 +1,232 @@
-/* =========================================
-   Basis-Variablen (Dark Mode Standard)
-   ========================================= */
 :root {
-    --bg: #121212;
-    --card-bg: #1e1e1e;
-    --primary: #bb86fc;
-    --danger: #cf6679;
-    --text: #e0e0e0;
-    --header-bg: #000000;
-    --tab-inactive: #888888;
+    --bg: #000000; 
+    --card-bg: #1c1c1e; 
+    --primary: #bf5af2; 
+    --secondary: #64d2ff; 
+    --text: #ffffff;
+    --text-muted: #8e8e93; 
+    --danger: #ff453a; 
+    --success: #30d158; 
+    --border: #2c2c2e; 
 }
 
-/* =========================================
-   🌊 Mint Ozean Modus
-   ========================================= */
-body.theme-mint-ocean {
-    --bg: #0b1d28;         /* Tiefsee-Blau */
-    --card-bg: #132e3d;    /* Riff-Schatten */
-    --primary: #20c997;    /* Leuchtendes Mintgrün */
-    --danger: #ff6b81;     /* Korallenrot */
-    --text: #e6f7f8;       /* Klares Wasser-Weiß */
-    --header-bg: #07131a;  /* Dunkler Header */
-    --tab-inactive: #6c98a3; /* Gedämpftes Blaugrün */
+/* --- THEME VARIANTEN --- */
+body.theme-girl {
+    --bg: #ffeef4;         /* Sanfter, hellrosa Hintergrund */
+    --card-bg: #ffffff;    /* Schneeweiße Karten für edlen Kontrast */
+    --primary: #ff66a4;    /* Kräftiges Schleifchen-Pink */
+    --secondary: #ff1493;  /* Leuchtendes Neon-Pink */
+    --text: #4a0026;       /* Dunkelbeere für perfekte Lesbarkeit */
+    --text-muted: #a66584; 
+    --danger: #d90452;     /* Intensives Beerenrot für Warnungen */
+    --success: #ff3385;    /* Knalliges Pink für Bestätigungen */
+    --border: #ffccd9; 
 }
 
-/* =========================================
-   🌸 Girl Edition Modus
-   ========================================= */
-body.theme-girl-edition {
-    --bg: #fff0f5;         /* Lavendelblass */
-    --card-bg: #ffffff;    /* Reines Weiß */
-    --primary: #ff69b4;    /* Hot Pink */
-    --danger: #ff4757;     /* Kräftiges Rot */
-    --text: #2f3542;       /* Dunkles Grau für Lesbarkeit */
-    --header-bg: #ffe4e1;  /* Zartes Rosa */
-    --tab-inactive: #a4b0be;
+body.theme-mint {
+    --primary: #00e676;    /* Frisches Neongrün/Mint */
+    --secondary: #00b0ff;  /* Leuchtendes Aquablau */
 }
 
-/* =========================================
-   Allgemeines Layout & Typografie
-   ========================================= */
-body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    margin: 0;
-    padding-bottom: 70px;
-    /* Weicher Übergang beim Theme-Wechsel */
-    transition: background-color 0.4s ease, color 0.4s ease;
+* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; transition: background-color 0.5s ease; }
+
+header { background: rgba(28, 28, 30, 0.8); padding: 16px 20px; box-shadow: 0 1px 0 var(--border); position: sticky; top: 0; z-index: 99; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.header-main { display: flex; justify-content: space-between; align-items: center; }
+header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+.subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+.header-title-container { display: flex; align-items: center; gap: 8px; }
+.version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
+
+.menu-toggle { background: none; border: none; cursor: pointer; padding: 4px; display: flex; flex-direction: column; gap: 5px; z-index: 101; }
+.menu-toggle .bar { width: 24px; height: 2.5px; background-color: var(--primary); border-radius: 2px; transition: 0.3s; }
+
+.nav-menu { position: fixed; top: 0; right: -280px; width: 280px; height: 100vh; background: rgba(28, 28, 30, 0.94); z-index: 1000; transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); box-shadow: -5px 0 25px rgba(0,0,0,0.5); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-left: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; }
+.nav-menu.open { transform: translateX(-280px); }
+.nav-menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-weight: 600; font-size: 1.1rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+.close-menu { background: none; border: none; color: var(--primary); font-size: 1.3rem; cursor: pointer; }
+
+.nav-links { display: flex; flex-direction: column; gap: 8px; }
+.nav-links button { width: 100%; text-align: left; padding: 14px 16px; border: none; background: rgba(255,255,255,0.03); color: #fff; font-size: 1rem; font-weight: 500; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+.nav-links button.active { color: #000; background: var(--primary); font-weight: 600; }
+
+.menu-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; backdrop-filter: blur(2px); }
+.menu-backdrop.open { display: block; }
+
+.tab-content { display: none; padding: 15px; animation: iosSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.tab-content.active { display: block; }
+
+@keyframes iosSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (min-width: 768px) {
+    .menu-toggle, .close-menu, .nav-menu-header, .menu-backdrop { display: none !important; }
+    .nav-menu { position: static; width: 100%; height: auto; background: #1c1c1e; border-left: none; border-bottom: 1px solid var(--border); padding: 0; box-shadow: none; transform: none !important; backdrop-filter: none; }
+    .nav-links { flex-direction: row; gap: 0; max-width: 1200px; margin: 0 auto; width: 100%; }
+    .nav-links button { flex: 1; text-align: center; border-radius: 0; background: none; padding: 16px; color: var(--text-muted); }
+    .nav-links button.active { color: var(--primary); background: rgba(191, 90, 242, 0.1); border-bottom: 3px solid var(--primary); }
 }
 
-header {
-    background: var(--header-bg);
-    padding: 20px;
-    text-align: center;
-    color: var(--primary);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    transition: background-color 0.4s ease, color 0.4s ease;
+.category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.5s ease; }
+.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.5s ease, border-color 0.5s ease, background-color 0.5s ease; }
+.card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: color 0.5s ease; }
+
+body.theme-girl .stock { background: rgba(255, 102, 164, 0.15); }
+body.theme-mint .stock { background: rgba(0, 230, 118, 0.15); }
+
+.cross-hint { font-size: 0.75rem; color: #ffd60a; margin-top: 4px; display: block; font-weight: 500; }
+.hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
+
+.trace-grid { display: grid; grid-template-columns: 1fr 100px 50px; gap: 5px; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.trace-grid label { font-size: 0.95rem; }
+.trace-grid input { margin-bottom: 0 !important; text-align: right; }
+.unit-label { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
+
+.log-item { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.log-item.in { border-left: 4px solid var(--success); }
+.log-item.out { border-left: 4px solid var(--danger); }
+.log-details { font-size: 0.85rem; }
+.log-date { font-size: 0.75rem; color: var(--text-muted); }
+
+.stat-block { background: #2c2c2e; padding: 14px; border-radius: 10px; margin-bottom: 12px; }
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); }
+.stat-grid div strong { display: block; font-size: 0.95rem; color: #fff; margin-bottom: 2px; }
+.prognose-badge { font-size: 0.8rem; color: #ffd60a; background: rgba(255, 214, 10, 0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: 500; }
+
+.btn-group { display: flex; gap: 10px; }
+button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12px; border: none; cursor: pointer; transition: all 0.15s ease; }
+.btn-animated:active { transform: scale(0.96); opacity: 0.8; }
+
+.btn-in { background: rgba(48, 209, 88, 0.15); color: var(--success); flex: 1; }
+.btn-out { background: rgba(255, 69, 58, 0.15); color: var(--danger); flex: 1; }
+
+.btn-primary { background: var(--primary); color: #fff; width: 100%; transition: background-color 0.5s ease; }
+.btn-secondary { background: #3a3a3c; color: var(--secondary); width: 100%; }
+.btn-danger { background: var(--danger); color: white; width: 100%; }
+.btn-cancel { background: #2c2c2e; color: #fff; width: 100%; margin-top: 12px; }
+
+textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.95rem; resize: none; margin-bottom: 15px; }
+input[type="number"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
+.input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
+
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.modal-content { background: rgba(28, 28, 30, 0.94); border: 1px solid var(--border); padding: 24px; width: 92%; max-width: 360px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
+
+.switch-container { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; margin-bottom: 15px; border: 1px dashed rgba(255, 255, 255, 0.1); }
+.switch { position: relative; display: inline-block; width: 51px; height: 31px; }
+.switch input { opacity: 0; width: 0; height: 0; margin-bottom: 0 !important; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #3a3a3c; transition: .3s; border-radius: 34px; }
+.slider:before { position: absolute; content: ""; height: 27px; width: 27px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 3px 8px rgba(0,0,0,0.3); }
+input:checked + .slider { background-color: var(--success); }
+input:checked + .slider:before { transform: translateX(20px); }
+
+/* --- FUTURISTIC LED RGB ANIMATIONEN --- */
+body.party-mode { 
+    animation: smoothGradient 10s ease infinite; 
+    background: linear-gradient(45deg, #0a001a, #001a1a, #1a000d, #00001a);
+    background-size: 400% 400%;
+}
+body.party-mode .card { 
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: rgbPulse 6s infinite alternate ease-in-out; 
+}
+body.party-mode header h1, body.party-mode .stock { 
+    animation: rgbText 5s linear infinite; 
+}
+body.party-mode button.btn-animated { 
+    animation: rgbBorder 4s infinite alternate; 
 }
 
-header h1 {
-    margin: 0;
-    font-size: 1.5rem;
-    letter-spacing: 1px;
+@keyframes smoothGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes rgbPulse { 
+    0% { box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 10px rgba(0,255,255,0.1); border-color: rgba(0,255,255,0.5); } 
+    50% { box-shadow: 0 0 15px rgba(255,0,255,0.3), inset 0 0 10px rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.5); } 
+    100% { box-shadow: 0 0 15px rgba(0,255,0,0.3), inset 0 0 10px rgba(0,255,0,0.1); border-color: rgba(0,255,0,0.5); } 
+}
+@keyframes rgbText { 
+    0% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
+    33% { color: #f0f; text-shadow: 0 0 8px rgba(255,0,255,0.6); } 
+    66% { color: #0f0; text-shadow: 0 0 8px rgba(0,255,0,0.6); } 
+    100% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
+}
+@keyframes rgbBorder { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+
+
+/* ==========================================================================
+   🎀 SUPER CUTE PINK GIRL EDITION OVERRIDES 🎀
+   ========================================================================== */
+
+body.theme-girl textarea,
+body.theme-girl input[type="number"],
+body.theme-girl input[type="file"],
+body.theme-girl select,
+body.theme-girl .log-item,
+body.theme-girl .stat-block,
+body.theme-girl #cr-preview-container,
+body.theme-girl #containerSection {
+    background: #fff5f8 !important;
+    color: #4a0026 !important;
+    border: 1px solid #ffccd9 !important;
 }
 
-/* =========================================
-   Navigation (Tabs)
-   ========================================= */
-.tabs {
-    display: flex;
-    background: var(--card-bg);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    transition: background-color 0.4s ease;
+body.theme-girl select option { background: #ffffff !important; color: #4a0026 !important; }
+body.theme-girl .modal-content { background: #ffffff !important; border: 2px solid #ff66a4 !important; color: #4a0026 !important; }
+
+/* Alle Texte im Girl Mode auf dunkelbeerig umschalten */
+body.theme-girl h1, body.theme-girl h2, body.theme-girl h3, body.theme-girl h4, 
+body.theme-girl label, body.theme-girl span, body.theme-girl strong, 
+body.theme-girl .stat-grid div strong, body.theme-girl .trace-grid label {
+    color: #4a0026 !important;
 }
 
-.tabs button {
-    flex: 1;
-    padding: 15px;
-    border: none;
-    background: none;
-    color: var(--tab-inactive);
-    font-weight: bold;
-    font-size: 1rem;
-    transition: color 0.3s ease, border-bottom 0.3s ease;
-    cursor: pointer;
+/* Ein- und Auslagerungsbuttons sowie Menüs in Pink-Schattierungen */
+body.theme-girl .btn-in { background: #ffe3ee !important; color: #ff1493 !important; border: 1px solid #ffb3d1 !important; }
+body.theme-girl .btn-out { background: #fff0f5 !important; color: #d90452 !important; border: 1px solid #ffccd9 !important; }
+body.theme-girl .btn-primary { background: #ff66a4 !important; color: #ffffff !important; }
+body.theme-girl .btn-secondary { background: #ffccd9 !important; color: #4a0026 !important; }
+body.theme-girl .btn-danger { background: #d90452 !important; color: #ffffff !important; }
+body.theme-girl .btn-cancel { background: #ffccd9 !important; color: #4a0026 !important; }
+
+/* Highlights, Badges und Navigationsleisten */
+body.theme-girl .stock { background: #ffccd9 !important; color: #d90452 !important; }
+body.theme-girl .version-badge { background: #ffccd9 !important; color: #ff1493 !important; border: 1px solid #ff66a4 !important; }
+body.theme-girl .prognose-badge { background: #ffe3ee !important; color: #ff1493 !important; }
+body.theme-girl header { background: rgba(255, 238, 244, 0.85) !important; box-shadow: 0 1px 0 #ffccd9 !important; }
+body.theme-girl .nav-menu { background: rgba(255, 255, 255, 0.96) !important; border-left: 1px solid #ffccd9 !important; }
+body.theme-girl .nav-links button { background: #fff5f8 !important; color: #4a0026 !important; }
+body.theme-girl .nav-links button.active { background: #ff66a4 !important; color: #ffffff !important; }
+body.theme-girl .cross-hint { color: #d90452 !important; }
+
+/* Desktop Navigation Anpassung für Girl Edition */
+@media (min-width: 768px) {
+    body.theme-girl .nav-menu { background: #ffffff !important; border-bottom: 1px solid #ffccd9 !important; }
+    body.theme-girl .nav-links button.active { background: rgba(255, 102, 164, 0.1) !important; color: #ff1493 !important; border-bottom: 3px solid #ff1493 !important; }
 }
 
-.tabs button.active {
-    color: var(--primary);
-    border-bottom: 3px solid var(--primary);
-}
+/* 💖 AUTOMATISCHE HERZEN & SCHLEIFCHEN AKZENTE 🎀 */
+body.theme-girl header h1::before { content: "💖 "; }
+body.theme-girl header h1::after { content: " 🎀"; }
+body.theme-girl .category-title::before { content: "💕 "; }
+body.theme-girl .category-title::after { content: " 💕"; }
+body.theme-girl .card h4 span::before { content: "🌸 "; }
+body.theme-girl .btn-in::before { content: "🎀 "; }
+body.theme-girl .btn-out::before { content: "💗 "; }
 
-.tabs button:hover:not(.active) {
-    color: var(--text);
+/* 💥 SPEZIAL: MAGISCHE INTERAKTIVE PINK-DISKO-SHOW */
+body.theme-girl.party-mode { 
+    animation: pinkDiscoGradient 8s ease infinite !important; 
+    background: linear-gradient(45deg, #ffb6c1, #ff69b4, #da70d6, #ffc0cb) !important;
+    background-size: 400% 400% !important;
 }
-
-/* =========================================
-   Content & Karten
-   ========================================= */
-.tab-content {
-    display: none;
-    padding: 20px;
-    max-width: 800px;
-    margin: 0 auto;
+body.theme-girl.party-mode .card {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border: 1px solid #ff66a4 !important;
+    animation: pinkRgbPulse 4s infinite alternate ease-in-out !important;
 }
-
-.tab-content.active {
-    display: block;
-    animation: fadeIn 0.4s ease forwards;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-.card {
-    background: var(--card-bg);
-    margin: 15px 0;
-    padding: 20px;
-    border-radius: 16px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
-    transition: background-color 0.4s ease, transform 0.2s ease;
-}
-
-.card h3 {
-    margin-top: 0;
-    margin-bottom: 15px;
-    color: var(--primary);
-}
-
-/* =========================================
-   Formularelemente & Buttons
-   ========================================= */
-textarea {
-    width: 100%;
-    height: 120px;
-    background: rgba(0, 0, 0, 0.1);
-    color: var(--text);
-    border: 1px solid var(--tab-inactive);
-    border-radius: 8px;
-    padding: 15px;
-    margin: 10px 0;
-    box-sizing: border-box;
-    font-family: monospace;
-    resize: vertical;
-    transition: border-color 0.3s ease, background-color 0.3s ease;
-}
-
-textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    background: rgba(0, 0, 0, 0.2);
-}
-
-button {
-    width: 100%;
-    padding: 14px;
-    border-radius: 10px;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 1rem;
-    margin-top: 10px;
-    transition: transform 0.1s ease, filter 0.2s ease, box-shadow 0.2s ease;
-}
-
-button:active {
-    transform: scale(0.98);
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: #000;
-    box-shadow: 0 4px 10px rgba(32, 201, 151, 0.3);
-}
-
-.btn-primary:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 6px 14px rgba(32, 201, 151, 0.4);
-}
-
-.btn-danger {
-    background: var(--danger);
-    color: white;
-    box-shadow: 0 4px 10px rgba(255, 107, 129, 0.3);
-}
-
-.btn-danger:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 6px 14px rgba(255, 107, 129, 0.4);
+@keyframes pinkDiscoGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes pinkRgbPulse {
+    0% { box-shadow: 0 0 15px rgba(255,20,147,0.2); border-color: #ff66a4; }
+    100% { box-shadow: 0 0 15px rgba(218,112,214,0.4); border-color: #ff1493; }
 }
