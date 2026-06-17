@@ -238,7 +238,7 @@ function renderLogs() {
                 <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${(log.amount || 0).toFixed(2)} ml</span><br>
                 <span class="log-date">${new Date(log.timestamp).toLocaleString()}</span>
             </div>
-            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:90px;" onclick="undoLog(${index})">Wiederherstellen</button>
+            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:140px;" onclick="undoLog(${index})">Wiederherstellen</button>
         </div>
     `).reverse().join('');
     container.innerHTML = logHTML;
