@@ -487,3 +487,15 @@ function importData() {
 
 initDB();
 renderLager();
+
+// Funktion für den verrückten Disko-Modus
+function togglePartyMode() {
+    const isChecked = document.getElementById('partyToggle').checked;
+    if (isChecked) {
+        document.body.classList.add('party-mode');
+        // Kleiner Soundeffekt-Spaß (optional, falls der Browser es erlaubt)
+        alert("🚨 WARNUNG: Extrem verrückter Ambientlight-Modus aktiviert! 🕺💃");
+    } else {
+        document.body.classList.remove('party-mode');
+    }
+}
