@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.0.3</span>
+                <span class="version-badge">v4.6.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -42,13 +42,11 @@
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
     <main id="app">
-        
         <div id="lager" class="tab-content active"></div>
 
         <div id="cr-export" class="tab-content">
             <div class="card card-accent">
                 <h3>C&R Liste per Copy & Paste auslagern</h3>
-                <p class="hint">Füge hier die unformatierte Zeile aus deiner Auswertung ein:</p>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..."></textarea>
                 <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
             </div>
@@ -57,14 +55,11 @@
         <div id="trace-export" class="tab-content">
             <div class="card">
                 <h3>Kationen Mischung</h3>
-                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein:</p>
                 <div id="kationen-inputs-container"></div>
                 <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('kationen')">Kationen Mischung abziehen</button>
             </div>
-            
             <div class="card" style="margin-top: 20px;">
                 <h3>Anionen Mischung</h3>
-                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein:</p>
                 <div id="anionen-inputs-container"></div>
                 <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
             </div>
@@ -73,10 +68,10 @@
         <div id="statistik" class="tab-content">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Verbrauchsstatistik & Prognose</h3>
-                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
+                    <h3>Verbrauchsstatistik</h3>
+                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem;" onclick="resetStatsSingle()">Reset</button>
                 </div>
-                <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
+                <p class="hint" id="stats-start-date">--</p>
                 <div id="stats-container"></div>
             </div>
         </div>
@@ -84,53 +79,27 @@
         <div id="log" class="tab-content">
             <div class="card">
                 <h3>Aktionsprotokoll</h3>
-                <p class="hint">Hier siehst du alle vergangenen Buchungen und kannst sie bei Bedarf rückgängig machen:</p>
                 <div id="log-container"></div>
             </div>
         </div>
 
         <div id="daten" class="tab-content">
-            
-            <div class="card" style="border: 1px solid #ffd60a; background: rgba(255, 214, 10, 0.02); margin-bottom: 20px;">
+            <div class="card" style="border: 1px solid #ffd60a; background: rgba(255, 214, 10, 0.02);">
                 <h3 style="color: #ffd60a;">Ambientlight & Effekt-Steuerung</h3>
-                <p class="hint">Aktiviert den Testmodus für Spezialeffekte und Licht-Animationen.</p>
                 <div class="switch-container">
-                    <span style="font-weight: 600; font-size: 0.95rem;">💥 Disko- & Animationsmodus</span>
-                    <label class="switch">
-                        <input type="checkbox" id="partyToggle" onchange="togglePartyMode()">
-                        <span class="slider"></span>
-                    </label>
+                    <span>💥 Disko- & Animationsmodus</span>
+                    <label class="switch"><input type="checkbox" id="partyToggle" onchange="togglePartyMode()"><span class="slider"></span></label>
                 </div>
             </div>
-
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
-                <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
-                
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <p class="hint" style="margin-bottom: 8px;"><strong>1. Nur Statistiken zurücksetzen:</strong> Nullt die Verbräuche und startet den Berechnungszeitraum neu. Bestände und Protokoll bleiben erhalten.</p>
-                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken nullen</button>
-                </div>
-
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <p class="hint" style="margin-bottom: 8px;"><strong>2. Nur Aktionsprotokoll löschen:</strong> Leert die Liste der vergangenen Buchungen. Bestände und Statistiken bleiben erhalten.</p>
-                    <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
-                </div>
-
-                <div>
-                    <p class="hint" style="margin-bottom: 8px;"><strong>3. Nur Lagerbestand nullen:</strong> Setzt alle aktuellen ml-Mengen im Lager auf 0 ml zurück. Statistiken und Protokolle bleiben unverändert.</p>
-                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand nullen</button>
-                </div>
+            <div class="card" style="border: 1px solid var(--danger); margin-top: 20px;">
+                <h3 style="color: var(--danger);">Daten-Reset</h3>
+                <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="margin-bottom:10px;">Statistiken nullen</button>
+                <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="margin-bottom:10px;">Protokoll löschen</button>
+                <button onclick="resetLagerSingle()" class="btn-danger btn-animated">Lagerbestand nullen</button>
             </div>
-
             <div class="card" style="margin-top: 20px;">
-                <h3>Backup exportieren</h3>
-                <p class="hint">Speichert den aktuellen Bestand, Statistiken und das Protokoll als Textdatei.</p>
-                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
-            </div>
-            
-            <div class="card">
-                <h3>Backup einlesen</h3>
-                <p class="hint">Wähle eine exportierte .txt Datei aus, um den Stand vollständig wiederherzustellen.</p>
+                <h3>Backup</h3>
+                <button onclick="exportData()" class="btn-primary btn-animated" style="margin-bottom:10px;">Daten exportieren (.txt)</button>
                 <input type="file" id="importFile" accept=".txt">
                 <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
             </div>
@@ -140,8 +109,9 @@
     <div id="modal" class="modal">
         <div class="modal-content">
             <h3 id="modal-title">Aktion</h3>
-            <div id="modal-body"></div>
-            <button onclick="closeModal()" class="btn-cancel">Schließen / Abbrechen</button>
+            <div id="modal-body">
+                </div>
+            <button onclick="closeModal()" class="btn-cancel">Abbrechen</button>
         </div>
     </div>
 
