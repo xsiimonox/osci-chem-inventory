@@ -10,28 +10,11 @@
     --border: #2c2c2e; 
 }
 
-/* --- THEME VARIANTEN --- */
-body.theme-girl {
-    --bg: #ffeef4;         /* Sanfter, hellrosa Hintergrund */
-    --card-bg: #ffffff;    /* Schneeweiße Karten für edlen Kontrast */
-    --primary: #ff66a4;    /* Kräftiges Schleifchen-Pink */
-    --secondary: #ff1493;  /* Leuchtendes Neon-Pink */
-    --text: #4a0026;       /* Dunkelbeere für perfekte Lesbarkeit */
-    --text-muted: #a66584; 
-    --danger: #d90452;     /* Intensives Beerenrot für Warnungen */
-    --success: #ff3385;    /* Knalliges Pink für Bestätigungen */
-    --border: #ffccd9; 
-}
-
-body.theme-mint {
-    --primary: #00e676;    /* Frisches Neongrün/Mint */
-    --secondary: #00b0ff;  /* Leuchtendes Aquablau */
-}
-
+/* --- BASICS --- */
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; transition: background-color 0.5s ease; }
+body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; transition: background-color 0.5s ease, color 0.3s ease; }
 
-header { background: rgba(28, 28, 30, 0.8); padding: 16px 20px; box-shadow: 0 1px 0 var(--border); position: sticky; top: 0; z-index: 99; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+header { background: rgba(28, 28, 30, 0.8); padding: 16px 20px; box-shadow: 0 1px 0 var(--border); position: sticky; top: 0; z-index: 99; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); transition: all 0.4s ease; }
 .header-main { display: flex; justify-content: space-between; align-items: center; }
 header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
 .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
@@ -68,12 +51,9 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 }
 
 .category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.5s ease; }
-.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.5s ease, border-color 0.5s ease, background-color 0.5s ease; }
+.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: all 0.4s ease; }
 .card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: color 0.5s ease; }
-
-body.theme-girl .stock { background: rgba(255, 102, 164, 0.15); }
-body.theme-mint .stock { background: rgba(0, 230, 118, 0.15); }
+.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: all 0.4s ease; }
 
 .cross-hint { font-size: 0.75rem; color: #ffd60a; margin-top: 4px; display: block; font-weight: 500; }
 .hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
@@ -83,13 +63,13 @@ body.theme-mint .stock { background: rgba(0, 230, 118, 0.15); }
 .trace-grid input { margin-bottom: 0 !important; text-align: right; }
 .unit-label { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
 
-.log-item { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+.log-item { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s; }
 .log-item.in { border-left: 4px solid var(--success); }
 .log-item.out { border-left: 4px solid var(--danger); }
 .log-details { font-size: 0.85rem; }
 .log-date { font-size: 0.75rem; color: var(--text-muted); }
 
-.stat-block { background: #2c2c2e; padding: 14px; border-radius: 10px; margin-bottom: 12px; }
+.stat-block { background: #2c2c2e; padding: 14px; border-radius: 10px; margin-bottom: 12px; transition: all 0.3s; }
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; margin-top: 8px; font-size: 0.8rem; color: var(--text-muted); }
 .stat-grid div strong { display: block; font-size: 0.95rem; color: #fff; margin-bottom: 2px; }
 .prognose-badge { font-size: 0.8rem; color: #ffd60a; background: rgba(255, 214, 10, 0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: 500; }
@@ -101,13 +81,13 @@ button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12p
 .btn-in { background: rgba(48, 209, 88, 0.15); color: var(--success); flex: 1; }
 .btn-out { background: rgba(255, 69, 58, 0.15); color: var(--danger); flex: 1; }
 
-.btn-primary { background: var(--primary); color: #fff; width: 100%; transition: background-color 0.5s ease; }
+.btn-primary { background: var(--primary); color: #fff; width: 100%; }
 .btn-secondary { background: #3a3a3c; color: var(--secondary); width: 100%; }
 .btn-danger { background: var(--danger); color: white; width: 100%; }
 .btn-cancel { background: #2c2c2e; color: #fff; width: 100%; margin-top: 12px; }
 
-textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.95rem; resize: none; margin-bottom: 15px; }
-input[type="number"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
+textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.95rem; resize: none; margin-bottom: 15px; transition: all 0.3s; }
+input[type="number"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; transition: all 0.3s; }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -121,75 +101,31 @@ input[type="number"], input[type="file"], select { width: 100%; padding: 12px; b
 input:checked + .slider { background-color: var(--success); }
 input:checked + .slider:before { transform: translateX(20px); }
 
-/* --- FUTURISTIC LED RGB ANIMATIONEN --- */
-body.party-mode { 
-    animation: smoothGradient 10s ease infinite; 
-    background: linear-gradient(45deg, #0a001a, #001a1a, #1a000d, #00001a);
-    background-size: 400% 400%;
-}
-body.party-mode .card { 
-    background: #111;
-    border: 1px solid rgba(255,255,255,0.1);
-    animation: rgbPulse 6s infinite alternate ease-in-out; 
-}
-body.party-mode header h1, body.party-mode .stock { 
-    animation: rgbText 5s linear infinite; 
-}
-body.party-mode button.btn-animated { 
-    animation: rgbBorder 4s infinite alternate; 
-}
+/* Standard-Disko-Modus Animations-Definitionen */
+body.party-mode { animation: smoothGradient 10s ease infinite; background: linear-gradient(45deg, #0a001a, #001a1a, #1a000d, #00001a); background-size: 400% 400%; }
+body.party-mode .card { background: #111; border: 1px solid rgba(255,255,255,0.1); animation: rgbPulse 6s infinite alternate ease-in-out; }
+body.party-mode header h1, body.party-mode .stock { animation: rgbText 5s linear infinite; }
+body.party-mode button.btn-animated { animation: rgbBorder 4s infinite alternate; }
 
 @keyframes smoothGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-@keyframes rgbPulse { 
-    0% { box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 10px rgba(0,255,255,0.1); border-color: rgba(0,255,255,0.5); } 
-    50% { box-shadow: 0 0 15px rgba(255,0,255,0.3), inset 0 0 10px rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.5); } 
-    100% { box-shadow: 0 0 15px rgba(0,255,0,0.3), inset 0 0 10px rgba(0,255,0,0.1); border-color: rgba(0,255,0,0.5); } 
-}
-@keyframes rgbText { 
-    0% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
-    33% { color: #f0f; text-shadow: 0 0 8px rgba(255,0,255,0.6); } 
-    66% { color: #0f0; text-shadow: 0 0 8px rgba(0,255,0,0.6); } 
-    100% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
-}
-@keyframes rgbBorder { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
+@keyframes rgbPulse { 0% { box-shadow: 0 0 15px rgba(0,255,255,0.3); border-color: rgba(0,255,255,0.5); } 50% { box-shadow: 0 0 15px rgba(255,0,255,0.3); border-color: rgba(255,0,255,0.5); } 100% { box-shadow: 0 0 15px rgba(0,255,0,0.3); border-color: rgba(0,255,0,0.5); } }
+@keyframes rgbText { 0% { color: #0ff; } 33% { color: #f0f; } 66% { color: #0f0; } 100% { color: #0ff; } }
 
 
 /* ==========================================================================
-   🎀 SUPER CUTE PINK GIRL EDITION OVERRIDES 🎀
+   🎀 INTERFACE-PRESET: SUPER CUTE PINK GIRL EDITION 🎀
    ========================================================================== */
-
-body.theme-girl textarea,
-body.theme-girl input[type="number"],
-body.theme-girl input[type="file"],
-body.theme-girl select,
-body.theme-girl .log-item,
-body.theme-girl .stat-block,
-body.theme-girl #cr-preview-container,
-body.theme-girl #containerSection {
-    background: #fff5f8 !important;
-    color: #4a0026 !important;
-    border: 1px solid #ffccd9 !important;
-}
-
+body.theme-girl { --bg: #ffeef4; --card-bg: #ffffff; --primary: #ff66a4; --secondary: #ff1493; --text: #4a0026; --text-muted: #a66584; --danger: #d90452; --success: #ff3385; --border: #ffccd9; }
+body.theme-girl textarea, body.theme-girl input[type="number"], body.theme-girl input[type="file"], body.theme-girl select, body.theme-girl .log-item, body.theme-girl .stat-block, body.theme-girl #cr-preview-container, body.theme-girl #containerSection { background: #fff5f8 !important; color: #4a0026 !important; border: 1px solid #ffccd9 !important; }
 body.theme-girl select option { background: #ffffff !important; color: #4a0026 !important; }
-body.theme-girl .modal-content { background: #ffffff !important; border: 2px solid #ff66a4 !important; color: #4a0026 !important; }
-
-/* Alle Texte im Girl Mode auf dunkelbeerig umschalten */
-body.theme-girl h1, body.theme-girl h2, body.theme-girl h3, body.theme-girl h4, 
-body.theme-girl label, body.theme-girl span, body.theme-girl strong, 
-body.theme-girl .stat-grid div strong, body.theme-girl .trace-grid label {
-    color: #4a0026 !important;
-}
-
-/* Ein- und Auslagerungsbuttons sowie Menüs in Pink-Schattierungen */
+body.theme-girl .modal-content { background: #ffffff !important; border: 2px solid #ff66a4 !important; }
+body.theme-girl h1, body.theme-girl h2, body.theme-girl h3, body.theme-girl h4, body.theme-girl label, body.theme-girl span, body.theme-girl strong, body.theme-girl .stat-grid div strong, body.theme-girl .trace-grid label { color: #4a0026 !important; }
 body.theme-girl .btn-in { background: #ffe3ee !important; color: #ff1493 !important; border: 1px solid #ffb3d1 !important; }
 body.theme-girl .btn-out { background: #fff0f5 !important; color: #d90452 !important; border: 1px solid #ffccd9 !important; }
 body.theme-girl .btn-primary { background: #ff66a4 !important; color: #ffffff !important; }
 body.theme-girl .btn-secondary { background: #ffccd9 !important; color: #4a0026 !important; }
 body.theme-girl .btn-danger { background: #d90452 !important; color: #ffffff !important; }
 body.theme-girl .btn-cancel { background: #ffccd9 !important; color: #4a0026 !important; }
-
-/* Highlights, Badges und Navigationsleisten */
 body.theme-girl .stock { background: #ffccd9 !important; color: #d90452 !important; }
 body.theme-girl .version-badge { background: #ffccd9 !important; color: #ff1493 !important; border: 1px solid #ff66a4 !important; }
 body.theme-girl .prognose-badge { background: #ffe3ee !important; color: #ff1493 !important; }
@@ -198,35 +134,92 @@ body.theme-girl .nav-menu { background: rgba(255, 255, 255, 0.96) !important; bo
 body.theme-girl .nav-links button { background: #fff5f8 !important; color: #4a0026 !important; }
 body.theme-girl .nav-links button.active { background: #ff66a4 !important; color: #ffffff !important; }
 body.theme-girl .cross-hint { color: #d90452 !important; }
-
-/* Desktop Navigation Anpassung für Girl Edition */
-@media (min-width: 768px) {
-    body.theme-girl .nav-menu { background: #ffffff !important; border-bottom: 1px solid #ffccd9 !important; }
-    body.theme-girl .nav-links button.active { background: rgba(255, 102, 164, 0.1) !important; color: #ff1493 !important; border-bottom: 3px solid #ff1493 !important; }
-}
-
-/* 💖 AUTOMATISCHE HERZEN & SCHLEIFCHEN AKZENTE 🎀 */
-body.theme-girl header h1::before { content: "💖 "; }
-body.theme-girl header h1::after { content: " 🎀"; }
-body.theme-girl .category-title::before { content: "💕 "; }
-body.theme-girl .category-title::after { content: " 💕"; }
+@media (min-width: 768px) { body.theme-girl .nav-menu { background: #ffffff !important; border-bottom: 1px solid #ffccd9 !important; } body.theme-girl .nav-links button.active { background: rgba(255, 102, 164, 0.1) !important; color: #ff1493 !important; border-bottom: 3px solid #ff1493 !important; } }
+/* Emojis */
+body.theme-girl header h1::before { content: "💖 "; } body.theme-girl header h1::after { content: " 🎀"; }
+body.theme-girl .category-title::before { content: "💕 "; } body.theme-girl .category-title::after { content: " 💕"; }
 body.theme-girl .card h4 span::before { content: "🌸 "; }
-body.theme-girl .btn-in::before { content: "🎀 "; }
-body.theme-girl .btn-out::before { content: "💗 "; }
-
-/* 💥 SPEZIAL: MAGISCHE INTERAKTIVE PINK-DISKO-SHOW */
-body.theme-girl.party-mode { 
-    animation: pinkDiscoGradient 8s ease infinite !important; 
-    background: linear-gradient(45deg, #ffb6c1, #ff69b4, #da70d6, #ffc0cb) !important;
-    background-size: 400% 400% !important;
-}
-body.theme-girl.party-mode .card {
-    background: rgba(255, 255, 255, 0.85) !important;
-    border: 1px solid #ff66a4 !important;
-    animation: pinkRgbPulse 4s infinite alternate ease-in-out !important;
-}
+body.theme-girl .btn-in::before { content: "🎀 "; } body.theme-girl .btn-out::before { content: "💗 "; }
+/* Disko */
+body.theme-girl.party-mode { animation: pinkDiscoGradient 8s ease infinite !important; background: linear-gradient(45deg, #ffb6c1, #ff69b4, #da70d6, #ffc0cb) !important; background-size: 400% 400% !important; }
+body.theme-girl.party-mode .card { background: rgba(255, 255, 255, 0.85) !important; border: 1px solid #ff66a4 !important; animation: pinkRgbPulse 4s infinite alternate ease-in-out !important; }
 @keyframes pinkDiscoGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-@keyframes pinkRgbPulse {
-    0% { box-shadow: 0 0 15px rgba(255,20,147,0.2); border-color: #ff66a4; }
-    100% { box-shadow: 0 0 15px rgba(218,112,214,0.4); border-color: #ff1493; }
-}
+@keyframes pinkRgbPulse { 0% { box-shadow: 0 0 15px rgba(255,20,147,0.2); } 100% { box-shadow: 0 0 15px rgba(218,112,214,0.4); } }
+
+
+/* ==========================================================================
+   🌊 INTERFACE-PRESET: DEEP OCEAN MODUS 🌊
+   ========================================================================== */
+body.theme-ocean { --bg: #031424; --card-bg: #0a2540; --primary: #00f0ff; --secondary: #64ffda; --text: #e6f1ff; --text-muted: #8892b0; --danger: #ff4a74; --success: #00e676; --border: #103a61; }
+body.theme-ocean textarea, body.theme-ocean input[type="number"], body.theme-ocean input[type="file"], body.theme-ocean select, body.theme-ocean .log-item, body.theme-ocean .stat-block, body.theme-ocean #cr-preview-container, body.theme-ocean #containerSection { background: #051b30 !important; color: #e6f1ff !important; border: 1px solid #103a61 !important; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+body.theme-ocean select option { background: #0a2540 !important; color: #e6f1ff !important; }
+body.theme-ocean .modal-content { background: #0a2540 !important; border: 2px solid #00f0ff !important; color: #e6f1ff !important; }
+body.theme-ocean h1, body.theme-ocean h2, body.theme-ocean h3, body.theme-ocean h4, body.theme-ocean label, body.theme-ocean span, body.theme-ocean strong, body.theme-ocean .stat-grid div strong, body.theme-ocean .trace-grid label { color: #e6f1ff !important; }
+body.theme-ocean .btn-in { background: rgba(0, 240, 255, 0.1) !important; color: #00f0ff !important; border: 1px solid rgba(0, 240, 255, 0.3) !important; }
+body.theme-ocean .btn-out { background: rgba(255, 74, 116, 0.1) !important; color: #ff4a74 !important; border: 1px solid rgba(255, 74, 116, 0.3) !important; }
+body.theme-ocean .btn-primary { background: linear-gradient(135deg, #00f0ff, #0072ff) !important; color: #ffffff !important; }
+body.theme-ocean .btn-secondary { background: #103a61 !important; color: #64ffda !important; }
+body.theme-ocean .btn-danger { background: #ff4a74 !important; color: #ffffff !important; }
+body.theme-ocean .btn-cancel { background: #051b30 !important; color: #8892b0 !important; }
+body.theme-ocean .stock { background: rgba(100, 255, 218, 0.15) !important; color: #64ffda !important; }
+body.theme-ocean .version-badge { background: rgba(0, 240, 255, 0.15) !important; color: #00f0ff !important; border: 1px solid #00f0ff !important; }
+body.theme-ocean .prognose-badge { background: rgba(0, 240, 255, 0.1) !important; color: #64ffda !important; }
+body.theme-ocean header { background: rgba(3, 20, 36, 0.85) !important; box-shadow: 0 1px 0 #103a61 !important; }
+body.theme-ocean .nav-menu { background: rgba(10, 37, 64, 0.95) !important; border-left: 1px solid #103a61 !important; }
+body.theme-ocean .nav-links button { background: #0a2540 !important; color: #8892b0 !important; }
+body.theme-ocean .nav-links button.active { background: #00f0ff !important; color: #031424 !important; }
+@media (min-width: 768px) { body.theme-ocean .nav-menu { background: #0a2540 !important; border-bottom: 1px solid #103a61 !important; } body.theme-ocean .nav-links button.active { background: rgba(0, 240, 255, 0.1) !important; color: #00f0ff !important; border-bottom: 3px solid #00f0ff !important; } }
+/* Emojis */
+body.theme-ocean header h1::before { content: "🌊 "; } body.theme-ocean header h1::after { content: " 🐬"; }
+body.theme-ocean .category-title::before { content: "🐠 "; } body.theme-ocean .category-title::after { content: " 🐙"; }
+body.theme-ocean .card h4 span::before { content: "🐚 "; }
+body.theme-ocean .btn-in::before { content: "⚓ "; } body.theme-ocean .btn-out::before { content: "🌊 "; }
+/* Disko */
+body.theme-ocean.party-mode { animation: oceanDiscoGradient 8s ease infinite !important; background: linear-gradient(45deg, #020b14, #004e92, #000428, #00c6ff) !important; background-size: 400% 400% !important; }
+body.theme-ocean.party-mode .card { background: rgba(5, 27, 48, 0.85) !important; border: 1px solid #00f0ff !important; animation: oceanRgbPulse 4s infinite alternate ease-in-out !important; }
+@keyframes oceanDiscoGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes oceanRgbPulse { 0% { box-shadow: 0 0 15px rgba(0,240,255,0.3); } 100% { box-shadow: 0 0 15px rgba(100,255,218,0.5); } }
+
+
+/* ==========================================================================
+   ⚡ INTERFACE-PRESET: CYBERPUNK NEON GRID ⚡
+   ========================================================================== */
+body.theme-cyberpunk { --bg: #0b0c10; --card-bg: #1f2833; --primary: #fffe00; --secondary: #00f0ff; --text: #c5c6c7; --text-muted: #66fcf1; --danger: #ff0055; --success: #39ff14; --border: #45a29e; }
+body.theme-cyberpunk textarea, body.theme-cyberpunk input[type="number"], body.theme-cyberpunk input[type="file"], body.theme-cyberpunk select, body.theme-cyberpunk .log-item, body.theme-cyberpunk .stat-block, body.theme-cyberpunk #cr-preview-container, body.theme-cyberpunk #containerSection { background: #000000 !important; color: #39ff14 !important; border: 1px solid #00f0ff !important; font-family: 'Courier New', Courier, monospace !important; }
+body.theme-cyberpunk select option { background: #1f2833 !important; color: #00f0ff !important; }
+body.theme-cyberpunk .card { border-left: 3px solid var(--primary) !important; border-radius: 0px !important; }
+body.theme-cyberpunk button { border-radius: 0px !important; text-transform: uppercase; }
+body.theme-cyberpunk .btn-in { background: rgba(57, 255, 20, 0.1) !important; color: #39ff14 !important; border: 1px solid #39ff14 !important; }
+body.theme-cyberpunk .btn-out { background: rgba(255, 0, 85, 0.1) !important; color: #ff0055 !important; border: 1px solid #ff0055 !important; }
+body.theme-cyberpunk .btn-primary { background: #fffe00 !important; color: #000000 !important; font-weight: 900 !important; }
+body.theme-cyberpunk .stock { background: #00f0ff !important; color: #000000 !important; border-radius: 0px !important; }
+/* Emojis */
+body.theme-cyberpunk header h1::before { content: "⚡ "; } body.theme-cyberpunk header h1::after { content: " 🛸"; }
+body.theme-cyberpunk .category-title::before { content: "🤖 "; }
+body.theme-cyberpunk .btn-in::before { content: "💾 "; }
+/* Disko */
+body.theme-cyberpunk.party-mode { animation: smoothGradient 5s ease infinite !important; background: linear-gradient(90deg, #ff0055, #00f0ff, #fffe00) !important; background-size: 300% 300% !important; }
+body.theme-cyberpunk.party-mode .card { background: #000 !important; border: 2px dashed #fffe00 !important; }
+
+
+/* ==========================================================================
+   🍁 INTERFACE-PRESET: COZY AUTUMN (HERBST-MODUS) 🍁
+   ========================================================================== */
+body.theme-autumn { --bg: #2e1f1d; --card-bg: #fdfbf7; --primary: #d97736; --secondary: #8a9a86; --text: #3d2622; --text-muted: #7c605a; --danger: #b83a26; --success: #607d56; --border: #e6dfd5; }
+body.theme-autumn textarea, body.theme-autumn input[type="number"], body.theme-autumn input[type="file"], body.theme-autumn select, body.theme-autumn .log-item, body.theme-autumn .stat-block, body.theme-autumn #cr-preview-container, body.theme-autumn #containerSection { background: #f7f3eb !important; color: #3d2622 !important; border: 1px solid #d4c7b8 !important; }
+body.theme-autumn select option { background: #fdfbf7 !important; color: #3d2622 !important; }
+body.theme-autumn h1, body.theme-autumn h2, body.theme-autumn h3, body.theme-autumn h4, body.theme-autumn label, body.theme-autumn span, body.theme-autumn strong, body.theme-autumn .stat-grid div strong, body.theme-autumn .trace-grid label { color: #3d2622 !important; }
+body.theme-autumn h1, body.theme-autumn .subtitle { color: #fdfbf7 !important; } /* Im Header weiß lassen */
+body.theme-autumn .btn-in { background: #eef2ec !important; color: #607d56 !important; border: 1px solid #cbd6c7 !important; }
+body.theme-autumn .btn-out { background: #f9ebe9 !important; color: #b83a26 !important; border: 1px solid #f0cfca !important; }
+body.theme-autumn .btn-primary { background: #d97736 !important; color: #ffffff !important; }
+body.theme-autumn .stock { background: #e6dfd5 !important; color: #d97736 !important; }
+body.theme-autumn header { background: rgba(46, 31, 29, 0.9) !important; box-shadow: 0 1px 0 #523b37 !important; }
+/* Emojis */
+body.theme-autumn header h1::before { content: "🍁 "; } body.theme-autumn header h1::after { content: " 🦊"; }
+body.theme-autumn .category-title::before { content: "🪵 "; }
+body.theme-autumn .card h4 span::before { content: "🐿️ "; }
+body.theme-autumn .btn-in::before { content: "☕ "; }
+/* Disko */
+body.theme-autumn.party-mode { animation: autumnDisco 7s ease infinite !important; background: linear-gradient(45deg, #2e1f1d, #d97736, #8a9a86, #a64b2a) !important; background-size: 400% 400% !important; }
+@keyframes autumnDisco { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
