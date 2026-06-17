@@ -11,7 +11,7 @@
 }
 
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; }
+body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; transition: background-color 0.5s ease; }
 
 header { background: rgba(28, 28, 30, 0.8); padding: 16px 20px; box-shadow: 0 1px 0 var(--border); position: sticky; top: 0; z-index: 99; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 .header-main { display: flex; justify-content: space-between; align-items: center; }
@@ -50,19 +50,18 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 }
 
 .category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; }
-.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.5s ease, border-color 0.5s ease; }
 .card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
 .stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; }
 
 .cross-hint { font-size: 0.75rem; color: #ffd60a; margin-top: 4px; display: block; font-weight: 500; }
 .hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
 
-/* Geändertes Layout für die neuen Gramm-Angaben im Trace Bereich */
-.trace-grid { display: grid; grid-template-columns: 1fr 90px 30px 65px; gap: 5px; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+/* Anpassung des Grids für die neue Gramm Anzeige */
+.trace-grid { display: grid; grid-template-columns: 1fr 100px 50px; gap: 5px; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .trace-grid label { font-size: 0.95rem; }
 .trace-grid input { margin-bottom: 0 !important; text-align: right; }
 .unit-label { font-size: 0.9rem; color: var(--text-muted); font-weight: 600; }
-.gram-label { font-size: 0.85rem; color: var(--secondary); font-weight: 600; text-align: right; }
 
 .log-item { background: #2c2c2e; padding: 12px; border-radius: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
 .log-item.in { border-left: 4px solid var(--success); }
@@ -94,6 +93,7 @@ input[type="number"], input[type="file"] { width: 100%; padding: 12px; backgroun
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .modal-content { background: rgba(28, 28, 30, 0.94); border: 1px solid var(--border); padding: 24px; width: 92%; max-width: 360px; border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.4); }
 
+/* Party Mode Switch */
 .switch-container { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; margin-bottom: 20px; border: 1px dashed rgba(191, 90, 242, 0.3); }
 .switch { position: relative; display: inline-block; width: 51px; height: 31px; }
 .switch input { opacity: 0; width: 0; height: 0; margin-bottom: 0 !important; }
@@ -102,58 +102,39 @@ input[type="number"], input[type="file"] { width: 100%; padding: 12px; backgroun
 input:checked + .slider { background-color: var(--success); }
 input:checked + .slider:before { transform: translateX(20px); }
 
-/* --- FUTURISTISCHER LED RGB MODUS --- */
+/* --- FUTURISTIC LED RGB ANIMATIONEN --- */
 body.party-mode { 
-    background: linear-gradient(45deg, #0f0c29, #302b63, #24243e); 
+    animation: smoothGradient 10s ease infinite; 
+    background: linear-gradient(45deg, #0a001a, #001a1a, #1a000d, #00001a);
     background-size: 400% 400%;
-    animation: ledBackground 15s ease infinite; 
 }
-
 body.party-mode .card { 
-    border: 1px solid rgba(0, 255, 255, 0.3) !important; 
-    box-shadow: 0 0 15px rgba(0, 255, 255, 0.1), inset 0 0 10px rgba(255, 0, 255, 0.05);
-    background: rgba(20, 20, 30, 0.8);
-    animation: ledPulse 4s infinite alternate ease-in-out; 
+    background: #111;
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: rgbPulse 6s infinite alternate ease-in-out; 
 }
-
 body.party-mode header h1, body.party-mode .stock { 
-    background: linear-gradient(90deg, #ff00ff, #00ffff, #00ff00, #ffff00, #ff00ff);
-    background-size: 200% auto;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: rgbText 4s linear infinite;
-    text-shadow: none;
+    animation: rgbText 5s linear infinite; 
+}
+body.party-mode button.btn-animated { 
+    animation: rgbBorder 4s infinite alternate; 
 }
 
-body.party-mode button { 
-    background: linear-gradient(90deg, #ff007f, #7f00ff);
-    box-shadow: 0 0 15px rgba(127, 0, 255, 0.4);
-    color: #fff;
-    border: none;
+@keyframes smoothGradient { 
+    0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} 
 }
-
-body.party-mode button:hover {
-    box-shadow: 0 0 25px rgba(255, 0, 127, 0.7);
-    transform: translateY(-2px);
+@keyframes rgbPulse { 
+    0% { box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 10px rgba(0,255,255,0.1); border-color: rgba(0,255,255,0.5); } 
+    50% { box-shadow: 0 0 15px rgba(255,0,255,0.3), inset 0 0 10px rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.5); } 
+    100% { box-shadow: 0 0 15px rgba(0,255,0,0.3), inset 0 0 10px rgba(0,255,0,0.1); border-color: rgba(0,255,0,0.5); } 
 }
-
-@keyframes ledBackground { 
-    0% { background-position: 0% 50%; } 
-    50% { background-position: 100% 50%; } 
-    100% { background-position: 0% 50%; } 
-}
-
-@keyframes ledPulse { 
-    0% { 
-        box-shadow: 0 0 15px rgba(0, 255, 255, 0.1), inset 0 0 10px rgba(255, 0, 255, 0.05); 
-        border-color: rgba(0, 255, 255, 0.2); 
-    } 
-    100% { 
-        box-shadow: 0 0 25px rgba(255, 0, 255, 0.3), inset 0 0 15px rgba(0, 255, 255, 0.15); 
-        border-color: rgba(255, 0, 255, 0.4); 
-    } 
-}
-
 @keyframes rgbText { 
-    to { background-position: 200% center; } 
+    0% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
+    33% { color: #f0f; text-shadow: 0 0 8px rgba(255,0,255,0.6); } 
+    66% { color: #0f0; text-shadow: 0 0 8px rgba(0,255,0,0.6); } 
+    100% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
+}
+@keyframes rgbBorder { 
+    0% { filter: hue-rotate(0deg); } 
+    100% { filter: hue-rotate(360deg); } 
 }
