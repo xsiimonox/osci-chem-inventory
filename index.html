@@ -19,6 +19,7 @@
         <button onclick="showTab('cr-export')" id="tab-cr-export">C&R export</button>
         <button onclick="showTab('trace-export')" id="tab-trace-export">Trace export</button>
         <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
+        <button onclick="showTab('log')" id="tab-log">Protokoll</button>
         <button onclick="showTab('daten')" id="tab-daten">Daten</button>
     </nav>
 
@@ -37,14 +38,14 @@
         <div id="trace-export" class="tab-content">
             <div class="card">
                 <h3>Kationen Mischung</h3>
-                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein (0 für weglassen):</p>
+                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein:</p>
                 <div id="kationen-inputs-container"></div>
                 <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('kationen')">Kationen Mischung abziehen</button>
             </div>
             
             <div class="card" style="margin-top: 20px;">
                 <h3>Anionen Mischung</h3>
-                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein (0 für weglassen):</p>
+                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein:</p>
                 <div id="anionen-inputs-container"></div>
                 <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
             </div>
@@ -52,21 +53,32 @@
 
         <div id="statistik" class="tab-content">
             <div class="card">
-                <h3>Verbrauchsstatistik</h3>
-                <p class="hint">Gesamte jemals ausgelagerte Mengen:</p>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3>Verbrauchsstatistik & Prognose</h3>
+                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStats()">Reset</button>
+                </div>
+                <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
                 <div id="stats-container"></div>
+            </div>
+        </div>
+
+        <div id="log" class="tab-content">
+            <div class="card">
+                <h3>Aktionsprotokoll</h3>
+                <p class="hint">Hier siehst du alle vergangenen Buchungen und kannst sie bei Bedarf rückgängig machen:</p>
+                <div id="log-container"></div>
             </div>
         </div>
 
         <div id="daten" class="tab-content">
             <div class="card">
                 <h3>Backup exportieren</h3>
-                <p class="hint">Speichere den aktuellen Bestand als Textdatei ab.</p>
+                <p class="hint">Speichert den aktuellen Bestand, Statistiken und das Protokoll als Textdatei.</p>
                 <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
             </div>
             <div class="card">
                 <h3>Backup einlesen</h3>
-                <p class="hint">Wähle eine exportierte .txt Datei aus, um den Stand wiederherzustellen.</p>
+                <p class="hint">Wähle eine exportierte .txt Datei aus, um den Stand vollständig wiederherzustellen.</p>
                 <input type="file" id="importFile" accept=".txt">
                 <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
             </div>
@@ -77,7 +89,7 @@
         <div class="modal-content">
             <h3 id="modal-title">Aktion</h3>
             <div id="modal-body"></div>
-            <button onclick="closeModal()" class="btn-cancel">Abbrechen</button>
+            <button onclick="closeModal()" class="btn-cancel">Schließen / Abbrechen</button>
         </div>
     </div>
 
