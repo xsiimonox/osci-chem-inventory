@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.0.1</span>
+                <span class="version-badge">v4.4.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -73,7 +73,7 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h3>Verbrauchsstatistik & Prognose</h3>
-                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStats()">Reset</button>
+                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
                 </div>
                 <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
                 <div id="stats-container"></div>
@@ -89,11 +89,25 @@
         </div>
 
         <div id="daten" class="tab-content">
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.02);">
-                <h3 style="color: var(--danger);">System & Lager zurücksetzen</h3>
-                <p class="hint">Setzt alle aktuellen Bestände auf 0 ml zurück. (Statistiken und Protokolle werden ebenfalls gelöscht).</p>
-                <button onclick="resetLager()" class="btn-danger btn-animated" style="background: var(--danger);">Gesamtes Lager nullen (Reset)</button>
+            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
+                <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
+                
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <p class="hint" style="margin-bottom: 8px;"><strong>1. Nur Statistiken zurücksetzen:</strong> Nullt die Verbräuche und startet den Berechnungszeitraum neu. Bestände und Protokoll bleiben erhalten.</p>
+                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken nullen</button>
+                </div>
+
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <p class="hint" style="margin-bottom: 8px;"><strong>2. Nur Aktionsprotokoll löschen:</strong> Leert die Liste der vergangenen Buchungen (Reiter Protokoll). Bestände und Statistiken bleiben erhalten.</p>
+                    <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
+                </div>
+
+                <div>
+                    <p class="hint" style="margin-bottom: 8px;"><strong>3. Nur Lagerbestand nullen:</strong> Setzt alle aktuellen ml-Mengen im Lager auf 0 ml zurück. Statistiken und Protokolle bleiben unverändert.</p>
+                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand nullen</button>
+                </div>
             </div>
+
             <div class="card" style="margin-top: 20px;">
                 <h3>Backup exportieren</h3>
                 <p class="hint">Speichert den aktuellen Bestand, Statistiken und das Protokoll als Textdatei.</p>
