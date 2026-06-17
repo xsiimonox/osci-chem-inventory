@@ -71,7 +71,12 @@
         </div>
 
         <div id="daten" class="tab-content">
-            <div class="card">
+            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.02);">
+                <h3 style="color: var(--danger);">System & Lager zurücksetzen</h3>
+                <p class="hint">Setzt alle aktuellen Bestände auf 0 ml zurück. (Statistiken und Protokolle werden ebenfalls gelöscht).</p>
+                <button onclick="resetLager()" class="btn-danger btn-animated" style="background: var(--danger);">Gesamtes Lager nullen (Reset)</button>
+            </div>
+            <div class="card" style="margin-top: 20px;">
                 <h3>Backup exportieren</h3>
                 <p class="hint">Speichert den aktuellen Bestand, Statistiken und das Protokoll als Textdatei.</p>
                 <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
