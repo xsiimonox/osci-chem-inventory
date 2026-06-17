@@ -411,6 +411,53 @@ function undoLog(index) {
 }
 
 // --- QUEUE & LISTEN VERARBEITUNG ---
+function previewCRPaste() {
+    const pasteArea = document.getElementById('cr-paste-area');
+    const previewContainer = document.getElementById('cr-preview-container');
+    const previewList = document.getElementById('cr-preview-list');
+    
+    if (!pasteArea || !previewContainer || !previewList) return;
+
+    const text = pasteArea.value;
+    const matches = text.match(/([\d.]+)\s*ml/g);
+
+    if (!text.trim()) {
+        previewContainer.style.display = 'none';
+        return;
+    }
+
+    if (!matches || matches.length < crOrder.length) {
+        previewContainer.style.display = 'block';
+        previewList.innerHTML = `<span style="color: var(--danger); font-size: 0.85rem;">Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span>`;
+        return;
+    }
+
+    let html = '<div style="display: flex; flex-direction: column; gap: 6px;">';
+    
+    for (let i = 0; i < crOrder.length; i++) {
+        let amountMl = parseFloat(matches[i].replace(/[^\d.]/g, ''));
+        let itemName = crOrder[i].name;
+        let factor = densityFactors[itemName] || 1.0;
+        let amountG = (amountMl * factor).toFixed(2);
+        
+        if (amountMl > 0) {
+            html += `
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
+                    <span style="color: #fff;">${itemName}</span>
+                    <span style="text-align: right;">
+                        <strong style="color: #fff;">${amountMl.toFixed(2)} ml</strong> 
+                        <span style="color: var(--secondary); margin-left: 8px;">(${amountG} g)</span>
+                    </span>
+                </div>
+            `;
+        }
+    }
+    html += '</div>';
+
+    previewList.innerHTML = html;
+    previewContainer.style.display = 'block';
+}
+
 function processCRPaste() {
     const text = document.getElementById('cr-paste-area').value;
     const matches = text.match(/([\d.]+)\s*ml/g);
@@ -442,7 +489,10 @@ function executeQueueWithConflictHandling(queue, index) {
     if (index >= queue.length) {
         saveDB();
         const pasteArea = document.getElementById('cr-paste-area');
-        if (pasteArea) pasteArea.value = '';
+        if (pasteArea) {
+            pasteArea.value = '';
+            previewCRPaste(); // Damit das Vorschaufeld wieder verschwindet
+        }
         alert("Werte erfolgreich verarbeitet!");
         closeModal();
         showTab('lager');
