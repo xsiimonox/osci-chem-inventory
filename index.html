@@ -2,60 +2,37 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSCI Motion Inventory</title>
-    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>OSCI Lagerbestand</h1>
-    </header>
-
-    <nav class="tabs">
+    <header><h1>OSCI Motion</h1></header>
+    <div class="tabs">
         <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
-        <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
-        <button onclick="showTab('settings')" id="tab-settings">Daten</button>
-    </nav>
-
+        <button onclick="showTab('cr-import')" id="tab-cr-import">C&R Import</button>
+        <button onclick="showTab('mischungen')" id="tab-mischungen">Mischungen</button>
+    </div>
     <main id="app">
         <div id="lager" class="tab-content active"></div>
-
-        <div id="statistik" class="tab-content">
-            <h2>Verbrauchsstatistik</h2>
-            <p>Gesamte ausgelagerte Mengen (in ml):</p>
-            <div id="stats-container"></div>
-        </div>
-
-        <div id="settings" class="tab-content">
-            <h2>Datenverwaltung</h2>
+        <div id="cr-import" class="tab-content">
             <div class="card">
-                <h3>Export</h3>
-                <p>Speichere den aktuellen Bestand und die Historie als .txt Datei.</p>
-                <button onclick="exportData()" class="btn-primary">Daten exportieren (.txt)</button>
+                <h3>C&R Liste einfügen</h3>
+                <textarea id="cr-paste-area" placeholder="Hier Liste einfügen..."></textarea>
+                <button class="btn-primary" onclick="processCRPaste()">Bestand aktualisieren</button>
+            </div>
+        </div>
+        <div id="mischungen" class="tab-content">
+            <div class="card">
+                <h3>Kationen Mischung</h3>
+                <button class="btn-danger" onclick="auslagernMischung('kationen')">Kationen auslagern</button>
             </div>
             <div class="card">
-                <h3>Import</h3>
-                <p>Lade eine zuvor exportierte .txt Datei wieder ein.</p>
-                <input type="file" id="importFile" accept=".txt">
-                <button onclick="importData()" class="btn-secondary">Daten importieren</button>
+                <h3>Anionen Mischung</h3>
+                <button class="btn-danger" onclick="auslagernMischung('anionen')">Anionen auslagern</button>
             </div>
         </div>
     </main>
-
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3 id="modal-title">Aktion</h3>
-            <div id="modal-body"></div>
-            <button onclick="closeModal()" class="btn-cancel">Abbrechen</button>
-        </div>
-    </div>
-
     <script src="app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js');
-        }
-    </script>
 </body>
 </html>
