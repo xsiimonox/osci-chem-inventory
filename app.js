@@ -137,37 +137,45 @@ function renderLager() {
 function renderTraceExportInputs() {
     const katContainer = document.getElementById('kationen-inputs-container');
     const anContainer = document.getElementById('anionen-inputs-container');
+    
     if (katContainer) {
-        katContainer.innerHTML = mixDefinitions.kationen.map(item => `
+        katContainer.innerHTML = mixDefinitions.kationen.map(item => {
+            let id = 'mix-kat-' + item.replace(/[^a-zA-Z]/g, '');
+            return `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}" oninput="updateGrams('${item}', this.value, 'kat')">
-                <span class="unit-label">ml</span>
-                <span class="gram-label" id="gram-kat-${item.replace(/[^a-zA-Z]/g, '')}">0.00 g</span>
+                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" oninput="calcTraceGrams('${id}', '${item}')">
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <span class="unit-label">ml</span>
+                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">0.00 g</span>
+                </div>
             </div>
-        `).join('');
+        `}).join('');
     }
     if (anContainer) {
-        anContainer.innerHTML = mixDefinitions.anionen.map(item => `
+        anContainer.innerHTML = mixDefinitions.anionen.map(item => {
+            let id = 'mix-an-' + item.replace(/[^a-zA-Z]/g, '');
+            return `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}" oninput="updateGrams('${item}', this.value, 'an')">
-                <span class="unit-label">ml</span>
-                <span class="gram-label" id="gram-an-${item.replace(/[^a-zA-Z]/g, '')}">0.00 g</span>
+                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" oninput="calcTraceGrams('${id}', '${item}')">
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <span class="unit-label">ml</span>
+                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">0.00 g</span>
+                </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 }
 
-// NEU: Live-Berechnung der Gramm-Anzahl
-function updateGrams(itemName, mlValue, prefix) {
-    let ml = parseFloat(mlValue) || 0;
-    let density = densityFactors[itemName] || 1.0;
-    let grams = ml * density;
-    let elementId = `gram-${prefix}-${itemName.replace(/[^a-zA-Z]/g, '')}`;
-    let el = document.getElementById(elementId);
-    if(el) {
-        el.innerText = grams.toFixed(2) + ' g';
+function calcTraceGrams(inputId, itemName) {
+    let inputEl = document.getElementById(inputId);
+    let gramEl = document.getElementById(inputId + '-g');
+    if (inputEl && gramEl) {
+        let ml = parseFloat(inputEl.value) || 0;
+        let factor = densityFactors[itemName] || 1.0;
+        let g = ml * factor;
+        gramEl.innerText = g.toFixed(2) + ' g';
     }
 }
 
