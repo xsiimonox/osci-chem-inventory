@@ -28,7 +28,6 @@ const catalog = {
     }
 };
 
-// Festgelegte Sortierung für das Auslesen deiner unformatierten C&R Zeile
 const crOrder = [
     { name: "Natriumchlorid (NaCl)", cat: "C&R Produkte" },
     { name: "Magnesiumchlorid (MgCl2)", cat: "C&R Produkte" },
@@ -42,6 +41,11 @@ const crOrder = [
     { name: "Natriumfluorid (NaF)", cat: "C&R Produkte" },
     { name: "Bor (B)", cat: "C&R Produkte" }
 ];
+
+const mixDefinitions = {
+    kationen: ["Cobalt (Co)", "Nickel (Ni)", "Eisen (Fe)", "Mangan (Mn)", "Kupfer (Cu)", "Chrom (Cr)", "Zink (Zn)"],
+    anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
+};
 
 let db = { inventory: {}, stats: {} };
 
@@ -70,19 +74,17 @@ function showTab(tabId) {
     document.getElementById('tab-' + tabId).classList.add('active');
     if(tabId === 'lager') renderLager();
     if(tabId === 'statistik') renderStats();
+    if(tabId === 'trace-export') renderTraceExportInputs();
 }
 
 function renderLager() {
     const container = document.getElementById('lager');
     container.innerHTML = '';
-    
     for (let cat in catalog) {
         container.innerHTML += `<h2 class="category-title">${cat}</h2>`;
         for (let item in catalog[cat]) {
             let stock = db.inventory[cat][item];
             let crossHint = "";
-            
-            // Warn-Verweise für das identische Fluor / NaF einblenden
             if (item === "Fluor (F)" && stock === 0) {
                 let nafStock = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"];
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
@@ -90,7 +92,6 @@ function renderLager() {
                 let fStock = db.inventory["Anionen"]["Fluor (F)"];
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
             }
-
             container.innerHTML += `
                 <div class="card">
                     <h4><span>${item}</span> <span class="stock">${stock.toFixed(1)} ml</span></h4>
@@ -103,6 +104,26 @@ function renderLager() {
             `;
         }
     }
+}
+
+// Generiert die individuellen Eingabefelder für jedes Element im Trace Export
+function renderTraceExportInputs() {
+    const katContainer = document.getElementById('kationen-inputs-container');
+    const anContainer = document.getElementById('anionen-inputs-container');
+    
+    katContainer.innerHTML = mixDefinitions.kationen.map(item => `
+        <div class="trace-grid">
+            <label>${item}</label>
+            <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}">
+        </div>
+    `).join('');
+    
+    anContainer.innerHTML = mixDefinitions.anionen.map(item => `
+        <div class="trace-grid">
+            <label>${item}</label>
+            <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}">
+        </div>
+    `).join('');
 }
 
 function renderStats() {
@@ -122,7 +143,6 @@ function openModal(cat, item, action) {
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
-    
     let html = '';
     if (action === 'in') {
         html += `<p class="hint">Standardgebinde wählen:</p><div class="preset-btns">`;
@@ -131,7 +151,6 @@ function openModal(cat, item, action) {
         });
         html += `</div>`;
     }
-    
     html += `
         <div class="input-group">
             <label>Menge eingeben (ml):</label>
@@ -139,7 +158,6 @@ function openModal(cat, item, action) {
         </div>
         <button class="btn-primary btn-animated" onclick="executeAction()">Bestätigen</button>
     `;
-    
     document.getElementById('modal-body').innerHTML = html;
     modal.style.display = 'flex';
 }
@@ -149,14 +167,12 @@ function closeModal() { document.getElementById('modal').style.display = 'none';
 function executeAction() {
     let amount = parseFloat(document.getElementById('amount').value);
     if (isNaN(amount) || amount <= 0) return alert("Bitte eine gültige Menge eingeben.");
-    
     let { cat, item, action } = currentAction;
     
     if (action === 'in') {
         db.inventory[cat][item] += amount;
     } else {
         if (db.inventory[cat][item] - amount < 0) {
-            // Logik-Verknüpfung Fluor / NaF bei Mangel
             if (item === "Fluor (F)") {
                 let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"];
                 alert(`Mangel an Fluor (F)!\n\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
@@ -173,29 +189,23 @@ function executeAction() {
         db.inventory[cat][item] -= amount;
         db.stats[item] += amount;
     }
-    
     saveDB();
     closeModal();
     renderLager();
 }
 
-// Automatischer Parser für deine C&R Copy-Paste Textzeilen
 function processCRPaste() {
     const text = document.getElementById('cr-paste-area').value;
-    // Extrahiert alle Zahlenwerte, die direkt vor einem "ml" stehen
     const matches = text.match(/([\d.]+)\s*ml/g);
-    
     if (!matches || matches.length < crOrder.length) {
-        return alert("Fehler: Das Format konnte nicht verarbeitet werden oder es fehlen Werte. Bitte kopiere die exakte Zeile hinein.");
+        return alert("Fehler: Das Format konnte nicht verarbeitet werden. Bitte kopiere die exakte Zeile hinein.");
     }
-    
     let updates = [];
     for (let i = 0; i < crOrder.length; i++) {
         let valStr = matches[i].replace(/[^\d.]/g, '');
         let amount = parseFloat(valStr);
         let item = crOrder[i].name;
         let cat = crOrder[i].cat;
-        
         if (amount > 0) {
             if (db.inventory[cat][item] - amount < 0) {
                 return alert(`Abbruch: Zu wenig Bestand für ${item}. Benötigt werden ${amount} ml.`);
@@ -203,58 +213,51 @@ function processCRPaste() {
             updates.push({ cat, item, amount });
         }
     }
-    
     updates.forEach(u => {
         db.inventory[u.cat][u.item] -= u.amount;
         db.stats[u.item] += u.amount;
     });
-    
     saveDB();
     document.getElementById('cr-paste-area').value = '';
     alert("C&R Werte erfolgreich ausgelesen und vom Bestand abgezogen!");
     showTab('lager');
 }
 
-// Mischungen auslagern (zieht gesetzten Wert von allen Gruppenmitgliedern ab)
+// Verarbeitet das Auslagern der individuellen Mischungsmengen
 function auslagernMischung(typ) {
-    const amountInput = document.getElementById(`${typ}-amount`);
-    let amount = parseFloat(amountInput.value);
-    if (isNaN(amount) || amount <= 0) return alert("Bitte eine gültige Menge für die Mischung eingeben.");
-
+    let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
+    let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
+    let elements = mixDefinitions[typ];
+    
     let itemsToDeduct = [];
-    if (typ === 'kationen') {
-        itemsToDeduct = [
-            {cat: "Kationen", item: "Cobalt (Co)"}, {cat: "Kationen", item: "Nickel (Ni)"},
-            {cat: "Kationen", item: "Eisen (Fe)"}, {cat: "Kationen", item: "Mangan (Mn)"},
-            {cat: "Kationen", item: "Kupfer (Cu)"}, {cat: "Kationen", item: "Chrom (Cr)"},
-            {cat: "Kationen", item: "Zink (Zn)"}
-        ];
-    } else {
-        itemsToDeduct = [
-            {cat: "Anionen", item: "Fluor (F)"}, {cat: "Anionen", item: "Iod (I)"},
-            {cat: "Anionen", item: "Vanadium (V)"}, {cat: "Anionen", item: "Selen (Se)"}
-        ];
-    }
-
-    // Vorabprüfung auf ausreichenden Bestand
-    for (let i of itemsToDeduct) {
-        if (db.inventory[i.cat][i.item] - amount < 0) {
-            return alert(`Mischung blockiert: Nicht genug Bestand bei "${i.item}"!`);
+    
+    for (let item of elements) {
+        let inputId = prefix + item.replace(/[^a-zA-Z]/g, '');
+        let inputEl = document.getElementById(inputId);
+        let amount = parseFloat(inputEl.value) || 0;
+        
+        if (amount > 0) {
+            if (db.inventory[catName][item] - amount < 0) {
+                return alert(`Mischung blockiert: Nicht genug Bestand bei "${item}"! Vorhanden: ${db.inventory[catName][item]} ml. Benötigt: ${amount} ml.`);
+            }
+            itemsToDeduct.push({ cat: catName, item: item, amount: amount });
         }
     }
-
-    // Abzug durchführen
+    
+    if (itemsToDeduct.length === 0) {
+        return alert("Bitte trage bei mindestens einem Element eine Menge ein.");
+    }
+    
     itemsToDeduct.forEach(i => {
-        db.inventory[i.cat][i.item] -= amount;
-        db.stats[i.item] += amount;
+        db.inventory[i.cat][i.item] -= i.amount;
+        db.stats[i.item] += i.amount;
     });
-
+    
     saveDB();
-    alert(`${typ.toUpperCase()}-Mischung (${amount} ml pro Element) erfolgreich abgezogen!`);
+    alert(`Die gewählten Mengen für die ${typ.toUpperCase()}-Mischung wurden erfolgreich abgezogen!`);
     showTab('lager');
 }
 
-// Backup-Funktionen (.txt Im-/Export)
 function exportData() {
     let dataStr = JSON.stringify(db, null, 2);
     let blob = new Blob([dataStr], { type: "text/plain" });
@@ -267,7 +270,6 @@ function exportData() {
 function importData() {
     let file = document.getElementById('importFile').files[0];
     if (!file) return alert("Bitte wähle zuerst eine Sicherungsdatei (.txt) aus.");
-    
     let reader = new FileReader();
     reader.onload = function(e) {
         try {
@@ -282,6 +284,5 @@ function importData() {
     reader.readAsText(file);
 }
 
-// App starten
 initDB();
 renderLager();
