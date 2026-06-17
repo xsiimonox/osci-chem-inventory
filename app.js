@@ -37,35 +37,26 @@ const mixDefinitions = {
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
-// Verwende einen einheitlichen Daten-Key
 const DB_KEY = 'osci_db_v4';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 
 function initDB() {
     try {
         let saved = localStorage.getItem(DB_KEY);
-        // Abwärtskompatibilität: Falls noch das ganz alte v3 da ist, migrieren
-        if (!saved) {
-            saved = localStorage.getItem('osci_db_v3');
-        }
-
+        if (!saved) saved = localStorage.getItem('osci_db_v3');
         if (saved) {
             let parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object') {
-                db = parsed;
-            }
+            if (parsed && typeof parsed === 'object') db = parsed;
         }
     } catch (e) {
-        console.error("Fehler beim Laden aus dem LocalStorage:", e);
+        console.error("Fehler beim Laden:", e);
     }
 
-    // Sicherstellen, dass alle wichtigen Knoten existieren (Vermeidet Abstürze bei fehlenden Properties)
     if (!db.inventory) db.inventory = {};
     if (!db.stats) db.stats = {};
     if (!db.logs) db.logs = [];
     if (!db.statsStarted) db.statsStarted = Date.now();
 
-    // Fehlende Kategorien oder Items auffüllen
     for (let cat in catalog) {
         if (!db.inventory[cat]) db.inventory[cat] = {};
         for (let item in catalog[cat]) {
@@ -77,11 +68,7 @@ function initDB() {
 }
 
 function saveDB() { 
-    try {
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
-    } catch(e) {
-        console.error("Speichern fehlgeschlagen:", e);
-    }
+    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) { console.error("Speichern fehlgeschlagen:", e); }
 }
 
 function showTab(tabId) {
@@ -90,7 +77,6 @@ function showTab(tabId) {
     
     const targetTab = document.getElementById(tabId);
     const targetBtn = document.getElementById('tab-' + tabId);
-    
     if (targetTab && targetBtn) {
         targetTab.classList.add('active');
         targetBtn.classList.add('active');
@@ -146,7 +132,6 @@ function renderTraceExportInputs() {
             </div>
         `).join('');
     }
-    
     if (anContainer) {
         anContainer.innerHTML = mixDefinitions.anionen.map(item => `
             <div class="trace-grid">
@@ -156,6 +141,11 @@ function renderTraceExportInputs() {
             </div>
         `).join('');
     }
+}
+
+function countOutsForElement(itemName) {
+    if (!db.logs) return 0;
+    return db.logs.filter(log => log.item === itemName && log.action === 'out').length;
 }
 
 function renderStats() {
@@ -180,10 +170,17 @@ function renderStats() {
             let perYear = totalConsumed / yearsElapsed;
             
             let currentStock = findCurrentStock(item);
-            let prognosisText = "Keine Prognose möglich";
-            if (perWeek > 0) {
+            let prognosisText = "";
+            
+            // Intelligenter Prognoseschutz: Benötigt mindestens 2 Entnahmen im Logbuch
+            let outCount = countOutsForElement(item);
+            if (outCount < 2) {
+                prognosisText = "Prognose ab der 2. Entnahme verfügbar";
+            } else if (perWeek > 0) {
                 let weeksLeft = currentStock / perWeek;
                 prognosisText = weeksLeft > 52 ? `Reichweite: >1 Jahr` : `Reichweite: ca. ${weeksLeft.toFixed(1)} Wochen`;
+            } else {
+                prognosisText = "Keine Prognose möglich";
             }
 
             content += `
@@ -205,9 +202,7 @@ function renderStats() {
 
 function findCurrentStock(itemName) {
     for (let cat in catalog) {
-        if (db.inventory[cat] && db.inventory[cat][itemName] !== undefined) {
-            return db.inventory[cat][itemName];
-        }
+        if (db.inventory[cat] && db.inventory[cat][itemName] !== undefined) return db.inventory[cat][itemName];
     }
     return 0;
 }
@@ -221,6 +216,27 @@ function resetStats() {
     }
 }
 
+// 1. NEUE FUNKTION: Komplettes Lager zurücksetzen
+function resetLager() {
+    if (confirm("🚨 WARNUNG!\nMöchtest du wirklich das gesamte System zurücksetzen?\nAlle Lagerbestände werden genullt, Statistiken und Protokolle werden unwiderruflich gelöscht.")) {
+        clearAllDataStructure();
+        alert("Das Lager wurde vollständig zurückgesetzt.");
+        showTab('lager');
+    }
+}
+
+function clearAllDataStructure() {
+    db.inventory = {}; db.stats = {}; db.logs = []; db.statsStarted = Date.now();
+    for (let cat in catalog) {
+        db.inventory[cat] = {};
+        for (let item in catalog[cat]) {
+            db.inventory[cat][item] = 0;
+            db.stats[item] = 0;
+        }
+    }
+    saveDB();
+}
+
 function renderLogs() {
     const container = document.getElementById('log-container');
     if (!container) return;
@@ -231,6 +247,7 @@ function renderLogs() {
         return;
     }
     
+    // 2. KORREKTUR: max-width auf 140px verbreitert und Text in "Rückgängig" geändert
     let logHTML = db.logs.map((log, index) => `
         <div class="log-item ${log.action}">
             <div class="log-details">
@@ -238,7 +255,7 @@ function renderLogs() {
                 <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${(log.amount || 0).toFixed(2)} ml</span><br>
                 <span class="log-date">${new Date(log.timestamp).toLocaleString()}</span>
             </div>
-            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:140px;" onclick="undoLog(${index})">Wiederherstellen</button>
+            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:140px;" onclick="undoLog(${index})">Rückgängig</button>
         </div>
     `).reverse().join('');
     container.innerHTML = logHTML;
@@ -276,7 +293,6 @@ function openModal(cat, item, action) {
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
-    
     if(!modal || !modalTitle || !modalBody) return;
     
     modalTitle.innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
@@ -348,7 +364,6 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
     const modalTitle = document.getElementById('modal-title');
-    
     if(!modal || !modalBody || !modalTitle) return;
     
     let missing = required - current;
@@ -383,7 +398,6 @@ function processCRPaste() {
         let cat = crOrder[i].cat;
         if (amount > 0) queue.push({ cat, item, amount });
     }
-    
     executeQueueWithConflictHandling(queue, 0);
 }
 
@@ -428,7 +442,6 @@ function auslagernMischung(typ) {
         let amount = inputEl ? parseFloat(inputEl.value) : 0;
         if (amount > 0) queue.push({ cat: catName, item, amount });
     }
-    
     if (queue.length === 0) return alert("Bitte trage bei mindestens einem Element eine Menge ein.");
     executeQueueWithConflictHandling(queue, 0);
 }
@@ -466,6 +479,5 @@ function importData() {
     reader.readAsText(file);
 }
 
-// Start-Reihenfolge
 initDB();
 renderLager();
