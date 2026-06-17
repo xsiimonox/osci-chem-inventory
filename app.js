@@ -552,3 +552,56 @@ window.addEventListener('DOMContentLoaded', () => {
     initDB();
     renderLager();
 });
+
+// --- PDF EXPORT FUNKTION ---
+async function exportToPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Titel
+    doc.setFontSize(18);
+    doc.text("Aktueller Bestand - OSCI Lager", 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Stand: ${new Date().toLocaleString()}`, 14, 28);
+
+    // Tabellen-Header
+    let y = 40;
+    doc.setFontSize(12);
+    doc.setFont(undefined, 'bold');
+    doc.text("Kategorie / Element", 14, y);
+    doc.text("Menge (ml)", 120, y);
+    doc.text("Menge (g)", 160, y);
+    doc.line(14, y + 2, 195, y + 2); // Trennlinie
+
+    y += 10;
+    doc.setFont(undefined, 'normal');
+
+    // Daten aus der Datenbank rendern
+    for (let cat in catalog) {
+        // Kategorie-Überschrift in PDF
+        doc.setFont(undefined, 'bold');
+        doc.text(cat, 14, y);
+        y += 7;
+        doc.setFont(undefined, 'normal');
+
+        for (let item in catalog[cat]) {
+            let ml = db.inventory[cat][item] || 0;
+            let factor = densityFactors[item] || 1.0;
+            let gram = (ml * factor).toFixed(1);
+
+            doc.text(item, 20, y);
+            doc.text(ml.toFixed(1), 120, y);
+            doc.text(gram, 160, y);
+            y += 7;
+
+            // Neue Seite, wenn Platz am Ende erreicht
+            if (y > 280) {
+                doc.addPage();
+                y = 20;
+            }
+        }
+        y += 5;
+    }
+
+    doc.save(`Lagerbestand_${new Date().toISOString().split('T')[0]}.pdf`);
+}
