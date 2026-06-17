@@ -3,310 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>OSCI Motion Tracker</title>
+    <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #000000 0%, #4a4a4a 100%);
-            background-attachment: fixed;
-            color: #ffffff;
-            min-height: 100vh;
-            box-sizing: border-box;
-        }
-        h1, h2, h3 { font-weight: 300; letter-spacing: 1px; margin-top: 0; }
-        .card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .tabs {
-            display: flex;
-            overflow-x: auto;
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            scrollbar-width: none;
-        }
-        .tabs::-webkit-scrollbar { display: none; }
-        .tab {
-            padding: 8px 16px;
-            margin-right: 10px;
-            border-radius: 20px;
-            background: rgba(255,255,255,0.1);
-            white-space: nowrap;
-            color: #ccc;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        .tab.active {
-            background: #ffffff;
-            color: #000000;
-            font-weight: 600;
-        }
-        select, input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            border-radius: 8px;
-            border: 1px solid rgba(255,255,255,0.3);
-            background: rgba(0,0,0,0.3);
-            color: #ffffff;
-            font-size: 16px;
-            box-sizing: border-box;
-        }
-        select option { background: #222; color: white; }
-        .btn-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 5px; }
-        button {
-            padding: 12px 20px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        button:active { opacity: 0.8; }
-        .btn-add { background: #4CAF50; color: white; }
-        .btn-sub { background: #f44336; color: white; width: 100%; margin-top: 10px; }
-        .btn-tool { background: #2196F3; color: white; width: 100%; margin-top: 10px; }
-        
-        .inventory-list { margin-top: 10px; }
-        .inventory-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .inventory-item:last-child { border-bottom: none; }
-        .item-name { font-size: 15px; }
-        .item-amount { font-weight: bold; font-family: monospace; font-size: 16px; }
-        .low-stock { color: #ff9800; }
-        
-        /* Verstecktes Dateieingabefeld für den Import */
-        #fileInput { display: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <header>
+        <h1>OSCI Lagerbestand</h1>
+    </header>
 
-    <h1>OSCI Motion</h1>
-    
-    <div class="tabs" id="categoryTabs">
-        <div class="tab active" onclick="setCategory('C&R Produkte')">C&R Produkte</div>
-        <div class="tab" onclick="setCategory('Makro Elements')">Makro Elements</div>
-        <div class="tab" onclick="setCategory('Nutrition Elements')">Nutrition Elements</div>
-        <div class="tab" onclick="setCategory('Trace Elements')">Trace Elements</div>
-    </div>
+    <nav class="tabs">
+        <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
+        <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
+        <button onclick="showTab('settings')" id="tab-settings">Daten</button>
+    </nav>
 
-    <div class="card">
-        <h2>Aktion durchführen</h2>
-        <select id="productSelect" onchange="updateUI()"></select>
-        
-        <div style="margin-top: 20px;">
-            <label style="font-size: 12px; color: #aaa;">EINLAGERN (Feste Gebinde)</label>
-            <div id="addButtons" class="btn-group"></div>
+    <main id="app">
+        <div id="lager" class="tab-content active"></div>
+
+        <div id="statistik" class="tab-content">
+            <h2>Verbrauchsstatistik</h2>
+            <p>Gesamte ausgelagerte Mengen (in ml):</p>
+            <div id="stats-container"></div>
         </div>
 
-        <div style="margin-top: 25px;">
-            <label style="font-size: 12px; color: #aaa;">AUSLAGERN (Verbrauch in ml)</label>
-            <input type="number" id="consumeAmount" placeholder="z.B. 12.5" step="0.1" min="0.1">
-            <button class="btn-sub" onclick="consumeStock()">Verbrauch buchen</button>
+        <div id="settings" class="tab-content">
+            <h2>Datenverwaltung</h2>
+            <div class="card">
+                <h3>Export</h3>
+                <p>Speichere den aktuellen Bestand und die Historie als .txt Datei.</p>
+                <button onclick="exportData()" class="btn-primary">Daten exportieren (.txt)</button>
+            </div>
+            <div class="card">
+                <h3>Import</h3>
+                <p>Lade eine zuvor exportierte .txt Datei wieder ein.</p>
+                <input type="file" id="importFile" accept=".txt">
+                <button onclick="importData()" class="btn-secondary">Daten importieren</button>
+            </div>
+        </div>
+    </main>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Aktion</h3>
+            <div id="modal-body"></div>
+            <button onclick="closeModal()" class="btn-cancel">Abbrechen</button>
         </div>
     </div>
 
-    <div class="card">
-        <h2>Aktueller Bestand</h2>
-        <div id="inventoryList" class="inventory-list"></div>
-    </div>
-
-    <div class="card">
-        <h2>Datenverwaltung</h2>
-        <p style="font-size: 12px; color: #ccc;">Sichere deinen Bestand als Datei oder lade ein Backup wieder ein.</p>
-        <button class="btn-tool" onclick="exportData()">⬇️ Bestand als .txt exportieren</button>
-        <button class="btn-tool" onclick="document.getElementById('fileInput').click()" style="background: #607D8B;">⬆️ Bestand aus .txt importieren</button>
-        <input type="file" id="fileInput" accept=".txt" onchange="importData(event)">
-    </div>
-
+    <script src="app.js"></script>
     <script>
-        // Produktdatenbank mit Kategorien
-        const productDB = [
-            // C&R Produkte
-            { id: 'srcl2', name: 'Strontiumchlorid (SrCl2)', sizes: [100, 1000], cat: 'C&R Produkte' },
-            { id: 'mgso4', name: 'Magnesiumsulfat (MgSO4)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'mgcl2', name: 'Magnesiumchlorid (MgCl2)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'kbr', name: 'Kaliumbromid (KBr)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'cacl2', name: 'Calciumchlorid (CaCl2)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'kcl', name: 'Kaliumchlorid (KCl)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'naf', name: 'Natriumfluorid (NaF)', sizes: [5000], cat: 'C&R Produkte' },
-            { id: 'b', name: 'Bor (B)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'nacl', name: 'Natriumchlorid (NaCl)', sizes: [5000, 10000], cat: 'C&R Produkte' },
-            { id: 'k2so4', name: 'Kaliumsulfat (K2SO4)', sizes: [1000, 5000], cat: 'C&R Produkte' },
-            { id: 'na2so4', name: 'Natriumsulfat (Na2SO4)', sizes: [5000], cat: 'C&R Produkte' },
-            
-            // Makro Elements
-            { id: 'ca', name: 'Calcium', sizes: [5000], cat: 'Makro Elements' },
-            { id: 'kh_nacht', name: 'KH Nacht', sizes: [5000], cat: 'Makro Elements' },
-            { id: 'kh_tag', name: 'KH Tag', sizes: [10000], cat: 'Makro Elements' },
-            { id: 'mg', name: 'Magnesium', sizes: [5000], cat: 'Makro Elements' },
-
-            // Nutrition Elements
-            { id: 'c', name: 'Kohlenstoff (C)', sizes: [1000], cat: 'Nutrition Elements' },
-            { id: 'la', name: 'Lanthan (La)', sizes: [1000], cat: 'Nutrition Elements' },
-            { id: 'p', name: 'Phosphor (P)', sizes: [1000], cat: 'Nutrition Elements' },
-            { id: 'n', name: 'Stickstoff (N)', sizes: [1000], cat: 'Nutrition Elements' },
-
-            // Trace Elements
-            { id: 'ba', name: 'Barium (Ba)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'cr', name: 'Chrom (Cr)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'co', name: 'Cobalt (Co)', sizes: [1000], cat: 'Trace Elements' },
-            { id: 'fe', name: 'Eisen (Fe)', sizes: [100], cat: 'Trace Elements' },
-            { id: 'cu', name: 'Kupfer (Cu)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'li', name: 'Lithium (Li)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'zn', name: 'Zink (Zn)', sizes: [100], cat: 'Trace Elements' },
-            { id: 'mn', name: 'Mangan (Mn)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'ni', name: 'Nickel (Ni)', sizes: [1000], cat: 'Trace Elements' },
-            { id: 'mo', name: 'Molybdän (Mo)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'f', name: 'Fluor (F)', sizes: [100], cat: 'Trace Elements' },
-            { id: 'i', name: 'Iod (I)', sizes: [30, 100], cat: 'Trace Elements' },
-            { id: 'se', name: 'Selen (Se)', sizes: [100], cat: 'Trace Elements' },
-            { id: 'v', name: 'Vanadium (V)', sizes: [30, 100], cat: 'Trace Elements' }
-        ];
-
-        let stockData = JSON.parse(localStorage.getItem('osciStock')) || {};
-        let currentCategory = 'C&R Produkte';
-        
-        // Initialisiere fehlende Produkte
-        productDB.forEach(p => {
-            if (stockData[p.id] === undefined) stockData[p.id] = 0;
-        });
-
-        function saveData() {
-            localStorage.setItem('osciStock', JSON.stringify(stockData));
-            renderInventory();
-        }
-
-        function setCategory(cat) {
-            currentCategory = cat;
-            
-            // Tabs visuell updaten
-            const tabs = document.querySelectorAll('.tab');
-            tabs.forEach(tab => {
-                tab.classList.remove('active');
-                if(tab.innerText === cat) tab.classList.add('active');
-            });
-
-            // Dropdown filtern
-            const select = document.getElementById('productSelect');
-            select.innerHTML = '';
-            
-            const filteredProducts = productDB.filter(p => p.cat === cat);
-            filteredProducts.forEach(p => {
-                let option = document.createElement('option');
-                option.value = p.id;
-                option.textContent = p.name;
-                select.appendChild(option);
-            });
-            
-            updateUI();
-            renderInventory();
-        }
-
-        function updateUI() {
-            const selectedId = document.getElementById('productSelect').value;
-            const product = productDB.find(p => p.id === selectedId);
-            if(!product) return;
-
-            const btnContainer = document.getElementById('addButtons');
-            btnContainer.innerHTML = '';
-            product.sizes.forEach(size => {
-                let btn = document.createElement('button');
-                btn.className = 'btn-add';
-                btn.textContent = `+ ${size} ml`;
-                btn.onclick = () => addStock(product.id, size);
-                btnContainer.appendChild(btn);
-            });
-        }
-
-        function addStock(id, amount) {
-            stockData[id] += amount;
-            saveData();
-        }
-
-        function consumeStock() {
-            const selectedId = document.getElementById('productSelect').value;
-            const inputField = document.getElementById('consumeAmount');
-            const amount = parseFloat(inputField.value);
-
-            if (isNaN(amount) || amount <= 0) return;
-
-            stockData[selectedId] = Math.round((stockData[selectedId] - amount) * 10) / 10;
-            if (stockData[selectedId] < 0) stockData[selectedId] = 0;
-            
-            inputField.value = '';
-            saveData();
-        }
-
-        function renderInventory() {
-            const list = document.getElementById('inventoryList');
-            list.innerHTML = '';
-
-            const filteredProducts = productDB.filter(p => p.cat === currentCategory);
-
-            filteredProducts.forEach(p => {
-                const amount = stockData[p.id];
-                const isLow = amount < (p.sizes[0] / 2); // Dynamische Warnschwelle
-                
-                list.innerHTML += `
-                    <div class="inventory-item">
-                        <div class="item-name">${p.name}</div>
-                        <div class="item-amount ${isLow && amount > 0 ? 'low-stock' : ''}">${amount} ml</div>
-                    </div>
-                `;
-            });
-        }
-
-        // ---- EXPORT & IMPORT LOGIK ----
-        function exportData() {
-            const dataStr = JSON.stringify(stockData, null, 2);
-            const dataUri = 'data:text/plain;charset=utf-8,'+ encodeURIComponent(dataStr);
-            const exportName = 'osci_bestand.txt';
-
-            let linkElement = document.createElement('a');
-            linkElement.setAttribute('href', dataUri);
-            linkElement.setAttribute('download', exportName);
-            document.body.appendChild(linkElement);
-            linkElement.click();
-            document.body.removeChild(linkElement);
-        }
-
-        function importData(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const importedData = JSON.parse(e.target.result);
-                    stockData = { ...stockData, ...importedData }; // Fügt Daten zusammen
-                    saveData();
-                    alert('Daten erfolgreich importiert!');
-                } catch (err) {
-                    alert('Fehler beim Lesen. Bitte wähle eine gültige OSCI Backup-Datei (.txt) aus.');
-                }
-            };
-            reader.readAsText(file);
-            event.target.value = ''; // Reset Input
-        }
-
-        // Start
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js'); });
+            navigator.serviceWorker.register('sw.js');
         }
-        setCategory('C&R Produkte'); // Initiale Kategorie setzen
     </script>
 </body>
 </html>

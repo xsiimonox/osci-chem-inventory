@@ -1,0 +1,46 @@
+:root {
+    --primary: #005f73;
+    --secondary: #0a9396;
+    --bg: #f4f4f9;
+    --card-bg: #ffffff;
+    --text: #333333;
+    --danger: #ae2012;
+    --success: #2b9348;
+}
+
+* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 60px; }
+header { background-color: var(--primary); color: white; padding: 15px; text-align: center; position: sticky; top: 0; z-index: 10; }
+header h1 { margin: 0; font-size: 1.2rem; }
+
+.tabs { display: flex; background: white; border-bottom: 2px solid #ddd; position: sticky; top: 50px; z-index: 9; }
+.tabs button { flex: 1; padding: 15px 0; border: none; background: none; font-size: 1rem; font-weight: bold; color: #666; cursor: pointer; }
+.tabs button.active { color: var(--primary); border-bottom: 3px solid var(--primary); }
+
+.tab-content { display: none; padding: 15px; }
+.tab-content.active { display: block; }
+
+.category-title { border-bottom: 2px solid var(--secondary); padding-bottom: 5px; margin-top: 25px; color: var(--primary); }
+.card { background: var(--card-bg); padding: 15px; margin-bottom: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+.card h4 { margin: 0 0 10px 0; font-size: 1.1rem; display: flex; justify-content: space-between; }
+.stock { font-weight: bold; color: var(--secondary); }
+
+.btn-group { display: flex; gap: 10px; }
+button { padding: 10px; border-radius: 5px; border: none; font-weight: bold; font-size: 1rem; flex: 1; cursor: pointer; }
+.btn-in { background-color: var(--success); color: white; }
+.btn-out { background-color: var(--danger); color: white; }
+.btn-primary { background-color: var(--primary); color: white; width: 100%; margin-top: 10px; }
+.btn-secondary { background-color: var(--secondary); color: white; width: 100%; margin-top: 10px; }
+.btn-cancel { background-color: #ddd; color: #333; width: 100%; margin-top: 15px; }
+
+/* Modal */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+.modal-content { background: white; padding: 20px; width: 90%; max-width: 400px; border-radius: 10px; max-height: 90vh; overflow-y: auto; }
+.modal-content h3 { margin-top: 0; }
+.input-group { margin-bottom: 15px; }
+.input-group label { display: block; margin-bottom: 5px; }
+.input-group input { width: 100%; padding: 10px; font-size: 1rem; border: 1px solid #ccc; border-radius: 5px; }
+.preset-btns { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+.preset-btns button { flex: 1 1 45%; background: #eee; color: #333; }
+
+.stat-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
