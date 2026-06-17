@@ -41,7 +41,7 @@ const densityFactors = {
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 
 const DB_KEY = 'osci_db_v5';
-let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
+let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
 
 // --- INITIALISIERUNG ---
@@ -60,6 +60,7 @@ function initDB() {
     if (!db.stats) db.stats = {};
     if (!db.logs) db.logs = [];
     if (!db.statsStarted) db.statsStarted = Date.now();
+    if (!db.theme) db.theme = 'default';
 
     for (let cat in catalog) {
         if (!db.inventory[cat]) db.inventory[cat] = {};
@@ -68,6 +69,9 @@ function initDB() {
             if (db.stats[item] === undefined) db.stats[item] = 0;
         }
     }
+    
+    // Geladenes Design direkt beim Start anwenden
+    applyTheme(db.theme, false);
     saveDB();
 }
 
@@ -100,6 +104,51 @@ function showTab(tabId) {
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
     if(tabId === 'log') renderLogs();
+}
+
+// --- DESIGN / THEME STEUERUNG ---
+function applyTheme(themeName, shouldSave = true) {
+    // Alle alten Design-Klassen vom Body entfernen
+    document.body.classList.remove('theme-girl', 'theme-mint');
+    
+    if (themeName !== 'default') {
+        document.body.classList.add('theme-' + themeName);
+    }
+    
+    db.theme = themeName;
+    if (shouldSave) saveDB();
+    
+    // Dropdown-Auswahl im Menü synchronisieren, falls geladen
+    const themeSelect = document.getElementById('themeSelect');
+    if (themeSelect) themeSelect.value = themeName;
+}
+
+// --- AUTOMATISCHES CACHE LEEREN & FORCE UPDATE ---
+async function forceUpdateApp() {
+    if (confirm("Möchtest du ein App-Update erzwingen? Dabei wird der interne Zwischenspeicher (Cache) geleert und die allerneueste Version geladen. Deine Bestandsdaten bleiben erhalten!")) {
+        // 1. Service Worker deregistrieren
+        if ('serviceWorker' in navigator) {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                for (let registration of registrations) {
+                    await registration.unregister();
+                }
+            } catch (err) { console.error("SW-Deregister Fehler:", err); }
+        }
+        
+        // 2. Browser Caches komplett löschen
+        if ('caches' in window) {
+            try {
+                const cacheNames = await caches.keys();
+                for (let name of cacheNames) {
+                    await caches.delete(name);
+                }
+            } catch (err) { console.error("Cache-Delete Fehler:", err); }
+        }
+        
+        // 3. Einen harten Reload erzwingen
+        window.location.reload();
+    }
 }
 
 // --- RENDER FUNKTIONEN ---
@@ -303,6 +352,12 @@ function toggleContainerOptions() {
     document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
 }
 
+// Hier wird sichergestellt, dass beim manuellen Öffnen der Einstellungen das Dropdown synchron ist
+document.addEventListener("DOMContentLoaded", () => {
+    const themeSelect = document.getElementById('themeSelect');
+    if(themeSelect && db.theme) themeSelect.value = db.theme;
+});
+
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
 function executeAction() {
@@ -314,7 +369,6 @@ function executeAction() {
     
     let finalMl = rawAmount;
     
-    // Umrechnung wenn in Gramm gewogen wurde
     if (unit === 'g') {
         if (document.getElementById('useContainer').checked) {
             let containerWeight = containers[document.getElementById('containerSelect').value];
@@ -326,7 +380,6 @@ function executeAction() {
 
     if (finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
 
-    // Einlagern
     if (action === 'in') {
         db.inventory[cat][item] += finalMl;
         addLog(cat, item, 'in', finalMl);
@@ -334,11 +387,9 @@ function executeAction() {
         closeModal();
         renderLager();
     } 
-    // Auslagern
     else {
         let stock = db.inventory[cat][item] || 0;
         if (stock - finalMl < 0) {
-            // Spezialwarnungen für Fluor
             if (item === "Fluor (F)") {
                 let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
                 alert(`Mangel an Fluor (F)!\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
@@ -433,7 +484,6 @@ function previewCRPaste() {
     }
 
     let html = '<div style="display: flex; flex-direction: column; gap: 6px;">';
-    
     for (let i = 0; i < crOrder.length; i++) {
         let amountMl = parseFloat(matches[i].replace(/[^\d.]/g, ''));
         let itemName = crOrder[i].name;
@@ -491,7 +541,7 @@ function executeQueueWithConflictHandling(queue, index) {
         const pasteArea = document.getElementById('cr-paste-area');
         if (pasteArea) {
             pasteArea.value = '';
-            previewCRPaste(); // Damit das Vorschaufeld wieder verschwindet
+            previewCRPaste();
         }
         alert("Werte erfolgreich verarbeitet!");
         closeModal();
@@ -537,7 +587,7 @@ function importData() {
     reader.onload = e => {
         try {
             let parsed = JSON.parse(e.target.result);
-            if(parsed.inventory) { db = parsed; if(!db.logs) db.logs=[]; saveDB(); alert("Backup geladen!"); showTab('lager'); } 
+            if(parsed.inventory) { db = parsed; if(!db.logs) db.logs=[]; saveDB(); applyTheme(db.theme || 'default', false); alert("Backup geladen!"); showTab('lager'); } 
             else alert("Ungültiges Backup-Format.");
         } catch(err) { alert("Fehler beim Lesen der Datei."); }
     };
