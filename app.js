@@ -141,8 +141,9 @@ function renderTraceExportInputs() {
         katContainer.innerHTML = mixDefinitions.kationen.map(item => `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}">
+                <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}" oninput="updateGrams('${item}', this.value, 'kat')">
                 <span class="unit-label">ml</span>
+                <span class="gram-label" id="gram-kat-${item.replace(/[^a-zA-Z]/g, '')}">0.00 g</span>
             </div>
         `).join('');
     }
@@ -150,10 +151,23 @@ function renderTraceExportInputs() {
         anContainer.innerHTML = mixDefinitions.anionen.map(item => `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}">
+                <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}" oninput="updateGrams('${item}', this.value, 'an')">
                 <span class="unit-label">ml</span>
+                <span class="gram-label" id="gram-an-${item.replace(/[^a-zA-Z]/g, '')}">0.00 g</span>
             </div>
         `).join('');
+    }
+}
+
+// NEU: Live-Berechnung der Gramm-Anzahl
+function updateGrams(itemName, mlValue, prefix) {
+    let ml = parseFloat(mlValue) || 0;
+    let density = densityFactors[itemName] || 1.0;
+    let grams = ml * density;
+    let elementId = `gram-${prefix}-${itemName.replace(/[^a-zA-Z]/g, '')}`;
+    let el = document.getElementById(elementId);
+    if(el) {
+        el.innerText = grams.toFixed(2) + ' g';
     }
 }
 
