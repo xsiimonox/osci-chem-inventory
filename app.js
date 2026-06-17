@@ -37,38 +37,65 @@ const mixDefinitions = {
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
+// Verwende einen einheitlichen Daten-Key
+const DB_KEY = 'osci_db_v4';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 
 function initDB() {
-    let saved = localStorage.getItem('osci_db_v4');
-    if (saved) {
-        db = JSON.parse(saved);
-        if(!db.logs) db.logs = [];
-        if(!db.statsStarted) db.statsStarted = Date.now();
-    } else {
-        clearAllDataStructure();
-    }
-}
+    try {
+        let saved = localStorage.getItem(DB_KEY);
+        // Abwärtskompatibilität: Falls noch das ganz alte v3 da ist, migrieren
+        if (!saved) {
+            saved = localStorage.getItem('osci_db_v3');
+        }
 
-function clearAllDataStructure() {
-    db.inventory = {}; db.stats = {}; db.logs = []; db.statsStarted = Date.now();
+        if (saved) {
+            let parsed = JSON.parse(saved);
+            if (parsed && typeof parsed === 'object') {
+                db = parsed;
+            }
+        }
+    } catch (e) {
+        console.error("Fehler beim Laden aus dem LocalStorage:", e);
+    }
+
+    // Sicherstellen, dass alle wichtigen Knoten existieren (Vermeidet Abstürze bei fehlenden Properties)
+    if (!db.inventory) db.inventory = {};
+    if (!db.stats) db.stats = {};
+    if (!db.logs) db.logs = [];
+    if (!db.statsStarted) db.statsStarted = Date.now();
+
+    // Fehlende Kategorien oder Items auffüllen
     for (let cat in catalog) {
-        db.inventory[cat] = {};
+        if (!db.inventory[cat]) db.inventory[cat] = {};
         for (let item in catalog[cat]) {
-            db.inventory[cat][item] = 0;
-            db.stats[item] = 0;
+            if (db.inventory[cat][item] === undefined) db.inventory[cat][item] = 0;
+            if (db.stats[item] === undefined) db.stats[item] = 0;
         }
     }
     saveDB();
 }
 
-function saveDB() { localStorage.setItem('osci_db_v4', JSON.stringify(db)); }
+function saveDB() { 
+    try {
+        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
+    } catch(e) {
+        console.error("Speichern fehlgeschlagen:", e);
+    }
+}
 
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
-    document.getElementById(tabId).classList.add('active');
-    document.getElementById('tab-' + tabId).classList.add('active');
+    
+    const targetTab = document.getElementById(tabId);
+    const targetBtn = document.getElementById('tab-' + tabId);
+    
+    if (targetTab && targetBtn) {
+        targetTab.classList.add('active');
+        targetBtn.classList.add('active');
+    }
+    
     if(tabId === 'lager') renderLager();
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
@@ -77,17 +104,19 @@ function showTab(tabId) {
 
 function renderLager() {
     const container = document.getElementById('lager');
+    if (!container) return;
     container.innerHTML = '';
+    
     for (let cat in catalog) {
         container.innerHTML += `<h2 class="category-title">${cat}</h2>`;
         for (let item in catalog[cat]) {
-            let stock = db.inventory[cat][item];
+            let stock = db.inventory[cat][item] || 0;
             let crossHint = "";
             if (item === "Fluor (F)" && stock === 0) {
-                let nafStock = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"];
+                let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
             } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
-                let fStock = db.inventory["Anionen"]["Fluor (F)"];
+                let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
             }
             container.innerHTML += `
@@ -107,25 +136,34 @@ function renderLager() {
 function renderTraceExportInputs() {
     const katContainer = document.getElementById('kationen-inputs-container');
     const anContainer = document.getElementById('anionen-inputs-container');
-    katContainer.innerHTML = mixDefinitions.kationen.map(item => `
-        <div class="trace-grid">
-            <label>${item}</label>
-            <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}">
-            <span class="unit-label">ml</span>
-        </div>
-    `).join('');
-    anContainer.innerHTML = mixDefinitions.anionen.map(item => `
-        <div class="trace-grid">
-            <label>${item}</label>
-            <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}">
-            <span class="unit-label">ml</span>
-        </div>
-    `).join('');
+    
+    if (katContainer) {
+        katContainer.innerHTML = mixDefinitions.kationen.map(item => `
+            <div class="trace-grid">
+                <label>${item}</label>
+                <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}">
+                <span class="unit-label">ml</span>
+            </div>
+        `).join('');
+    }
+    
+    if (anContainer) {
+        anContainer.innerHTML = mixDefinitions.anionen.map(item => `
+            <div class="trace-grid">
+                <label>${item}</label>
+                <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}">
+                <span class="unit-label">ml</span>
+            </div>
+        `).join('');
+    }
 }
 
 function renderStats() {
-    document.getElementById('stats-start-date').innerText = "Statistik aufgezeichnet seit: " + new Date(db.statsStarted).toLocaleDateString();
+    const dateEl = document.getElementById('stats-start-date');
+    if (dateEl) dateEl.innerText = "Statistik aufgezeichnet seit: " + new Date(db.statsStarted).toLocaleDateString();
+    
     const container = document.getElementById('stats-container');
+    if (!container) return;
     container.innerHTML = '';
     
     let daysElapsed = Math.max(1, (Date.now() - db.statsStarted) / (1000 * 60 * 60 * 24));
@@ -141,7 +179,6 @@ function renderStats() {
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
             
-            // Reichweiten-Prognose (Feature)
             let currentStock = findCurrentStock(item);
             let prognosisText = "Keine Prognose möglich";
             if (perWeek > 0) {
@@ -168,7 +205,9 @@ function renderStats() {
 
 function findCurrentStock(itemName) {
     for (let cat in catalog) {
-        if (catalog[cat][itemName] !== undefined) return db.inventory[cat][itemName];
+        if (db.inventory[cat] && db.inventory[cat][itemName] !== undefined) {
+            return db.inventory[cat][itemName];
+        }
     }
     return 0;
 }
@@ -182,19 +221,251 @@ function resetStats() {
     }
 }
 
-// Protokollierung rendern
 function renderLogs() {
     const container = document.getElementById('log-container');
+    if (!container) return;
     container.innerHTML = '';
+    
     if (!db.logs || db.logs.length === 0) {
         container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
         return;
     }
     
-    // Die neuesten Aktionen ganz oben anzeigen
     let logHTML = db.logs.map((log, index) => `
         <div class="log-item ${log.action}">
             <div class="log-details">
                 <strong>${log.item}</strong><br>
-                <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${log.amount.toFixed(2)} ml</span><br>
-                <span class="log-date">${new Date(log.timestamp
+                <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${(log.amount || 0).toFixed(2)} ml</span><br>
+                <span class="log-date">${new Date(log.timestamp).toLocaleString()}</span>
+            </div>
+            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:90px;" onclick="undoLog(${index})">Umdrehen</button>
+        </div>
+    `).reverse().join('');
+    container.innerHTML = logHTML;
+}
+
+function addLog(cat, item, action, amount) {
+    if(!db.logs) db.logs = [];
+    db.logs.push({ cat, item, action, amount, timestamp: Date.now() });
+    if (db.logs.length > 200) db.logs.shift();
+}
+
+function undoLog(index) {
+    let log = db.logs[index];
+    if (!log) return;
+    
+    if (log.action === 'in') {
+        if ((db.inventory[log.cat][log.item] || 0) - log.amount < 0) {
+            if(!confirm("Nicht genug Bestand für Stornierung. Bestand wird negativ. Trotzdem stornieren?")) return;
+        }
+        db.inventory[log.cat][log.item] -= log.amount;
+    } else {
+        db.inventory[log.cat][log.item] += log.amount;
+        db.stats[log.item] = Math.max(0, (db.stats[log.item] || 0) - log.amount);
+    }
+    
+    db.logs.splice(index, 1);
+    saveDB();
+    alert("Aktion erfolgreich rückgängig gemacht!");
+    renderLogs();
+}
+
+let currentAction = {};
+function openModal(cat, item, action) {
+    currentAction = { cat, item, action };
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    
+    if(!modal || !modalTitle || !modalBody) return;
+    
+    modalTitle.innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
+    let html = '';
+    if (action === 'in') {
+        html += `<p class="hint">Standardgebinde wählen:</p><div class="preset-btns">`;
+        catalog[cat][item].forEach(p => {
+            html += `<button onclick="document.getElementById('amount').value='${p}'">${p} ml</button>`;
+        });
+        html += `</div>`;
+    }
+    html += `
+        <div class="input-group">
+            <label>Menge eingeben (ml):</label>
+            <input type="number" step="0.01" id="amount" placeholder="z.B. 12.5" autofocus>
+        </div>
+        <button class="btn-primary btn-animated" onclick="executeAction()">Bestätigen</button>
+    `;
+    modalBody.innerHTML = html;
+    modal.style.display = 'flex';
+}
+
+function closeModal() { 
+    const modal = document.getElementById('modal');
+    if (modal) modal.style.display = 'none'; 
+}
+
+function executeAction() {
+    let amount = parseFloat(document.getElementById('amount').value);
+    if (isNaN(amount) || amount <= 0) return alert("Bitte eine gültige Menge eingeben.");
+    let { cat, item, action } = currentAction;
+    
+    if (action === 'in') {
+        db.inventory[cat][item] += amount;
+        addLog(cat, item, 'in', amount);
+    } else {
+        let stock = db.inventory[cat][item] || 0;
+        if (stock - amount < 0) {
+            if (item === "Fluor (F)") {
+                let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
+                alert(`Mangel an Fluor (F)!\n\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
+                return;
+            } else if (item === "Natriumfluorid (NaF)") {
+                let alt = db.inventory["Anionen"]["Fluor (F)"] || 0;
+                alert(`Mangel an Natriumfluorid (NaF)!\n\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
+                return;
+            }
+            
+            showConflictModal(cat, item, amount, stock, () => {
+                db.inventory[cat][item] -= amount;
+                db.stats[item] += amount;
+                addLog(cat, item, 'out', amount);
+                saveDB();
+                closeModal();
+                renderLager();
+            });
+            return;
+        }
+        db.inventory[cat][item] -= amount;
+        db.stats[item] += amount;
+        addLog(cat, item, 'out', amount);
+    }
+    saveDB();
+    closeModal();
+    renderLager();
+}
+
+function showConflictModal(cat, item, required, current, proceedCallback) {
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modal-body');
+    const modalTitle = document.getElementById('modal-title');
+    
+    if(!modal || !modalBody || !modalTitle) return;
+    
+    let missing = required - current;
+    modalTitle.innerText = "⚠️ Bestands-Warnung";
+    
+    modalBody.innerHTML = `
+        <div style="background: rgba(239,68,68,0.1); border: 1px solid var(--danger); padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.95rem;">
+            Zu wenig Bestand für <strong>${item}</strong>.<br><br>
+            Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${required.toFixed(2)} ml</span><br>
+            Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${current.toFixed(2)} ml</span><br>
+            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missing.toFixed(2)} ml</span>
+        </div>
+        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
+    `;
+    
+    document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
+    modal.style.display = 'flex';
+}
+
+function processCRPaste() {
+    const text = document.getElementById('cr-paste-area').value;
+    const matches = text.match(/([\d.]+)\s*ml/g);
+    if (!matches || matches.length < crOrder.length) {
+        return alert("Fehler: Das Format konnte nicht verarbeitet werden. Bitte kopiere die exakte Zeile hinein.");
+    }
+    
+    let queue = [];
+    for (let i = 0; i < crOrder.length; i++) {
+        let valStr = matches[i].replace(/[^\d.]/g, '');
+        let amount = parseFloat(valStr);
+        let item = crOrder[i].name;
+        let cat = crOrder[i].cat;
+        if (amount > 0) queue.push({ cat, item, amount });
+    }
+    
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function executeQueueWithConflictHandling(queue, index) {
+    if (index >= queue.length) {
+        saveDB();
+        const pasteArea = document.getElementById('cr-paste-area');
+        if (pasteArea) pasteArea.value = '';
+        alert("Werte erfolgreich verarbeitet!");
+        closeModal();
+        showTab('lager');
+        return;
+    }
+    
+    let { cat, item, amount } = queue[index];
+    let stock = db.inventory[cat][item] || 0;
+    
+    if (stock - amount < 0) {
+        showConflictModal(cat, item, amount, stock, () => {
+            db.inventory[cat][item] -= amount;
+            db.stats[item] += amount;
+            addLog(cat, item, 'out', amount);
+            executeQueueWithConflictHandling(queue, index + 1);
+        });
+    } else {
+        db.inventory[cat][item] -= amount;
+        db.stats[item] += amount;
+        addLog(cat, item, 'out', amount);
+        executeQueueWithConflictHandling(queue, index + 1);
+    }
+}
+
+function auslagernMischung(typ) {
+    let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
+    let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
+    let elements = mixDefinitions[typ];
+    
+    let queue = [];
+    for (let item of elements) {
+        let inputId = prefix + item.replace(/[^a-zA-Z]/g, '');
+        let inputEl = document.getElementById(inputId);
+        let amount = inputEl ? parseFloat(inputEl.value) : 0;
+        if (amount > 0) queue.push({ cat: catName, item, amount });
+    }
+    
+    if (queue.length === 0) return alert("Bitte trage bei mindestens einem Element eine Menge ein.");
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function exportData() {
+    let dataStr = JSON.stringify(db, null, 2);
+    let blob = new Blob([dataStr], { type: "text/plain" });
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `OSCI_Full_Backup_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+}
+
+function importData() {
+    let fileInput = document.getElementById('importFile');
+    let file = fileInput ? fileInput.files[0] : null;
+    if (!file) return alert("Bitte wähle zuerst eine Sicherungsdatei (.txt) aus.");
+    let reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            let parsed = JSON.parse(e.target.result);
+            if(parsed.inventory && parsed.stats) {
+                db = parsed;
+                if(!db.logs) db.logs = [];
+                saveDB();
+                alert("Komplettsicherung erfolgreich eingelesen!");
+                showTab('lager');
+            } else {
+                alert("Fehler: Unvollständige oder veraltete Backup-Datei.");
+            }
+        } catch (err) {
+            alert("Fehler: Ungültiges Dateiformat.");
+        }
+    };
+    reader.readAsText(file);
+}
+
+// Start-Reihenfolge
+initDB();
+renderLager();
