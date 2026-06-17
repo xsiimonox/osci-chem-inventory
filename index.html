@@ -2,37 +2,98 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSCI Motion Inventory</title>
+    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header><h1>OSCI Motion</h1></header>
-    <div class="tabs">
+
+    <header>
+        <h1>OSCI Motion</h1>
+        <div class="subtitle">Lagerverwaltung & Analyse</div>
+    </header>
+
+    <nav class="tabs">
         <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
         <button onclick="showTab('cr-import')" id="tab-cr-import">C&R Import</button>
         <button onclick="showTab('mischungen')" id="tab-mischungen">Mischungen</button>
-    </div>
+        <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
+        <button onclick="showTab('daten')" id="tab-daten">Daten</button>
+    </nav>
+
     <main id="app">
         <div id="lager" class="tab-content active"></div>
+
         <div id="cr-import" class="tab-content">
-            <div class="card">
-                <h3>C&R Liste einfügen</h3>
-                <textarea id="cr-paste-area" placeholder="Hier Liste einfügen..."></textarea>
-                <button class="btn-primary" onclick="processCRPaste()">Bestand aktualisieren</button>
+            <div class="card card-accent">
+                <h3>C&R Liste per Copy & Paste auslagern</h3>
+                <p class="hint">Füge hier einfach die unformatierte Zeile aus deiner Auswertung ein:</p>
+                <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..."></textarea>
+                <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
             </div>
         </div>
+
         <div id="mischungen" class="tab-content">
             <div class="card">
                 <h3>Kationen Mischung</h3>
-                <button class="btn-danger" onclick="auslagernMischung('kationen')">Kationen auslagern</button>
+                <p class="mix-info">Bestandteile: Cobalt, Nickel, Eisen, Mangan, Kupfer, Chrom, Zink</p>
+                <div class="input-group">
+                    <label>Menge pro Element (ml):</label>
+                    <input type="number" id="kationen-amount" value="10" step="0.1">
+                </div>
+                <button class="btn-danger btn-animated" onclick="auslagernMischung('kationen')">Mischung abziehen</button>
             </div>
             <div class="card">
                 <h3>Anionen Mischung</h3>
-                <button class="btn-danger" onclick="auslagernMischung('anionen')">Anionen auslagern</button>
+                <p class="mix-info">Bestandteile: Fluor, Iod, Vanadium, Selen</p>
+                <div class="input-group">
+                    <label>Menge pro Element (ml):</label>
+                    <input type="number" id="anionen-amount" value="10" step="0.1">
+                </div>
+                <button class="btn-danger btn-animated" onclick="auslagernMischung('anionen')">Mischung abziehen</button>
+            </div>
+        </div>
+
+        <div id="statistik" class="tab-content">
+            <div class="card">
+                <h3>Verbrauchsstatistik</h3>
+                <p class="hint">Gesamte jemals ausgelagerte Mengen:</p>
+                <div id="stats-container"></div>
+            </div>
+        </div>
+
+        <div id="daten" class="tab-content">
+            <div class="card">
+                <h3>Backup exportieren</h3>
+                <p class="hint">Speichere den aktuellen Bestand als Textdatei ab.</p>
+                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
+            </div>
+            <div class="card">
+                <h3>Backup einlesen</h3>
+                <p class="hint">Wähle eine exportierte .txt Datei aus, um den Stand wiederherzustellen.</p>
+                <input type="file" id="importFile" accept=".txt">
+                <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
             </div>
         </div>
     </main>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Aktion</h3>
+            <div id="modal-body"></div>
+            <button onclick="closeModal()" class="btn-cancel">Abbrechen</button>
+        </div>
+    </div>
+
     <script src="app.js"></script>
+    <script>
+        // Registrierung des Service Workers für die Offline-PWA Funktionalität
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js')
+                .then(() => console.log('OSCI Service Worker aktiv.'))
+                .catch(err => console.error('PWA Fehler:', err));
+        }
+    </script>
 </body>
 </html>
