@@ -6,44 +6,40 @@
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <style>
-        /* Kleiner CSS-Zusatz für die Versionsanzeige im Header */
-        .header-title-container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-        }
-        .version-badge {
-            font-size: 0.75rem;
-            background: rgba(168, 85, 247, 0.15);
-            color: var(--primary);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid rgba(168, 85, 247, 0.3);
-            font-weight: bold;
-            vertical-align: middle;
-        }
-    </style>
 </head>
 <body>
 
     <header>
-        <div class="header-title-container">
-            <h1>OSCI Motion</h1>
-            <span class="version-badge">v1.0.0</span>
+        <div class="header-main">
+            <div class="header-title-container">
+                <h1>OSCI Motion</h1>
+                <span class="version-badge">v4.3.0</span>
+            </div>
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </button>
         </div>
         <div class="subtitle">Lagerverwaltung & Analyse</div>
     </header>
 
-    <nav class="tabs">
-        <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
-        <button onclick="showTab('cr-export')" id="tab-cr-export">C&R export</button>
-        <button onclick="showTab('trace-export')" id="tab-trace-export">Trace export</button>
-        <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
-        <button onclick="showTab('log')" id="tab-log">Protokoll</button>
-        <button onclick="showTab('daten')" id="tab-daten">Daten</button>
+    <nav class="nav-menu" id="main-nav">
+        <div class="nav-menu-header">
+            <span>Navigation</span>
+            <button class="close-menu" onclick="toggleMenu()">✕</button>
+        </div>
+        <div class="nav-links">
+            <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
+            <button onclick="selectTab('cr-export')" id="tab-cr-export">C&R export</button>
+            <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace export</button>
+            <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
+            <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
+            <button onclick="selectTab('daten')" id="tab-daten">Daten</button>
+        </div>
     </nav>
+    
+    <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
     <main id="app">
         <div id="lager" class="tab-content active"></div>
