@@ -1,4 +1,26 @@
 // [catalog, crOrder und mixDefinitions bleiben identisch]
+// Dichte-Faktoren (Gramm zu ml)
+
+const densityFactors = {
+    "Strontiumchlorid (SrCl2)": 1.154, "Magnesiumsulfat (MgSO4)": 1.224,
+    "Magnesiumchlorid (MgCl2)": 1.289, "Kaliumbromid (KBr)": 1.104,
+    "Calciumchlorid (CaCl2)": 1.399, "Kaliumchlorid (KCl)": 1.112,
+    "Natriumfluorid (NaF)": 1.000, "Bor (B)": 0.999, // Hinweis: NaF hinzugefügt
+    "Natriumchlorid (NaCl)": 1.192, "Kaliumsulfat (K2SO4)": 1.067,
+    "Natriumsulfat (Na2SO4)": 1.110, "Barium (Ba)": 1.005,
+    "Chrom (Cr)": 1.047, "Cobalt (Co)": 1.000, "Eisen (Fe)": 1.039,
+    "Kupfer (Cu)": 1.024, "Mangan (Mn)": 1.234, "Molybdän (Mo)": 1.002,
+    "Nickel (Ni)": 0.999, "Selen (Se)": 1.010, "Vanadium (V)": 1.026,
+    "Zink (Zn)": 1.024, "Iod (I)": 1.097, "Fluor (F)": 1.009, 
+    "Lithium (Li)": 1.023, "Calcium": 1.000, "KH Nacht": 1.000, 
+    "KH Tag": 1.000, "Magnesium": 1.000, "Kohlenstoff (C)": 1.000,
+    "Lanthan (La)": 1.000, "Phosphor (P)": 1.000, "Stickstoff (N)": 1.000
+};
+
+const containers = {
+    "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440
+};
+
 const catalog = {
     "C&R Produkte": {
         "Strontiumchlorid (SrCl2)": [100, 1000], "Magnesiumsulfat (MgSO4)": [1000, 5000],
