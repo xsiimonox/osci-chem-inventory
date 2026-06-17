@@ -1,8 +1,3 @@
-Hier ist die komplette, ungekürzte **`app.js`** (Version **v5.1.0**). Alle Funktionen sind voll ausgeschrieben, die Dichtefaktoren sowie die Behältergewichte sind hinterlegt, und das Einlagerungs-Modal rendert nun automatisch die passenden Schnellauswahl-Buttons für deine Gebindegrößen.
-
-Ersetze den gesamten Inhalt deiner `app.js` durch diesen Code:
-
-```javascript
 // --- DATEN & KONFIGURATION ---
 const catalog = {
     "C&R Produkte": {
@@ -53,19 +48,23 @@ const densityFactors = {
 
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 
-const DB_KEY = 'osci_db_v5_1';
+const DB_KEY = 'osci_db_v5_2';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 let currentAction = {};
 
 // --- INITIALISIERUNG ---
 function initDB() {
     try {
-        let saved = localStorage.getItem(DB_KEY) || localStorage.getItem('osci_db_v5') || localStorage.getItem('osci_db_v4');
+        let saved = localStorage.getItem(DB_KEY) || localStorage.getItem('osci_db_v5_1') || localStorage.getItem('osci_db_v5') || localStorage.getItem('osci_db_v4');
         if (saved) {
             let parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object') db = parsed;
+            if (parsed && typeof parsed === 'object') {
+                db = parsed;
+            }
         }
-    } catch (e) { console.error("Fehler beim Laden:", e); }
+    } catch (e) { 
+        console.error("Fehler beim Laden der Datenbank:", e); 
+    }
 
     if (!db.inventory) db.inventory = {};
     if (!db.stats) db.stats = {};
@@ -82,18 +81,32 @@ function initDB() {
     saveDB();
 }
 
-function saveDB() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {} }
+function saveDB() { 
+    try { 
+        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
+    } catch(e) {
+        console.error("Speichern fehlgeschlagen:", e);
+    } 
+}
 
 // --- UI / MENÜ STEUERUNG ---
 function toggleMenu() {
-    document.getElementById('main-nav').classList.toggle('open');
-    document.getElementById('menu-backdrop').classList.toggle('open');
+    const nav = document.getElementById('main-nav');
+    const backdrop = document.getElementById('menu-backdrop');
+    if (nav && backdrop) {
+        nav.classList.toggle('open');
+        backdrop.classList.toggle('open');
+    }
 }
 
 function selectTab(tabId) {
     showTab(tabId);
-    document.getElementById('main-nav').classList.remove('open');
-    document.getElementById('menu-backdrop').classList.remove('open');
+    const nav = document.getElementById('main-nav');
+    const backdrop = document.getElementById('menu-backdrop');
+    if (nav && backdrop) {
+        nav.classList.remove('open');
+        backdrop.classList.remove('open');
+    }
 }
 
 function showTab(tabId) {
@@ -228,7 +241,6 @@ function findCat(itemName) {
     return "C&R Produkte";
 }
 
-// --- LOGS RENDERN & STEUREN ---
 function renderLogs() {
     const container = document.getElementById('log-container');
     if (!container) return;
@@ -256,6 +268,8 @@ function openModal(cat, item, action) {
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
+    if (!modal || !modalBody) return;
+    
     document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
     
     // Dynamische Gebinde-Auswahl (Nur beim Einlagern sichtbar)
@@ -308,17 +322,32 @@ function openModal(cat, item, action) {
 }
 
 function toggleContainerOptions() {
-    const isGram = document.getElementById('unitSelect').value === 'g';
-    const isChecked = document.getElementById('useContainer').checked;
-    document.getElementById('containerSection').style.display = isGram ? 'block' : 'none';
-    document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
+    const unitSel = document.getElementById('unitSelect');
+    const useCont = document.getElementById('useContainer');
+    const contSec = document.getElementById('containerSection');
+    const contSel = document.getElementById('containerSelect');
+    
+    if(!unitSel || !contSec || !contSel || !useCont) return;
+
+    const isGram = unitSel.value === 'g';
+    const isChecked = useCont.checked;
+    
+    contSec.style.display = isGram ? 'block' : 'none';
+    contSel.style.display = (isGram && isChecked) ? 'block' : 'none';
 }
 
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function closeModal() { 
+    const modal = document.getElementById('modal');
+    if(modal) modal.style.display = 'none'; 
+}
 
 function executeAction() {
-    let rawAmount = parseFloat(document.getElementById('amount').value);
-    let unit = document.getElementById('unitSelect').value;
+    const amountInput = document.getElementById('amount');
+    const unitSel = document.getElementById('unitSelect');
+    if(!amountInput || !unitSel) return;
+
+    let rawAmount = parseFloat(amountInput.value);
+    let unit = unitSel.value;
     let { cat, item, action } = currentAction;
     
     if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
@@ -327,8 +356,10 @@ function executeAction() {
     
     // Umrechnung wenn in Gramm gewogen wurde
     if (unit === 'g') {
-        if (document.getElementById('useContainer').checked) {
-            let containerWeight = containers[document.getElementById('containerSelect').value];
+        const useCont = document.getElementById('useContainer');
+        const contSel = document.getElementById('containerSelect');
+        if (useCont && useCont.checked && contSel) {
+            let containerWeight = containers[contSel.value] || 0;
             finalMl -= containerWeight;
         }
         let factor = densityFactors[item] || 1.0;
@@ -349,7 +380,6 @@ function executeAction() {
     else {
         let stock = db.inventory[cat][item] || 0;
         if (stock - finalMl < 0) {
-            // Spezialwarnungen für Fluor
             if (item === "Fluor (F)") {
                 let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
                 alert(`Mangel an Fluor (F)!\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
@@ -381,7 +411,11 @@ function executeAction() {
 
 function showConflictModal(cat, item, required, current, proceedCallback) {
     const modalBody = document.getElementById('modal-body');
-    document.getElementById('modal-title').innerText = "⚠️ Bestands-Warnung";
+    const modalTitle = document.getElementById('modal-title');
+    const modal = document.getElementById('modal');
+    if(!modalBody || !modalTitle || !modal) return;
+
+    modalTitle.innerText = "⚠️ Bestands-Warnung";
     let missing = required - current;
     
     modalBody.innerHTML = `
@@ -393,8 +427,10 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
         </div>
         <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
     `;
-    document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
-    document.getElementById('modal').style.display = 'flex';
+    
+    const btn = document.getElementById('proceed-conflict-btn');
+    if(btn) btn.onclick = proceedCallback;
+    modal.style.display = 'flex';
 }
 
 function addLog(cat, item, action, amount) {
@@ -423,7 +459,9 @@ function undoLog(index) {
 
 // --- BATCH VERARBEITUNG & MISCHUNGEN ---
 function processCRPaste() {
-    const text = document.getElementById('cr-paste-area').value;
+    const pasteArea = document.getElementById('cr-paste-area');
+    if(!pasteArea) return;
+    const text = pasteArea.value;
     const matches = text.match(/([\d.]+)\s*ml/g);
     if (!matches || matches.length < crOrder.length) return alert("Fehler: Format ungültig.");
     
@@ -491,7 +529,9 @@ function exportData() {
 }
 
 function importData() {
-    let file = document.getElementById('importFile').files[0];
+    const fileInput = document.getElementById('importFile');
+    if(!fileInput) return;
+    let file = fileInput.files[0];
     if (!file) return alert("Bitte wähle eine Datei (.txt) aus.");
     let reader = new FileReader();
     reader.onload = e => {
@@ -508,7 +548,7 @@ function importData() {
 function togglePartyMode() { document.body.classList.toggle('party-mode'); }
 
 // APP-START TRIGGER
-initDB();
-renderLager();
-
-```
+window.addEventListener('DOMContentLoaded', () => {
+    initDB();
+    renderLager();
+});
