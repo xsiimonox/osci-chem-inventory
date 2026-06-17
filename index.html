@@ -2,142 +2,37 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OSCI Motion Inventory</title>
-    <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body>
-
-    <header>
-        <div class="header-main">
-            <div class="header-title-container">
-                <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.1.0DEV</span>
-            </div>
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-            </button>
-        </div>
-        <div class="subtitle">Lagerverwaltung & Analyse</div>
-    </header>
-
-    <nav class="nav-menu" id="main-nav">
-        <div class="nav-menu-header">
-            <span>Navigation</span>
-            <button class="close-menu" onclick="toggleMenu()">✕</button>
-        </div>
-        <div class="nav-links">
-            <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
-            <button onclick="selectTab('cr-export')" id="tab-cr-export">C&R export</button>
-            <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace export</button>
-            <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
-            <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
-            <button onclick="selectTab('daten')" id="tab-daten">Daten</button>
-        </div>
-    </nav>
-    
-    <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
-
+    <header><h1>OSCI Motion</h1></header>
+    <div class="tabs">
+        <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
+        <button onclick="showTab('cr-import')" id="tab-cr-import">C&R Import</button>
+        <button onclick="showTab('mischungen')" id="tab-mischungen">Mischungen</button>
+    </div>
     <main id="app">
         <div id="lager" class="tab-content active"></div>
-
-        <div id="cr-export" class="tab-content">
-            <div class="card card-accent">
-                <h3>C&R Liste per Copy & Paste auslagern</h3>
-                <p class="hint">Füge hier die unformatierte Zeile aus deiner Auswertung ein:</p>
-                <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..."></textarea>
-                <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
+        <div id="cr-import" class="tab-content">
+            <div class="card">
+                <h3>C&R Liste einfügen</h3>
+                <textarea id="cr-paste-area" placeholder="Hier Liste einfügen..."></textarea>
+                <button class="btn-primary" onclick="processCRPaste()">Bestand aktualisieren</button>
             </div>
         </div>
-
-        <div id="trace-export" class="tab-content">
+        <div id="mischungen" class="tab-content">
             <div class="card">
                 <h3>Kationen Mischung</h3>
-                <div id="kationen-inputs-container"></div>
-                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('kationen')">Kationen Mischung abziehen</button>
+                <button class="btn-danger" onclick="auslagernMischung('kationen')">Kationen auslagern</button>
             </div>
-            <div class="card" style="margin-top: 20px;">
+            <div class="card">
                 <h3>Anionen Mischung</h3>
-                <div id="anionen-inputs-container"></div>
-                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
-            </div>
-        </div>
-
-        <div id="statistik" class="tab-content">
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Verbrauchsstatistik & Prognose</h3>
-                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
-                </div>
-                <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
-                <div id="stats-container"></div>
-            </div>
-        </div>
-
-        <div id="log" class="tab-content">
-            <div class="card">
-                <h3>Aktionsprotokoll</h3>
-                <p class="hint">Hier siehst du alle vergangenen Buchungen und kannst sie bei Bedarf rückgängig machen:</p>
-                <div id="log-container"></div>
-            </div>
-        </div>
-
-        <div id="daten" class="tab-content">
-            <div class="card" style="border: 1px solid #ffd60a; background: rgba(255, 214, 10, 0.02); margin-bottom: 20px;">
-                <h3 style="color: #ffd60a;">Ambientlight & Effekt-Steuerung</h3>
-                <div class="switch-container">
-                    <span style="font-weight: 600; font-size: 0.95rem;">💥 Disko- & Animationsmodus</span>
-                    <label class="switch">
-                        <input type="checkbox" id="partyToggle" onchange="togglePartyMode()">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
-                <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken nullen</button>
-                </div>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
-                </div>
-                <div>
-                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand nullen</button>
-                </div>
-            </div>
-
-            <div class="card" style="margin-top: 20px;">
-                <h3>Backup exportieren</h3>
-                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
-            </div>
-            <div class="card">
-                <h3>Backup einlesen</h3>
-                <input type="file" id="importFile" accept=".txt">
-                <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
+                <button class="btn-danger" onclick="auslagernMischung('anionen')">Anionen auslagern</button>
             </div>
         </div>
     </main>
-
-    <div id="modal" class="modal">
-        <div class="modal-content">
-            <h3 id="modal-title">Aktion</h3>
-            <div id="modal-body"></div>
-            <button onclick="closeModal()" class="btn-cancel">Schließen / Abbrechen</button>
-        </div>
-    </div>
-
     <script src="app.js"></script>
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
-                .then(() => console.log('OSCI Service Worker aktiv.'))
-                .catch(err => console.error('PWA Fehler:', err));
-        }
-    </script>
 </body>
 </html>

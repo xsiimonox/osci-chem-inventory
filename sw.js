@@ -1,5 +1,5 @@
-const CACHE_NAME = 'osci-pwa-cache-v5_pdf';
-const ASSETS = [
+const CACHE_NAME = 'osci-lager-v1';
+const urlsToCache = [
   './',
   './index.html',
   './style.css',
@@ -7,14 +7,18 @@ const ASSETS = [
   './manifest.json'
 ];
 
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(urlsToCache))
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((res) => res || fetch(e.request))
+self.addEventListener('fetch', event => {
+  event.respondWith(
+    caches.match(event.request)
+      .then(response => {
+        return response || fetch(event.request);
+      })
   );
 });
