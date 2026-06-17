@@ -1,3 +1,4 @@
+// [catalog, crOrder und mixDefinitions bleiben absolut identisch zu deiner Vorversion]
 const catalog = {
     "C&R Produkte": {
         "Strontiumchlorid (SrCl2)": [100, 1000], "Magnesiumsulfat (MgSO4)": [1000, 5000],
@@ -40,6 +41,27 @@ const mixDefinitions = {
 const DB_KEY = 'osci_db_v4';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 
+// NEUE FUNKTIONEN FÜR APPLE MENÜ-STEUERUNG
+function toggleMenu() {
+    const nav = document.getElementById('main-nav');
+    const backdrop = document.getElementById('menu-backdrop');
+    if(nav && backdrop) {
+        nav.classList.toggle('open');
+        backdrop.classList.toggle('open');
+    }
+}
+
+function selectTab(tabId) {
+    showTab(tabId);
+    // Schließt das Menü auf Mobilgeräten nach Auswahl automatisch
+    const nav = document.getElementById('main-nav');
+    const backdrop = document.getElementById('menu-backdrop');
+    if(nav && backdrop) {
+        nav.classList.remove('open');
+        backdrop.classList.remove('open');
+    }
+}
+
 function initDB() {
     try {
         let saved = localStorage.getItem(DB_KEY);
@@ -48,9 +70,7 @@ function initDB() {
             let parsed = JSON.parse(saved);
             if (parsed && typeof parsed === 'object') db = parsed;
         }
-    } catch (e) {
-        console.error("Fehler beim Laden:", e);
-    }
+    } catch (e) { console.error("Fehler beim Laden:", e); }
 
     if (!db.inventory) db.inventory = {};
     if (!db.stats) db.stats = {};
@@ -67,13 +87,11 @@ function initDB() {
     saveDB();
 }
 
-function saveDB() { 
-    try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) { console.error("Speichern fehlgeschlagen:", e); }
-}
+function saveDB() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) { console.error(e); } }
 
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.tabs button').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-links button').forEach(el => el.classList.remove('active'));
     
     const targetTab = document.getElementById(tabId);
     const targetBtn = document.getElementById('tab-' + tabId);
@@ -122,7 +140,6 @@ function renderLager() {
 function renderTraceExportInputs() {
     const katContainer = document.getElementById('kationen-inputs-container');
     const anContainer = document.getElementById('anionen-inputs-container');
-    
     if (katContainer) {
         katContainer.innerHTML = mixDefinitions.kationen.map(item => `
             <div class="trace-grid">
@@ -151,7 +168,6 @@ function countOutsForElement(itemName) {
 function renderStats() {
     const dateEl = document.getElementById('stats-start-date');
     if (dateEl) dateEl.innerText = "Statistik aufgezeichnet seit: " + new Date(db.statsStarted).toLocaleDateString();
-    
     const container = document.getElementById('stats-container');
     if (!container) return;
     container.innerHTML = '';
@@ -168,11 +184,9 @@ function renderStats() {
             let perWeek = totalConsumed / weeksElapsed;
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
-            
             let currentStock = findCurrentStock(item);
             let prognosisText = "";
             
-            // Intelligenter Prognoseschutz: Benötigt mindestens 2 Entnahmen im Logbuch
             let outCount = countOutsForElement(item);
             if (outCount < 2) {
                 prognosisText = "Prognose ab der 2. Entnahme verfügbar";
@@ -188,6 +202,9 @@ function renderStats() {
                     <h4 style="margin:0 0 5px 0; color: var(--primary);">${item}</h4>
                     <div style="font-size:0.85rem; margin-bottom:5px;">Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong></div>
                     <div class="stat-grid">
+                        <div>------------------------------------------</div>
+                    </div>
+                    <div class="stat-grid" style="margin-top:2px;">
                         <div><strong>${perWeek.toFixed(1)} ml</strong>/Woche</div>
                         <div><strong>${perMonth.toFixed(1)} ml</strong>/Monat</div>
                         <div><strong>${perYear.toFixed(1)} ml</strong>/Jahr</div>
@@ -216,7 +233,6 @@ function resetStats() {
     }
 }
 
-// 1. NEUE FUNKTION: Komplettes Lager zurücksetzen
 function resetLager() {
     if (confirm("🚨 WARNUNG!\nMöchtest du wirklich das gesamte System zurücksetzen?\nAlle Lagerbestände werden genullt, Statistiken und Protokolle werden unwiderruflich gelöscht.")) {
         clearAllDataStructure();
@@ -241,13 +257,11 @@ function renderLogs() {
     const container = document.getElementById('log-container');
     if (!container) return;
     container.innerHTML = '';
-    
     if (!db.logs || db.logs.length === 0) {
         container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
         return;
     }
     
-    // 2. KORREKTUR: max-width auf 140px verbreitert und Text in "Rückgängig" geändert
     let logHTML = db.logs.map((log, index) => `
         <div class="log-item ${log.action}">
             <div class="log-details">
@@ -270,7 +284,6 @@ function addLog(cat, item, action, amount) {
 function undoLog(index) {
     let log = db.logs[index];
     if (!log) return;
-    
     if (log.action === 'in') {
         if ((db.inventory[log.cat][log.item] || 0) - log.amount < 0) {
             if(!confirm("Nicht genug Bestand für Stornierung. Bestand wird negativ. Trotzdem stornieren?")) return;
@@ -280,7 +293,6 @@ function undoLog(index) {
         db.inventory[log.cat][log.item] += log.amount;
         db.stats[log.item] = Math.max(0, (db.stats[log.item] || 0) - log.amount);
     }
-    
     db.logs.splice(index, 1);
     saveDB();
     alert("Aktion erfolgreich rückgängig gemacht!");
@@ -340,7 +352,6 @@ function executeAction() {
                 alert(`Mangel an Natriumfluorid (NaF)!\n\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
                 return;
             }
-            
             showConflictModal(cat, item, amount, stock, () => {
                 db.inventory[cat][item] -= amount;
                 db.stats[item] += amount;
@@ -368,9 +379,8 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
     
     let missing = required - current;
     modalTitle.innerText = "⚠️ Bestands-Warnung";
-    
     modalBody.innerHTML = `
-        <div style="background: rgba(239,68,68,0.1); border: 1px solid var(--danger); padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.95rem;">
+        <div style="background: rgba(255,69,58,0.1); border: 1px solid var(--danger); padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.95rem;">
             Zu wenig Bestand für <strong>${item}</strong>.<br><br>
             Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${required.toFixed(2)} ml</span><br>
             Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${current.toFixed(2)} ml</span><br>
@@ -378,7 +388,6 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
         </div>
         <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
     `;
-    
     document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
     modal.style.display = 'flex';
 }
@@ -389,7 +398,6 @@ function processCRPaste() {
     if (!matches || matches.length < crOrder.length) {
         return alert("Fehler: Das Format konnte nicht verarbeitet werden. Bitte kopiere die exakte Zeile hinein.");
     }
-    
     let queue = [];
     for (let i = 0; i < crOrder.length; i++) {
         let valStr = matches[i].replace(/[^\d.]/g, '');
@@ -411,10 +419,8 @@ function executeQueueWithConflictHandling(queue, index) {
         showTab('lager');
         return;
     }
-    
     let { cat, item, amount } = queue[index];
     let stock = db.inventory[cat][item] || 0;
-    
     if (stock - amount < 0) {
         showConflictModal(cat, item, amount, stock, () => {
             db.inventory[cat][item] -= amount;
@@ -434,7 +440,6 @@ function auslagernMischung(typ) {
     let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
     let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
     let elements = mixDefinitions[typ];
-    
     let queue = [];
     for (let item of elements) {
         let inputId = prefix + item.replace(/[^a-zA-Z]/g, '');
@@ -469,12 +474,8 @@ function importData() {
                 saveDB();
                 alert("Komplettsicherung erfolgreich eingelesen!");
                 showTab('lager');
-            } else {
-                alert("Fehler: Unvollständige oder veraltete Backup-Datei.");
-            }
-        } catch (err) {
-            alert("Fehler: Ungültiges Dateiformat.");
-        }
+            } else { alert("Fehler: Backup-Datei ungültig."); }
+        } catch (err) { alert("Fehler: Ungültiges Dateiformat."); }
     };
     reader.readAsText(file);
 }
