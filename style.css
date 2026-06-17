@@ -23,13 +23,25 @@ body.theme-girl {
     --border: #ffccd9; 
 }
 
+body.theme-ocean {
+    --bg: #031424;         /* Tiefsee-Abyss-Blau */
+    --card-bg: #0a2540;    /* Dunkles Marineblau für Karten */
+    --primary: #00f0ff;    /* Leuchtendes Aquamarin / Cyan */
+    --secondary: #64ffda;  /* Helles Karibik-Mint */
+    --text: #e6f1ff;       /* Klares Eisweiß für perfekte Lesbarkeit */
+    --text-muted: #8892b0; /* Sanftes Nebelblau */
+    --danger: #ff4a74;     /* Kräftiges Korallenrot */
+    --success: #00e676;    /* Biolumineszentes Seegrün */
+    --border: #103a61;     /* Riff-Blau für Ränder */
+}
+
 body.theme-mint {
     --primary: #00e676;    /* Frisches Neongrün/Mint */
     --secondary: #00b0ff;  /* Leuchtendes Aquablau */
 }
 
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; transition: background-color 0.5s ease; }
+body { margin: 0; padding: 0; background-color: var(--bg); color: var(--text); padding-bottom: 30px; -webkit-font-smoothing: antialiased; }
 
 header { background: rgba(28, 28, 30, 0.8); padding: 16px 20px; box-shadow: 0 1px 0 var(--border); position: sticky; top: 0; z-index: 99; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
 .header-main { display: flex; justify-content: space-between; align-items: center; }
@@ -37,7 +49,7 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 .subtitle { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
 
 .header-title-container { display: flex; align-items: center; gap: 8px; }
-.version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
+.version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; }
 
 .menu-toggle { background: none; border: none; cursor: pointer; padding: 4px; display: flex; flex-direction: column; gap: 5px; z-index: 101; }
 .menu-toggle .bar { width: 24px; height: 2.5px; background-color: var(--primary); border-radius: 2px; transition: 0.3s; }
@@ -67,13 +79,13 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     .nav-links button.active { color: var(--primary); background: rgba(191, 90, 242, 0.1); border-bottom: 3px solid var(--primary); }
 }
 
-.category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.5s ease; }
-.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.5s ease, border-color 0.5s ease, background-color 0.5s ease; }
+.category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.3s ease; }
 .card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: color 0.5s ease; }
+.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; }
 
 body.theme-girl .stock { background: rgba(255, 102, 164, 0.15); }
-body.theme-mint .stock { background: rgba(0, 230, 118, 0.15); }
+body.theme-ocean .stock { background: rgba(100, 255, 250, 0.15); }
 
 .cross-hint { font-size: 0.75rem; color: #ffd60a; margin-top: 4px; display: block; font-weight: 500; }
 .hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
@@ -101,7 +113,7 @@ button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12p
 .btn-in { background: rgba(48, 209, 88, 0.15); color: var(--success); flex: 1; }
 .btn-out { background: rgba(255, 69, 58, 0.15); color: var(--danger); flex: 1; }
 
-.btn-primary { background: var(--primary); color: #fff; width: 100%; transition: background-color 0.5s ease; }
+.btn-primary { background: var(--primary); color: #fff; width: 100%; }
 .btn-secondary { background: #3a3a3c; color: var(--secondary); width: 100%; }
 .btn-danger { background: var(--danger); color: white; width: 100%; }
 .btn-cancel { background: #2c2c2e; color: #fff; width: 100%; margin-top: 12px; }
@@ -121,43 +133,20 @@ input[type="number"], input[type="file"], select { width: 100%; padding: 12px; b
 input:checked + .slider { background-color: var(--success); }
 input:checked + .slider:before { transform: translateX(20px); }
 
-/* --- FUTURISTIC LED RGB ANIMATIONEN --- */
-body.party-mode { 
-    animation: smoothGradient 10s ease infinite; 
-    background: linear-gradient(45deg, #0a001a, #001a1a, #1a000d, #00001a);
-    background-size: 400% 400%;
-}
-body.party-mode .card { 
-    background: #111;
-    border: 1px solid rgba(255,255,255,0.1);
-    animation: rgbPulse 6s infinite alternate ease-in-out; 
-}
-body.party-mode header h1, body.party-mode .stock { 
-    animation: rgbText 5s linear infinite; 
-}
-body.party-mode button.btn-animated { 
-    animation: rgbBorder 4s infinite alternate; 
-}
+/* Party Animationen */
+body.party-mode { animation: discoBackground 1.5s infinite linear; }
+body.party-mode .card { animation: crazyBlink 0.4s infinite alternate ease-in-out; border: 2px solid #fff !important; }
+body.party-mode header h1, body.party-mode .stock { animation: textGlow 0.3s infinite alternate linear; }
+body.party-mode button { animation: spinButtons 2s infinite linear; }
 
-@keyframes smoothGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
-@keyframes rgbPulse { 
-    0% { box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 10px rgba(0,255,255,0.1); border-color: rgba(0,255,255,0.5); } 
-    50% { box-shadow: 0 0 15px rgba(255,0,255,0.3), inset 0 0 10px rgba(255,0,255,0.1); border-color: rgba(255,0,255,0.5); } 
-    100% { box-shadow: 0 0 15px rgba(0,255,0,0.3), inset 0 0 10px rgba(0,255,0,0.1); border-color: rgba(0,255,0,0.5); } 
-}
-@keyframes rgbText { 
-    0% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
-    33% { color: #f0f; text-shadow: 0 0 8px rgba(255,0,255,0.6); } 
-    66% { color: #0f0; text-shadow: 0 0 8px rgba(0,255,0,0.6); } 
-    100% { color: #0ff; text-shadow: 0 0 8px rgba(0,255,255,0.6); } 
-}
-@keyframes rgbBorder { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(360deg); } }
-
+@keyframes discoBackground { 0% { background-color: #ff0055; } 20% { background-color: #00ff55; } 40% { background-color: #0055ff; } 60% { background-color: #ffff00; } 80% { background-color: #ff00ff; } 100% { background-color: #ff0055; } }
+@keyframes crazyBlink { 0% { transform: scale(1) rotate(0deg); background: #1c1c1e; box-shadow: 0 0 5px #fff; } 50% { transform: scale(1) rotate(0deg); background: #3a3a3c; } 100% { transform: scale(1) rotate(0deg); background: #1c1c1e; box-shadow: 0 0 5px #fff; } }
+@keyframes textGlow { from { text-shadow: 0 0 5px #fff, 0 0 10px var(--primary); color: #fff; } to { text-shadow: 0 0 10px #fff, 0 0 20px var(--secondary); color: #fff; } }
+@keyframes spinButtons { 0% { transform: scale(1); } 50% { transform: scale(0.95); filter: hue-rotate(180deg); } 100% { transform: scale(1); } }
 
 /* ==========================================================================
    🎀 SUPER CUTE PINK GIRL EDITION OVERRIDES 🎀
    ========================================================================== */
-
 body.theme-girl textarea,
 body.theme-girl input[type="number"],
 body.theme-girl input[type="file"],
@@ -174,14 +163,12 @@ body.theme-girl #containerSection {
 body.theme-girl select option { background: #ffffff !important; color: #4a0026 !important; }
 body.theme-girl .modal-content { background: #ffffff !important; border: 2px solid #ff66a4 !important; color: #4a0026 !important; }
 
-/* Alle Texte im Girl Mode auf dunkelbeerig umschalten */
 body.theme-girl h1, body.theme-girl h2, body.theme-girl h3, body.theme-girl h4, 
 body.theme-girl label, body.theme-girl span, body.theme-girl strong, 
 body.theme-girl .stat-grid div strong, body.theme-girl .trace-grid label {
     color: #4a0026 !important;
 }
 
-/* Ein- und Auslagerungsbuttons sowie Menüs in Pink-Schattierungen */
 body.theme-girl .btn-in { background: #ffe3ee !important; color: #ff1493 !important; border: 1px solid #ffb3d1 !important; }
 body.theme-girl .btn-out { background: #fff0f5 !important; color: #d90452 !important; border: 1px solid #ffccd9 !important; }
 body.theme-girl .btn-primary { background: #ff66a4 !important; color: #ffffff !important; }
@@ -189,7 +176,6 @@ body.theme-girl .btn-secondary { background: #ffccd9 !important; color: #4a0026 
 body.theme-girl .btn-danger { background: #d90452 !important; color: #ffffff !important; }
 body.theme-girl .btn-cancel { background: #ffccd9 !important; color: #4a0026 !important; }
 
-/* Highlights, Badges und Navigationsleisten */
 body.theme-girl .stock { background: #ffccd9 !important; color: #d90452 !important; }
 body.theme-girl .version-badge { background: #ffccd9 !important; color: #ff1493 !important; border: 1px solid #ff66a4 !important; }
 body.theme-girl .prognose-badge { background: #ffe3ee !important; color: #ff1493 !important; }
@@ -199,7 +185,6 @@ body.theme-girl .nav-links button { background: #fff5f8 !important; color: #4a00
 body.theme-girl .nav-links button.active { background: #ff66a4 !important; color: #ffffff !important; }
 body.theme-girl .cross-hint { color: #d90452 !important; }
 
-/* Desktop Navigation Anpassung für Girl Edition */
 @media (min-width: 768px) {
     body.theme-girl .nav-menu { background: #ffffff !important; border-bottom: 1px solid #ffccd9 !important; }
     body.theme-girl .nav-links button.active { background: rgba(255, 102, 164, 0.1) !important; color: #ff1493 !important; border-bottom: 3px solid #ff1493 !important; }
@@ -229,4 +214,80 @@ body.theme-girl.party-mode .card {
 @keyframes pinkRgbPulse {
     0% { box-shadow: 0 0 15px rgba(255,20,147,0.2); border-color: #ff66a4; }
     100% { box-shadow: 0 0 15px rgba(218,112,214,0.4); border-color: #ff1493; }
+}
+
+/* ==========================================================================
+   🌊 PREMIUM DEEP OCEAN VARIANTE OVERRIDES 🌊
+   ========================================================================== */
+body.theme-ocean textarea,
+body.theme-ocean input[type="number"],
+body.theme-ocean input[type="file"],
+body.theme-ocean select,
+body.theme-ocean .log-item,
+body.theme-ocean .stat-block,
+body.theme-ocean #cr-preview-container,
+body.theme-ocean #containerSection {
+    background: #051b30 !important;
+    color: #e6f1ff !important;
+    border: 1px solid #103a61 !important;
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+body.theme-ocean select option { background: #0a2540 !important; color: #e6f1ff !important; }
+body.theme-ocean .modal-content { background: #0a2540 !important; border: 2px solid #00f0ff !important; color: #e6f1ff !important; box-shadow: 0 10px 40px rgba(0,240,255,0.2) !important; }
+
+body.theme-ocean h1, body.theme-ocean h2, body.theme-ocean h3, body.theme-ocean h4, 
+body.theme-ocean label, body.theme-ocean span, body.theme-ocean strong, 
+body.theme-ocean .stat-grid div strong, body.theme-ocean .trace-grid label {
+    color: #e6f1ff !important;
+}
+body.theme-ocean .subtitle, body.theme-ocean .hint, body.theme-ocean .unit-label, body.theme-ocean .log-date {
+    color: #8892b0 !important;
+}
+
+body.theme-ocean .btn-in { background: rgba(0, 240, 255, 0.1) !important; color: #00f0ff !important; border: 1px solid rgba(0, 240, 255, 0.3) !important; }
+body.theme-ocean .btn-out { background: rgba(255, 74, 116, 0.1) !important; color: #ff4a74 !important; border: 1px solid rgba(255, 74, 116, 0.3) !important; }
+body.theme-ocean .btn-primary { background: linear-gradient(135deg, #00f0ff, #0072ff) !important; color: #ffffff !important; }
+body.theme-ocean .btn-secondary { background: #103a61 !important; color: #64ffda !important; }
+body.theme-ocean .btn-danger { background: #ff4a74 !important; color: #ffffff !important; }
+body.theme-ocean .btn-cancel { background: #051b30 !important; color: #8892b0 !important; }
+
+body.theme-ocean .stock { background: rgba(100, 255, 250, 0.15) !important; color: #64ffda !important; }
+body.theme-ocean .version-badge { background: rgba(0, 240, 255, 0.15) !important; color: #00f0ff !important; border: 1px solid #00f0ff !important; }
+body.theme-ocean .prognose-badge { background: rgba(0, 240, 255, 0.1) !important; color: #64ffda !important; }
+body.theme-ocean header { background: rgba(3, 20, 36, 0.85) !important; box-shadow: 0 1px 0 #103a61 !important; }
+body.theme-ocean .nav-menu { background: rgba(10, 37, 64, 0.96) !important; border-left: 1px solid #103a61 !important; }
+body.theme-ocean .nav-links button { background: #0a2540 !important; color: #8892b0 !important; }
+body.theme-ocean .nav-links button.active { background: #00f0ff !important; color: #031424 !important; }
+body.theme-ocean .cross-hint { color: #ff4a74 !important; }
+
+@media (min-width: 768px) {
+    body.theme-ocean .nav-menu { background: #0a2540 !important; border-bottom: 1px solid #103a61 !important; }
+    body.theme-ocean .nav-links button.active { background: rgba(0, 240, 255, 0.1) !important; color: #00f0ff !important; border-bottom: 3px solid #00f0ff !important; }
+}
+
+/* 🌊 AUTOMATISCHE OZEAN & SUBMARIN AKZENTE 🐬 */
+body.theme-ocean header h1::before { content: "🌊 "; }
+body.theme-ocean header h1::after { content: " 🐬"; }
+body.theme-ocean .category-title::before { content: "🐠 "; }
+body.theme-ocean .category-title::after { content: " 🐙"; }
+body.theme-ocean .card h4 span::before { content: "🐚 "; }
+body.theme-ocean .btn-in::before { content: "⚓ "; }
+body.theme-ocean .btn-out::before { content: "🌊 "; }
+
+/* 🧬 SPEZIAL: BIOLUMINESZENTER TIEFSEE-RAVE */
+body.theme-ocean.party-mode { 
+    animation: oceanDiscoGradient 8s ease infinite !important; 
+    background: linear-gradient(45deg, #020b14, #004e92, #000428, #00c6ff) !important;
+    background-size: 400% 400% !important;
+}
+body.theme-ocean.party-mode .card {
+    background: rgba(5, 27, 48, 0.85) !important;
+    border: 1px solid #00f0ff !important;
+    animation: oceanRgbPulse 4s infinite alternate ease-in-out !important;
+}
+@keyframes oceanDiscoGradient { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+@keyframes oceanRgbPulse {
+    0% { box-shadow: 0 0 15px rgba(0,240,255,0.2); border-color: #00f0ff; }
+    100% { box-shadow: 0 0 20px rgba(100,255,218,0.4); border-color: #64ffda; }
 }
