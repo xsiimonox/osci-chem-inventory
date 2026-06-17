@@ -197,4 +197,284 @@ function renderStats() {
 
             content += `
                 <div class="stat-block">
-                    <h4
+                    <h4 style="margin:0 0 5px 0; color: var(--primary);">${item}</h4>
+                    <div style="font-size:0.85rem; margin-bottom:5px;">Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong></div>
+                    <div class="stat-grid">
+                        <div><strong>${perWeek.toFixed(1)} ml</strong>/Woche</div>
+                        <div><strong>${perMonth.toFixed(1)} ml</strong>/Monat</div>
+                        <div><strong>${perYear.toFixed(1)} ml</strong>/Jahr</div>
+                    </div>
+                    <div class="prognose-badge">${prognosisText}</div>
+                </div>
+            `;
+        }
+    }
+    container.innerHTML = content || '<p class="hint">Noch keine Verbräuche aufgezeichnet.</p>';
+}
+
+function findCat(itemName) {
+    for (let cat in catalog) { if (catalog[cat][itemName] !== undefined) return cat; }
+    return "C&R Produkte";
+}
+
+function renderLogs() {
+    const container = document.getElementById('log-container');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!db.logs || db.logs.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
+        return;
+    }
+    
+    let logHTML = db.logs.map((log, index) => `
+        <div class="log-item ${log.action}">
+            <div class="log-details">
+                <strong>${log.item}</strong><br>
+                <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${(log.amount || 0).toFixed(2)} ml</span><br>
+                <span class="log-date">${new Date(log.timestamp).toLocaleString()}</span>
+            </div>
+            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:140px;" onclick="undoLog(${index})">Rückgängig</button>
+        </div>
+    `).reverse().join('');
+    container.innerHTML = logHTML;
+}
+
+// --- MODAL & EINGABELOGIK ---
+function openModal(cat, item, action) {
+    currentAction = { cat, item, action };
+    const modal = document.getElementById('modal');
+    const modalBody = document.getElementById('modal-body');
+    document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
+    
+    modalBody.innerHTML = `
+        <div class="input-group">
+            <label>Einheit auswählen:</label>
+            <select id="unitSelect" onchange="toggleContainerOptions()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+                <option value="ml">Milliliter (ml)</option>
+                <option value="g">Gramm (g)</option>
+            </select>
+        </div>
+        
+        <div id="containerSection" style="display:none; margin-top:15px; padding:10px; background:rgba(255,255,255,0.05); border-radius:10px;">
+            <label style="display:flex; align-items:center; gap:10px; color:#fff;">
+                <input type="checkbox" id="useContainer" onchange="toggleContainerOptions()" style="width:20px; height:20px; margin:0;"> 
+                Behälter-Gewicht (Tara) abziehen
+            </label>
+            <select id="containerSelect" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
+                ${Object.keys(containers).map(c => `<option value="${c}">${c} (wiegt ${containers[c]}g)</option>`).join('')}
+            </select>
+        </div>
+
+        <div class="input-group" style="margin-top:15px;">
+            <label>Menge eingeben:</label>
+            <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" style="width:100%; padding:12px;">
+        </div>
+        <button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction()">Buchung ausführen</button>
+    `;
+    modal.style.display = 'flex';
+}
+
+function toggleContainerOptions() {
+    const isGram = document.getElementById('unitSelect').value === 'g';
+    const isChecked = document.getElementById('useContainer').checked;
+    document.getElementById('containerSection').style.display = isGram ? 'block' : 'none';
+    document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
+}
+
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
+
+function executeAction() {
+    let rawAmount = parseFloat(document.getElementById('amount').value);
+    let unit = document.getElementById('unitSelect').value;
+    let { cat, item, action } = currentAction;
+    
+    if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
+    
+    let finalMl = rawAmount;
+    
+    // Umrechnung wenn in Gramm gewogen wurde
+    if (unit === 'g') {
+        if (document.getElementById('useContainer').checked) {
+            let containerWeight = containers[document.getElementById('containerSelect').value];
+            finalMl -= containerWeight;
+        }
+        let factor = densityFactors[item] || 1.0;
+        finalMl = finalMl / factor;
+    }
+
+    if (finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
+
+    // Einlagern
+    if (action === 'in') {
+        db.inventory[cat][item] += finalMl;
+        addLog(cat, item, 'in', finalMl);
+        saveDB();
+        closeModal();
+        renderLager();
+    } 
+    // Auslagern
+    else {
+        let stock = db.inventory[cat][item] || 0;
+        if (stock - finalMl < 0) {
+            // Spezialwarnungen für Fluor
+            if (item === "Fluor (F)") {
+                let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
+                alert(`Mangel an Fluor (F)!\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
+                return;
+            } else if (item === "Natriumfluorid (NaF)") {
+                let alt = db.inventory["Anionen"]["Fluor (F)"] || 0;
+                alert(`Mangel an Natriumfluorid (NaF)!\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
+                return;
+            }
+            
+            showConflictModal(cat, item, finalMl, stock, () => {
+                db.inventory[cat][item] -= finalMl;
+                db.stats[item] += finalMl;
+                addLog(cat, item, 'out', finalMl);
+                saveDB();
+                closeModal();
+                renderLager();
+            });
+            return;
+        }
+        db.inventory[cat][item] -= finalMl;
+        db.stats[item] += finalMl;
+        addLog(cat, item, 'out', finalMl);
+        saveDB();
+        closeModal();
+        renderLager();
+    }
+}
+
+function showConflictModal(cat, item, required, current, proceedCallback) {
+    const modalBody = document.getElementById('modal-body');
+    document.getElementById('modal-title').innerText = "⚠️ Bestands-Warnung";
+    let missing = required - current;
+    
+    modalBody.innerHTML = `
+        <div style="background: rgba(255,69,58,0.1); border: 1px solid var(--danger); padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.95rem;">
+            Zu wenig Bestand für <strong>${item}</strong>.<br><br>
+            Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${required.toFixed(2)} ml</span><br>
+            Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${current.toFixed(2)} ml</span><br>
+            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missing.toFixed(2)} ml</span>
+        </div>
+        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
+    `;
+    document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
+    document.getElementById('modal').style.display = 'flex';
+}
+
+function addLog(cat, item, action, amount) {
+    if(!db.logs) db.logs = [];
+    db.logs.push({ cat, item, action, amount, timestamp: Date.now() });
+    if (db.logs.length > 200) db.logs.shift();
+}
+
+function undoLog(index) {
+    let log = db.logs[index];
+    if (!log) return;
+    if (log.action === 'in') {
+        if ((db.inventory[log.cat][log.item] || 0) - log.amount < 0) {
+            if(!confirm("Nicht genug Bestand für Stornierung. Bestand wird negativ. Trotzdem stornieren?")) return;
+        }
+        db.inventory[log.cat][log.item] -= log.amount;
+    } else {
+        db.inventory[log.cat][log.item] += log.amount;
+        db.stats[log.item] = Math.max(0, (db.stats[log.item] || 0) - log.amount);
+    }
+    db.logs.splice(index, 1);
+    saveDB();
+    alert("Aktion erfolgreich rückgängig gemacht!");
+    renderLogs();
+}
+
+// --- QUEUE & LISTEN VERARBEITUNG ---
+function processCRPaste() {
+    const text = document.getElementById('cr-paste-area').value;
+    const matches = text.match(/([\d.]+)\s*ml/g);
+    if (!matches || matches.length < crOrder.length) return alert("Fehler: Format ungültig.");
+    
+    let queue = [];
+    for (let i = 0; i < crOrder.length; i++) {
+        let amount = parseFloat(matches[i].replace(/[^\d.]/g, ''));
+        if (amount > 0) queue.push({ cat: crOrder[i].cat, item: crOrder[i].name, amount });
+    }
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function auslagernMischung(typ) {
+    let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
+    let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
+    let queue = [];
+    
+    for (let item of mixDefinitions[typ]) {
+        let inputEl = document.getElementById(prefix + item.replace(/[^a-zA-Z]/g, ''));
+        let amount = inputEl ? parseFloat(inputEl.value) : 0;
+        if (amount > 0) queue.push({ cat: catName, item, amount });
+    }
+    if (queue.length === 0) return alert("Trage mindestens bei einem Element eine Menge ein.");
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function executeQueueWithConflictHandling(queue, index) {
+    if (index >= queue.length) {
+        saveDB();
+        const pasteArea = document.getElementById('cr-paste-area');
+        if (pasteArea) pasteArea.value = '';
+        alert("Werte erfolgreich verarbeitet!");
+        closeModal();
+        showTab('lager');
+        return;
+    }
+    
+    let { cat, item, amount } = queue[index];
+    let stock = db.inventory[cat][item] || 0;
+    
+    if (stock - amount < 0) {
+        showConflictModal(cat, item, amount, stock, () => {
+            db.inventory[cat][item] -= amount;
+            db.stats[item] += amount;
+            addLog(cat, item, 'out', amount);
+            executeQueueWithConflictHandling(queue, index + 1);
+        });
+    } else {
+        db.inventory[cat][item] -= amount;
+        db.stats[item] += amount;
+        addLog(cat, item, 'out', amount);
+        executeQueueWithConflictHandling(queue, index + 1);
+    }
+}
+
+// --- BACKUP & RESETS ---
+function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in db.stats) db.stats[i]=0; db.statsStarted=Date.now(); saveDB(); renderStats(); alert("Statistiken auf 0 gesetzt."); } }
+function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; saveDB(); renderLogs(); alert("Protokoll gelöscht."); } }
+function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; saveDB(); renderLager(); alert("Lager ist leer."); } }
+
+function exportData() {
+    let blob = new Blob([JSON.stringify(db, null, 2)], { type: "text/plain" });
+    let a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `OSCI_Backup_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+}
+
+function importData() {
+    let file = document.getElementById('importFile').files[0];
+    if (!file) return alert("Bitte wähle eine Datei (.txt) aus.");
+    let reader = new FileReader();
+    reader.onload = e => {
+        try {
+            let parsed = JSON.parse(e.target.result);
+            if(parsed.inventory) { db = parsed; if(!db.logs) db.logs=[]; saveDB(); alert("Backup geladen!"); showTab('lager'); } 
+            else alert("Ungültiges Backup-Format.");
+        } catch(err) { alert("Fehler beim Lesen der Datei."); }
+    };
+    reader.readAsText(file);
+}
+
+// --- AMBIENT PARTY MODE ---
+function togglePartyMode() { document.body.classList.toggle('party-mode'); }
+
+// APP START
+initDB();
+renderLager();
