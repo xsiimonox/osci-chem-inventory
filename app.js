@@ -1,4 +1,4 @@
-// [catalog, crOrder und mixDefinitions bleiben absolut identisch zu deiner Vorversion]
+// [catalog, crOrder und mixDefinitions bleiben identisch]
 const catalog = {
     "C&R Produkte": {
         "Strontiumchlorid (SrCl2)": [100, 1000], "Magnesiumsulfat (MgSO4)": [1000, 5000],
@@ -41,7 +41,6 @@ const mixDefinitions = {
 const DB_KEY = 'osci_db_v4';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 
-// NEUE FUNKTIONEN FÜR APPLE MENÜ-STEUERUNG
 function toggleMenu() {
     const nav = document.getElementById('main-nav');
     const backdrop = document.getElementById('menu-backdrop');
@@ -53,7 +52,6 @@ function toggleMenu() {
 
 function selectTab(tabId) {
     showTab(tabId);
-    // Schließt das Menü auf Mobilgeräten nach Auswahl automatisch
     const nav = document.getElementById('main-nav');
     const backdrop = document.getElementById('menu-backdrop');
     if(nav && backdrop) {
@@ -201,9 +199,6 @@ function renderStats() {
                 <div class="stat-block">
                     <h4 style="margin:0 0 5px 0; color: var(--primary);">${item}</h4>
                     <div style="font-size:0.85rem; margin-bottom:5px;">Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong></div>
-                    <div class="stat-grid">
-                        <div>------------------------------------------</div>
-                    </div>
                     <div class="stat-grid" style="margin-top:2px;">
                         <div><strong>${perWeek.toFixed(1)} ml</strong>/Woche</div>
                         <div><strong>${perMonth.toFixed(1)} ml</strong>/Monat</div>
@@ -224,34 +219,44 @@ function findCurrentStock(itemName) {
     return 0;
 }
 
-function resetStats() {
-    if (confirm("Möchtest du die Verbrauchsstatistiken wirklich zurücksetzen? Der aktuelle Lagerbestand bleibt erhalten.")) {
+// --- DIE DREI NEUEN ISOLIERTEN RESET-FUNKTIONEN ---
+
+// 1. Nur Statistiken resetten
+function resetStatsSingle() {
+    if (confirm("Möchtest du die Verbrauchsstatistiken wirklich zurücksetzen?\nDer aktuelle Lagerbestand und das Protokoll bleiben erhalten!")) {
         for (let item in db.stats) db.stats[item] = 0;
         db.statsStarted = Date.now();
         saveDB();
         renderStats();
+        alert("Statistiken wurden zurückgesetzt.");
     }
 }
 
-function resetLager() {
-    if (confirm("🚨 WARNUNG!\nMöchtest du wirklich das gesamte System zurücksetzen?\nAlle Lagerbestände werden genullt, Statistiken und Protokolle werden unwiderruflich gelöscht.")) {
-        clearAllDataStructure();
-        alert("Das Lager wurde vollständig zurückgesetzt.");
-        showTab('lager');
+// 2. Nur Protokoll löschen
+function resetLogsSingle() {
+    if (confirm("Möchtest du das gesamte Aktionsprotokoll unwiderruflich löschen?\nDer aktuelle Lagerbestand und die Statistiken bleiben erhalten!")) {
+        db.logs = [];
+        saveDB();
+        if(document.getElementById('log').classList.contains('active')) renderLogs();
+        alert("Aktionsprotokoll wurde geleert.");
     }
 }
 
-function clearAllDataStructure() {
-    db.inventory = {}; db.stats = {}; db.logs = []; db.statsStarted = Date.now();
-    for (let cat in catalog) {
-        db.inventory[cat] = {};
-        for (let item in catalog[cat]) {
-            db.inventory[cat][item] = 0;
-            db.stats[item] = 0;
+// 3. Nur Lagerbestand nullen
+function resetLagerSingle() {
+    if (confirm("🚨 ACHTUNG!\nMöchtest du wirklich alle aktuellen Lagerbestände auf 0 ml zurücksetzen?\nDeine Statistiken und das Protokoll bleiben erhalten!")) {
+        for (let cat in catalog) {
+            for (let item in catalog[cat]) {
+                db.inventory[cat][item] = 0;
+            }
         }
+        saveDB();
+        if(document.getElementById('lager').classList.contains('active')) renderLager();
+        alert("Alle Bestände wurden auf 0 ml gesetzt.");
     }
-    saveDB();
 }
+
+// --------------------------------------------------
 
 function renderLogs() {
     const container = document.getElementById('log-container');
