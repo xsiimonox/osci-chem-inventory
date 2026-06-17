@@ -8,18 +8,10 @@ const catalog = {
         "Natriumchlorid (NaCl)": [5000, 10000], "Kaliumsulfat (K2SO4)": [1000, 5000],
         "Natriumsulfat (Na2SO4)": [5000]
     },
-    "Makro Elements": { 
-        "Calcium": [5000], "KH Nacht": [5000], "KH Tag": [10000], "Magnesium": [5000] 
-    },
-    "Nutrition Elements": { 
-        "Kohlenstoff (C)": [1000], "Lanthan (La)": [1000], "Phosphor (P)": [1000], "Stickstoff (N)": [1000] 
-    },
-    "Trace Elements": { 
-        "Barium (Ba)": [30, 100], "Chrom (Cr)": [30, 100], "Cobalt (Co)": [1000], "Eisen (Fe)": [100], 
-        "Kupfer (Cu)": [30, 100], "Lithium (Li)": [30, 100], "Zink (Zn)": [100], "Mangan (Mn)": [30, 100], 
-        "Nickel (Ni)": [1000], "Molybdän (Mo)": [30, 100], "Fluor (F)": [100], "Iod": [30, 100], 
-        "Selen": [100], "Vanadium": [30, 100] 
-    }
+    "Makro Elements": { "Calcium": [5000], "KH Nacht": [5000], "KH Tag": [10000], "Magnesium": [5000] },
+    "Nutrition Elements": { "Kohlenstoff (C)": [1000], "Lanthan (La)": [1000], "Phosphor (P)": [1000], "Stickstoff (N)": [1000] },
+    "Anionen": { "Fluor (F)": [100], "Iod (I)": [30, 100], "Selen (Se)": [100], "Vanadium (V)": [30, 100] },
+    "Kationen": { "Barium (Ba)": [30, 100], "Chrom (Cr)": [30, 100], "Cobalt (Co)": [1000], "Eisen (Fe)": [100], "Kupfer (Cu)": [30, 100], "Lithium (Li)": [30, 100], "Zink (Zn)": [100], "Mangan (Mn)": [30, 100], "Nickel (Ni)": [1000], "Molybdän (Mo)": [30, 100] }
 };
 
 const crOrder = [
@@ -33,7 +25,7 @@ const crOrder = [
 
 const mixDefinitions = {
     kationen: ["Cobalt (Co)", "Nickel (Ni)", "Eisen (Fe)", "Mangan (Mn)", "Kupfer (Cu)", "Chrom (Cr)", "Zink (Zn)"],
-    anionen: ["Fluor (F)", "Iod", "Vanadium", "Selen"]
+    anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
 const densityFactors = {
@@ -42,29 +34,27 @@ const densityFactors = {
     "Natriumfluorid (NaF)": 1.000, "Bor (B)": 0.999, "Natriumchlorid (NaCl)": 1.192,
     "Kaliumsulfat (K2SO4)": 1.067, "Natriumsulfat (Na2SO4)": 1.110, "Barium (Ba)": 1.005,
     "Chrom (Cr)": 1.047, "Cobalt (Co)": 1.000, "Eisen (Fe)": 1.039, "Kupfer (Cu)": 1.024,
-    "Mangan (Mn)": 1.234, "Molybdän (Mo)": 1.002, "Nickel (Ni)": 0.999, "Selen": 1.010,
-    "Vanadium": 1.026, "Zink (Zn)": 1.024, "Iod": 1.097, "Fluor (F)": 1.009, "Lithium (Li)": 1.023
+    "Mangan (Mn)": 1.234, "Molybdän (Mo)": 1.002, "Nickel (Ni)": 0.999, "Selen (Se)": 1.010,
+    "Vanadium (V)": 1.026, "Zink (Zn)": 1.024, "Iod (I)": 1.097, "Fluor (F)": 1.009, "Lithium (Li)": 1.023
 };
 
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 
-const DB_KEY = 'osci_db_v5_2';
+const DB_KEY = 'osci_db_v5';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 let currentAction = {};
 
 // --- INITIALISIERUNG ---
 function initDB() {
     try {
-        let saved = localStorage.getItem(DB_KEY) || localStorage.getItem('osci_db_v5_1') || localStorage.getItem('osci_db_v5') || localStorage.getItem('osci_db_v4');
+        let saved = localStorage.getItem(DB_KEY);
+        if (!saved) saved = localStorage.getItem('osci_db_v4');
+        if (!saved) saved = localStorage.getItem('osci_db_v3');
         if (saved) {
             let parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object') {
-                db = parsed;
-            }
+            if (parsed && typeof parsed === 'object') db = parsed;
         }
-    } catch (e) { 
-        console.error("Fehler beim Laden der Datenbank:", e); 
-    }
+    } catch (e) { console.error("Fehler beim Laden:", e); }
 
     if (!db.inventory) db.inventory = {};
     if (!db.stats) db.stats = {};
@@ -81,32 +71,18 @@ function initDB() {
     saveDB();
 }
 
-function saveDB() { 
-    try { 
-        localStorage.setItem(DB_KEY, JSON.stringify(db)); 
-    } catch(e) {
-        console.error("Speichern fehlgeschlagen:", e);
-    } 
-}
+function saveDB() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {} }
 
 // --- UI / MENÜ STEUERUNG ---
 function toggleMenu() {
-    const nav = document.getElementById('main-nav');
-    const backdrop = document.getElementById('menu-backdrop');
-    if (nav && backdrop) {
-        nav.classList.toggle('open');
-        backdrop.classList.toggle('open');
-    }
+    document.getElementById('main-nav').classList.toggle('open');
+    document.getElementById('menu-backdrop').classList.toggle('open');
 }
 
 function selectTab(tabId) {
     showTab(tabId);
-    const nav = document.getElementById('main-nav');
-    const backdrop = document.getElementById('menu-backdrop');
-    if (nav && backdrop) {
-        nav.classList.remove('open');
-        backdrop.classList.remove('open');
-    }
+    document.getElementById('main-nav').classList.remove('open');
+    document.getElementById('menu-backdrop').classList.remove('open');
 }
 
 function showTab(tabId) {
@@ -141,7 +117,7 @@ function renderLager() {
                 let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
             } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
-                let fStock = (db.inventory["Trace Elements"] && db.inventory["Trace Elements"]["Fluor (F)"]) || 0;
+                let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
                 crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
             }
             container.innerHTML += `
@@ -268,32 +244,9 @@ function openModal(cat, item, action) {
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
-    if (!modal || !modalBody) return;
-    
     document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
     
-    // Dynamische Gebinde-Auswahl (Nur beim Einlagern sichtbar)
-    let presetButtonsHTML = '';
-    if (action === 'in' && catalog[cat] && catalog[cat][item]) {
-        const sizes = catalog[cat][item];
-        presetButtonsHTML = `
-            <div style="margin-bottom: 15px;">
-                <label style="display:block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px;">Schnellauswahl Gebinde:</label>
-                <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                    ${sizes.map(size => `
-                        <button type="button" class="btn-secondary" style="flex:1; padding:8px; font-size:0.85rem; min-width:70px;" 
-                                onclick="document.getElementById('amount').value = ${size}; document.getElementById('unitSelect').value = 'ml'; toggleContainerOptions();">
-                            ${size} ml
-                        </button>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-    
     modalBody.innerHTML = `
-        ${presetButtonsHTML}
-        
         <div class="input-group">
             <label>Einheit auswählen:</label>
             <select id="unitSelect" onchange="toggleContainerOptions()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
@@ -316,38 +269,23 @@ function openModal(cat, item, action) {
             <label>Menge eingeben:</label>
             <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" style="width:100%; padding:12px;">
         </div>
-        <button class="btn-primary btn-animated" style="margin-top:15px;" onclick="executeAction()">Buchung ausführen</button>
+        <button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction()">Buchung ausführen</button>
     `;
     modal.style.display = 'flex';
 }
 
 function toggleContainerOptions() {
-    const unitSel = document.getElementById('unitSelect');
-    const useCont = document.getElementById('useContainer');
-    const contSec = document.getElementById('containerSection');
-    const contSel = document.getElementById('containerSelect');
-    
-    if(!unitSel || !contSec || !contSel || !useCont) return;
-
-    const isGram = unitSel.value === 'g';
-    const isChecked = useCont.checked;
-    
-    contSec.style.display = isGram ? 'block' : 'none';
-    contSel.style.display = (isGram && isChecked) ? 'block' : 'none';
+    const isGram = document.getElementById('unitSelect').value === 'g';
+    const isChecked = document.getElementById('useContainer').checked;
+    document.getElementById('containerSection').style.display = isGram ? 'block' : 'none';
+    document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
 }
 
-function closeModal() { 
-    const modal = document.getElementById('modal');
-    if(modal) modal.style.display = 'none'; 
-}
+function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
 function executeAction() {
-    const amountInput = document.getElementById('amount');
-    const unitSel = document.getElementById('unitSelect');
-    if(!amountInput || !unitSel) return;
-
-    let rawAmount = parseFloat(amountInput.value);
-    let unit = unitSel.value;
+    let rawAmount = parseFloat(document.getElementById('amount').value);
+    let unit = document.getElementById('unitSelect').value;
     let { cat, item, action } = currentAction;
     
     if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
@@ -356,10 +294,8 @@ function executeAction() {
     
     // Umrechnung wenn in Gramm gewogen wurde
     if (unit === 'g') {
-        const useCont = document.getElementById('useContainer');
-        const contSel = document.getElementById('containerSelect');
-        if (useCont && useCont.checked && contSel) {
-            let containerWeight = containers[contSel.value] || 0;
+        if (document.getElementById('useContainer').checked) {
+            let containerWeight = containers[document.getElementById('containerSelect').value];
             finalMl -= containerWeight;
         }
         let factor = densityFactors[item] || 1.0;
@@ -380,13 +316,14 @@ function executeAction() {
     else {
         let stock = db.inventory[cat][item] || 0;
         if (stock - finalMl < 0) {
+            // Spezialwarnungen für Fluor
             if (item === "Fluor (F)") {
                 let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
                 alert(`Mangel an Fluor (F)!\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
                 return;
             } else if (item === "Natriumfluorid (NaF)") {
-                let alt = db.inventory["Trace Elements"]["Fluor (F)"] || 0;
-                alert(`Mangel an Natriumfluorid (NaF)!\nHinweis: Fluor (F) aus den Trace Elements ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
+                let alt = db.inventory["Anionen"]["Fluor (F)"] || 0;
+                alert(`Mangel an Natriumfluorid (NaF)!\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
                 return;
             }
             
@@ -411,11 +348,7 @@ function executeAction() {
 
 function showConflictModal(cat, item, required, current, proceedCallback) {
     const modalBody = document.getElementById('modal-body');
-    const modalTitle = document.getElementById('modal-title');
-    const modal = document.getElementById('modal');
-    if(!modalBody || !modalTitle || !modal) return;
-
-    modalTitle.innerText = "⚠️ Bestands-Warnung";
+    document.getElementById('modal-title').innerText = "⚠️ Bestands-Warnung";
     let missing = required - current;
     
     modalBody.innerHTML = `
@@ -427,10 +360,8 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
         </div>
         <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
     `;
-    
-    const btn = document.getElementById('proceed-conflict-btn');
-    if(btn) btn.onclick = proceedCallback;
-    modal.style.display = 'flex';
+    document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
+    document.getElementById('modal').style.display = 'flex';
 }
 
 function addLog(cat, item, action, amount) {
@@ -457,11 +388,9 @@ function undoLog(index) {
     renderLogs();
 }
 
-// --- BATCH VERARBEITUNG & MISCHUNGEN ---
+// --- QUEUE & LISTEN VERARBEITUNG ---
 function processCRPaste() {
-    const pasteArea = document.getElementById('cr-paste-area');
-    if(!pasteArea) return;
-    const text = pasteArea.value;
+    const text = document.getElementById('cr-paste-area').value;
     const matches = text.match(/([\d.]+)\s*ml/g);
     if (!matches || matches.length < crOrder.length) return alert("Fehler: Format ungültig.");
     
@@ -475,12 +404,13 @@ function processCRPaste() {
 
 function auslagernMischung(typ) {
     let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
+    let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
     let queue = [];
     
     for (let item of mixDefinitions[typ]) {
         let inputEl = document.getElementById(prefix + item.replace(/[^a-zA-Z]/g, ''));
         let amount = inputEl ? parseFloat(inputEl.value) : 0;
-        if (amount > 0) queue.push({ cat: "Trace Elements", item, amount });
+        if (amount > 0) queue.push({ cat: catName, item, amount });
     }
     if (queue.length === 0) return alert("Trage mindestens bei einem Element eine Menge ein.");
     executeQueueWithConflictHandling(queue, 0);
@@ -515,7 +445,7 @@ function executeQueueWithConflictHandling(queue, index) {
     }
 }
 
-// --- BACKUP & DATA RESETS ---
+// --- BACKUP & RESETS ---
 function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in db.stats) db.stats[i]=0; db.statsStarted=Date.now(); saveDB(); renderStats(); alert("Statistiken auf 0 gesetzt."); } }
 function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; saveDB(); renderLogs(); alert("Protokoll gelöscht."); } }
 function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; saveDB(); renderLager(); alert("Lager ist leer."); } }
@@ -529,9 +459,7 @@ function exportData() {
 }
 
 function importData() {
-    const fileInput = document.getElementById('importFile');
-    if(!fileInput) return;
-    let file = fileInput.files[0];
+    let file = document.getElementById('importFile').files[0];
     if (!file) return alert("Bitte wähle eine Datei (.txt) aus.");
     let reader = new FileReader();
     reader.onload = e => {
@@ -547,8 +475,6 @@ function importData() {
 // --- AMBIENT PARTY MODE ---
 function togglePartyMode() { document.body.classList.toggle('party-mode'); }
 
-// APP-START TRIGGER
-window.addEventListener('DOMContentLoaded', () => {
-    initDB();
-    renderLager();
-});
+// APP START
+initDB();
+renderLager();
