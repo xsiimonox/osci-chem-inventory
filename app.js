@@ -1,15 +1,10 @@
 const catalog = {
     "C&R Produkte": {
-        "Strontiumchlorid (SrCl2)": [100, 1000],
-        "Magnesiumsulfat (MgSO4)": [1000, 5000],
-        "Magnesiumchlorid (MgCl2)": [1000, 5000],
-        "Kaliumbromid (KBr)": [1000, 5000],
-        "Calciumchlorid (CaCl2)": [1000, 5000],
-        "Kaliumchlorid (KCl)": [1000, 5000],
-        "Natriumfluorid (NaF)": [5000],
-        "Bor (B)": [1000, 5000],
-        "Natriumchlorid (NaCl)": [5000, 10000],
-        "Kaliumsulfat (K2SO4)": [1000, 5000],
+        "Strontiumchlorid (SrCl2)": [100, 1000], "Magnesiumsulfat (MgSO4)": [1000, 5000],
+        "Magnesiumchlorid (MgCl2)": [1000, 5000], "Kaliumbromid (KBr)": [1000, 5000],
+        "Calciumchlorid (CaCl2)": [1000, 5000], "Kaliumchlorid (KCl)": [1000, 5000],
+        "Natriumfluorid (NaF)": [5000], "Bor (B)": [1000, 5000],
+        "Natriumchlorid (NaCl)": [5000, 10000], "Kaliumsulfat (K2SO4)": [1000, 5000],
         "Natriumsulfat (Na2SO4)": [5000]
     },
     "Makro Elements": {
@@ -29,16 +24,11 @@ const catalog = {
 };
 
 const crOrder = [
-    { name: "Natriumchlorid (NaCl)", cat: "C&R Produkte" },
-    { name: "Magnesiumchlorid (MgCl2)", cat: "C&R Produkte" },
-    { name: "Natriumsulfat (Na2SO4)", cat: "C&R Produkte" },
-    { name: "Magnesiumsulfat (MgSO4)", cat: "C&R Produkte" },
-    { name: "Kaliumchlorid (KCl)", cat: "C&R Produkte" },
-    { name: "Kaliumsulfat (K2SO4)", cat: "C&R Produkte" },
-    { name: "Kaliumbromid (KBr)", cat: "C&R Produkte" },
-    { name: "Strontiumchlorid (SrCl2)", cat: "C&R Produkte" },
-    { name: "Calciumchlorid (CaCl2)", cat: "C&R Produkte" },
-    { name: "Natriumfluorid (NaF)", cat: "C&R Produkte" },
+    { name: "Natriumchlorid (NaCl)", cat: "C&R Produkte" }, { name: "Magnesiumchlorid (MgCl2)", cat: "C&R Produkte" },
+    { name: "Natriumsulfat (Na2SO4)", cat: "C&R Produkte" }, { name: "Magnesiumsulfat (MgSO4)", cat: "C&R Produkte" },
+    { name: "Kaliumchlorid (KCl)", cat: "C&R Produkte" }, { name: "Kaliumsulfat (K2SO4)", cat: "C&R Produkte" },
+    { name: "Kaliumbromid (KBr)", cat: "C&R Produkte" }, { name: "Strontiumchlorid (SrCl2)", cat: "C&R Produkte" },
+    { name: "Calciumchlorid (CaCl2)", cat: "C&R Produkte" }, { name: "Natriumfluorid (NaF)", cat: "C&R Produkte" },
     { name: "Bor (B)", cat: "C&R Produkte" }
 ];
 
@@ -47,25 +37,32 @@ const mixDefinitions = {
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
-let db = { inventory: {}, stats: {} };
+let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now() };
 
 function initDB() {
-    let saved = localStorage.getItem('osci_db_v3');
+    let saved = localStorage.getItem('osci_db_v4');
     if (saved) {
         db = JSON.parse(saved);
+        if(!db.logs) db.logs = [];
+        if(!db.statsStarted) db.statsStarted = Date.now();
     } else {
-        for (let cat in catalog) {
-            db.inventory[cat] = {};
-            for (let item in catalog[cat]) {
-                db.inventory[cat][item] = 0;
-                db.stats[item] = 0;
-            }
-        }
-        saveDB();
+        clearAllDataStructure();
     }
 }
 
-function saveDB() { localStorage.setItem('osci_db_v3', JSON.stringify(db)); }
+function clearAllDataStructure() {
+    db.inventory = {}; db.stats = {}; db.logs = []; db.statsStarted = Date.now();
+    for (let cat in catalog) {
+        db.inventory[cat] = {};
+        for (let item in catalog[cat]) {
+            db.inventory[cat][item] = 0;
+            db.stats[item] = 0;
+        }
+    }
+    saveDB();
+}
+
+function saveDB() { localStorage.setItem('osci_db_v4', JSON.stringify(db)); }
 
 function showTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -75,6 +72,7 @@ function showTab(tabId) {
     if(tabId === 'lager') renderLager();
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
+    if(tabId === 'log') renderLogs();
 }
 
 function renderLager() {
@@ -106,183 +104,97 @@ function renderLager() {
     }
 }
 
-// Generiert die individuellen Eingabefelder für jedes Element im Trace Export
 function renderTraceExportInputs() {
     const katContainer = document.getElementById('kationen-inputs-container');
     const anContainer = document.getElementById('anionen-inputs-container');
-    
     katContainer.innerHTML = mixDefinitions.kationen.map(item => `
         <div class="trace-grid">
             <label>${item}</label>
             <input type="number" step="0.1" min="0" value="0" id="mix-kat-${item.replace(/[^a-zA-Z]/g, '')}">
+            <span class="unit-label">ml</span>
         </div>
     `).join('');
-    
     anContainer.innerHTML = mixDefinitions.anionen.map(item => `
         <div class="trace-grid">
             <label>${item}</label>
             <input type="number" step="0.1" min="0" value="0" id="mix-an-${item.replace(/[^a-zA-Z]/g, '')}">
+            <span class="unit-label">ml</span>
         </div>
     `).join('');
 }
 
 function renderStats() {
+    document.getElementById('stats-start-date').innerText = "Statistik aufgezeichnet seit: " + new Date(db.statsStarted).toLocaleDateString();
     const container = document.getElementById('stats-container');
     container.innerHTML = '';
+    
+    let daysElapsed = Math.max(1, (Date.now() - db.statsStarted) / (1000 * 60 * 60 * 24));
+    let weeksElapsed = daysElapsed / 7;
+    let monthsElapsed = daysElapsed / 30.42;
+    let yearsElapsed = daysElapsed / 365;
+
     let content = '';
     for (let item in db.stats) {
-        if (db.stats[item] > 0) {
-            content += `<div class="stat-item"><span>${item}</span><strong>${db.stats[item].toFixed(1)} ml</strong></div>`;
+        let totalConsumed = db.stats[item] || 0;
+        if (totalConsumed > 0) {
+            let perWeek = totalConsumed / weeksElapsed;
+            let perMonth = totalConsumed / monthsElapsed;
+            let perYear = totalConsumed / yearsElapsed;
+            
+            // Reichweiten-Prognose (Feature)
+            let currentStock = findCurrentStock(item);
+            let prognosisText = "Keine Prognose möglich";
+            if (perWeek > 0) {
+                let weeksLeft = currentStock / perWeek;
+                prognosisText = weeksLeft > 52 ? `Reichweite: >1 Jahr` : `Reichweite: ca. ${weeksLeft.toFixed(1)} Wochen`;
+            }
+
+            content += `
+                <div class="stat-block">
+                    <h4 style="margin:0 0 5px 0; color: var(--primary);">${item}</h4>
+                    <div style="font-size:0.85rem; margin-bottom:5px;">Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong></div>
+                    <div class="stat-grid">
+                        <div><strong>${perWeek.toFixed(1)} ml</strong>/Woche</div>
+                        <div><strong>${perMonth.toFixed(1)} ml</strong>/Monat</div>
+                        <div><strong>${perYear.toFixed(1)} ml</strong>/Jahr</div>
+                    </div>
+                    <div class="prognose-badge">${prognosisText}</div>
+                </div>
+            `;
         }
     }
     container.innerHTML = content || '<p class="hint">Noch keine Verbräuche aufgezeichnet.</p>';
 }
 
-let currentAction = {};
-function openModal(cat, item, action) {
-    currentAction = { cat, item, action };
-    const modal = document.getElementById('modal');
-    document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
-    let html = '';
-    if (action === 'in') {
-        html += `<p class="hint">Standardgebinde wählen:</p><div class="preset-btns">`;
-        catalog[cat][item].forEach(p => {
-            html += `<button onclick="document.getElementById('amount').value='${p}'">${p} ml</button>`;
-        });
-        html += `</div>`;
+function findCurrentStock(itemName) {
+    for (let cat in catalog) {
+        if (catalog[cat][itemName] !== undefined) return db.inventory[cat][itemName];
     }
-    html += `
-        <div class="input-group">
-            <label>Menge eingeben (ml):</label>
-            <input type="number" step="0.01" id="amount" placeholder="z.B. 12.5" autofocus>
-        </div>
-        <button class="btn-primary btn-animated" onclick="executeAction()">Bestätigen</button>
-    `;
-    document.getElementById('modal-body').innerHTML = html;
-    modal.style.display = 'flex';
+    return 0;
 }
 
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
-
-function executeAction() {
-    let amount = parseFloat(document.getElementById('amount').value);
-    if (isNaN(amount) || amount <= 0) return alert("Bitte eine gültige Menge eingeben.");
-    let { cat, item, action } = currentAction;
-    
-    if (action === 'in') {
-        db.inventory[cat][item] += amount;
-    } else {
-        if (db.inventory[cat][item] - amount < 0) {
-            if (item === "Fluor (F)") {
-                let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"];
-                alert(`Mangel an Fluor (F)!\n\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
-                return;
-            } else if (item === "Natriumfluorid (NaF)") {
-                let alt = db.inventory["Anionen"]["Fluor (F)"];
-                alert(`Mangel an Natriumfluorid (NaF)!\n\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
-                return;
-            } else {
-                alert(`Nicht genügend Bestand von ${item} auf Lager.`);
-                return;
-            }
-        }
-        db.inventory[cat][item] -= amount;
-        db.stats[item] += amount;
+function resetStats() {
+    if (confirm("Möchtest du die Verbrauchsstatistiken wirklich zurücksetzen? Der aktuelle Lagerbestand bleibt erhalten.")) {
+        for (let item in db.stats) db.stats[item] = 0;
+        db.statsStarted = Date.now();
+        saveDB();
+        renderStats();
     }
-    saveDB();
-    closeModal();
-    renderLager();
 }
 
-function processCRPaste() {
-    const text = document.getElementById('cr-paste-area').value;
-    const matches = text.match(/([\d.]+)\s*ml/g);
-    if (!matches || matches.length < crOrder.length) {
-        return alert("Fehler: Das Format konnte nicht verarbeitet werden. Bitte kopiere die exakte Zeile hinein.");
-    }
-    let updates = [];
-    for (let i = 0; i < crOrder.length; i++) {
-        let valStr = matches[i].replace(/[^\d.]/g, '');
-        let amount = parseFloat(valStr);
-        let item = crOrder[i].name;
-        let cat = crOrder[i].cat;
-        if (amount > 0) {
-            if (db.inventory[cat][item] - amount < 0) {
-                return alert(`Abbruch: Zu wenig Bestand für ${item}. Benötigt werden ${amount} ml.`);
-            }
-            updates.push({ cat, item, amount });
-        }
-    }
-    updates.forEach(u => {
-        db.inventory[u.cat][u.item] -= u.amount;
-        db.stats[u.item] += u.amount;
-    });
-    saveDB();
-    document.getElementById('cr-paste-area').value = '';
-    alert("C&R Werte erfolgreich ausgelesen und vom Bestand abgezogen!");
-    showTab('lager');
-}
-
-// Verarbeitet das Auslagern der individuellen Mischungsmengen
-function auslagernMischung(typ) {
-    let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
-    let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
-    let elements = mixDefinitions[typ];
-    
-    let itemsToDeduct = [];
-    
-    for (let item of elements) {
-        let inputId = prefix + item.replace(/[^a-zA-Z]/g, '');
-        let inputEl = document.getElementById(inputId);
-        let amount = parseFloat(inputEl.value) || 0;
-        
-        if (amount > 0) {
-            if (db.inventory[catName][item] - amount < 0) {
-                return alert(`Mischung blockiert: Nicht genug Bestand bei "${item}"! Vorhanden: ${db.inventory[catName][item]} ml. Benötigt: ${amount} ml.`);
-            }
-            itemsToDeduct.push({ cat: catName, item: item, amount: amount });
-        }
+// Protokollierung rendern
+function renderLogs() {
+    const container = document.getElementById('log-container');
+    container.innerHTML = '';
+    if (!db.logs || db.logs.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
+        return;
     }
     
-    if (itemsToDeduct.length === 0) {
-        return alert("Bitte trage bei mindestens einem Element eine Menge ein.");
-    }
-    
-    itemsToDeduct.forEach(i => {
-        db.inventory[i.cat][i.item] -= i.amount;
-        db.stats[i.item] += i.amount;
-    });
-    
-    saveDB();
-    alert(`Die gewählten Mengen für die ${typ.toUpperCase()}-Mischung wurden erfolgreich abgezogen!`);
-    showTab('lager');
-}
-
-function exportData() {
-    let dataStr = JSON.stringify(db, null, 2);
-    let blob = new Blob([dataStr], { type: "text/plain" });
-    let a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_Bestand_${new Date().toISOString().split('T')[0]}.txt`;
-    a.click();
-}
-
-function importData() {
-    let file = document.getElementById('importFile').files[0];
-    if (!file) return alert("Bitte wähle zuerst eine Sicherungsdatei (.txt) aus.");
-    let reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            db = JSON.parse(e.target.result);
-            saveDB();
-            alert("Sicherung erfolgreich geladen!");
-            showTab('lager');
-        } catch (err) {
-            alert("Fehler: Ungültiges Dateiformat.");
-        }
-    };
-    reader.readAsText(file);
-}
-
-initDB();
-renderLager();
+    // Die neuesten Aktionen ganz oben anzeigen
+    let logHTML = db.logs.map((log, index) => `
+        <div class="log-item ${log.action}">
+            <div class="log-details">
+                <strong>${log.item}</strong><br>
+                <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${log.amount.toFixed(2)} ml</span><br>
+                <span class="log-date">${new Date(log.timestamp
