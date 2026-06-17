@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.3.0</span>
+                <span class="version-badge">v1.4.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -21,7 +21,7 @@
                 <div class="bar"></div>
             </button>
         </div>
-        <div class="subtitle">Lagerverwaltung & Statistik</div>
+        <div class="subtitle">Lagerverwaltung &amp; Statistik</div>
     </header>
 
     <nav class="nav-menu" id="main-nav">
@@ -31,11 +31,11 @@
         </div>
         <div class="nav-links">
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
-            <button onclick="selectTab('cr-export')" id="tab-cr-export">C&R</button>
+            <button onclick="selectTab('cr-export')" id="tab-cr-export">C&amp;R</button>
             <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
-            <button onclick="selectTab('daten')" id="tab-daten">Daten</button>
+            <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
         </div>
     </nav>
     
@@ -46,7 +46,7 @@
 
         <div id="cr-export" class="tab-content">
             <div class="card card-accent">
-                <h3>C&R Liste per Copy & Paste auslagern</h3>
+                <h3>C&amp;R Liste per Copy &amp; Paste auslagern</h3>
                 <p class="hint">Füge hier die unformatierte Zeile aus deiner Auswertung ein:</p>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..." oninput="previewCRPaste()"></textarea>
                 
@@ -75,7 +75,7 @@
         <div id="statistik" class="tab-content">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Verbrauchsstatistik & Prognose</h3>
+                    <h3>Verbrauchsstatistik &amp; Prognose</h3>
                     <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
                 </div>
                 <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
@@ -91,15 +91,37 @@
             </div>
         </div>
 
-        <div id="daten" class="tab-content">
-            <div class="card" style="border: 1px solid #ffd60a; background: rgba(255, 214, 10, 0.02); margin-bottom: 20px;">
-                <h3 style="color: #ffd60a;">Ambientlight & Effekt-Steuerung</h3>
+        <!-- REITER UMGERANNT AUF EINSTELLUNGEN -->
+        <div id="einstellungen" class="tab-content">
+            
+            <!-- NEU: SYSTEM & VERSION MIT UPDATE-ZWANG BUTTON -->
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">System &amp; Updates</h3>
+                <p class="hint">Falls eine neue Version bereitgestellt wurde, kannst du hier das Update direkt erzwingen, ohne mühsam den Browser-Cache leeren zu müssen.</p>
+                <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
+                    🚀 Neue Version laden (Cache leeren)
+                </button>
+            </div>
+
+            <!-- ANPASSUNG: STYLING & DESIGNS (GIRL EDITION) -->
+            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--primary);">Design &amp; Effekte</h3>
+                
                 <div class="switch-container">
-                    <span style="font-weight: 600; font-size: 0.95rem;">💥 Disko- & Animationsmodus</span>
+                    <span style="font-weight: 600; font-size: 0.95rem;">💥 Disko- &amp; Animationsmodus</span>
                     <label class="switch">
                         <input type="checkbox" id="partyToggle" onchange="togglePartyMode()">
                         <span class="slider"></span>
                     </label>
+                </div>
+
+                <div class="input-group" style="margin-top: 15px;">
+                    <label style="font-weight: 600;">🎨 Farbschema der App wechseln:</label>
+                    <select id="themeSelect" onchange="applyTheme(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
+                        <option value="default">Standard (Cyber Purple)</option>
+                        <option value="girl">Girl Edition (Neon Pink) 🎀</option>
+                        <option value="mint">Mint Clean (Ocean Mint) 🌊</option>
+                    </select>
                 </div>
             </div>
 
@@ -140,7 +162,7 @@
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
-                .then(() => console.log('OSCI Service Worker aktiv.'))
+                .then(() => console.log('OSCI Motion Service Worker aktiv.'))
                 .catch(err => console.error('PWA Fehler:', err));
         }
     </script>
