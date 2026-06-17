@@ -126,24 +126,35 @@ function showTab(tabId) {
     if(tabId === 'log') renderLogs();
 }
 
-// --- RENDER FUNKTIONEN ---
+// --- RENDER FUNKTION ---
 function renderLager() {
     const container = document.getElementById('lager');
     if (!container) return;
-    container.innerHTML = '';
     
+    // Zuerst den Button oben einfügen
+    container.innerHTML = `
+        <div style="margin-bottom: 20px;">
+            <button class="btn-primary" onclick="exportToPDF()" style="width: 100%; padding: 15px; border-radius: 10px; background: var(--primary); border: none; color: #fff; font-weight: bold; cursor: pointer;">
+                📄 PDF-Bestandsliste exportieren
+            </button>
+        </div>
+    `;
+    
+    // Dann die Kategorien und Artikel wie gewohnt rendern
     for (let cat in catalog) {
         container.innerHTML += `<h2 class="category-title">${cat}</h2>`;
         for (let item in catalog[cat]) {
             let stock = db.inventory[cat][item] || 0;
             let crossHint = "";
+            // ... (Hier bleibt dein bisheriger Logik-Code für die Hinweise) ...
             if (item === "Fluor (F)" && stock === 0) {
                 let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
-                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
+                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF: ${nafStock.toFixed(1)} ml)</span>`;
             } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
                 let fStock = (db.inventory["Trace Elements"] && db.inventory["Trace Elements"]["Fluor (F)"]) || 0;
-                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
+                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor: ${fStock.toFixed(1)} ml)</span>`;
             }
+            
             container.innerHTML += `
                 <div class="card">
                     <h4><span>${item}</span> <span class="stock">${stock.toFixed(1)} ml</span></h4>
