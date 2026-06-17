@@ -16,8 +16,8 @@
 
     <nav class="tabs">
         <button onclick="showTab('lager')" class="active" id="tab-lager">Lager</button>
-        <button onclick="showTab('cr-import')" id="tab-cr-import">C&R Import</button>
-        <button onclick="showTab('mischungen')" id="tab-mischungen">Mischungen</button>
+        <button onclick="showTab('cr-export')" id="tab-cr-export">C&R export</button>
+        <button onclick="showTab('trace-export')" id="tab-trace-export">Trace export</button>
         <button onclick="showTab('statistik')" id="tab-statistik">Statistik</button>
         <button onclick="showTab('daten')" id="tab-daten">Daten</button>
     </nav>
@@ -25,33 +25,28 @@
     <main id="app">
         <div id="lager" class="tab-content active"></div>
 
-        <div id="cr-import" class="tab-content">
+        <div id="cr-export" class="tab-content">
             <div class="card card-accent">
                 <h3>C&R Liste per Copy & Paste auslagern</h3>
-                <p class="hint">Füge hier einfach die unformatierte Zeile aus deiner Auswertung ein:</p>
+                <p class="hint">Füge hier die unformatierte Zeile aus deiner Auswertung ein:</p>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..."></textarea>
                 <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
             </div>
         </div>
 
-        <div id="mischungen" class="tab-content">
+        <div id="trace-export" class="tab-content">
             <div class="card">
                 <h3>Kationen Mischung</h3>
-                <p class="mix-info">Bestandteile: Cobalt, Nickel, Eisen, Mangan, Kupfer, Chrom, Zink</p>
-                <div class="input-group">
-                    <label>Menge pro Element (ml):</label>
-                    <input type="number" id="kationen-amount" value="10" step="0.1">
-                </div>
-                <button class="btn-danger btn-animated" onclick="auslagernMischung('kationen')">Mischung abziehen</button>
+                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein (0 für weglassen):</p>
+                <div id="kationen-inputs-container"></div>
+                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('kationen')">Kationen Mischung abziehen</button>
             </div>
-            <div class="card">
+            
+            <div class="card" style="margin-top: 20px;">
                 <h3>Anionen Mischung</h3>
-                <p class="mix-info">Bestandteile: Fluor, Iod, Vanadium, Selen</p>
-                <div class="input-group">
-                    <label>Menge pro Element (ml):</label>
-                    <input type="number" id="anionen-amount" value="10" step="0.1">
-                </div>
-                <button class="btn-danger btn-animated" onclick="auslagernMischung('anionen')">Mischung abziehen</button>
+                <p class="hint">Gib für jedes Element die gewünschte Entnahmemenge ein (0 für weglassen):</p>
+                <div id="anionen-inputs-container"></div>
+                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
             </div>
         </div>
 
@@ -88,7 +83,6 @@
 
     <script src="app.js"></script>
     <script>
-        // Registrierung des Service Workers für die Offline-PWA Funktionalität
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => console.log('OSCI Service Worker aktiv.'))
