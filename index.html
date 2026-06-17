@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.2.0</span>
+                <span class="version-badge">v1.3.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -48,7 +48,13 @@
             <div class="card card-accent">
                 <h3>C&R Liste per Copy & Paste auslagern</h3>
                 <p class="hint">Füge hier die unformatierte Zeile aus deiner Auswertung ein:</p>
-                <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..."></textarea>
+                <textarea id="cr-paste-area" placeholder="Beispiel: NaClMgCl2...4798.13 ml25.24 ml..." oninput="previewCRPaste()"></textarea>
+                
+                <div id="cr-preview-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px dashed var(--border);">
+                    <h4 style="margin: 0 0 10px 0; color: var(--secondary); font-size: 0.95rem;">Live Vorschau (Mengen):</h4>
+                    <div id="cr-preview-list"></div>
+                </div>
+
                 <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
             </div>
         </div>
