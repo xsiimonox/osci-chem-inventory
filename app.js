@@ -434,7 +434,7 @@ function openModal(cat, item, action) {
     modalBody.innerHTML = `
         <div class="input-group">
             <label>Einheit auswählen:</label>
-            <select id="unitSelect" onchange="toggleContainerOptions()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+            <select id="unitSelect" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
                 <option value="ml">Milliliter (ml)</option>
                 <option value="g">Gramm (g)</option>
             </select>
@@ -442,17 +442,18 @@ function openModal(cat, item, action) {
         
         <div id="containerSection" style="display:none; margin-top:15px; padding:10px; background:rgba(255,255,255,0.05); border-radius:10px;">
             <label style="display:flex; align-items:center; gap:10px; color:#fff;">
-                <input type="checkbox" id="useContainer" onchange="toggleContainerOptions()" style="width:20px; height:20px; margin:0;"> 
+                <input type="checkbox" id="useContainer" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:20px; height:20px; margin:0;"> 
                 Behälter-Gewicht (Tara) abziehen
             </label>
-            <select id="containerSelect" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
+            <select id="containerSelect" onchange="updateLiveConversion();" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
                 ${Object.keys(containers).map(c => `<option value="${c}">${c} (wiegt ${containers[c]}g)</option>`).join('')}
             </select>
         </div>
 
         <div class="input-group" style="margin-top:15px;">
             <label>Menge eingeben:</label>
-            <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" style="width:100%; padding:12px;">
+            <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" oninput="updateLiveConversion()" style="width:100%; padding:12px;">
+            <div id="liveConversion" style="margin-top: 8px; font-size: 0.9rem; color: var(--secondary); font-weight: 600; text-align: center; height: 1.2rem;"></div>
         </div>
         <button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction()">Buchung ausführen</button>
     `;
@@ -466,10 +467,46 @@ function toggleContainerOptions() {
     document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
 }
 
+function updateLiveConversion() {
+    const amountInput = document.getElementById('amount');
+    const liveDiv = document.getElementById('liveConversion');
+    if (!amountInput || !liveDiv) return;
+
+    let rawAmount = parseFloat(amountInput.value);
+    if (isNaN(rawAmount) || rawAmount <= 0) {
+        liveDiv.innerText = '';
+        return;
+    }
+
+    let unit = document.getElementById('unitSelect').value;
+    let factor = densityFactors[currentAction.item] || 1.0;
+
+    if (unit === 'ml') {
+        let finalG = rawAmount * factor;
+        liveDiv.innerText = `≈ ${finalG.toFixed(1)} g`;
+    } else if (unit === 'g') {
+        let netG = rawAmount;
+        if (document.getElementById('useContainer').checked) {
+            let containerWeight = containers[document.getElementById('containerSelect').value];
+            netG -= containerWeight;
+        }
+        if (netG < 0) {
+            liveDiv.innerText = `⚠️ Behälter ist schwerer als Eingabe!`;
+            liveDiv.style.color = 'var(--danger)';
+        } else {
+            let finalMl = netG / factor;
+            liveDiv.innerText = `≈ ${finalMl.toFixed(1)} ml`;
+            liveDiv.style.color = 'var(--secondary)';
+        }
+    }
+}
+
+
 // Hier wird sichergestellt, dass beim manuellen Öffnen der Einstellungen das Dropdown synchron ist
 document.addEventListener("DOMContentLoaded", () => {
     const themeSelect = document.getElementById('themeSelect');
     if(themeSelect && db.theme) themeSelect.value = db.theme;
+    initBulkProductSelect();
 });
 
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -710,6 +747,166 @@ function importData() {
 
 // --- AMBIENT PARTY MODE ---
 function togglePartyMode() { document.body.classList.toggle('party-mode'); }
+
+
+// --- MASSEN-EINGANG (WARENKORB SYSTEM MIT DYNAMISCHER SCHNELLAUSWAHL) ---
+let bulkCart = [];
+
+function initBulkProductSelect() {
+    const select = document.getElementById('bulkProductSelect');
+    if (!select) return;
+    
+    select.innerHTML = '';
+    
+    // Leere Option als Standard
+    let defaultOpt = document.createElement('option');
+    defaultOpt.value = "";
+    defaultOpt.innerText = "-- Produkt wählen --";
+    select.appendChild(defaultOpt);
+    
+    for (let category in catalog) {
+        let optGroup = document.createElement('optgroup');
+        optGroup.label = category;
+        
+        for (let item in catalog[category]) {
+            let option = document.createElement('option');
+            option.value = JSON.stringify({ cat: category, item: item });
+            option.innerText = item;
+            optGroup.appendChild(option);
+        }
+        select.appendChild(optGroup);
+    }
+    
+    // Event Listener für automatischen Wechsel der Schnellauswahl-Buttons
+    select.onchange = updateBulkQuickButtons;
+}
+
+function updateBulkQuickButtons() {
+    const select = document.getElementById('bulkProductSelect');
+    const container = document.getElementById('bulkQuickButtonsContainer');
+    if (!select || !container) return;
+    
+    container.innerHTML = '';
+    if (!select.value) return;
+    
+    const product = JSON.parse(select.value);
+    // Hole die definierten Flaschengrößen direkt aus dem catalog-Objekt
+    const sizes = catalog[product.cat][product.item] || [];
+    
+    if (sizes.length === 0) return;
+    
+    let label = document.createElement('label');
+    label.innerText = "Schnellauswahl Flaschengröße:";
+    label.style.display = "block";
+    label.style.marginBottom = "5px";
+    label.style.fontSize = "0.85rem";
+    label.style.color = "var(--text-muted)";
+    container.appendChild(label);
+    
+    let btnGroup = document.createElement('div');
+    btnGroup.style.display = "flex";
+    btnGroup.style.gap = "10px";
+    btnGroup.style.flexWrap = "wrap";
+    btnGroup.style.marginBottom = "15px";
+    
+    sizes.forEach(size => {
+        let btn = document.createElement('button');
+        btn.className = "btn-secondary";
+        btn.type = "button";
+        btn.style.padding = "8px 12px";
+        btn.style.fontSize = "0.85rem";
+        btn.style.borderRadius = "8px";
+        btn.innerText = `${size} ml`;
+        btn.onclick = () => {
+            document.getElementById('bulkAmount').value = size;
+            document.getElementById('bulkUnitSelect').value = 'ml';
+        };
+        btnGroup.appendChild(btn);
+    });
+    
+    container.appendChild(btnGroup);
+}
+
+function addToBulkCart() {
+    const productDataRaw = document.getElementById('bulkProductSelect').value;
+    const unit = document.getElementById('bulkUnitSelect').value;
+    const amountRaw = parseFloat(document.getElementById('bulkAmount').value);
+    
+    if (!productDataRaw || isNaN(amountRaw) || amountRaw <= 0) {
+        return alert("Bitte ein Produkt und eine gültige Menge auswählen.");
+    }
+    
+    const product = JSON.parse(productDataRaw);
+    let finalMl = amountRaw;
+    
+    if (unit === 'g') {
+        let factor = densityFactors[product.item] || 1.0;
+        finalMl = amountRaw / factor;
+    }
+    
+    let existingIndex = bulkCart.findIndex(c => c.cat === product.cat && c.item === product.item);
+    if (existingIndex > -1) {
+        bulkCart[existingIndex].ml += finalMl;
+    } else {
+        bulkCart.push({
+            cat: product.cat,
+            item: product.item,
+            ml: finalMl
+        });
+    }
+    
+    document.getElementById('bulkAmount').value = '';
+    renderBulkCart();
+}
+
+function removeFromBulkCart(index) {
+    bulkCart.splice(index, 1);
+    renderBulkCart();
+}
+
+function renderBulkCart() {
+    const listDiv = document.getElementById('bulkCartList');
+    const submitBtn = document.getElementById('btnSubmitBulk');
+    
+    if (bulkCart.length === 0) {
+        listDiv.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Der Warenkorb ist leer.</span>';
+        submitBtn.style.display = 'none';
+        return;
+    }
+    
+    submitBtn.style.display = 'block';
+    listDiv.innerHTML = bulkCart.map((entry, index) => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px; border: 1px solid var(--border);">
+            <div>
+                <strong style="color: var(--text);">${entry.item}</strong><br>
+                <small style="color: var(--text-muted);">${entry.cat}</small>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <span style="color: var(--success); font-weight:600;">+ ${entry.ml.toFixed(1)} ml</span>
+                <button onclick="removeFromBulkCart(${index})" style="background:none; color:var(--danger); padding:4px 8px; font-size:1.1rem; border:none; cursor:pointer;">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function submitBulkCart() {
+    if (bulkCart.length === 0) return;
+    
+    if (!confirm(`${bulkCart.length} Positionen jetzt final in das Lager einbuchen?`)) return;
+    
+    bulkCart.forEach(entry => {
+        db.inventory[entry.cat][entry.item] = (db.inventory[entry.cat][entry.item] || 0) + entry.ml;
+        addLog(entry.cat, entry.item, 'in', entry.ml);
+    });
+    
+    saveDB();
+    bulkCart = [];
+    renderBulkCart();
+    renderLager();
+    
+    alert("Massen-Wareneingang erfolgreich verbucht!");
+    showTab('lager');
+}
 
 // APP START
 initDB();
