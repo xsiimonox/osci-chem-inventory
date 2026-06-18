@@ -374,3 +374,30 @@ body.theme-mint.party-mode .card {
     transform: scale(1.2);
     color: var(--danger);
 }
+
+/* --- APP FOOTER (IMPRESSUM) --- */
+.app-footer {
+    text-align: center;
+    padding: 20px 16px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.app-footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.app-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Automatische Farbanpassung für das helle Girl-Theme */
+body.theme-girl .app-footer {
+    background: rgba(255, 102, 164, 0.05);
+}
