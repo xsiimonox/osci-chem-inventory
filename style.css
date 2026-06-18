@@ -313,3 +313,60 @@ body.theme-mint.party-mode .card {
     0% { box-shadow: 0 0 15px rgba(0,240,255,0.2); border-color: #00f0ff; }
     100% { box-shadow: 0 0 20px rgba(100,255,218,0.4); border-color: #64ffda; }
 }
+
+/* --- NEUE FEATURES: SUCHE, WARNUNGEN & STATISTIK --- */
+
+/* Suchfeld im Lager */
+.search-input {
+    width: 100%;
+    padding: 12px 15px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    font-size: 1rem;
+    margin-bottom: 20px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+.search-input:focus {
+    border-color: var(--primary);
+}
+
+/* Warn-Karten (Wenn Bestand unter Schwelle) */
+.card-warning {
+    border: 1px solid var(--danger) !important;
+    box-shadow: 0 0 12px rgba(255, 69, 58, 0.25) !important;
+}
+
+/* Visuelle Auswertung: Balken in der Statistik */
+.visual-bar-bg {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    height: 8px;
+    margin-top: 8px;
+    overflow: hidden;
+    width: 100%;
+}
+.visual-bar-fill {
+    background: var(--primary);
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s ease-out;
+}
+
+/* Button für die Warnschwellen (Glocken-Icon) */
+.threshold-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 0;
+    margin-left: 8px;
+    transition: transform 0.2s;
+}
+.threshold-btn:hover {
+    transform: scale(1.2);
+    color: var(--danger);
+}

@@ -61,6 +61,7 @@ function initDB() {
     if (!db.logs) db.logs = [];
     if (!db.statsStarted) db.statsStarted = Date.now();
     if (!db.theme) db.theme = 'default';
+    if (!db.thresholds) db.thresholds = {};
 
     for (let cat in catalog) {
         if (!db.inventory[cat]) db.inventory[cat] = {};
@@ -151,34 +152,100 @@ async function forceUpdateApp() {
     }
 }
 
+// --- NEUE HILFSFUNKTIONEN ---
+function getGrams(itemName, mlAmount) {
+    let factor = densityFactors[itemName] || 1.0;
+    return (mlAmount * factor).toFixed(1);
+}
+
+function setThreshold(item) {
+    let current = db.thresholds[item] || 0;
+    let val = prompt(`Warnschwelle für ${item} (in ml) festlegen:\nFällt der Bestand auf oder unter diesen Wert, wird die Karte rot markiert.\n(Aktuell: ${current} ml)`, current);
+    
+    if (val !== null) {
+        let parsed = parseFloat(val);
+        if (!isNaN(parsed) && parsed >= 0) {
+            db.thresholds[item] = parsed;
+            saveDB();
+            filterLager(); // Aktualisiert die UI sofort
+        } else {
+            alert("Bitte eine gültige Zahl eingeben.");
+        }
+    }
+}
+
 // --- RENDER FUNKTIONEN ---
 function renderLager() {
     const container = document.getElementById('lager');
     if (!container) return;
-    container.innerHTML = '';
+
+    // Suchfeld einbauen, falls nicht vorhanden
+    if (!document.getElementById('searchInput')) {
+        container.innerHTML = `
+            <input type="text" id="searchInput" class="search-input" placeholder="🔍 Chemikalie suchen..." onkeyup="filterLager()">
+            <div id="lager-container"></div>
+        `;
+    }
+    filterLager();
+}
+
+function filterLager() {
+    const listContainer = document.getElementById('lager-container');
+    const searchInput = document.getElementById('searchInput');
+    const term = searchInput ? searchInput.value.toLowerCase() : '';
+    
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
     
     for (let cat in catalog) {
-        container.innerHTML += `<h2 class="category-title">${cat}</h2>`;
+        let catHTML = `<h2 class="category-title">${cat}</h2>`;
+        let hasItems = false;
+        
         for (let item in catalog[cat]) {
-            let stock = db.inventory[cat][item] || 0;
-            let crossHint = "";
-            if (item === "Fluor (F)" && stock === 0) {
-                let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
-                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
-            } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
-                let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
-                crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
-            }
-            container.innerHTML += `
-                <div class="card">
-                    <h4><span>${item}</span> <span class="stock">${stock.toFixed(1)} ml</span></h4>
-                    ${crossHint}
-                    <div class="btn-group">
-                        <button class="btn-in btn-animated" onclick="openModal('${cat}', '${item}', 'in')">Einlagern</button>
-                        <button class="btn-out btn-animated" onclick="openModal('${cat}', '${item}', 'out')">Auslagern</button>
+            if (item.toLowerCase().includes(term)) {
+                hasItems = true;
+                let stock = db.inventory[cat][item] || 0;
+                let stockG = getGrams(item, stock); // Umrechnung in Gramm
+                let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+                
+                // Warn-Logik
+                let warningClass = (stock <= threshold && threshold > 0) ? 'card-warning' : '';
+                let thresholdHint = threshold > 0 ? `<span style="font-size: 0.75rem; color: var(--danger); display: block; margin-top: 4px;">⚠️ Warnschwelle: ${threshold} ml</span>` : '';
+
+                // Kreuz-Check für Fluor/NaF
+                let crossHint = "";
+                if (item === "Fluor (F)" && stock === 0) {
+                    let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
+                    crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
+                } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
+                    let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
+                    crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
+                }
+
+                catHTML += `
+                    <div class="card ${warningClass}">
+                        <h4>
+                            <span style="display:flex; align-items:center;">
+                                ${item} 
+                                <button class="threshold-btn" onclick="setThreshold('${item}')" title="Warnschwelle setzen">🔔</button>
+                            </span>
+                            <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
+                                <span>${stock.toFixed(1)} ml</span>
+                                <span style="font-size: 0.75rem; opacity: 0.8; font-weight: normal;">${stockG} g</span>
+                            </span>
+                        </h4>
+                        ${crossHint}
+                        ${thresholdHint}
+                        <div class="btn-group" style="margin-top: 10px;">
+                            <button class="btn-in btn-animated" onclick="openModal('${cat}', '${item}', 'in')">Einlagern</button>
+                            <button class="btn-out btn-animated" onclick="openModal('${cat}', '${item}', 'out')">Auslagern</button>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            }
+        }
+        if (hasItems) {
+            listContainer.innerHTML += catHTML;
         }
     }
 }
@@ -245,6 +312,12 @@ function renderStats() {
     let monthsElapsed = daysElapsed / 30.42;
     let yearsElapsed = daysElapsed / 365;
 
+    // Ermittle den absoluten Spitzenreiter für die visuelle Balken-Skalierung
+    let maxConsumed = 0;
+    for (let i in db.stats) {
+        if (db.stats[i] > maxConsumed) maxConsumed = db.stats[i];
+    }
+
     let content = '';
     for (let item in db.stats) {
         let totalConsumed = db.stats[item] || 0;
@@ -253,12 +326,12 @@ function renderStats() {
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
             
-            let currentStock = db.inventory[findCat(item)][item] || 0;
+            let currentStock = db.inventory[findCat(item)] ? (db.inventory[findCat(item)][item] || 0) : 0;
             let prognosisText = "";
             let outCount = countOutsForElement(item);
             
             if (outCount < 2) {
-                prognosisText = "Prognose ab der 2. Entnahme verfügbar";
+                prognosisText = "Prognose ab 2. Entnahme";
             } else if (perWeek > 0) {
                 let weeksLeft = currentStock / perWeek;
                 prognosisText = weeksLeft > 52 ? `Reichweite: >1 Jahr` : `Reichweite: ca. ${weeksLeft.toFixed(1)} Wochen`;
@@ -266,14 +339,36 @@ function renderStats() {
                 prognosisText = "Keine Prognose möglich";
             }
 
+            // Breite des Balkens berechnen (maxConsumed = 100%)
+            let widthPct = maxConsumed > 0 ? (totalConsumed / maxConsumed) * 100 : 0;
+
             content += `
                 <div class="stat-block">
-                    <h4 style="margin:0 0 5px 0; color: var(--primary);">${item}</h4>
-                    <div style="font-size:0.85rem; margin-bottom:5px;">Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong></div>
-                    <div class="stat-grid">
-                        <div><strong>${perWeek.toFixed(1)} ml</strong>/Woche</div>
-                        <div><strong>${perMonth.toFixed(1)} ml</strong>/Monat</div>
-                        <div><strong>${perYear.toFixed(1)} ml</strong>/Jahr</div>
+                    <h4 style="margin:0 0 5px 0; color: var(--primary); display:flex; justify-content:space-between;">
+                        ${item}
+                        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>
+                    </h4>
+                    <div style="font-size:0.85rem; margin-bottom:5px;">
+                        Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong>
+                    </div>
+                    
+                    <div class="visual-bar-bg">
+                        <div class="visual-bar-fill" style="width: ${widthPct}%;"></div>
+                    </div>
+
+                    <div class="stat-grid" style="margin-top: 10px;">
+                        <div>
+                            <strong>${perWeek.toFixed(1)} ml</strong><br>
+                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo
+                        </div>
+                        <div>
+                            <strong>${perMonth.toFixed(1)} ml</strong><br>
+                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo
+                        </div>
+                        <div>
+                            <strong>${perYear.toFixed(1)} ml</strong><br>
+                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr
+                        </div>
                     </div>
                     <div class="prognose-badge">${prognosisText}</div>
                 </div>
@@ -292,21 +387,40 @@ function renderLogs() {
     const container = document.getElementById('log-container');
     if (!container) return;
     container.innerHTML = '';
+    
     if (!db.logs || db.logs.length === 0) {
         container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
         return;
     }
     
-    let logHTML = db.logs.map((log, index) => `
-        <div class="log-item ${log.action}">
-            <div class="log-details">
-                <strong>${log.item}</strong><br>
-                <span>${log.action === 'in' ? 'Eingelagert' : 'Ausgelagert'}: ${(log.amount || 0).toFixed(2)} ml</span><br>
-                <span class="log-date">${new Date(log.timestamp).toLocaleString()}</span>
+    // Kopie erstellen und umdrehen, damit das Neueste oben steht
+    let sortedLogs = [...db.logs].reverse();
+
+    let logHTML = sortedLogs.map((log, index) => {
+        let originalIndex = db.logs.length - 1 - index; // Wichtig für den "Rückgängig"-Button
+        let isOut = log.action === 'out';
+        let actionColor = isOut ? 'var(--danger)' : 'var(--success)';
+        let sign = isOut ? '-' : '+';
+        let actionText = isOut ? 'Ausgelagert' : 'Einlagert';
+        
+        // Umrechnung in Gramm für das Protokoll
+        let gAmount = getGrams(log.item, log.amount);
+        
+        return `
+            <div class="log-item ${log.action}" style="border-left: 4px solid ${actionColor};">
+                <div>
+                    <div class="log-details"><strong>${log.item}</strong></div>
+                    <div class="log-date">${new Date(log.time).toLocaleString()} | ${actionText}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="color: ${actionColor}; font-weight: bold;">${sign}${parseFloat(log.amount).toFixed(1)} ml</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>
+                    <button onclick="undoLog(${originalIndex})" style="background:none; border:none; color: var(--text-muted); text-decoration: underline; font-size: 0.75rem; padding:0; margin-top:4px; cursor:pointer;">Rückgängig</button>
+                </div>
             </div>
-            <button class="btn-out" style="padding:5px 10px; font-size:0.8rem; max-width:140px;" onclick="undoLog(${index})">Rückgängig</button>
-        </div>
-    `).reverse().join('');
+        `;
+    }).join('');
+    
     container.innerHTML = logHTML;
 }
 
