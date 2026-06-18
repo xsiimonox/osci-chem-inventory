@@ -225,7 +225,7 @@ function filterLager() {
                 catHTML += `
                     <div class="card ${warningClass}">
                         <h4>
-                            <span style="display:flex; align-items:center;">
+                               <span style="display:flex; align-items:center; min-width:0;">
                                 ${item} 
                                 <button class="threshold-btn" onclick="setThreshold('${item}')" title="Warnschwelle setzen">🔔</button>
                             </span>

@@ -77,8 +77,11 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 
 .category-title { color: var(--primary); font-size: 1.1rem; font-weight: 600; margin: 25px 0 10px 5px; text-transform: uppercase; letter-spacing: 0.5px; transition: color 0.5s ease; }
 .card { background: var(--card-bg); padding: 16px; margin-bottom: 12px; border-radius: 12px; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: box-shadow 0.5s ease, border-color 0.5s ease, background-color 0.5s ease; }
-.card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: color 0.5s ease; }
+/*.card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }*/
+.card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+/*.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; white-space: nowrap; flex-shrink: 0; transition: color 0.5s ease; }.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; transition: color 0.5s ease; }
+*/
+.stock { color: var(--secondary); font-weight: 600; background: rgba(100, 210, 255, 0.1); padding: 3px 8px; border-radius: 6px; font-size: 0.95rem; white-space: nowrap; flex-shrink: 0; transition: color 0.5s ease; }
 
 body.theme-girl .stock { background: rgba(255, 102, 164, 0.15); }
 body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst für Meeres-Badge */
@@ -293,7 +296,8 @@ body.theme-mint header h1::before { content: "🌊 "; }
 body.theme-mint header h1::after { content: " 🐬"; }
 body.theme-mint .category-title::before { content: "🐠 "; }
 body.theme-mint .category-title::after { content: " 🐙"; }
-body.theme-mint .card h4 span::before { content: "🐚 "; }
+/*body.theme-mint .card h4 span::before { content: "🐚 "; }*/
+body.theme-mint .stock span::before { content: "🐚 "; }
 body.theme-mint .btn-in::before { content: "⚓ "; }
 body.theme-mint .btn-out::before { content: "🌊 "; }
 
