@@ -213,7 +213,7 @@ function toggleLowStockFilter() {
             btn.style.borderColor = "var(--border)";
             btn.style.color = "var(--text-muted)";
             btn.style.background = "#1c1c1e";
-            btn.innerHTML = "⏳ Geringer Bestand";
+            btn.innerHTML = "Geringer Bestand";
         }
     }
     filterLager();
@@ -276,7 +276,7 @@ function renderLager() {
                     reachText = ">1 Jahr";
                     reachColor = "var(--success)";
                 } else {
-                    reachText = `ca. ${(reachDays / 7).toFixed(0)} Woc.`;
+                    reachText = `ca. ${(reachDays / 7).toFixed(0)} Wochen`;
                     reachColor = "var(--success)";
                 }
             }
