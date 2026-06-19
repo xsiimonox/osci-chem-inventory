@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.6.5</span>
+                <span class="version-badge">v1.6.4</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -34,37 +34,17 @@
             <button onclick="selectTab('cr-export')" id="tab-cr-export">C&amp;R</button>
             <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
-            <button onclick="selectTab('bestellliste')" id="tab-bestellliste">Bestellliste</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
 			<button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
             <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
+            
         </div>
     </nav>
     
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
     <main id="app">
-        <div id="lager" class="tab-content active">
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px;">
-                <input type="text" id="searchInput" class="search-input" placeholder="🔍 Chemikalie suchen..." onkeyup="renderLager()" style="width: 100%; margin: 0; height: 44px; padding: 12px; border-radius: 10px;">
-                
-                <div style="display: flex; gap: 8px; width: 100%;">
-                    <select id="categoryFilterSelect" onchange="renderLager()" style="flex: 1; padding: 0 12px; background: #1c1c1e; color: #fff; border: 1px solid var(--border); border-radius: 10px; font-weight: 500; height: 44px; font-size: 0.9rem;">
-                        <option value="">Alle Kategorien</option>
-                        <option value="C&R Produkte">C&amp;R Produkte</option>
-                        <option value="Makro Elements">Makro Elements</option>
-                        <option value="Nutrition Elements">Nutrition Elements</option>
-                        <option value="Anionen">Anionen</option>
-                        <option value="Kationen">Kationen</option>
-                    </select>
-
-                    <button id="btnLowStockFilter" onclick="toggleLowStockFilter()" style="padding: 0 14px; border-radius: 10px; white-space: nowrap; background: #1c1c1e; color: var(--text-muted); border: 1px solid var(--border); font-weight: 500; cursor: pointer; height: 44px; font-size: 0.9rem; transition: all 0.2s ease;">
-                        ⏳ Geringer Bestand
-                    </button>
-                </div>
-            </div>
-            <div id="lager-container"></div>
-        </div>
+        <div id="lager" class="tab-content active"></div>
 
         <div id="cr-export" class="tab-content">
             <div class="card card-accent">
@@ -105,16 +85,6 @@
             </div>
         </div>
 
-        <div id="bestellliste" class="tab-content">
-            <div class="card">
-                <h2>🛒 Bestell-Empfehlungen</h2>
-                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
-                    Automatische Auswertung der Langzeit-Statistiken. Folgende Waren sind leer oder werden voraussichtlich <strong>innerhalb der nächsten 4 Wochen (28 Tage)</strong> vollständig aufgebraucht sein.
-                </p>
-                <div id="orderListContainer" style="margin-top: 15px;"></div>
-            </div>
-        </div>
-
         <div id="log" class="tab-content">
             <div class="card">
                 <h3>Aktionsprotokoll</h3>
@@ -123,19 +93,24 @@
             </div>
         </div>
 
+        <!-- REITER UMGERANNT AUF EINSTELLUNGEN -->
         <div id="einstellungen" class="tab-content">
+            
+            <!-- NEU: SYSTEM & VERSION MIT UPDATE-ZWANG BUTTON -->
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--secondary); margin-bottom: 5px;">System &amp; Updates</h3>
-                <p class="hint">Falls eine neue Version bereitgestellt wurde, kannst du hier das Update direkt erzwingen, ohne mühsam den Browser-Cache leeren zu müssen.</p>
+                <p class="hint">Falls eine neue Version bereitgestellt wurde, kannst du sie hier laden. Daten bleiben gespeichert. Ein Backup vorher schadet aber nicht.</p>
                 <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
-                    🚀 Neue Version laden (Cache leeren)
+                    🚀 Neue Version laden 🚀
                 </button>
             </div>
 
+            <!-- ANPASSUNG: STYLING & DESIGNS (GIRL EDITION) -->
             <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--primary);">Design &amp; Effekte</h3>
+                
                 <div class="switch-container">
-                    <span style="font-weight: 600; font-size: 0.95rem;">💥 Disko- &amp; Animationsmodus</span>
+                    <span style="font-weight: 600; font-size: 0.95rem;">Disko- &amp; Animationsmodus</span>
                     <label class="switch">
                         <input type="checkbox" id="partyToggle" onchange="togglePartyMode()">
                         <span class="slider"></span>
@@ -143,11 +118,11 @@
                 </div>
 
                 <div class="input-group" style="margin-top: 15px;">
-                    <label style="font-weight: 600;">🎨 Farbschema der App wechseln:</label>
+                    <label style="font-weight: 600;">Farbschema der App wechseln:</label>
                     <select id="themeSelect" onchange="applyTheme(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
-                        <option value="default">Standard (Cyber Purple)</option>
-                        <option value="girl">Girl Edition (Neon Pink) 🎀</option>
-                        <option value="mint">Mint Clean (Ocean Mint) 🌊</option>
+                        <option value="default">Standard Design</option>
+                        <option value="girl">Girl Edition  🎀</option>
+                        <option value="mint">Ocean Mint  🌊</option>
                     </select>
                 </div>
             </div>
@@ -155,19 +130,19 @@
             <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
                 <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken nullen</button>
+                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken löschen</button>
                 </div>
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
                     <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
                 </div>
                 <div>
-                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand nullen</button>
+                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand löschen</button>
                 </div>
             </div>
 
             <div class="card" style="margin-top: 20px;">
                 <h3>Backup exportieren</h3>
-                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren (.txt)</button>
+                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren</button>
             </div>
             <div class="card">
                 <h3>Backup einlesen</h3>
@@ -175,7 +150,7 @@
                 <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
             </div>
         </div>
-
+        <!-- Masseneingang (Warenkorb) Tab Content -->
         <div id="masseneingang" class="tab-content">
             <div class="card">
                 <h2>📦 Massen-Wareneingang</h2>
@@ -188,6 +163,7 @@
                     <select id="bulkProductSelect" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;"></select>
                 </div>
 
+                <!-- Dynamischer Container für die Flaschengrößen-Schnellauswahl-Buttons -->
                 <div id="bulkQuickButtonsContainer"></div>
 
                 <div class="input-group">
@@ -217,7 +193,7 @@
     </main>
 
     <footer class="app-footer">
-        <p>© 2026 xsiimonox • <a href="#" onclick="alert('Kontaktdaten\n\nName: Simon Asbach\nKontakt: simon@asbach.tech'); return false;">Impressum</a></p>
+    <p>© 2026 xsiimonox • <a href="#" onclick="alert('Kontaktdaten\n\nName: Simon Asbach\nKontakt: simon@asbach.tech'); return false;">Impressum</a></p>
     </footer>
 
     <div id="modal" class="modal">
@@ -233,7 +209,7 @@
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
                 .then(() => console.log('OSCI Motion Service Worker aktiv.'))
-                .catch(err => console.log('SW Fehler:', err));
+                .catch(err => console.error('PWA Fehler:', err));
         }
     </script>
 </body>
