@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.6.4</span>
+                <span class="version-badge">v1.8.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -103,6 +103,44 @@
                 <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
                     🚀 Neue Version laden 🚀
                 </button>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--success); margin-bottom: 5px;">Benachrichtigungen</h3>
+                <p class="hint">Die App kann dich beim Öffnen und nach Buchungen informieren, wenn Artikel den Warnzeitraum unterschreiten.</p>
+                <div id="notification-status" class="notification-status">Status wird geladen...</div>
+                <div id="disabled-alert-products" class="disabled-alert-products"></div>
+                <div class="btn-group" style="margin-top: 12px;">
+                    <button onclick="enableStockNotifications()" class="btn-in btn-animated">Aktivieren</button>
+                    <button onclick="sendTestNotification()" class="btn-secondary btn-animated">Test</button>
+                </div>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Produkte</h3>
+                <p class="hint">Lege zusätzliche Lagerartikel an. Flaschengrößen bitte mit Komma trennen, zum Beispiel: 250, 500, 1000.</p>
+                <div class="input-group">
+                    <label>Produktname:</label>
+                    <input type="text" id="customProductName" placeholder="z.B. Testlösung A">
+                </div>
+                <div class="input-group">
+                    <label>Kategorie:</label>
+                    <select id="customProductCategory"></select>
+                </div>
+                <div class="input-group">
+                    <label>Neue Kategorie optional:</label>
+                    <input type="text" id="customProductNewCategory" placeholder="Nur ausfüllen, wenn neue Kategorie gewünscht">
+                </div>
+                <div class="input-group">
+                    <label>Flaschengrößen in ml:</label>
+                    <input type="text" id="customProductSizes" placeholder="30, 100, 1000">
+                </div>
+                <div class="input-group">
+                    <label>Dichte optional:</label>
+                    <input type="number" step="0.001" min="0" id="customProductDensity" placeholder="1.000">
+                </div>
+                <button onclick="addCustomProduct()" class="btn-primary btn-animated">Produkt anlegen</button>
+                <div id="custom-products-list" class="custom-products-list"></div>
             </div>
 
             <!-- ANPASSUNG: STYLING & DESIGNS (GIRL EDITION) -->

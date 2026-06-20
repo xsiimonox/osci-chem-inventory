@@ -118,7 +118,7 @@ button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12p
 .btn-cancel { background: #2c2c2e; color: #fff; width: 100%; margin-top: 12px; }
 
 textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.95rem; resize: none; margin-bottom: 15px; }
-input[type="number"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
+input[type="number"], input[type="text"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -170,6 +170,7 @@ body.party-mode button.btn-animated {
    ========================================================================== */
 body.theme-girl textarea,
 body.theme-girl input[type="number"],
+body.theme-girl input[type="text"],
 body.theme-girl input[type="file"],
 body.theme-girl select,
 body.theme-girl .log-item,
@@ -243,6 +244,7 @@ body.theme-girl.party-mode .card {
 /* Eingabefelder, Listen, Protokolle & Blöcke im Meeres-Stil */
 body.theme-mint textarea,
 body.theme-mint input[type="number"],
+body.theme-mint input[type="text"],
 body.theme-mint input[type="file"],
 body.theme-mint select,
 body.theme-mint .log-item,
@@ -321,6 +323,20 @@ body.theme-mint.party-mode .card {
 /* --- NEUE FEATURES: SUCHE, WARNUNGEN & STATISTIK --- */
 
 /* Suchfeld im Lager */
+.lager-tools {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+@media (min-width: 768px) {
+    .lager-tools {
+        grid-template-columns: 1.4fr 1fr 180px;
+        align-items: end;
+    }
+}
+
 .search-input {
     width: 100%;
     padding: 12px 15px;
@@ -329,12 +345,170 @@ body.theme-mint.party-mode .card {
     color: var(--text);
     border-radius: 12px;
     font-size: 1rem;
-    margin-bottom: 20px;
+    margin-bottom: 0;
     outline: none;
     transition: border-color 0.3s;
 }
 .search-input:focus {
     border-color: var(--primary);
+}
+
+.filter-select,
+.forecast-window-control select {
+    width: 100%;
+    padding: 12px 15px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 12px;
+    font-size: 1rem;
+    margin-bottom: 0;
+    outline: none;
+}
+
+.forecast-window-control label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0 0 5px 2px;
+    font-weight: 600;
+}
+
+.alert-summary {
+    background: rgba(255, 69, 58, 0.10);
+    border: 1px solid rgba(255, 69, 58, 0.45);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 16px;
+}
+
+.alert-summary.success {
+    background: rgba(48, 209, 88, 0.08);
+    border-color: rgba(48, 209, 88, 0.35);
+    color: var(--success);
+    font-weight: 600;
+}
+
+.alert-title {
+    color: var(--danger);
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    list-style: none;
+}
+
+.alert-title::-webkit-details-marker {
+    display: none;
+}
+
+.alert-summary[open] .alert-title {
+    margin-bottom: 8px;
+}
+
+.alert-summary-hint {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+
+.alert-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.88rem;
+}
+
+@media (min-width: 680px) {
+    .alert-row {
+        grid-template-columns: 1fr auto auto;
+    }
+}
+
+.alert-row small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    margin-top: 2px;
+}
+
+.alert-reason {
+    color: var(--danger);
+    font-weight: 700;
+}
+
+.alert-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.alert-actions button,
+.disabled-alert-row button,
+.custom-product-row button {
+    background: rgba(255,255,255,0.06);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-size: 0.78rem;
+}
+
+.item-hint {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    margin-top: 4px;
+}
+
+.danger-text {
+    color: var(--danger);
+}
+
+.notification-status {
+    color: var(--text-muted);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.88rem;
+    line-height: 1.4;
+}
+
+.disabled-alert-products,
+.custom-products-list {
+    margin-top: 12px;
+}
+
+.disabled-alert-title {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.disabled-alert-row,
+.custom-product-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 9px 0;
+    border-top: 1px solid var(--border);
+    font-size: 0.86rem;
+}
+
+.custom-product-row small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    margin-top: 2px;
 }
 
 /* Warn-Karten (Wenn Bestand unter Schwelle) */

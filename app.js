@@ -45,6 +45,19 @@ let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 
 let currentAction = {};
 
 // --- INITIALISIERUNG ---
+function applyCustomProductsToCatalog() {
+    if (!db.customProducts) db.customProducts = [];
+
+    db.customProducts.forEach(product => {
+        if (!product || !product.name || !product.cat) return;
+        if (!catalog[product.cat]) catalog[product.cat] = {};
+        catalog[product.cat][product.name] = Array.isArray(product.sizes) ? product.sizes : [];
+
+        const density = parseFloat(product.density);
+        if (!isNaN(density) && density > 0) densityFactors[product.name] = density;
+    });
+}
+
 function initDB() {
     try {
         let saved = localStorage.getItem(DB_KEY);
@@ -62,6 +75,18 @@ function initDB() {
     if (!db.statsStarted) db.statsStarted = Date.now();
     if (!db.theme) db.theme = 'default';
     if (!db.thresholds) db.thresholds = {};
+    if (!db.settings) db.settings = {};
+    if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
+    if (!db.notifications) db.notifications = {};
+    if (db.notifications.enabled === undefined) db.notifications.enabled = false;
+    if (!db.notifications.lastAlertSignature) db.notifications.lastAlertSignature = '';
+    if (!db.notifications.lastSentAt) db.notifications.lastSentAt = 0;
+    if (!db.alerts) db.alerts = {};
+    if (!db.alerts.dismissed) db.alerts.dismissed = {};
+    if (!db.alerts.disabled) db.alerts.disabled = {};
+    if (!db.customProducts) db.customProducts = [];
+
+    applyCustomProductsToCatalog();
 
     for (let cat in catalog) {
         if (!db.inventory[cat]) db.inventory[cat] = {};
@@ -77,6 +102,10 @@ function initDB() {
 }
 
 function saveDB() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {} }
+
+function jsArg(value) {
+    return JSON.stringify(value).replace(/'/g, "\\u0027");
+}
 
 // --- UI / MENÜ STEUERUNG ---
 function toggleMenu() {
@@ -105,6 +134,10 @@ function showTab(tabId) {
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
     if(tabId === 'log') renderLogs();
+    if(tabId === 'einstellungen') {
+        updateNotificationStatus();
+        renderCustomProductSettings();
+    }
 }
 
 // --- DESIGN / THEME STEUERUNG ---
@@ -158,6 +191,427 @@ function getGrams(itemName, mlAmount) {
     return (mlAmount * factor).toFixed(1);
 }
 
+function getLogTime(log) {
+    return log.timestamp || log.time || null;
+}
+
+function getStock(itemName) {
+    const cat = findCat(itemName);
+    return db.inventory[cat] ? (db.inventory[cat][itemName] || 0) : 0;
+}
+
+function getUsageMetrics(itemName) {
+    const now = Date.now();
+    const outLogs = (db.logs || [])
+        .filter(log => log.item === itemName && log.action === 'out')
+        .map(log => ({ ...log, timeValue: getLogTime(log) }))
+        .filter(log => log.timeValue)
+        .sort((a, b) => a.timeValue - b.timeValue);
+
+    const totalConsumed = db.stats[itemName] || 0;
+    const started = db.statsStarted || now;
+    const daysSinceStart = Math.max(1, (now - started) / (1000 * 60 * 60 * 24));
+
+    if (outLogs.length >= 2) {
+        const first = outLogs[0].timeValue;
+        const daysCovered = Math.max(1, (now - first) / (1000 * 60 * 60 * 24));
+        const consumedFromLogs = outLogs.reduce((sum, log) => sum + (parseFloat(log.amount) || 0), 0);
+        return {
+            outCount: outLogs.length,
+            totalConsumed,
+            perDay: consumedFromLogs / daysCovered,
+            confidence: 'good'
+        };
+    }
+
+    return {
+        outCount: outLogs.length,
+        totalConsumed,
+        perDay: totalConsumed > 0 ? totalConsumed / daysSinceStart : 0,
+        confidence: outLogs.length > 0 ? 'low' : 'none'
+    };
+}
+
+function getWeeksLeft(itemName) {
+    const metrics = getUsageMetrics(itemName);
+    const stock = getStock(itemName);
+    if (stock <= 0) return 0;
+    if (metrics.perDay <= 0) return null;
+    return stock / (metrics.perDay * 7);
+}
+
+function formatWeeksLeft(itemName) {
+    const weeksLeft = getWeeksLeft(itemName);
+    if (weeksLeft === null) return 'Keine Prognose';
+    if (weeksLeft === 0) return 'Leer';
+    if (weeksLeft > 52) return '>1 Jahr';
+    return `ca. ${weeksLeft.toFixed(1)} Wochen`;
+}
+
+function getStockAlerts() {
+    const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+    const alerts = [];
+
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            if (db.alerts && db.alerts.disabled && db.alerts.disabled[item]) continue;
+
+            const stock = db.inventory[cat][item] || 0;
+            const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+            const metrics = getUsageMetrics(item);
+            const weeksLeft = getWeeksLeft(item);
+            const isUnderThreshold = threshold > 0 && stock <= threshold;
+            const isSoonEmpty = weeksLeft !== null && weeksLeft <= warningWeeks;
+            const isRelevantEmpty = stock <= 0 && (threshold > 0 || metrics.totalConsumed > 0);
+
+            if (isUnderThreshold || isSoonEmpty || isRelevantEmpty) {
+                const alert = { cat, item, stock, threshold, weeksLeft, isUnderThreshold, isSoonEmpty };
+                alert.stateKey = getItemAlertStateKey(alert);
+                if (db.alerts && db.alerts.dismissed && db.alerts.dismissed[item] === alert.stateKey) continue;
+                alerts.push(alert);
+            }
+        }
+    }
+
+    return alerts.sort((a, b) => {
+        const aWeeks = a.weeksLeft === null ? 9999 : a.weeksLeft;
+        const bWeeks = b.weeksLeft === null ? 9999 : b.weeksLeft;
+        return aWeeks - bWeeks;
+    });
+}
+
+function getItemAlertStateKey(alert) {
+    const stockPart = Math.round((alert.stock || 0) * 10) / 10;
+    const weekPart = alert.weeksLeft === null ? 'x' : Math.round(alert.weeksLeft * 10) / 10;
+    const thresholdPart = alert.threshold || 0;
+    return `${stockPart}:${weekPart}:${thresholdPart}:${alert.isUnderThreshold ? 1 : 0}:${alert.isSoonEmpty ? 1 : 0}`;
+}
+
+function dismissStockAlert(itemName, stateKey) {
+    if (!db.alerts) db.alerts = {};
+    if (!db.alerts.dismissed) db.alerts.dismissed = {};
+    db.alerts.dismissed[itemName] = stateKey || '';
+    if (db.notifications) db.notifications.lastAlertSignature = '';
+    saveDB();
+    filterLager();
+    updateNotificationStatus();
+}
+
+function disableStockAlert(itemName) {
+    if (!confirm(`Warnmeldungen für ${itemName} deaktivieren?`)) return;
+    if (!db.alerts) db.alerts = {};
+    if (!db.alerts.disabled) db.alerts.disabled = {};
+    db.alerts.disabled[itemName] = true;
+    if (db.notifications) db.notifications.lastAlertSignature = '';
+    saveDB();
+    filterLager();
+    updateNotificationStatus();
+}
+
+function enableStockAlert(itemName) {
+    if (db.alerts && db.alerts.disabled) delete db.alerts.disabled[itemName];
+    if (db.alerts && db.alerts.dismissed) delete db.alerts.dismissed[itemName];
+    if (db.notifications) db.notifications.lastAlertSignature = '';
+    saveDB();
+    filterLager();
+    updateNotificationStatus();
+}
+
+function updateForecastWindow(value) {
+    const weeks = parseInt(value, 10);
+    if (!isNaN(weeks) && weeks > 0 && weeks <= 52) {
+        db.settings.forecastWeeks = weeks;
+        saveDB();
+        filterLager();
+        renderStats();
+        checkAndNotifyStockAlerts('manual');
+    }
+}
+
+function supportsNotifications() {
+    return 'Notification' in window;
+}
+
+function getNotificationPermissionText() {
+    if (!supportsNotifications()) return 'Nicht unterstützt';
+    if (Notification.permission === 'granted') return 'Erlaubt';
+    if (Notification.permission === 'denied') return 'Blockiert';
+    return 'Noch nicht gefragt';
+}
+
+function updateNotificationStatus() {
+    const el = document.getElementById('notification-status');
+    const disabledEl = document.getElementById('disabled-alert-products');
+    if (!el && !disabledEl) return;
+
+    const enabled = db.notifications && db.notifications.enabled;
+    const permission = getNotificationPermissionText();
+    const alerts = getStockAlerts();
+    let detail = enabled ? 'Aktiv' : 'Aus';
+
+    if (!supportsNotifications()) {
+        if (el) el.innerHTML = 'Benachrichtigungen werden von diesem Browser nicht unterstützt.';
+        renderDisabledAlertProducts(disabledEl);
+        return;
+    }
+
+    if (Notification.permission === 'denied') {
+        if (el) el.innerHTML = 'Status: Blockiert. Bitte in den Browser- oder Handy-Einstellungen wieder erlauben.';
+        renderDisabledAlertProducts(disabledEl);
+        return;
+    }
+
+    if (el) el.innerHTML = `Status: ${detail} · Erlaubnis: ${permission} · Aktuelle Warnungen: ${alerts.length}`;
+    renderDisabledAlertProducts(disabledEl);
+}
+
+function renderDisabledAlertProducts(container) {
+    if (!container) return;
+    const disabled = Object.keys((db.alerts && db.alerts.disabled) || {});
+
+    if (disabled.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="disabled-alert-title">Deaktivierte Produktwarnungen:</div>
+        ${disabled.map(item => `
+            <div class="disabled-alert-row">
+                <span>${item}</span>
+                <button type="button" onclick='enableStockAlert(${jsArg(item)})'>Wieder aktivieren</button>
+            </div>
+        `).join('')}
+    `;
+}
+
+async function enableStockNotifications() {
+    if (!supportsNotifications()) {
+        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.");
+        updateNotificationStatus();
+        return;
+    }
+
+    let permission = Notification.permission;
+    if (permission === 'default') {
+        permission = await Notification.requestPermission();
+    }
+
+    if (permission !== 'granted') {
+        db.notifications.enabled = false;
+        saveDB();
+        updateNotificationStatus();
+        alert("Benachrichtigungen wurden nicht erlaubt.");
+        return;
+    }
+
+    db.notifications.enabled = true;
+    db.notifications.lastAlertSignature = '';
+    db.notifications.lastSentAt = 0;
+    saveDB();
+    updateNotificationStatus();
+    showLocalNotification("OSCI Lager", "Benachrichtigungen sind aktiviert.");
+    checkAndNotifyStockAlerts('manual');
+}
+
+function getAlertSignature(alerts) {
+    return alerts
+        .map(alert => `${alert.cat}:${alert.item}:${Math.round(alert.stock * 10) / 10}:${alert.weeksLeft === null ? 'x' : Math.round(alert.weeksLeft * 10) / 10}`)
+        .join('|');
+}
+
+function buildAlertNotification(alerts) {
+    const count = alerts.length;
+    const first = alerts[0];
+    let body = `${first.item}: ${first.stock.toFixed(1)} ml`;
+
+    if (first.weeksLeft !== null && first.stock > 0) {
+        body += `, leer in ca. ${first.weeksLeft.toFixed(1)} Wochen`;
+    } else if (first.stock <= 0) {
+        body += ', Bestand leer';
+    }
+
+    if (count > 1) body += ` · plus ${count - 1} weitere Warnung(en)`;
+    return {
+        title: `OSCI Lager: ${count} Bestandswarnung${count === 1 ? '' : 'en'}`,
+        body
+    };
+}
+
+async function showLocalNotification(title, body) {
+    if (!supportsNotifications() || Notification.permission !== 'granted') return;
+
+    const options = {
+        body,
+        icon: 'icon.png',
+        badge: 'icon.png',
+        tag: 'osci-stock-alert',
+        renotify: true
+    };
+
+    try {
+        if ('serviceWorker' in navigator) {
+            const registration = await navigator.serviceWorker.ready;
+            if (registration && registration.showNotification) {
+                registration.showNotification(title, options);
+                return;
+            }
+        }
+    } catch (e) {
+        console.warn("Service-Worker-Benachrichtigung nicht verfügbar:", e);
+    }
+
+    try {
+        new Notification(title, options);
+    } catch (e) {
+        console.warn("Lokale Benachrichtigung nicht verfügbar:", e);
+    }
+}
+
+function checkAndNotifyStockAlerts(trigger = 'auto') {
+    if (!db.notifications || !db.notifications.enabled) return;
+    if (!supportsNotifications() || Notification.permission !== 'granted') return;
+
+    const alerts = getStockAlerts();
+    if (alerts.length === 0) {
+        db.notifications.lastAlertSignature = '';
+        saveDB();
+        updateNotificationStatus();
+        return;
+    }
+
+    const signature = getAlertSignature(alerts);
+    const now = Date.now();
+    const minimumPauseMs = trigger === 'manual' ? 0 : 1000 * 60 * 60 * 12;
+    const alreadySent = db.notifications.lastAlertSignature === signature;
+    const recentlySent = now - (db.notifications.lastSentAt || 0) < minimumPauseMs;
+
+    if (alreadySent && recentlySent) {
+        updateNotificationStatus();
+        return;
+    }
+
+    const notification = buildAlertNotification(alerts);
+    showLocalNotification(notification.title, notification.body);
+    db.notifications.lastAlertSignature = signature;
+    db.notifications.lastSentAt = now;
+    saveDB();
+    updateNotificationStatus();
+}
+
+function sendTestNotification() {
+    if (!supportsNotifications()) {
+        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.");
+        return;
+    }
+
+    if (Notification.permission !== 'granted') {
+        alert("Bitte Benachrichtigungen zuerst aktivieren.");
+        return;
+    }
+
+    showLocalNotification("OSCI Lager Test", "Die lokale Benachrichtigung funktioniert.");
+}
+
+function renderCustomProductSettings() {
+    const categorySelect = document.getElementById('customProductCategory');
+    const list = document.getElementById('custom-products-list');
+
+    if (categorySelect) {
+        const currentValue = categorySelect.value;
+        categorySelect.innerHTML = Object.keys(catalog)
+            .map(cat => `<option value="${cat}">${cat}</option>`)
+            .join('');
+        if (currentValue && catalog[currentValue]) categorySelect.value = currentValue;
+    }
+
+    if (!list) return;
+    if (!db.customProducts || db.customProducts.length === 0) {
+        list.innerHTML = '<p class="hint" style="margin-top: 12px;">Noch keine eigenen Produkte angelegt.</p>';
+        return;
+    }
+
+    list.innerHTML = db.customProducts.map((product, index) => `
+        <div class="custom-product-row">
+            <span>
+                <strong>${product.name}</strong>
+                <small>${product.cat} · ${(product.sizes || []).join(', ') || 'keine'} ml · Dichte ${product.density || 1}</small>
+            </span>
+            <button type="button" onclick="deleteCustomProduct(${index})">Löschen</button>
+        </div>
+    `).join('');
+}
+
+function addCustomProduct() {
+    const nameEl = document.getElementById('customProductName');
+    const catEl = document.getElementById('customProductCategory');
+    const newCatEl = document.getElementById('customProductNewCategory');
+    const sizesEl = document.getElementById('customProductSizes');
+    const densityEl = document.getElementById('customProductDensity');
+
+    const name = nameEl ? nameEl.value.trim() : '';
+    const newCat = newCatEl ? newCatEl.value.trim() : '';
+    const cat = newCat || (catEl ? catEl.value : '');
+    const sizesRaw = sizesEl ? sizesEl.value : '';
+    const sizes = sizesRaw
+        .split(',')
+        .map(value => parseFloat(value.trim()))
+        .filter(value => !isNaN(value) && value > 0);
+    const densityRaw = densityEl && densityEl.value ? parseFloat(densityEl.value) : 1;
+    const density = (!isNaN(densityRaw) && densityRaw > 0) ? densityRaw : 1;
+
+    if (!name || !cat) {
+        alert("Bitte Produktname und Kategorie ausfüllen.");
+        return;
+    }
+
+    if (catalogHasItem(name) && !(db.customProducts || []).some(product => product.name === name)) {
+        alert("Dieses Produkt existiert bereits im Standard-Katalog.");
+        return;
+    }
+
+    if ((db.customProducts || []).some(product => product.name === name)) {
+        alert("Dieses eigene Produkt existiert bereits.");
+        return;
+    }
+
+    db.customProducts.push({ name, cat, sizes, density });
+    applyCustomProductsToCatalog();
+
+    if (!db.inventory[cat]) db.inventory[cat] = {};
+    db.inventory[cat][name] = db.inventory[cat][name] || 0;
+    db.stats[name] = db.stats[name] || 0;
+    densityFactors[name] = density;
+    saveDB();
+
+    if (nameEl) nameEl.value = '';
+    if (newCatEl) newCatEl.value = '';
+    if (sizesEl) sizesEl.value = '';
+    if (densityEl) densityEl.value = '';
+
+    renderCustomProductSettings();
+    renderLager();
+    initBulkProductSelect();
+    alert("Produkt wurde angelegt.");
+}
+
+function deleteCustomProduct(index) {
+    const product = db.customProducts && db.customProducts[index];
+    if (!product) return;
+    if (!confirm(`${product.name} wirklich löschen? Bestehende Lager- und Statistikdaten für dieses Produkt werden entfernt.`)) return;
+
+    db.customProducts.splice(index, 1);
+    if (db.inventory[product.cat]) delete db.inventory[product.cat][product.name];
+    if (db.stats) delete db.stats[product.name];
+    if (db.thresholds) delete db.thresholds[product.name];
+    if (db.alerts && db.alerts.dismissed) delete db.alerts.dismissed[product.name];
+    if (db.alerts && db.alerts.disabled) delete db.alerts.disabled[product.name];
+    delete densityFactors[product.name];
+    saveDB();
+
+    window.location.reload();
+}
+
 function setThreshold(item) {
     let current = db.thresholds[item] || 0;
     let val = prompt(`Warnschwelle für ${item} (in ml) festlegen:\nFällt der Bestand auf oder unter diesen Wert, wird die Karte rot markiert.\n(Aktuell: ${current} ml)`, current);
@@ -168,6 +622,7 @@ function setThreshold(item) {
             db.thresholds[item] = parsed;
             saveDB();
             filterLager(); // Aktualisiert die UI sofort
+            checkAndNotifyStockAlerts('manual');
         } else {
             alert("Bitte eine gültige Zahl eingeben.");
         }
@@ -179,12 +634,32 @@ function renderLager() {
     const container = document.getElementById('lager');
     if (!container) return;
 
-    // Suchfeld einbauen, falls nicht vorhanden
+    // Such- und Filterfeld einbauen, falls nicht vorhanden
     if (!document.getElementById('searchInput')) {
+        const categoryOptions = Object.keys(catalog)
+            .map(cat => `<option value="${cat}">${cat}</option>`)
+            .join('');
         container.innerHTML = `
-            <input type="text" id="searchInput" class="search-input" placeholder="🔍 Chemikalie suchen..." onkeyup="filterLager()">
+            <div class="lager-tools">
+                <input type="text" id="searchInput" class="search-input" placeholder="Chemikalie suchen..." oninput="filterLager()">
+                <select id="categoryFilter" class="filter-select" onchange="filterLager()">
+                    <option value="all">Alle Kategorien</option>
+                    ${categoryOptions}
+                </select>
+                <div class="forecast-window-control">
+                    <label for="forecastWeeks">Warnzeitraum</label>
+                    <select id="forecastWeeks" onchange="updateForecastWindow(this.value)">
+                        <option value="2">2 Wochen</option>
+                        <option value="4">4 Wochen</option>
+                        <option value="8">8 Wochen</option>
+                        <option value="12">12 Wochen</option>
+                    </select>
+                </div>
+            </div>
+            <div id="stock-alerts"></div>
             <div id="lager-container"></div>
         `;
+        document.getElementById('forecastWeeks').value = String((db.settings && db.settings.forecastWeeks) || 4);
     }
     filterLager();
 }
@@ -192,12 +667,18 @@ function renderLager() {
 function filterLager() {
     const listContainer = document.getElementById('lager-container');
     const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const alertsContainer = document.getElementById('stock-alerts');
     const term = searchInput ? searchInput.value.toLowerCase() : '';
+    const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
     
     if (!listContainer) return;
     listContainer.innerHTML = '';
+    renderStockAlerts(alertsContainer);
     
     for (let cat in catalog) {
+        if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
+
         let catHTML = `<h2 class="category-title">${cat}</h2>`;
         let hasItems = false;
         
@@ -207,10 +688,17 @@ function filterLager() {
                 let stock = db.inventory[cat][item] || 0;
                 let stockG = getGrams(item, stock); // Umrechnung in Gramm
                 let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+                let reachText = formatWeeksLeft(item);
+                let metrics = getUsageMetrics(item);
                 
                 // Warn-Logik
-                let warningClass = (stock <= threshold && threshold > 0) ? 'card-warning' : '';
-                let thresholdHint = threshold > 0 ? `<span style="font-size: 0.75rem; color: var(--danger); display: block; margin-top: 4px;">⚠️ Warnschwelle: ${threshold} ml</span>` : '';
+                let weeksLeft = getWeeksLeft(item);
+                let warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+                let alertsDisabled = db.alerts && db.alerts.disabled && db.alerts.disabled[item];
+                let warningClass = (!alertsDisabled && ((stock <= threshold && threshold > 0) || (stock <= 0 && metrics.totalConsumed > 0) || (weeksLeft !== null && weeksLeft <= warningWeeks))) ? 'card-warning' : '';
+                let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ml</span>` : '';
+                let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
+                let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
 
                 // Kreuz-Check für Fluor/NaF
                 let crossHint = "";
@@ -227,7 +715,7 @@ function filterLager() {
                         <h4>
                                <span style="display:flex; align-items:center; min-width:0;">
                                 ${item} 
-                                <button class="threshold-btn" onclick="setThreshold('${item}')" title="Warnschwelle setzen">🔔</button>
+                                <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
                             </span>
                             <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
                                 <span>${stock.toFixed(1)} ml</span>
@@ -235,10 +723,12 @@ function filterLager() {
                             </span>
                         </h4>
                         ${crossHint}
+                        ${prognosisHint}
                         ${thresholdHint}
+                        ${disabledHint}
                         <div class="btn-group" style="margin-top: 10px;">
-                            <button class="btn-in btn-animated" onclick="openModal('${cat}', '${item}', 'in')">Einlagern</button>
-                            <button class="btn-out btn-animated" onclick="openModal('${cat}', '${item}', 'out')">Auslagern</button>
+                            <button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
+                            <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>
                         </div>
                     </div>
                 `;
@@ -248,6 +738,47 @@ function filterLager() {
             listContainer.innerHTML += catHTML;
         }
     }
+}
+
+function renderStockAlerts(container) {
+    if (!container) return;
+    const alerts = getStockAlerts();
+    const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+
+    if (alerts.length === 0) {
+        container.innerHTML = `
+            <div class="alert-summary success">
+                Keine kritischen Artikel im gewählten Warnzeitraum von ${warningWeeks} Wochen.
+            </div>
+        `;
+        return;
+    }
+
+    const rows = alerts.map(alert => {
+        let reason = 'Bestand leer';
+        if (alert.isUnderThreshold) reason = `unter Warnschwelle (${alert.threshold} ml)`;
+        if (alert.isSoonEmpty && alert.weeksLeft !== null && alert.stock > 0) reason = `leer in ${alert.weeksLeft.toFixed(1)} Wochen`;
+        return `
+            <div class="alert-row">
+                <span><strong>${alert.item}</strong><small>${alert.cat} · ${alert.stock.toFixed(1)} ml</small></span>
+                <span class="alert-reason">${reason}</span>
+                <div class="alert-actions">
+                    <button type="button" onclick='dismissStockAlert(${jsArg(alert.item)}, ${jsArg(alert.stateKey)})'>Quittieren</button>
+                    <button type="button" onclick='disableStockAlert(${jsArg(alert.item)})'>Deaktivieren</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <details class="alert-summary" ${alerts.length <= 3 ? 'open' : ''}>
+            <summary class="alert-title">
+                <span>Bestandswarnungen (${alerts.length})</span>
+                <span class="alert-summary-hint">anzeigen</span>
+            </summary>
+            ${rows}
+        </details>
+    `;
 }
 
 function renderTraceExportInputs() {
@@ -326,14 +857,15 @@ function renderStats() {
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
             
-            let currentStock = db.inventory[findCat(item)] ? (db.inventory[findCat(item)][item] || 0) : 0;
+            let currentStock = getStock(item);
             let prognosisText = "";
-            let outCount = countOutsForElement(item);
+            let metrics = getUsageMetrics(item);
+            let outCount = metrics.outCount;
             
             if (outCount < 2) {
                 prognosisText = "Prognose ab 2. Entnahme";
-            } else if (perWeek > 0) {
-                let weeksLeft = currentStock / perWeek;
+            } else if (metrics.perDay > 0) {
+                let weeksLeft = currentStock / (metrics.perDay * 7);
                 prognosisText = weeksLeft > 52 ? `Reichweite: >1 Jahr` : `Reichweite: ca. ${weeksLeft.toFixed(1)} Wochen`;
             } else {
                 prognosisText = "Keine Prognose möglich";
@@ -383,6 +915,13 @@ function findCat(itemName) {
     return "C&R Produkte";
 }
 
+function catalogHasItem(itemName) {
+    for (let cat in catalog) {
+        if (catalog[cat][itemName] !== undefined) return true;
+    }
+    return false;
+}
+
 function renderLogs() {
     const container = document.getElementById('log-container');
     if (!container) return;
@@ -401,7 +940,7 @@ function renderLogs() {
         let isOut = log.action === 'out';
         let actionColor = isOut ? 'var(--danger)' : 'var(--success)';
         let sign = isOut ? '-' : '+';
-        let actionText = isOut ? 'Ausgelagert' : 'Einlagert';
+        let actionText = isOut ? 'Ausgelagert' : 'Eingelagert';
         
         // Umrechnung in Gramm für das Protokoll
         let gAmount = getGrams(log.item, log.amount);
@@ -410,7 +949,7 @@ function renderLogs() {
             <div class="log-item ${log.action}" style="border-left: 4px solid ${actionColor};">
                 <div>
                     <div class="log-details"><strong>${log.item}</strong></div>
-                    <div class="log-date">${new Date(log.time).toLocaleString()} | ${actionText}</div>
+                    <div class="log-date">${new Date(getLogTime(log) || Date.now()).toLocaleString()} | ${actionText}</div>
                 </div>
                 <div style="text-align: right;">
                     <div style="color: ${actionColor}; font-weight: bold;">${sign}${parseFloat(log.amount).toFixed(1)} ml</div>
@@ -532,12 +1071,13 @@ function executeAction() {
     if (finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
 
     if (action === 'in') {
-        db.inventory[cat][item] += finalMl;
-        addLog(cat, item, 'in', finalMl);
-        saveDB();
-        closeModal();
-        renderLager();
-    } 
+                db.inventory[cat][item] += finalMl;
+                addLog(cat, item, 'in', finalMl);
+                saveDB();
+                closeModal();
+                renderLager();
+                checkAndNotifyStockAlerts();
+            } 
     else {
         let stock = db.inventory[cat][item] || 0;
         if (stock - finalMl < 0) {
@@ -558,6 +1098,7 @@ function executeAction() {
                 saveDB();
                 closeModal();
                 renderLager();
+                checkAndNotifyStockAlerts();
             });
             return;
         }
@@ -567,6 +1108,7 @@ function executeAction() {
         saveDB();
         closeModal();
         renderLager();
+        checkAndNotifyStockAlerts();
     }
 }
 
@@ -590,7 +1132,8 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
 
 function addLog(cat, item, action, amount) {
     if(!db.logs) db.logs = [];
-    db.logs.push({ cat, item, action, amount, timestamp: Date.now() });
+    const now = Date.now();
+    db.logs.push({ cat, item, action, amount, timestamp: now, time: now });
     if (db.logs.length > 200) db.logs.shift();
 }
 
@@ -697,6 +1240,7 @@ function executeQueueWithConflictHandling(queue, index) {
         alert("Werte erfolgreich verarbeitet!");
         closeModal();
         showTab('lager');
+        checkAndNotifyStockAlerts();
         return;
     }
     
@@ -719,9 +1263,9 @@ function executeQueueWithConflictHandling(queue, index) {
 }
 
 // --- BACKUP & RESETS ---
-function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in db.stats) db.stats[i]=0; db.statsStarted=Date.now(); saveDB(); renderStats(); alert("Statistiken auf 0 gesetzt."); } }
-function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; saveDB(); renderLogs(); alert("Protokoll gelöscht."); } }
-function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; saveDB(); renderLager(); alert("Lager ist leer."); } }
+function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in db.stats) db.stats[i]=0; db.statsStarted=Date.now(); if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderStats(); updateNotificationStatus(); alert("Statistiken auf 0 gesetzt."); } }
+function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLogs(); updateNotificationStatus(); alert("Protokoll gelöscht."); } }
+function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLager(); updateNotificationStatus(); alert("Lager ist leer."); } }
 
 function exportData() {
     let blob = new Blob([JSON.stringify(db, null, 2)], { type: "text/plain" });
@@ -738,7 +1282,24 @@ function importData() {
     reader.onload = e => {
         try {
             let parsed = JSON.parse(e.target.result);
-            if(parsed.inventory) { db = parsed; if(!db.logs) db.logs=[]; saveDB(); applyTheme(db.theme || 'default', false); alert("Backup geladen!"); showTab('lager'); } 
+            if(parsed.inventory) {
+                db = parsed;
+                if(!db.logs) db.logs=[];
+                if(!db.settings) db.settings = {};
+                if(!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
+                if(!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
+                if(!db.alerts) db.alerts = { dismissed: {}, disabled: {} };
+                if(!db.alerts.dismissed) db.alerts.dismissed = {};
+                if(!db.alerts.disabled) db.alerts.disabled = {};
+                if(!db.customProducts) db.customProducts = [];
+                applyCustomProductsToCatalog();
+                saveDB();
+                applyTheme(db.theme || 'default', false);
+                updateNotificationStatus();
+                alert("Backup geladen!");
+                showTab('lager');
+                checkAndNotifyStockAlerts();
+            } 
             else alert("Ungültiges Backup-Format.");
         } catch(err) { alert("Fehler beim Lesen der Datei."); }
     };
@@ -903,6 +1464,7 @@ function submitBulkCart() {
     bulkCart = [];
     renderBulkCart();
     renderLager();
+    checkAndNotifyStockAlerts();
     
     alert("Massen-Wareneingang erfolgreich verbucht!");
     showTab('lager');
@@ -911,3 +1473,5 @@ function submitBulkCart() {
 // APP START
 initDB();
 renderLager();
+updateNotificationStatus();
+setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
