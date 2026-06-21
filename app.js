@@ -476,6 +476,14 @@ function supportsNotifications() {
     return 'Notification' in window;
 }
 
+function isIOSSafari() {
+    const ua = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    return { isIOS, isSafari: isIOS && isSafari, isStandalone };
+}
+
 function getNotificationPermissionText() {
     if (!supportsNotifications()) return 'Nicht unterstützt';
     if (Notification.permission === 'granted') return 'Erlaubt';
@@ -489,9 +497,16 @@ function updateNotificationStatus() {
     if (!el && !disabledEl) return;
 
     const enabled = db.notifications && db.notifications.enabled;
+    const inAppOnly = db.notifications && db.notifications.inAppOnly;
     const permission = getNotificationPermissionText();
     const alerts = getStockAlerts();
     let detail = enabled ? 'Aktiv' : 'Aus';
+
+    if (enabled && inAppOnly) {
+        if (el) el.innerHTML = `Status: Aktiv (In-App) · Aktuelle Warnungen: ${alerts.length}`;
+        renderDisabledAlertProducts(disabledEl);
+        return;
+    }
 
     if (!supportsNotifications()) {
         if (el) el.innerHTML = 'Benachrichtigungen werden von diesem Browser nicht unterstützt.';
@@ -530,8 +545,33 @@ function renderDisabledAlertProducts(container) {
 }
 
 async function enableStockNotifications() {
+    const ios = isIOSSafari();
+    
+    // iOS Safari: In-App Benachrichtigungen aktivieren
+    if (ios.isIOS && !supportsNotifications()) {
+        if (ios.isSafari && !ios.isStandalone) {
+            alert("📱 iOS Safari unterstützt keine Push-Benachrichtigungen.\n\nSo geht's:\n1. Tippe auf das Teilen-Symbol (□↑)\n2. Wähle 'Zum Home-Bildschirm'\n3. Öffne die App vom Home-Bildschirm\n\nDann werden Benachrichtigungen unterstützt.\n\nAlternativ: In-App-Warnungen werden automatisch als Toast-Meldungen angezeigt.");
+        } else {
+            alert("📱 Auf diesem Gerät werden Push-Benachrichtigungen aktiviert, sobald die App offen ist.\nIn-App-Warnungen werden als Toast-Meldungen angezeigt.");
+        }
+        // Aktiviere In-App Benachrichtigungen als Fallback
+        db.notifications.enabled = true;
+        db.notifications.inAppOnly = true;
+        db.notifications.lastAlertSignature = '';
+        db.notifications.lastSentAt = 0;
+        saveDB();
+        updateNotificationStatus();
+        showToast('In-App Benachrichtigungen aktiviert', 'success');
+        checkAndNotifyStockAlerts('manual');
+        return;
+    }
+
     if (!supportsNotifications()) {
-        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.");
+        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.\n\nIn-App-Warnungen werden als Toast-Meldungen angezeigt.");
+        db.notifications.enabled = true;
+        db.notifications.inAppOnly = true;
+        db.notifications.lastAlertSignature = '';
+        saveDB();
         updateNotificationStatus();
         return;
     }
@@ -550,6 +590,7 @@ async function enableStockNotifications() {
     }
 
     db.notifications.enabled = true;
+    db.notifications.inAppOnly = false;
     db.notifications.lastAlertSignature = '';
     db.notifications.lastSentAt = 0;
     saveDB();
@@ -614,7 +655,6 @@ async function showLocalNotification(title, body) {
 
 function checkAndNotifyStockAlerts(trigger = 'auto') {
     if (!db.notifications || !db.notifications.enabled) return;
-    if (!supportsNotifications() || Notification.permission !== 'granted') return;
 
     const alerts = getStockAlerts();
     if (alerts.length === 0) {
@@ -636,7 +676,14 @@ function checkAndNotifyStockAlerts(trigger = 'auto') {
     }
 
     const notification = buildAlertNotification(alerts);
-    showLocalNotification(notification.title, notification.body);
+    
+    // In-App Fallback (iOS etc.)
+    if (db.notifications.inAppOnly || !supportsNotifications() || Notification.permission !== 'granted') {
+        showToast(`⚠️ ${notification.title}`, 'warning', 6000);
+    } else {
+        showLocalNotification(notification.title, notification.body);
+    }
+    
     db.notifications.lastAlertSignature = signature;
     db.notifications.lastSentAt = now;
     saveDB();
@@ -644,8 +691,13 @@ function checkAndNotifyStockAlerts(trigger = 'auto') {
 }
 
 function sendTestNotification() {
+    if (db.notifications && db.notifications.inAppOnly) {
+        showToast('⚠️ OSCI Lager Test: Die In-App Benachrichtigung funktioniert.', 'warning', 4000);
+        return;
+    }
+    
     if (!supportsNotifications()) {
-        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.");
+        alert("Dieses Gerät oder dieser Browser unterstützt lokale Benachrichtigungen leider nicht.\n\nIn-App-Warnungen werden als Toast-Meldungen angezeigt.");
         return;
     }
 
@@ -811,21 +863,10 @@ function renderLager() {
                         ${categoryOptions}
                     </select>
                 </div>
-                <div class="toolbar-divider"></div>
-                <div class="toolbar-field toolbar-field-compact">
-                    <span class="toolbar-icon">⏱</span>
-                    <select id="forecastWeeks" class="forecast-select" onchange="updateForecastWindow(this.value)">
-                        <option value="2">  2 Wochen</option>
-                        <option value="4">  4 Wochen</option>
-                        <option value="8">  8 Wochen</option>
-                        <option value="12">  12 Wochen</option>
-                    </select>
-                </div>
             </div>
             <div id="stock-alerts"></div>
             <div id="lager-container"></div>
         `;
-        document.getElementById('forecastWeeks').value = String((db.settings && db.settings.forecastWeeks) || 4);
     }
     filterLager();
 }
@@ -1212,6 +1253,8 @@ function updateLiveConversion() {
 document.addEventListener("DOMContentLoaded", () => {
     const themeSelect = document.getElementById('themeSelect');
     if(themeSelect && db.theme) themeSelect.value = db.theme;
+    const forecastSelect = document.getElementById('forecastWeeks');
+    if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
     initBulkProductSelect();
 });
 

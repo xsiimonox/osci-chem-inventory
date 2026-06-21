@@ -109,6 +109,18 @@
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--success); margin-bottom: 5px;">Benachrichtigungen</h3>
                 <p class="hint">Die App kann dich beim Öffnen und nach Buchungen informieren, wenn Artikel den Warnzeitraum unterschreiten.</p>
+                
+                <div class="input-group" style="margin-top: 12px; margin-bottom: 15px;">
+                    <label style="font-weight: 600;">Warnzeitraum (Verbrauchsprognose):</label>
+                    <p class="hint" style="margin-top: 4px; margin-bottom: 8px; font-size: 0.8rem;">Wie viele Wochen im Voraus soll die App dich warnen, bevor ein Bestand voraussichtlich leer geht — basierend auf der berechneten Verbrauchsprognose.</p>
+                    <select id="forecastWeeks" onchange="updateForecastWindow(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
+                        <option value="2">2 Wochen Vorwarnzeit</option>
+                        <option value="4">4 Wochen Vorwarnzeit</option>
+                        <option value="8">8 Wochen Vorwarnzeit</option>
+                        <option value="12">12 Wochen Vorwarnzeit</option>
+                    </select>
+                </div>
+                
                 <div id="notification-status" class="notification-status">Status wird geladen...</div>
                 <div id="disabled-alert-products" class="disabled-alert-products"></div>
                 <div class="btn-group" style="margin-top: 12px;">
