@@ -40,6 +40,122 @@ const densityFactors = {
 
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 
+// --- OSCI SHOP BUILT-IN PRODUCT PRESET ---
+// This preset is always available and cannot be permanently deleted.
+// It represents the full OSCI Motion product portfolio that maps to shopLinksPreset.
+const OSCI_SHOP_PRESET_NAME = 'OSCI Motion Shop (Standard)';
+const OSCI_SHOP_PRESET_PRODUCTS = [
+    // C&R Produkte
+    { name: 'Natriumchlorid (NaCl)',    cat: 'C&R Produkte', sizes: [5000, 10000], sizeUnit: 'ml', sizesOriginal: [5000, 10000], density: 1.192 },
+    { name: 'Magnesiumchlorid (MgCl2)', cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.289 },
+    { name: 'Natriumsulfat (Na2SO4)',   cat: 'C&R Produkte', sizes: [5000],        sizeUnit: 'ml', sizesOriginal: [5000],        density: 1.110 },
+    { name: 'Magnesiumsulfat (MgSO4)',  cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.224 },
+    { name: 'Kaliumchlorid (KCl)',      cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.112 },
+    { name: 'Kaliumsulfat (K2SO4)',     cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.067 },
+    { name: 'Kaliumbromid (KBr)',       cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.104 },
+    { name: 'Strontiumchlorid (SrCl2)', cat: 'C&R Produkte', sizes: [100, 1000],   sizeUnit: 'ml', sizesOriginal: [100, 1000],   density: 1.154 },
+    { name: 'Calciumchlorid (CaCl2)',   cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 1.399 },
+    { name: 'Natriumfluorid (NaF)',     cat: 'C&R Produkte', sizes: [5000],        sizeUnit: 'ml', sizesOriginal: [5000],        density: 1.000 },
+    { name: 'Bor (B)',                  cat: 'C&R Produkte', sizes: [1000, 5000],  sizeUnit: 'ml', sizesOriginal: [1000, 5000],  density: 0.999 },
+    // Makro Elements
+    { name: 'Calcium',   cat: 'Makro Elements', sizes: [5000],  sizeUnit: 'ml', sizesOriginal: [5000],  density: 1.0 },
+    { name: 'KH Nacht',  cat: 'Makro Elements', sizes: [5000],  sizeUnit: 'ml', sizesOriginal: [5000],  density: 1.0 },
+    { name: 'KH Tag',    cat: 'Makro Elements', sizes: [10000], sizeUnit: 'ml', sizesOriginal: [10000], density: 1.0 },
+    { name: 'Magnesium', cat: 'Makro Elements', sizes: [5000],  sizeUnit: 'ml', sizesOriginal: [5000],  density: 1.0 },
+    // Nutrition Elements
+    { name: 'Kohlenstoff (C)', cat: 'Nutrition Elements', sizes: [1000], sizeUnit: 'ml', sizesOriginal: [1000], density: 1.0 },
+    { name: 'Lanthan (La)',    cat: 'Nutrition Elements', sizes: [1000], sizeUnit: 'ml', sizesOriginal: [1000], density: 1.0 },
+    { name: 'Phosphor (P)',    cat: 'Nutrition Elements', sizes: [1000], sizeUnit: 'ml', sizesOriginal: [1000], density: 1.0 },
+    { name: 'Stickstoff (N)', cat: 'Nutrition Elements', sizes: [1000], sizeUnit: 'ml', sizesOriginal: [1000], density: 1.0 },
+    // Anionen
+    { name: 'Fluor (F)',    cat: 'Anionen', sizes: [100],      sizeUnit: 'ml', sizesOriginal: [100],      density: 1.009 },
+    { name: 'Iod (I)',      cat: 'Anionen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.097 },
+    { name: 'Selen (Se)',   cat: 'Anionen', sizes: [100],      sizeUnit: 'ml', sizesOriginal: [100],      density: 1.010 },
+    { name: 'Vanadium (V)', cat: 'Anionen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.026 },
+    // Kationen
+    { name: 'Barium (Ba)',     cat: 'Kationen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.005 },
+    { name: 'Chrom (Cr)',      cat: 'Kationen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.047 },
+    { name: 'Cobalt (Co)',     cat: 'Kationen', sizes: [1000],     sizeUnit: 'ml', sizesOriginal: [1000],     density: 1.000 },
+    { name: 'Eisen (Fe)',      cat: 'Kationen', sizes: [100],      sizeUnit: 'ml', sizesOriginal: [100],      density: 1.039 },
+    { name: 'Kupfer (Cu)',     cat: 'Kationen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.024 },
+    { name: 'Lithium (Li)',    cat: 'Kationen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.023 },
+    { name: 'Zink (Zn)',       cat: 'Kationen', sizes: [100],      sizeUnit: 'ml', sizesOriginal: [100],      density: 1.024 },
+    { name: 'Mangan (Mn)',     cat: 'Kationen', sizes: [30, 100],  sizeUnit: 'ml', sizesOriginal: [30, 100],  density: 1.234 },
+    { name: 'Nickel (Ni)',     cat: 'Kationen', sizes: [1000],     sizeUnit: 'ml', sizesOriginal: [1000],     density: 0.999 },
+    { name: 'Molybd\u00e4n (Mo)', cat: 'Kationen', sizes: [30, 100], sizeUnit: 'ml', sizesOriginal: [30, 100], density: 1.002 },
+];
+
+// Format: { itemName: { sizeMl: fullUrl, ... } }
+// Sizes: 30, 100, 1000, 5000, 10000
+const BASE = 'https://osci-motion.de/product/';
+const shopLinksPreset = {
+    // C&R Produkte
+    "Natriumchlorid (NaCl)":    { 5000: BASE+'custom-repair-elements-natriumchlorid/?attribute_volumen=5+Liter',    10000: BASE+'custom-repair-elements-natriumchlorid/?attribute_volumen=10+Liter' },
+    "Magnesiumchlorid (MgCl2)": { 1000: BASE+'custom-repair-elements-magnesiumchlorid/?attribute_volumen=1+Liter',  5000: BASE+'custom-repair-elements-magnesiumchlorid/?attribute_volumen=5+Liter' },
+    "Natriumsulfat (Na2SO4)":   { 5000: BASE+'custom-repair-elements-natriumsulfat/?attribute_volumen=5+Liter' },
+    "Magnesiumsulfat (MgSO4)":  { 1000: BASE+'custom-repair-elements-magnesiumsulfat/?attribute_volumen=1+Liter',  5000: BASE+'custom-repair-elements-magnesiumsulfat/?attribute_volumen=5+Liter' },
+    "Kaliumchlorid (KCl)":      { 1000: BASE+'custom-repair-elements-kaliumchlorid/?attribute_volumen=1+Liter',    5000: BASE+'custom-repair-elements-kaliumchlorid/?attribute_volumen=5+Liter' },
+    "Kaliumsulfat (K2SO4)":     { 1000: BASE+'custom-repair-elements-kaliumsulfat/?attribute_volumen=1+Liter',     5000: BASE+'custom-repair-elements-kaliumsulfat/?attribute_volumen=5+Liter' },
+    "Kaliumbromid (KBr)":       { 1000: BASE+'custom-repair-elements-kaliumbromid/?attribute_volumen=1+Liter',     5000: BASE+'custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter' },
+    "Strontiumchlorid (SrCl2)": { 100:  BASE+'custom-repair-elements-strontiumchlorid/?attribute_volumen=100+ml',  1000: BASE+'custom-repair-elements-strontiumchlorid/?attribute_volumen=1+Liter' },
+    "Calciumchlorid (CaCl2)":   { 1000: BASE+'custom-repair-elements-calciumchlorid/?attribute_volumen=1+Liter',   5000: BASE+'custom-repair-elements-calciumchlorid/?attribute_volumen=5+Liter' },
+    "Natriumfluorid (NaF)":     { 5000: BASE+'custom-repair-elements-natriumfluorid/?attribute_volumen=5+Liter' },
+    "Bor (B)":                  { 1000: BASE+'custom-repair-elements-bor/?attribute_volumen=1+Liter',              5000: BASE+'custom-repair-elements-bor/?attribute_volumen=5+Liter' },
+    // Makro Elements
+    "Calcium":   { 5000: BASE+'makro-elements-calcium/?attribute_volumen=5+Liter' },
+    "KH Nacht":  { 5000: BASE+'makro-elements-kh-nacht/?attribute_volumen=5+Liter' },
+    "KH Tag":    { 10000: BASE+'makro-elements-kh-tag/?attribute_volumen=10+Liter' },
+    "Magnesium": { 5000: BASE+'makro-elements-magnesium/?attribute_volumen=5+Liter' },
+    // Nutrition Elements
+    "Kohlenstoff (C)": { 1000: BASE+'nutrition-elements-kohlenstoff/?attribute_volumen=1+Liter' },
+    "Lanthan (La)":    { 1000: BASE+'nutrition-elements-lanthan/?attribute_volumen=1+Liter' },
+    "Phosphor (P)":    { 1000: BASE+'nutrition-elements-phosphat/?attribute_volumen=1+Liter' },
+    "Stickstoff (N)":  { 1000: BASE+'nutrition-elements-stickstoff/?attribute_volumen=1+Liter' },
+    // Anionen
+    "Fluor (F)":    { 100: BASE+'trace-elements-flour/?attribute_volumen=1000+ml' },
+    "Iod (I)":      { 30: BASE+'trace-elements-iod/?attribute_volumen=30+ml',   100: BASE+'trace-elements-iod/?attribute_volumen=100+ml' },
+    "Selen (Se)":   { 100: BASE+'trace-elements-selen/?attribute_volumen=100+ml' },
+    "Vanadium (V)": { 30: BASE+'trace-elements-vanadium/?attribute_volumen=30+ml', 100: BASE+'trace-elements-vanadium/?attribute_volumen=100+ml' },
+    // Kationen
+    "Barium (Ba)":   { 30: BASE+'trace-elements-barium/?attribute_volumen=30+ml',   100: BASE+'trace-elements-barium/?attribute_volumen=100+ml' },
+    "Chrom (Cr)":    { 30: BASE+'trace-elements-chrom/?attribute_volumen=30+ml',    100: BASE+'trace-elements-chrom/?attribute_volumen=100+ml' },
+    "Cobalt (Co)":   { 1000: BASE+'trace-elements-cobalt/?attribute_volumen=1+Liter' },
+    "Eisen (Fe)":    { 100: BASE+'trace-elements-eisen/?attribute_volumen=100+ml' },
+    "Kupfer (Cu)":   { 30: BASE+'trace-elements-kupfer/?attribute_volumen=30+ml',   100: BASE+'trace-elements-kupfer/?attribute_volumen=100+ml' },
+    "Lithium (Li)":  { 30: BASE+'trace-elements-lithium/?attribute_volumen=30+ml',  100: BASE+'trace-elements-lithium/?attribute_volumen=100+ml' },
+    "Zink (Zn)":     { 100: BASE+'trace-elements-zink/?attribute_volumen=100+ml' },
+    "Mangan (Mn)":   { 30: BASE+'trace-elements-mangan/?attribute_volumen=30+ml',   100: BASE+'trace-elements-mangan/?attribute_volumen=100+ml' },
+    "Nickel (Ni)":   { 1000: BASE+'trace-elements-nickel/?attribute_volumen=1+Liter' },
+    "Molybd\u00e4n (Mo)": { 30: BASE+'trace-elements-molybdaen/?attribute_volumen=30+ml', 100: BASE+'trace-elements-molybdaen/?attribute_volumen=100+ml' },
+};
+
+// Returns the URL map {sizeMl: url} for an item (db overrides preset)
+function getShopUrlMap(itemName) {
+    const fromDb = db.shopLinks && db.shopLinks[itemName];
+    const fromPreset = shopLinksPreset[itemName];
+    // Merge: db overrides preset per size
+    if (fromDb && typeof fromDb === 'object' && !fromDb.slug) {
+        if (fromPreset) return Object.assign({}, fromPreset, fromDb);
+        return fromDb;
+    }
+    // Legacy slug format migration
+    if (fromDb && (typeof fromDb === 'string' || fromDb.slug)) return fromPreset || null;
+    return fromPreset || null;
+}
+
+// Legacy compat shim
+function getShopSlug(itemName) {
+    const map = getShopUrlMap(itemName);
+    return map ? true : null; // just used for existence check in old code
+}
+
+function buildShopUrl(slug, sizeMl) {
+    // Legacy shim – not used in new code but kept for safety
+    const sizeMap = { 30: "30+ml", 100: "100+ml", 1000: "1+Liter", 5000: "5+Liter", 10000: "10+Liter" };
+    const vol = sizeMap[sizeMl] || sizeMl + "+ml";
+    return `https://osci-motion.de/product/${slug}/?attribute_volumen=${vol}`;
+}
+
 const DB_KEY = 'osci_db_v5';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
@@ -85,6 +201,10 @@ function initDB() {
     if (!db.alerts.dismissed) db.alerts.dismissed = {};
     if (!db.alerts.disabled) db.alerts.disabled = {};
     if (!db.customProducts) db.customProducts = [];
+    if (!db.shopLinks) db.shopLinks = {};
+    if (!db.productPresets) db.productPresets = {};
+    // Always ensure the built-in OSCI preset is present (injected fresh, non-destructive)
+    db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
 
     applyCustomProductsToCatalog();
 
@@ -134,9 +254,29 @@ function showTab(tabId) {
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
     if(tabId === 'log') renderLogs();
+    if(tabId === 'nachbestellen') renderNachbestellen();
     if(tabId === 'einstellungen') {
         updateNotificationStatus();
         renderCustomProductSettings();
+        renderShopLinkSettings();
+        renderProductPresets();
+        // Wire up collapsible toggle hints
+        setTimeout(() => {
+            const det = document.getElementById('shop-links-details');
+            const hint = document.getElementById('shop-links-toggle-hint');
+            if (det && hint) {
+                det.addEventListener('toggle', () => {
+                    hint.innerText = det.open ? 'zuklappen' : 'aufklappen';
+                }, { once: false });
+            }
+            const det2 = document.getElementById('product-presets-details');
+            const hint2 = document.getElementById('product-presets-toggle-hint');
+            if (det2 && hint2) {
+                det2.addEventListener('toggle', () => {
+                    hint2.innerText = det2.open ? 'zuklappen' : 'aufklappen';
+                }, { once: false });
+            }
+        }, 0);
     }
 }
 
@@ -531,15 +671,21 @@ function renderCustomProductSettings() {
         return;
     }
 
-    list.innerHTML = db.customProducts.map((product, index) => `
+    list.innerHTML = db.customProducts.map((product, index) => {
+        const unitLabel = product.sizeUnit === 'g' ? 'g' : 'ml';
+        const displaySizes = (product.sizesOriginal && product.sizesOriginal.length > 0)
+            ? product.sizesOriginal.map(s => s + ' ' + unitLabel).join(', ')
+            : (product.sizes || []).map(s => s.toFixed(1) + ' ml').join(', ') || 'keine';
+        return `
         <div class="custom-product-row">
             <span>
                 <strong>${product.name}</strong>
-                <small>${product.cat} · ${(product.sizes || []).join(', ') || 'keine'} ml · Dichte ${product.density || 1}</small>
+                <small>${product.cat} · ${displaySizes} · Dichte ${product.density || 1}</small>
             </span>
             <button type="button" onclick="deleteCustomProduct(${index})">Löschen</button>
         </div>
-    `).join('');
+    `;
+    }).join('');
 }
 
 function addCustomProduct() {
@@ -548,11 +694,13 @@ function addCustomProduct() {
     const newCatEl = document.getElementById('customProductNewCategory');
     const sizesEl = document.getElementById('customProductSizes');
     const densityEl = document.getElementById('customProductDensity');
+    const sizeUnitEl = document.getElementById('customProductSizeUnit');
 
     const name = nameEl ? nameEl.value.trim() : '';
     const newCat = newCatEl ? newCatEl.value.trim() : '';
     const cat = newCat || (catEl ? catEl.value : '');
     const sizesRaw = sizesEl ? sizesEl.value : '';
+    const sizeUnit = sizeUnitEl ? sizeUnitEl.value : 'ml';
     const sizes = sizesRaw
         .split(',')
         .map(value => parseFloat(value.trim()))
@@ -575,7 +723,13 @@ function addCustomProduct() {
         return;
     }
 
-    db.customProducts.push({ name, cat, sizes, density });
+    // Convert sizes to ml if entered in grams
+    let sizesInMl = sizes;
+    if (sizeUnit === 'g') {
+        sizesInMl = sizes.map(s => s / density);
+    }
+
+    db.customProducts.push({ name, cat, sizes: sizesInMl, sizeUnit, sizesOriginal: sizes, density });
     applyCustomProductsToCatalog();
 
     if (!db.inventory[cat]) db.inventory[cat] = {};
@@ -1091,10 +1245,10 @@ function executeAction() {
                 return;
             }
             
-            showConflictModal(cat, item, finalMl, stock, () => {
-                db.inventory[cat][item] -= finalMl;
-                db.stats[item] += finalMl;
-                addLog(cat, item, 'out', finalMl);
+        showConflictModal(cat, item, finalMl, stock, () => {
+                db.inventory[cat][item] = 0;
+                db.stats[item] += stock;
+                addLog(cat, item, 'out', stock);
                 saveDB();
                 closeModal();
                 renderLager();
@@ -1122,9 +1276,10 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
             Zu wenig Bestand für <strong>${item}</strong>.<br><br>
             Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${required.toFixed(2)} ml</span><br>
             Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${current.toFixed(2)} ml</span><br>
-            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missing.toFixed(2)} ml</span>
+            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missing.toFixed(2)} ml</span><br><br>
+            <span style="font-size:0.88rem; color: var(--text-muted);">Wenn du trotzdem fortfährst, wird der gesamte Restbestand (${current.toFixed(2)} ml) ausgelagert. Der Bestand geht <strong>nicht in den Minusbereich</strong>.</span>
         </div>
-        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren</button>
+        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren (${current.toFixed(2)} ml auslagern)</button>
     `;
     document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
     document.getElementById('modal').style.display = 'flex';
@@ -1183,11 +1338,18 @@ function previewCRPaste() {
         let itemName = crOrder[i].name;
         let factor = densityFactors[itemName] || 1.0;
         let amountG = (amountMl * factor).toFixed(2);
+        let cat = crOrder[i].cat;
+        let currentStock = (db.inventory[cat] && db.inventory[cat][itemName]) || 0;
         
         if (amountMl > 0) {
+            let stockWarning = '';
+            if (currentStock < amountMl) {
+                let missing = (amountMl - currentStock).toFixed(2);
+                stockWarning = `<span style="color: var(--danger); font-size: 0.8rem; margin-left: 8px;">⚠️ Fehlt: ${missing} ml (Bestand: ${currentStock.toFixed(1)} ml)</span>`;
+            }
             html += `
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">
-                    <span style="color: #fff;">${itemName}</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; flex-wrap: wrap; gap: 4px;">
+                    <span style="color: #fff;">${itemName}${stockWarning}</span>
                     <span style="text-align: right;">
                         <strong style="color: #fff;">${amountMl.toFixed(2)} ml</strong> 
                         <span style="color: var(--secondary); margin-left: 8px;">(${amountG} g)</span>
@@ -1249,9 +1411,9 @@ function executeQueueWithConflictHandling(queue, index) {
     
     if (stock - amount < 0) {
         showConflictModal(cat, item, amount, stock, () => {
-            db.inventory[cat][item] -= amount;
-            db.stats[item] += amount;
-            addLog(cat, item, 'out', amount);
+            db.inventory[cat][item] = 0;
+            db.stats[item] += stock;
+            addLog(cat, item, 'out', stock);
             executeQueueWithConflictHandling(queue, index + 1);
         });
     } else {
@@ -1292,6 +1454,8 @@ function importData() {
                 if(!db.alerts.dismissed) db.alerts.dismissed = {};
                 if(!db.alerts.disabled) db.alerts.disabled = {};
                 if(!db.customProducts) db.customProducts = [];
+                if(!db.shopLinks) db.shopLinks = {};
+                if(!db.productPresets) db.productPresets = {};
                 applyCustomProductsToCatalog();
                 saveDB();
                 applyTheme(db.theme || 'default', false);
@@ -1338,6 +1502,17 @@ function initBulkProductSelect() {
         select.appendChild(optGroup);
     }
     
+    // Behälter-Dropdown befüllen
+    const bulkContainerSelect = document.getElementById('bulkContainerSelect');
+    if (bulkContainerSelect && bulkContainerSelect.options.length === 0) {
+        for (let c in containers) {
+            let opt = document.createElement('option');
+            opt.value = c;
+            opt.innerText = `${c} (wiegt ${containers[c]}g)`;
+            bulkContainerSelect.appendChild(opt);
+        }
+    }
+    
     // Event Listener für automatischen Wechsel der Schnellauswahl-Buttons
     select.onchange = updateBulkQuickButtons;
 }
@@ -1357,7 +1532,7 @@ function updateBulkQuickButtons() {
     if (sizes.length === 0) return;
     
     let label = document.createElement('label');
-    label.innerText = "Schnellauswahl Flaschengröße:";
+    label.innerText = "Schnellauswahl Behältergröße:";
     label.style.display = "block";
     label.style.marginBottom = "5px";
     label.style.fontSize = "0.85rem";
@@ -1381,11 +1556,55 @@ function updateBulkQuickButtons() {
         btn.onclick = () => {
             document.getElementById('bulkAmount').value = size;
             document.getElementById('bulkUnitSelect').value = 'ml';
+            toggleBulkContainerSection();
         };
         btnGroup.appendChild(btn);
     });
     
     container.appendChild(btnGroup);
+}
+
+function toggleBulkContainerSection() {
+    const unit = document.getElementById('bulkUnitSelect').value;
+    const section = document.getElementById('bulkContainerSection');
+    if (!section) return;
+    section.style.display = unit === 'g' ? 'block' : 'none';
+    if (unit !== 'g') {
+        const cb = document.getElementById('bulkUseTara');
+        if (cb) cb.checked = false;
+        const sel = document.getElementById('bulkContainerSelect');
+        if (sel) sel.style.display = 'none';
+    }
+    updateBulkTaraPreview();
+}
+
+function toggleBulkTaraSelect() {
+    const isChecked = document.getElementById('bulkUseTara').checked;
+    const sel = document.getElementById('bulkContainerSelect');
+    if (sel) sel.style.display = isChecked ? 'block' : 'none';
+    updateBulkTaraPreview();
+}
+
+function updateBulkTaraPreview() {
+    const preview = document.getElementById('bulkTaraPreview');
+    if (!preview) return;
+    const useTaraEl = document.getElementById('bulkUseTara');
+    const isChecked = useTaraEl && useTaraEl.checked;
+    if (!isChecked) { preview.innerText = ''; return; }
+    const selVal = document.getElementById('bulkContainerSelect').value;
+    const taraG = containers[selVal];
+    if (taraG === undefined) return;
+    const amountRaw = parseFloat(document.getElementById('bulkAmount').value);
+    if (!isNaN(amountRaw) && amountRaw > 0) {
+        const netG = amountRaw - taraG;
+        if (netG <= 0) {
+            preview.innerHTML = `<span style="color:var(--danger)">⚠️ Tara (${taraG} g) ist größer oder gleich der Eingabe!</span>`;
+        } else {
+            preview.innerHTML = `Tara: −${taraG} g &rarr; Netto: <strong style="color:var(--success);">${netG.toFixed(1)} g</strong>`;
+        }
+    } else {
+        preview.innerText = `Tara: ${taraG} g werden abgezogen.`;
+    }
 }
 
 function addToBulkCart() {
@@ -1401,8 +1620,18 @@ function addToBulkCart() {
     let finalMl = amountRaw;
     
     if (unit === 'g') {
+        let netG = amountRaw;
+        const useTara = document.getElementById('bulkUseTara') && document.getElementById('bulkUseTara').checked;
+        if (useTara) {
+            const containerVal = document.getElementById('bulkContainerSelect').value;
+            const taraG = containers[containerVal] || 0;
+            netG -= taraG;
+            if (netG <= 0) {
+                return alert(`Fehler: Das Behälter-Gewicht (${taraG} g) ist größer oder gleich der eingegebenen Menge. Bitte prüfe die Eingabe.`);
+            }
+        }
         let factor = densityFactors[product.item] || 1.0;
-        finalMl = amountRaw / factor;
+        finalMl = netG / factor;
     }
     
     let existingIndex = bulkCart.findIndex(c => c.cat === product.cat && c.item === product.item);
@@ -1468,6 +1697,307 @@ function submitBulkCart() {
     
     alert("Massen-Wareneingang erfolgreich verbucht!");
     showTab('lager');
+}
+
+// --- NACHBESTELLEN & SHOP-LINKS ---
+
+function renderNachbestellen() {
+    const container = document.getElementById('nachbestellen-container');
+    if (!container) return;
+
+    // Build a combined product list: catalog + custom products
+    const allItems = [];
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
+        }
+    }
+
+    // Group by category
+    const byCat = {};
+    allItems.forEach(({ cat, item, sizes }) => {
+        const urlMap = getShopUrlMap(item);
+        // Include item if it has any URL configured (preset or custom db entry)
+        const hasAnyUrl = urlMap && Object.keys(urlMap).length > 0;
+        // Also include items that have a custom db entry even if not in preset
+        const hasDbEntry = db.shopLinks && db.shopLinks[item] && Object.keys(db.shopLinks[item]).length > 0;
+        if (!hasAnyUrl && !hasDbEntry) return;
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push({ item, sizes, urlMap: urlMap || {} });
+    });
+
+    let html = '';
+    for (let cat in byCat) {
+        let catRows = '';
+        byCat[cat].forEach(({ item, sizes, urlMap }) => {
+            const stock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
+            const checkId = 'shopcheck-' + item.replace(/[^a-zA-Z0-9]/g, '');
+
+            // Build size buttons — use URL from map if available, else skip
+            // Show all sizes that have a URL configured
+            const urlEntries = Object.entries(urlMap);
+            const sizeBtns = urlEntries.map(([sizeMl, url]) => {
+                const s = Number(sizeMl);
+                const label = s >= 1000 ? (s / 1000) + ' L' : s + ' ml';
+                return `<a href="${url}" target="_blank" rel="noopener" class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; text-decoration:none; display:inline-block;">${label}</a>`;
+            }).join(' ');
+
+            const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+            const weeksLeft = getWeeksLeft(item);
+            const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+            const isLow = (threshold > 0 && stock <= threshold) || (weeksLeft !== null && weeksLeft <= warningWeeks) || stock <= 0;
+            const stockColor = isLow ? 'var(--danger)' : 'var(--success)';
+            const firstUrl = urlEntries.length > 0 ? urlEntries[0][1] : '';
+
+            catRows += `
+                <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap;">
+                    <input type="checkbox" id="${checkId}" data-item="${item}"
+                        data-urls='${jsArg(urlMap)}' data-first-url="${firstUrl}"
+                        onchange="updateShopCartBtn()" style="width:20px; height:20px; flex-shrink:0; cursor:pointer;">
+                    <div style="flex:1; min-width:160px;">
+                        <strong style="color:var(--text);">${item}</strong><br>
+                        <small style="color:${stockColor};">Bestand: ${stock.toFixed(1)} ml${isLow ? ' ⚠️' : ''}</small>
+                    </div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap;">${sizeBtns}</div>
+                </div>
+            `;
+        });
+        html += `<div style="margin-bottom:20px;"><h3 style="color:var(--secondary); margin-bottom:8px;">${cat}</h3>${catRows}</div>`;
+    }
+
+    if (!html) {
+        html = '<p class="hint">Keine Shop-Links konfiguriert. Bitte unter Einstellungen &rarr; Shop-Links verwalten die Links einpflegen.</p>';
+    }
+
+    container.innerHTML = html;
+    updateShopCartBtn();
+}
+
+function updateShopCartBtn() {
+    const btn = document.getElementById('btnOpenShopCart');
+    if (!btn) return;
+    const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
+    btn.style.display = checked.length > 0 ? 'inline-block' : 'none';
+    btn.innerText = `Alle ${checked.length} markierten im Shop öffnen`;
+}
+
+function selectAllShopItems(select) {
+    document.querySelectorAll('#nachbestellen-container input[type=checkbox]').forEach(cb => {
+        cb.checked = select;
+    });
+    updateShopCartBtn();
+}
+
+function openShopLink(item, sizeMl) {
+    const urlMap = getShopUrlMap(item);
+    if (!urlMap || !urlMap[sizeMl]) return alert(`Kein Shop-Link für ${item} (${sizeMl} ml) hinterlegt.`);
+    window.open(urlMap[sizeMl], '_blank');
+}
+
+function openShopCart() {
+    const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
+    if (checked.length === 0) return;
+
+    let urls = [];
+    checked.forEach(cb => {
+        const firstUrl = cb.dataset.firstUrl;
+        if (firstUrl) urls.push(firstUrl);
+    });
+
+    if (urls.length === 0) return;
+    if (urls.length > 5) {
+        if (!confirm(`Es werden ${urls.length} Browser-Tabs geöffnet. Fortfahren?`)) return;
+    }
+    urls.forEach(url => window.open(url, '_blank'));
+}
+
+// --- SHOP-LINK EINSTELLUNGEN ---
+
+function renderShopLinkSettings() {
+    const container = document.getElementById('shop-links-settings-list');
+    if (!container) return;
+
+    // Build combined item list: catalog + custom products
+    const allItems = [];
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
+        }
+    }
+
+    // Group by category
+    const byCat = {};
+    allItems.forEach(({ cat, item, sizes }) => {
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push({ item, sizes });
+    });
+
+    let html = '';
+    for (let cat in byCat) {
+        html += `<div style="margin-bottom:20px;"><strong style="color:var(--secondary); font-size:0.95rem; display:block; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border);">${cat}</strong>`;
+        byCat[cat].forEach(({ item, sizes }) => {
+            const urlMap = getShopUrlMap(item) || {};
+            const dbEntry = (db.shopLinks && db.shopLinks[item]) || {};
+            const safeId = item.replace(/[^a-zA-Z0-9]/g, '');
+
+            // Determine which sizes to show: union of catalog sizes + any sizes that have a URL
+            const allSizes = new Set([
+                ...sizes.map(Number),
+                ...Object.keys(urlMap).map(Number),
+                ...Object.keys(dbEntry).map(Number)
+            ]);
+            if (allSizes.size === 0) {
+                // No catalog sizes defined — show one free-form row
+                allSizes.add('');
+            }
+
+            const sizeRows = [...allSizes].sort((a, b) => a - b).map(size => {
+                const currentUrl = dbEntry[size] || urlMap[size] || '';
+                const label = size >= 1000 ? (size / 1000) + ' L' : size ? size + ' ml' : 'Größe';
+                const inputId = `shopurl-${safeId}-${size}`;
+                return `
+                    <div style="display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap;">
+                        <span style="min-width:50px; font-size:0.8rem; color:var(--text-muted); flex-shrink:0;">${label}</span>
+                        <input type="text" id="${inputId}" data-item="${item}" data-size="${size}"
+                            value="${currentUrl}" placeholder="https://osci-motion.de/product/..."
+                            style="flex:1; min-width:200px; padding:6px 10px; background:#2c2c2e; color:#fff; border:1px solid var(--border); border-radius:8px; font-size:0.8rem;">
+                        ${currentUrl ? `<a href="${currentUrl}" target="_blank" rel="noopener" title="Testen" style="color:var(--secondary); font-size:0.9rem; flex-shrink:0;">↗</a>` : ''}
+                    </div>`;
+            }).join('');
+
+            html += `
+                <div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
+                    <div style="font-size:0.85rem; color:var(--text); font-weight:600; margin-bottom:2px;">${item}</div>
+                    ${sizeRows}
+                </div>`;
+        });
+        html += '</div>';
+    }
+
+    container.innerHTML = html || '<p class="hint">Keine Produkte im Katalog.</p>';
+}
+
+function saveShopLinks() {
+    if (!db.shopLinks) db.shopLinks = {};
+    document.querySelectorAll('#shop-links-settings-list input[data-item]').forEach(input => {
+        const item = input.dataset.item;
+        const size = input.dataset.size;
+        const val = input.value.trim();
+        if (!db.shopLinks[item]) db.shopLinks[item] = {};
+        if (val) {
+            db.shopLinks[item][size] = val;
+        } else {
+            delete db.shopLinks[item][size];
+        }
+        if (Object.keys(db.shopLinks[item]).length === 0) delete db.shopLinks[item];
+    });
+    saveDB();
+    renderShopLinkSettings();
+    alert('Shop-Links gespeichert!');
+}
+
+function resetShopLinksToPreset() {
+    if (!confirm('Alle eigenen Shop-Link-Änderungen zurücksetzen? Das Preset wird wiederhergestellt.')) return;
+    db.shopLinks = {};
+    saveDB();
+    renderShopLinkSettings();
+    alert('Preset wiederhergestellt.');
+}
+
+// --- PRODUKT-PRESETS ---
+
+function saveProductPreset() {
+    const nameEl = document.getElementById('presetNameInput');
+    const name = nameEl ? nameEl.value.trim() : '';
+    if (!name) return alert('Bitte einen Preset-Namen eingeben.');
+    if (!db.customProducts || db.customProducts.length === 0) return alert('Keine eigenen Produkte vorhanden zum Speichern.');
+
+    if (!db.productPresets) db.productPresets = {};
+    if (db.productPresets[name]) {
+        if (!confirm(`Preset "${name}" existiert bereits. Überschreiben?`)) return;
+    }
+    db.productPresets[name] = JSON.parse(JSON.stringify(db.customProducts));
+    saveDB();
+    if (nameEl) nameEl.value = '';
+    renderProductPresets();
+    alert(`Preset "${name}" mit ${db.customProducts.length} Produkt(en) gespeichert.`);
+}
+
+function loadProductPreset(name) {
+    const preset = db.productPresets && db.productPresets[name];
+    if (!preset) return;
+    if (!confirm(`Preset "${name}" laden? Dies überschreibt alle aktuellen eigenen Produkte (${(db.customProducts || []).length} Stk).`)) return;
+
+    // Remove current custom products from catalog
+    (db.customProducts || []).forEach(p => {
+        if (db.inventory[p.cat]) delete db.inventory[p.cat][p.name];
+        delete densityFactors[p.name];
+    });
+
+    db.customProducts = JSON.parse(JSON.stringify(preset));
+    applyCustomProductsToCatalog();
+
+    // Ensure inventory entries exist
+    db.customProducts.forEach(p => {
+        if (!db.inventory[p.cat]) db.inventory[p.cat] = {};
+        if (db.inventory[p.cat][p.name] === undefined) db.inventory[p.cat][p.name] = 0;
+        if (db.stats[p.name] === undefined) db.stats[p.name] = 0;
+    });
+    saveDB();
+    renderCustomProductSettings();
+    renderProductPresets();
+    renderLager();
+    initBulkProductSelect();
+    alert(`Preset "${name}" geladen.`);
+}
+
+function deleteProductPreset(name) {
+    if (name === OSCI_SHOP_PRESET_NAME) return alert('Das Standard-Preset kann nicht gelöscht werden.');
+    if (!confirm(`Preset "${name}" wirklich löschen?`)) return;
+    if (db.productPresets) delete db.productPresets[name];
+    saveDB();
+    renderProductPresets();
+}
+
+function renderProductPresets() {
+    const container = document.getElementById('product-presets-list');
+    if (!container) return;
+
+    const presets = db.productPresets || {};
+    const names = Object.keys(presets);
+
+    if (names.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine Presets gespeichert.</p>';
+        return;
+    }
+
+    // Sort: built-in first, then user presets alphabetically
+    const sorted = [OSCI_SHOP_PRESET_NAME, ...names.filter(n => n !== OSCI_SHOP_PRESET_NAME).sort()];
+
+    container.innerHTML = sorted.filter(name => presets[name]).map(name => {
+        const isBuiltIn = name === OSCI_SHOP_PRESET_NAME;
+        const count = (presets[name] || []).length;
+        const items = (presets[name] || []).map(p => p.name).join(', ');
+        const badge = isBuiltIn
+            ? `<span style="font-size:0.7rem; background:rgba(100,210,255,0.15); color:var(--secondary); border:1px solid var(--secondary); border-radius:12px; padding:2px 8px; margin-left:8px; vertical-align:middle;">Standard</span>`
+            : '';
+        const actionBtn = isBuiltIn
+            ? `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem;">Laden</button>`
+            : `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem;">Laden</button>
+               <button type="button" onclick='deleteProductPreset(${jsArg(name)})' style="background:none; color:var(--danger); border:1px solid var(--danger); border-radius:8px; padding:6px 12px; font-size:0.8rem; cursor:pointer;">Löschen</button>`;
+
+        return `
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px; background:${isBuiltIn ? 'rgba(100,210,255,0.04)' : 'rgba(255,255,255,0.03)'}; border:1px solid ${isBuiltIn ? 'var(--secondary)' : 'var(--border)'}; border-radius:10px; margin-bottom:8px; flex-wrap:wrap;">
+                <div style="flex:1; min-width:0;">
+                    <strong style="color:var(--text);">${name}${badge}</strong>
+                    <small style="display:block; color:var(--text-muted); margin-top:2px;">${count} Produkt(e): ${items}</small>
+                </div>
+                <div style="display:flex; gap:8px; flex-shrink:0;">
+                    ${actionBtn}
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 // APP START

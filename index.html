@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.8.0</span>
+                <span class="version-badge">v1.9.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -36,6 +36,7 @@
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
 			<button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
+			<button onclick="selectTab('nachbestellen')" id="tab-nachbestellen">Nachbestellen</button>
             <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
             
         </div>
@@ -118,7 +119,7 @@
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Produkte</h3>
-                <p class="hint">Lege zusätzliche Lagerartikel an. Flaschengrößen bitte mit Komma trennen, zum Beispiel: 250, 500, 1000.</p>
+                <p class="hint">Lege zusätzliche Lagerartikel an. Behältergrößen bitte mit Komma trennen, zum Beispiel: 250, 500, 1000.</p>
                 <div class="input-group">
                     <label>Produktname:</label>
                     <input type="text" id="customProductName" placeholder="z.B. Testlösung A">
@@ -132,7 +133,14 @@
                     <input type="text" id="customProductNewCategory" placeholder="Nur ausfüllen, wenn neue Kategorie gewünscht">
                 </div>
                 <div class="input-group">
-                    <label>Flaschengrößen in ml:</label>
+                    <label>Einheit für Behältergrößen:</label>
+                    <select id="customProductSizeUnit" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+                        <option value="ml">Milliliter (ml)</option>
+                        <option value="g">Gramm (g)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Behältergrößen:</label>
                     <input type="text" id="customProductSizes" placeholder="30, 100, 1000">
                 </div>
                 <div class="input-group">
@@ -141,6 +149,41 @@
                 </div>
                 <button onclick="addCustomProduct()" class="btn-primary btn-animated">Produkt anlegen</button>
                 <div id="custom-products-list" class="custom-products-list"></div>
+            </div>
+
+            <!-- PRODUKT-PRESETS -->
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <details id="product-presets-details">
+                    <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="color: var(--secondary); margin:0;">Produkt-Presets</h3>
+                        <span style="color:var(--secondary); font-size:0.85rem;" id="product-presets-toggle-hint">aufklappen</span>
+                    </summary>
+                    <p class="hint" style="margin-top:10px;">Speichere deine aktuellen eigenen Produkte als Preset und lade sie später wieder — z.B. für verschiedene Becken-Konfigurationen. Presets werden im Backup gespeichert.</p>
+                    <div class="input-group" style="margin-top:10px;">
+                        <label>Preset-Name:</label>
+                        <input type="text" id="presetNameInput" placeholder="z.B. Becken 1, Meerwasser-Setup ...">
+                    </div>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+                        <button onclick="saveProductPreset()" class="btn-in btn-animated">Aktuell als Preset speichern</button>
+                    </div>
+                    <div id="product-presets-list"></div>
+                </details>
+            </div>
+
+            <!-- SHOP-LINKS VERWALTEN -->
+            <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
+                <details id="shop-links-details">
+                    <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
+                        <h3 style="color: var(--success); margin:0;">Shop-Links verwalten</h3>
+                        <span style="color:var(--success); font-size:0.85rem;" id="shop-links-toggle-hint">aufklappen</span>
+                    </summary>
+                    <p class="hint" style="margin-top:10px;">Trage hier den vollständigen Shop-Link für jedes Produkt und jede Größe ein. Beispiel: <code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">https://osci-motion.de/product/custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter</code></p>
+                    <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                        <button onclick="saveShopLinks()" class="btn-in btn-animated">Speichern</button>
+                        <button onclick="resetShopLinksToPreset()" class="btn-secondary btn-animated">Preset zurücksetzen</button>
+                    </div>
+                    <div id="shop-links-settings-list"></div>
+                </details>
             </div>
 
             <!-- ANPASSUNG: STYLING & DESIGNS (GIRL EDITION) -->
@@ -193,7 +236,7 @@
             <div class="card">
                 <h2>📦 Massen-Wareneingang</h2>
                 <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
-                    Wähle ein Produkt aus. Die verfügbaren Flaschengrößen erscheinen automatisch als Schnellauswahl.
+                    Wähle ein Produkt aus. Die verfügbaren Behältergrößen erscheinen automatisch als Schnellauswahl.
                 </p>
                 
                 <div class="input-group">
@@ -201,20 +244,31 @@
                     <select id="bulkProductSelect" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;"></select>
                 </div>
 
-                <!-- Dynamischer Container für die Flaschengrößen-Schnellauswahl-Buttons -->
+                <!-- Dynamischer Container für die Behältergrößen-Schnellauswahl-Buttons -->
                 <div id="bulkQuickButtonsContainer"></div>
 
                 <div class="input-group">
                     <label>Einheit:</label>
-                    <select id="bulkUnitSelect" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
+                    <select id="bulkUnitSelect" onchange="toggleBulkContainerSection()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
                         <option value="ml">Milliliter (ml)</option>
                         <option value="g">Gramm (g)</option>
                     </select>
                 </div>
 
+                <!-- Tara-Abzug Sektion (nur bei Gramm sichtbar) -->
+                <div id="bulkContainerSection" style="display:none; margin-bottom:15px; padding:12px; background:rgba(255,255,255,0.04); border-radius:10px; border:1px solid var(--border);">
+                    <label style="display:flex; align-items:center; gap:10px; color:#fff; margin-bottom:10px;">
+                        <input type="checkbox" id="bulkUseTara" onchange="toggleBulkTaraSelect()" style="width:20px; height:20px; margin:0;">
+                        Behälter-Gewicht (Tara) abziehen
+                    </label>
+                    <select id="bulkContainerSelect" onchange="updateBulkTaraPreview()" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px;">
+                    </select>
+                    <div id="bulkTaraPreview" style="margin-top:8px; font-size:0.85rem; color:var(--text-muted);"></div>
+                </div>
+
                 <div class="input-group">
                     <label>Menge:</label>
-                    <input type="number" step="0.01" id="bulkAmount" placeholder="Wert eintragen" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
+                    <input type="number" step="0.01" id="bulkAmount" placeholder="Wert eintragen" oninput="updateBulkTaraPreview()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
                 </div>
 
                 <button class="btn-secondary btn-animated" onclick="addToBulkCart()" style="width:100%; margin-bottom:10px;">＋ Zum Warenkorb hinzufügen</button>
@@ -226,6 +280,22 @@
                     Der Warenkorb ist leer.
                 </div>
                 <button class="btn-primary btn-animated" id="btnSubmitBulk" onclick="submitBulkCart()" style="width:100%; display:none;">📦 Gesamten Wareneingang buchen</button>
+            </div>
+        </div>
+
+        <!-- Nachbestellen Tab -->
+        <div id="nachbestellen" class="tab-content">
+            <div class="card">
+                <h2>Nachbestellen im OSCI Shop</h2>
+                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
+                    Wähle Artikel und Größe aus — du musst im Shop eingeloggt sein. Jeder Link legt das Produkt direkt in deinen Warenkorb.
+                </p>
+                <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
+                    <button class="btn-primary btn-animated" onclick="openShopCart()" id="btnOpenShopCart" style="display:none;">Alle markierten im Shop öffnen</button>
+                    <button class="btn-secondary btn-animated" onclick="selectAllShopItems(true)">Alle auswählen</button>
+                    <button class="btn-secondary btn-animated" onclick="selectAllShopItems(false)">Auswahl aufheben</button>
+                </div>
+                <div id="nachbestellen-container"></div>
             </div>
         </div>
     </main>
