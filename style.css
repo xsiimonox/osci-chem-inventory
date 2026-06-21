@@ -409,6 +409,7 @@ body.theme-mint.party-mode .card {
     color: var(--text);
     font-size: 0.9rem;
     margin-bottom: 0;
+    padding-left: 6px !important;
     outline: none;
     cursor: pointer;
     min-width: 0;
@@ -1292,43 +1293,6 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     border-radius: 3px;
     font-family: monospace;
     font-size: 0.7rem;
-}
-
-/* ==========================================================================
-   💎 PREMIUM VISUAL UPGRADE
-   ========================================================================== */
-
-/* Glassmorphism Cards */
-body.glass-mode .card {
-    background: rgba(255, 255, 255, 0.05) !important;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-body.glass-mode header {
-    background: rgba(28, 28, 30, 0.6) !important;
-    backdrop-filter: blur(30px) saturate(180%) !important;
-    -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
-}
-body.glass-mode .modal-content {
-    background: rgba(28, 28, 30, 0.8) !important;
-    backdrop-filter: blur(40px);
-    -webkit-backdrop-filter: blur(40px);
-}
-
-/* Gradient Mesh Background */
-body.gradient-mode {
-    background: linear-gradient(-45deg, #0a0a0a, #1a0a2e, #0a1a2e, #0a0a1a, #1a0a1a) !important;
-    background-size: 400% 400% !important;
-    animation: gradientMesh 20s ease infinite !important;
-}
-@keyframes gradientMesh {
-    0% { background-position: 0% 50%; }
-    25% { background-position: 100% 50%; }
-    50% { background-position: 100% 100%; }
-    75% { background-position: 0% 100%; }
-    100% { background-position: 0% 50%; }
 }
 
 /* Custom Scrollbar */

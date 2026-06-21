@@ -2269,30 +2269,6 @@ if (db.lightMode) {
     document.body.classList.add('theme-light');
 }
 
-// ==========================================================================
-// 💎 PREMIUM FEATURES
-// ==========================================================================
-
-// Glass Mode Toggle
-function toggleGlassMode() {
-    const isGlass = document.body.classList.toggle('glass-mode');
-    db.glassMode = isGlass;
-    saveDB();
-    showToast(isGlass ? 'Glassmorphism aktiviert' : 'Glassmorphism deaktiviert', 'info');
-}
-
-// Gradient Background Toggle
-function toggleGradientMode() {
-    const isGradient = document.body.classList.toggle('gradient-mode');
-    db.gradientMode = isGradient;
-    saveDB();
-    showToast(isGradient ? 'Gradient Mesh aktiviert' : 'Gradient Mesh deaktiviert', 'info');
-}
-
-// Initialize Glass & Gradient if saved
-if (db.glassMode) document.body.classList.add('glass-mode');
-if (db.gradientMode) document.body.classList.add('gradient-mode');
-
 // Ripple Effect
 function createRipple(event, element) {
     const ripple = document.createElement('span');
@@ -2534,4 +2510,4 @@ showToast = function(message, type = 'info', duration = 4000) {
     }
 };
 
-console.log('💎 Premium Features loaded: Glass, Gradient, Confetti, Swipe, Dashboard, Haptic');
+console.log('✨ Premium Features loaded: Confetti, Swipe, Haptic, Ripple');
