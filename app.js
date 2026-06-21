@@ -97,7 +97,7 @@ const shopLinksPreset = {
     "Kaliumchlorid (KCl)":      { 1000: BASE+'custom-repair-elements-kaliumchlorid/?attribute_volumen=1+Liter',    5000: BASE+'custom-repair-elements-kaliumchlorid/?attribute_volumen=5+Liter' },
     "Kaliumsulfat (K2SO4)":     { 1000: BASE+'custom-repair-elements-kaliumsulfat/?attribute_volumen=1+Liter',     5000: BASE+'custom-repair-elements-kaliumsulfat/?attribute_volumen=5+Liter' },
     "Kaliumbromid (KBr)":       { 1000: BASE+'custom-repair-elements-kaliumbromid/?attribute_volumen=1+Liter',     5000: BASE+'custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter' },
-    "Strontiumchlorid (SrCl2)": { 100:  BASE+'custom-repair-elements-strontiumchlorid/?attribute_volumen=100+ml',  1000: BASE+'custom-repair-elements-strontiumchlorid/?attribute_volumen=1+Liter' },
+    "Strontiumchlorid (SrCl2)": { 100:  BASE+'custom-repair-elements-strontiumchlorid-2/?attribute_volumen=100ml',  1000: BASE+'custom-repair-elements-strontiumchlorid-2/?attribute_volumen=1+Liter' },
     "Calciumchlorid (CaCl2)":   { 1000: BASE+'custom-repair-elements-calciumchlorid/?attribute_volumen=1+Liter',   5000: BASE+'custom-repair-elements-calciumchlorid/?attribute_volumen=5+Liter' },
     "Natriumfluorid (NaF)":     { 5000: BASE+'custom-repair-elements-natriumfluorid/?attribute_volumen=5+Liter' },
     "Bor (B)":                  { 1000: BASE+'custom-repair-elements-bor/?attribute_volumen=1+Liter',              5000: BASE+'custom-repair-elements-bor/?attribute_volumen=5+Liter' },
@@ -113,20 +113,20 @@ const shopLinksPreset = {
     "Stickstoff (N)":  { 1000: BASE+'nutrition-elements-stickstoff/?attribute_volumen=1+Liter' },
     // Anionen
     "Fluor (F)":    { 100: BASE+'trace-elements-flour/?attribute_volumen=1000+ml' },
-    "Iod (I)":      { 30: BASE+'trace-elements-iod/?attribute_volumen=30+ml',   100: BASE+'trace-elements-iod/?attribute_volumen=100+ml' },
-    "Selen (Se)":   { 100: BASE+'trace-elements-selen/?attribute_volumen=100+ml' },
-    "Vanadium (V)": { 30: BASE+'trace-elements-vanadium/?attribute_volumen=30+ml', 100: BASE+'trace-elements-vanadium/?attribute_volumen=100+ml' },
+    "Iod (I)":      { 30: BASE+'trace-elements-iod/?attribute_volumen=30ml',   100: BASE+'trace-elements-iod/?attribute_volumen=100ml' },
+    "Selen (Se)":   { 100: BASE+'trace-elements-selen/?attribute_volumen=100ml' },
+    "Vanadium (V)": { 30: BASE+'trace-elements-vanadium/?attribute_volumen=30ml', 100: BASE+'trace-elements-vanadium/?attribute_volumen=100ml' },
     // Kationen
-    "Barium (Ba)":   { 30: BASE+'trace-elements-barium/?attribute_volumen=30+ml',   100: BASE+'trace-elements-barium/?attribute_volumen=100+ml' },
-    "Chrom (Cr)":    { 30: BASE+'trace-elements-chrom/?attribute_volumen=30+ml',    100: BASE+'trace-elements-chrom/?attribute_volumen=100+ml' },
+    "Barium (Ba)":   { 30: BASE+'trace-elements-barium/?attribute_volumen=30ml',   100: BASE+'trace-elements-barium/?attribute_volumen=100ml' },
+    "Chrom (Cr)":    { 30: BASE+'trace-elements-chrom/?attribute_volumen=30ml',    100: BASE+'trace-elements-chrom/?attribute_volumen=100ml' },
     "Cobalt (Co)":   { 1000: BASE+'trace-elements-cobalt/?attribute_volumen=1+Liter' },
-    "Eisen (Fe)":    { 100: BASE+'trace-elements-eisen/?attribute_volumen=100+ml' },
-    "Kupfer (Cu)":   { 30: BASE+'trace-elements-kupfer/?attribute_volumen=30+ml',   100: BASE+'trace-elements-kupfer/?attribute_volumen=100+ml' },
-    "Lithium (Li)":  { 30: BASE+'trace-elements-lithium/?attribute_volumen=30+ml',  100: BASE+'trace-elements-lithium/?attribute_volumen=100+ml' },
-    "Zink (Zn)":     { 100: BASE+'trace-elements-zink/?attribute_volumen=100+ml' },
-    "Mangan (Mn)":   { 30: BASE+'trace-elements-mangan/?attribute_volumen=30+ml',   100: BASE+'trace-elements-mangan/?attribute_volumen=100+ml' },
+    "Eisen (Fe)":    { 100: BASE+'trace-elements-eisen/?attribute_volumen=100ml' },
+    "Kupfer (Cu)":   { 30: BASE+'trace-elements-kupfer/?attribute_volumen=30ml',   100: BASE+'trace-elements-kupfer/?attribute_volumen=100ml' },
+    "Lithium (Li)":  { 30: BASE+'trace-elements-lithium/?attribute_volumen=30ml',  100: BASE+'trace-elements-lithium/?attribute_volumen=100ml' },
+    "Zink (Zn)":     { 100: BASE+'trace-elements-zink/?attribute_volumen=100ml' },
+    "Mangan (Mn)":   { 30: BASE+'trace-elements-mangan/?attribute_volumen=30ml',   100: BASE+'trace-elements-mangan/?attribute_volumen=100ml' },
     "Nickel (Ni)":   { 1000: BASE+'trace-elements-nickel/?attribute_volumen=1+Liter' },
-    "Molybd\u00e4n (Mo)": { 30: BASE+'trace-elements-molybdaen/?attribute_volumen=30+ml', 100: BASE+'trace-elements-molybdaen/?attribute_volumen=100+ml' },
+    "Molybd\u00e4n (Mo)": { 30: BASE+'trace-elements-molybdaen/?attribute_volumen=30ml', 100: BASE+'trace-elements-molybdaen/?attribute_volumen=100ml' },
 };
 
 // Returns the URL map {sizeMl: url} for an item (db overrides preset)
@@ -151,7 +151,7 @@ function getShopSlug(itemName) {
 
 function buildShopUrl(slug, sizeMl) {
     // Legacy shim – not used in new code but kept for safety
-    const sizeMap = { 30: "30+ml", 100: "100+ml", 1000: "1+Liter", 5000: "5+Liter", 10000: "10+Liter" };
+    const sizeMap = { 30: "30ml", 100: "100ml", 1000: "1+Liter", 5000: "5+Liter", 10000: "10+Liter" };
     const vol = sizeMap[sizeMl] || sizeMl + "+ml";
     return `https://osci-motion.de/product/${slug}/?attribute_volumen=${vol}`;
 }
@@ -246,6 +246,10 @@ function showTab(tabId) {
     const targetTab = document.getElementById(tabId);
     const targetBtn = document.getElementById('tab-' + tabId);
     if (targetTab && targetBtn) {
+        // Re-trigger the slide-in animation by briefly removing the class
+        targetTab.style.animation = 'none';
+        targetTab.offsetHeight; // Force reflow
+        targetTab.style.animation = '';
         targetTab.classList.add('active');
         targetBtn.classList.add('active');
     }
@@ -283,7 +287,7 @@ function showTab(tabId) {
 // --- DESIGN / THEME STEUERUNG ---
 function applyTheme(themeName, shouldSave = true) {
     // Alle alten Design-Klassen vom Body entfernen
-    document.body.classList.remove('theme-girl', 'theme-mint');
+    document.body.classList.remove('theme-girl', 'theme-mint', 'theme-badman', 'theme-light');
     
     if (themeName !== 'default') {
         document.body.classList.add('theme-' + themeName);
@@ -794,19 +798,27 @@ function renderLager() {
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
         container.innerHTML = `
-            <div class="lager-tools">
-                <input type="text" id="searchInput" class="search-input" placeholder="Chemikalie suchen..." oninput="filterLager()">
-                <select id="categoryFilter" class="filter-select" onchange="filterLager()">
-                    <option value="all">Alle Kategorien</option>
-                    ${categoryOptions}
-                </select>
-                <div class="forecast-window-control">
-                    <label for="forecastWeeks">Warnzeitraum</label>
-                    <select id="forecastWeeks" onchange="updateForecastWindow(this.value)">
-                        <option value="2">2 Wochen</option>
-                        <option value="4">4 Wochen</option>
-                        <option value="8">8 Wochen</option>
-                        <option value="12">12 Wochen</option>
+            <div class="lager-toolbar">
+                <div class="toolbar-field">
+                    <span class="toolbar-icon">🔍</span>
+                    <input type="text" id="searchInput" class="search-input" placeholder="Chemikalie suchen..." oninput="filterLager()">
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-field">
+                    <span class="toolbar-icon">📂</span>
+                    <select id="categoryFilter" class="filter-select" onchange="filterLager()">
+                        <option value="all">Alle Kategorien</option>
+                        ${categoryOptions}
+                    </select>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-field toolbar-field-compact">
+                    <span class="toolbar-icon">⏱</span>
+                    <select id="forecastWeeks" class="forecast-select" onchange="updateForecastWindow(this.value)">
+                        <option value="2">  2 Wochen</option>
+                        <option value="4">  4 Wochen</option>
+                        <option value="8">  8 Wochen</option>
+                        <option value="12">  12 Wochen</option>
                     </select>
                 </div>
             </div>
@@ -867,13 +879,14 @@ function filterLager() {
                 catHTML += `
                     <div class="card ${warningClass}">
                         <h4>
-                               <span style="display:flex; align-items:center; min-width:0;">
-                                ${item} 
+                            <span style="display:flex; align-items:center; gap:8px; min-width:0;">
+                                ${warningClass ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;"></span>' : ''}
+                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item}</span>
                                 <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
                             </span>
                             <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
                                 <span>${stock.toFixed(1)} ml</span>
-                                <span style="font-size: 0.75rem; opacity: 0.8; font-weight: normal;">${stockG} g</span>
+                                <span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>
                             </span>
                         </h4>
                         ${crossHint}
@@ -1733,26 +1746,25 @@ function renderNachbestellen() {
             const stock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
             const checkId = 'shopcheck-' + item.replace(/[^a-zA-Z0-9]/g, '');
 
-            // Build size buttons — use URL from map if available, else skip
-            // Show all sizes that have a URL configured
+            // Build size selection buttons — pre-select URL, no direct shop link
             const urlEntries = Object.entries(urlMap);
-            const sizeBtns = urlEntries.map(([sizeMl, url]) => {
+            const sizeBtns = urlEntries.map(([sizeMl, url], idx) => {
                 const s = Number(sizeMl);
                 const label = s >= 1000 ? (s / 1000) + ' L' : s + ' ml';
-                return `<a href="${url}" target="_blank" rel="noopener" class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem; border-radius:8px; text-decoration:none; display:inline-block;">${label}</a>`;
+                const isSelected = idx === 0 ? ' selected' : '';
+                return `<button type="button" class="size-select-btn${isSelected}" data-url="${url}" data-item="${item}" onclick="selectShopSize(this)">${label}</button>`;
             }).join(' ');
-
+            const defaultUrl = urlEntries.length > 0 ? urlEntries[0][1] : '';
             const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
             const weeksLeft = getWeeksLeft(item);
             const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
             const isLow = (threshold > 0 && stock <= threshold) || (weeksLeft !== null && weeksLeft <= warningWeeks) || stock <= 0;
             const stockColor = isLow ? 'var(--danger)' : 'var(--success)';
-            const firstUrl = urlEntries.length > 0 ? urlEntries[0][1] : '';
 
             catRows += `
                 <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap;">
                     <input type="checkbox" id="${checkId}" data-item="${item}"
-                        data-urls='${jsArg(urlMap)}' data-first-url="${firstUrl}"
+                        data-selected-url="${defaultUrl}"
                         onchange="updateShopCartBtn()" style="width:20px; height:20px; flex-shrink:0; cursor:pointer;">
                     <div style="flex:1; min-width:160px;">
                         <strong style="color:var(--text);">${item}</strong><br>
@@ -1794,14 +1806,30 @@ function openShopLink(item, sizeMl) {
     window.open(urlMap[sizeMl], '_blank');
 }
 
+// Größe auswählen — setzt die URL für das Produkt, ohne den Shop direkt zu öffnen
+function selectShopSize(btn) {
+    const item = btn.dataset.item;
+    const url = btn.dataset.url;
+    // Alle Buttons desselben Produkts deselektieren
+    document.querySelectorAll(`.size-select-btn[data-item="${item}"]`).forEach(b => b.classList.remove('selected'));
+    // Diesen Button selektieren
+    btn.classList.add('selected');
+    // URL im zugehörigen Checkbox-Datensatz aktualisieren
+    const row = btn.closest('div[style*="align-items:center"]');
+    if (row) {
+        const cb = row.querySelector('input[type=checkbox]');
+        if (cb) cb.dataset.selectedUrl = url;
+    }
+}
+
 function openShopCart() {
     const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
     if (checked.length === 0) return;
 
     let urls = [];
     checked.forEach(cb => {
-        const firstUrl = cb.dataset.firstUrl;
-        if (firstUrl) urls.push(firstUrl);
+        const selectedUrl = cb.dataset.selectedUrl;
+        if (selectedUrl) urls.push(selectedUrl);
     });
 
     if (urls.length === 0) return;
@@ -2000,8 +2028,510 @@ function renderProductPresets() {
     }).join('');
 }
 
+// ==========================================================================
+// 🍞 TOAST NOTIFICATION SYSTEM
+// ==========================================================================
+function showToast(message, type = 'info', duration = 4000) {
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" onclick="this.parentElement.classList.add('removing'); setTimeout(() => this.parentElement.remove(), 300);">&times;</button>
+    `;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+    }, duration);
+}
+
+// ==========================================================================
+// 📭 EMPTY STATE HELPER
+// ==========================================================================
+function createEmptyState(icon, title, text) {
+    return `
+        <div class="empty-state">
+            <div class="empty-state-icon">${icon}</div>
+            <div class="empty-state-title">${title}</div>
+            <div class="empty-state-text">${text}</div>
+        </div>
+    `;
+}
+
+// ==========================================================================
+// 💀 SKELETON LOADING HELPER
+// ==========================================================================
+function createSkeletonCards(count = 3) {
+    let html = '';
+    for (let i = 0; i < count; i++) {
+        html += `
+            <div class="skeleton skeleton-card"></div>
+            <div class="skeleton skeleton-line medium"></div>
+            <div class="skeleton skeleton-line short"></div>
+        `;
+    }
+    return html;
+}
+
+// ==========================================================================
+// 🎯 FLOATING ACTION BUTTON (FAB)
+// ==========================================================================
+let fabOpen = false;
+function toggleFab() {
+    fabOpen = !fabOpen;
+    const menu = document.getElementById('fab-menu');
+    const fab = document.getElementById('fab-main');
+    if (menu) menu.classList.toggle('open', fabOpen);
+    if (fab) fab.style.transform = fabOpen ? 'rotate(45deg)' : '';
+}
+
+function fabAddProduct() {
+    toggleFab();
+    selectTab('einstellungen');
+    setTimeout(() => {
+        const nameInput = document.getElementById('customProductName');
+        if (nameInput) {
+            nameInput.focus();
+            nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    }, 300);
+}
+
+function fabQuickStock() {
+    toggleFab();
+    selectTab('lager');
+    showToast('Schnellbuchung bereit - wähle ein Produkt aus', 'info');
+}
+
+function fabExport() {
+    toggleFab();
+    exportData();
+}
+
+// ==========================================================================
+// 📊 STATISTIC CHARTS
+// ==========================================================================
+function renderStatChart(containerId, data) {
+    if (!data || data.length === 0) {
+        return '<div class="chart-container">' + createEmptyState('📊', 'Keine Daten', 'Noch keine Verbrauchsdaten vorhanden.') + '</div>';
+    }
+    const maxVal = Math.max(...data.map(d => d.value), 1);
+    const bars = data.map(d => {
+        const height = (d.value / maxVal) * 100;
+        return `
+            <div class="chart-bar" style="height: ${height}%;">
+                <span class="chart-bar-value">${d.value.toFixed(1)}</span>
+                <span class="chart-bar-label">${d.label}</span>
+            </div>
+        `;
+    }).join('');
+    return `
+        <div class="chart-container">
+            <div class="chart-bar-group">${bars}</div>
+        </div>
+    `;
+}
+
+// ==========================================================================
+// ↩️ UNDO SYSTEM
+// ==========================================================================
+let undoStack = [];
+function pushUndoAction(action) {
+    undoStack.push({ ...action, timestamp: Date.now() });
+    if (undoStack.length > 10) undoStack.shift();
+}
+
+function showUndoToast(message, undoCallback) {
+    const undoId = 'undo-' + Date.now();
+    let container = document.querySelector('.toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'toast info';
+    toast.id = undoId;
+    toast.innerHTML = `
+        <span class="toast-icon">↩️</span>
+        <span class="toast-message">${message}</span>
+        <button onclick="executeUndo(); this.parentElement.classList.add('removing'); setTimeout(() => this.parentElement.remove(), 300);">Rückgängig</button>
+    `;
+    container.appendChild(toast);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        const el = document.getElementById(undoId);
+        if (el) {
+            el.classList.add('removing');
+            setTimeout(() => el.remove(), 300);
+        }
+    }, 5000);
+}
+
+function executeUndo() {
+    if (undoStack.length === 0) {
+        showToast('Nichts zum Rückgängig machen', 'warning');
+        return;
+    }
+    const action = undoStack.pop();
+    if (action && action.undo) {
+        action.undo();
+        showToast('Aktion rückgängig gemacht', 'success');
+        renderLager();
+    }
+}
+
+// ==========================================================================
+// ☀️ LIGHT MODE TOGGLE
+// ==========================================================================
+function toggleLightMode() {
+    const isLight = document.body.classList.toggle('theme-light');
+    db.lightMode = isLight;
+    saveDB();
+    showToast(isLight ? 'Light Mode aktiviert' : 'Dark Mode aktiviert', 'info');
+}
+
+// ==========================================================================
+// 📤 CSV EXPORT
+// ==========================================================================
+function exportToCSV() {
+    let csv = 'Kategorie,Produkt,Bestand,Einheit\n';
+    for (let cat in db.inventory) {
+        for (let item in db.inventory[cat]) {
+            const stock = db.inventory[cat][item];
+            csv += `"${cat}","${item}",${stock},ml\n`;
+        }
+    }
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `osci-motion-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    showToast('CSV exportiert!', 'success');
+}
+
+// ==========================================================================
+// ⌨️ KEYBOARD SHORTCUTS
+// ==========================================================================
+document.addEventListener('keydown', (e) => {
+    // Ctrl/Cmd + S = Save/Export
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        exportData();
+        showToast('Backup gespeichert', 'success');
+    }
+    // Ctrl/Cmd + F = Focus Search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        selectTab('lager');
+        setTimeout(() => {
+            const searchInput = document.querySelector('.search-input');
+            if (searchInput) searchInput.focus();
+        }, 200);
+    }
+    // Number keys 1-8 for tabs (when not in input)
+    if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'einstellungen' };
+        if (tabMap[e.key]) {
+            selectTab(tabMap[e.key]);
+        }
+    }
+    // Ctrl + Z = Undo
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        // Only if not in an input
+        if (document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            executeUndo();
+        }
+    }
+});
+
 // APP START
 initDB();
 renderLager();
 updateNotificationStatus();
 setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
+
+// Initialize Light Mode if saved
+if (db.lightMode) {
+    document.body.classList.add('theme-light');
+}
+
+// ==========================================================================
+// 💎 PREMIUM FEATURES
+// ==========================================================================
+
+// Glass Mode Toggle
+function toggleGlassMode() {
+    const isGlass = document.body.classList.toggle('glass-mode');
+    db.glassMode = isGlass;
+    saveDB();
+    showToast(isGlass ? 'Glassmorphism aktiviert' : 'Glassmorphism deaktiviert', 'info');
+}
+
+// Gradient Background Toggle
+function toggleGradientMode() {
+    const isGradient = document.body.classList.toggle('gradient-mode');
+    db.gradientMode = isGradient;
+    saveDB();
+    showToast(isGradient ? 'Gradient Mesh aktiviert' : 'Gradient Mesh deaktiviert', 'info');
+}
+
+// Initialize Glass & Gradient if saved
+if (db.glassMode) document.body.classList.add('glass-mode');
+if (db.gradientMode) document.body.classList.add('gradient-mode');
+
+// Ripple Effect
+function createRipple(event, element) {
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple-effect';
+    const rect = element.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height);
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = (event.clientX - rect.left - size / 2) + 'px';
+    ripple.style.top = (event.clientY - rect.top - size / 2) + 'px';
+    element.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+}
+
+// Add ripple to all buttons
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button, .btn-primary, .btn-secondary');
+    if (btn) createRipple(e, btn);
+});
+
+// Confetti System
+function launchConfetti(count = 50) {
+    const container = document.createElement('div');
+    container.className = 'confetti-container';
+    document.body.appendChild(container);
+    
+    const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff', '#ffa500', '#ff69b4'];
+    for (let i = 0; i < count; i++) {
+        const piece = document.createElement('div');
+        piece.className = 'confetti-piece';
+        piece.style.left = Math.random() * 100 + '%';
+        piece.style.animationDelay = Math.random() * 0.5 + 's';
+        piece.style.animationDuration = (2 + Math.random() * 2) + 's';
+        piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+        piece.style.transform = `rotate(${Math.random() * 360}deg)`;
+        if (Math.random() > 0.5) {
+            piece.style.borderRadius = '50%';
+        }
+        container.appendChild(piece);
+    }
+    setTimeout(() => container.remove(), 4000);
+}
+
+// Animated Counter
+function animateCounter(element, targetValue, duration = 1000) {
+    const startValue = 0;
+    const startTime = performance.now();
+    
+    function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        const currentValue = startValue + (targetValue - startValue) * eased;
+        element.textContent = currentValue.toFixed(1);
+        
+        if (progress < 1) {
+            requestAnimationFrame(update);
+        }
+    }
+    requestAnimationFrame(update);
+}
+
+// Pull to Refresh
+let pullStartY = 0;
+let pullDistance = 0;
+let isPulling = false;
+
+document.addEventListener('touchstart', (e) => {
+    if (window.scrollY === 0) {
+        pullStartY = e.touches[0].clientY;
+        isPulling = true;
+    }
+});
+
+document.addEventListener('touchmove', (e) => {
+    if (!isPulling) return;
+    pullDistance = e.touches[0].clientY - pullStartY;
+    if (pullDistance > 0 && pullDistance < 150) {
+        document.body.style.transform = `translateY(${pullDistance * 0.3}px)`;
+    }
+});
+
+document.addEventListener('touchend', () => {
+    if (pullDistance > 80) {
+        triggerRefresh();
+    }
+    document.body.style.transform = '';
+    isPulling = false;
+    pullDistance = 0;
+});
+
+function triggerRefresh() {
+    showToast('Aktualisiere...', 'info', 2000);
+    hapticFeedback();
+    renderLager();
+    setTimeout(() => showToast('Aktualisiert!', 'success'), 500);
+}
+
+// Swipe Gestures for Tab Navigation
+let touchStartX = 0;
+let touchEndX = 0;
+
+document.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+});
+
+document.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+});
+
+function handleSwipe() {
+    const swipeThreshold = 80;
+    const diff = touchStartX - touchEndX;
+    
+    if (Math.abs(diff) < swipeThreshold) return;
+    
+    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+    const currentTab = document.querySelector('.tab-content.active')?.id;
+    const currentIndex = tabs.indexOf(currentTab);
+    
+    if (diff > 0 && currentIndex < tabs.length - 1) {
+        // Swipe left = next tab
+        selectTab(tabs[currentIndex + 1]);
+        hapticFeedback();
+    } else if (diff < 0 && currentIndex > 0) {
+        // Swipe right = previous tab
+        selectTab(tabs[currentIndex - 1]);
+        hapticFeedback();
+    }
+}
+
+// Haptic Feedback
+function hapticFeedback(pattern = [10]) {
+    if ('vibrate' in navigator) {
+        navigator.vibrate(pattern);
+    }
+    // Visual feedback fallback
+    document.body.classList.add('haptic-flash');
+    setTimeout(() => document.body.classList.remove('haptic-flash'), 150);
+}
+
+// Remember Last Tab on tab change
+const originalShowTab = showTab;
+showTab = function(tabId) {
+    originalShowTab(tabId);
+    db.lastTab = tabId;
+    saveDB();
+};
+
+// Remember Last Tab
+if (db.lastTab) {
+    setTimeout(() => selectTab(db.lastTab), 100);
+}
+
+// Quick Preview Modal
+function showQuickPreview(item, category) {
+    const stock = (db.inventory[category] && db.inventory[category][item]) || 0;
+    const threshold = db.thresholds?.[item] || 0;
+    const weeksLeft = getWeeksLeft(item);
+    
+    let existingBackdrop = document.querySelector('.quick-preview-backdrop');
+    let existingPreview = document.querySelector('.quick-preview');
+    if (existingBackdrop) existingBackdrop.remove();
+    if (existingPreview) existingPreview.remove();
+    
+    const backdrop = document.createElement('div');
+    backdrop.className = 'quick-preview-backdrop';
+    backdrop.onclick = () => closeQuickPreview();
+    
+    const preview = document.createElement('div');
+    preview.className = 'quick-preview';
+    preview.innerHTML = `
+        <div class="quick-preview-header">
+            <h3 style="margin:0;">${item}</h3>
+            <button class="quick-preview-close" onclick="closeQuickPreview()">&times;</button>
+        </div>
+        <div style="margin-bottom:16px;">
+            <span class="stock" style="font-size:1.2rem;">${stock.toFixed(1)} ml</span>
+            <span style="color:var(--text-muted); margin-left:8px;">${category}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+                <div style="font-size:0.75rem; color:var(--text-muted);">Warnschwelle</div>
+                <div style="font-size:1.2rem; font-weight:600;">${threshold} ml</div>
+            </div>
+            <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
+                <div style="font-size:0.75rem; color:var(--text-muted);">Reichweite</div>
+                <div style="font-size:1.2rem; font-weight:600;">${weeksLeft !== null ? weeksLeft + ' Wochen' : '—'}</div>
+            </div>
+        </div>
+        <div style="margin-top:16px; display:flex; gap:10px;">
+            <button class="btn-in btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'in');">+ Einlagern</button>
+            <button class="btn-out btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'out');">- Auslagern</button>
+        </div>
+    `;
+    
+    document.body.appendChild(backdrop);
+    document.body.appendChild(preview);
+    setTimeout(() => {
+        backdrop.classList.add('active');
+        preview.classList.add('active');
+    }, 10);
+    hapticFeedback([5]);
+}
+
+function closeQuickPreview() {
+    const backdrop = document.querySelector('.quick-preview-backdrop');
+    const preview = document.querySelector('.quick-preview');
+    if (backdrop) backdrop.classList.remove('active');
+    if (preview) preview.classList.remove('active');
+    setTimeout(() => {
+        if (backdrop) backdrop.remove();
+        if (preview) preview.remove();
+    }, 300);
+}
+
+// Auto-Dark Mode Detection
+if (!db.theme || db.theme === 'default') {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        if (!db.lightMode) {
+            // Optional: auto-enable light mode
+            // document.body.classList.add('theme-light');
+        }
+    }
+}
+window.matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+    if (db.theme === 'default' && !db.lightMode) {
+        // Could auto-switch here
+    }
+});
+
+// Enhance showToast with confetti on success
+const originalShowToast = showToast;
+showToast = function(message, type = 'info', duration = 4000) {
+    originalShowToast(message, type, duration);
+    if (type === 'success' && message.includes('erfolgreich')) {
+        launchConfetti(30);
+        hapticFeedback([10, 50, 10]);
+    }
+};
+
+console.log('💎 Premium Features loaded: Glass, Gradient, Confetti, Swipe, Dashboard, Haptic');

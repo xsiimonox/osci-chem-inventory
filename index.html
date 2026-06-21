@@ -13,7 +13,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v1.9.0</span>
+                <span class="version-badge">v2.0.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -201,10 +201,30 @@
                 <div class="input-group" style="margin-top: 15px;">
                     <label style="font-weight: 600;">Farbschema der App wechseln:</label>
                     <select id="themeSelect" onchange="applyTheme(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
-                        <option value="default">Standard Design</option>
-                        <option value="girl">Girl Edition  🎀</option>
-                        <option value="mint">Ocean Mint  🌊</option>
+                        <option value="default">Standard Design (Dark)</option>
+                        <option value="light">Light Mode ☀️</option>
+                        <option value="girl">Girl Edition 🎀</option>
+                        <option value="mint">Ocean Mint 🌊</option>
+                        <option value="badman">BADMAN Shark 🦈</option>
                     </select>
+                </div>
+
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);">
+                    <label style="font-weight: 600; display: block; margin-bottom: 10px;">✨ Premium Effekte</label>
+                    <div class="switch-container">
+                        <span style="font-weight: 500; font-size: 0.9rem;">💎 Glassmorphism</span>
+                        <label class="switch">
+                            <input type="checkbox" id="glassToggle" onchange="toggleGlassMode()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="switch-container">
+                        <span style="font-weight: 500; font-size: 0.9rem;">🌈 Gradient Mesh</span>
+                        <label class="switch">
+                            <input type="checkbox" id="gradientToggle" onchange="toggleGradientMode()">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -223,7 +243,10 @@
 
             <div class="card" style="margin-top: 20px;">
                 <h3>Backup exportieren</h3>
-                <button onclick="exportData()" class="btn-primary btn-animated">Daten exportieren</button>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 JSON Backup</button>
+                    <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
+                </div>
             </div>
             <div class="card">
                 <h3>Backup einlesen</h3>
@@ -288,7 +311,7 @@
             <div class="card">
                 <h2>Nachbestellen im OSCI Shop</h2>
                 <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
-                    Wähle Artikel und Größe aus — du musst im Shop eingeloggt sein. Jeder Link legt das Produkt direkt in deinen Warenkorb.
+                    Wähle Artikel und Größe aus — Jeder Link öffnet das Produkt direkt in der richtigen Größe.
                 </p>
                 <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
                     <button class="btn-primary btn-animated" onclick="openShopCart()" id="btnOpenShopCart" style="display:none;">Alle markierten im Shop öffnen</button>
@@ -303,6 +326,25 @@
     <footer class="app-footer">
     <p>© 2026 xsiimonox • <a href="#" onclick="alert('Kontaktdaten\n\nName: Simon Asbach\nKontakt: simon@asbach.tech'); return false;">Impressum</a></p>
     </footer>
+
+    <!-- Floating Action Button -->
+    <button id="fab-main" class="fab" onclick="toggleFab()" aria-label="Schnellaktionen">＋</button>
+    <div id="fab-menu" class="fab-menu">
+        <div class="fab-menu-item" onclick="fabAddProduct()">
+            <span class="fab-menu-item-icon">📦</span> Produkt anlegen
+        </div>
+        <div class="fab-menu-item" onclick="fabQuickStock()">
+            <span class="fab-menu-item-icon">📊</span> Schnellbuchung
+        </div>
+        <div class="fab-menu-item" onclick="fabExport()">
+            <span class="fab-menu-item-icon">💾</span> Backup
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Hint -->
+    <div class="keyboard-shortcuts-hint">
+        ⌨️ <kbd>Ctrl+S</kbd> Backup · <kbd>Ctrl+F</kbd> Suche · <kbd>Ctrl+Z</kbd> Undo · <kbd>1-8</kbd> Tabs
+    </div>
 
     <div id="modal" class="modal">
         <div class="modal-content">
