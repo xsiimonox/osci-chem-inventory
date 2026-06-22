@@ -1619,7 +1619,7 @@ function parseCRElementTable(blockText) {
         .join('\n')
         .split(/\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0]
         .replace(/mg\s*\/\s*[lI1|]?/gi, 'mg/l');
-    const rowMatches = [...afterHeader.matchAll(/(?:Vorher|Nachher)\s+([\s\S]*?)(?=(?:Vorher|Nachher)\b|$)/gi)];
+    const rowMatches = [...afterHeader.matchAll(/\b(Vorher|Nachher)\b\s+([\s\S]*?)(?=\b(?:Vorher|Nachher)\b|$)/gi)];
 
     const parseRow = rowText => {
         const withoutUnits = String(rowText || '').replace(/mg\s*\/\s*[lI1|]?/gi, ' ');
@@ -1634,8 +1634,8 @@ function parseCRElementTable(blockText) {
     let before = null;
     let after = null;
     rowMatches.forEach(match => {
-        const label = match[0].trim().toLowerCase().startsWith('vorher') ? 'before' : 'after';
-        const values = parseRow(match[1]);
+        const label = match[1].toLowerCase() === 'vorher' ? 'before' : 'after';
+        const values = parseRow(match[2]);
         if (label === 'before') before = values;
         if (label === 'after') after = values;
     });
@@ -1860,11 +1860,11 @@ function renderCRPdfAdjustments() {
                     </div>
                     ${renderCRWaterInfo(adjustment)}
                     <div class="cr-adjustment-list">${rows}</div>
-                    ${renderCRElementValues(adjustment)}
                     <button class="${hasMissing ? 'btn-danger' : 'btn-primary'} btn-animated" onclick="exportCRAdjustment(${index})">
                         ${escapeHtml(adjustment.label)} auslagern
                     </button>
                 </details>
+                ${renderCRElementValues(adjustment)}
             </div>
         `;
     }).join('');

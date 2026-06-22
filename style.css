@@ -234,11 +234,13 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
 }
 
 .cr-element-values {
-    margin: 0 0 12px;
+    margin: 8px 0 0;
     border: 1px solid var(--border);
+    border-left: 3px solid var(--secondary);
     border-radius: 10px;
     padding: 8px;
     overflow: hidden;
+    background: rgba(255,255,255,0.025);
 }
 
 .cr-element-values summary {
