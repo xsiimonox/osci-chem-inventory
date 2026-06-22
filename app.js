@@ -1745,20 +1745,16 @@ function renderCRWaterInfo(adjustment) {
     `;
 }
 
-function renderCRElementValues(adjustment) {
-    if (!adjustment.elements || (!adjustment.elements.before && !adjustment.elements.after)) return '';
+function formatCRMeasurement(value) {
+    if (value === null || value === undefined) return '-';
+    if (Math.abs(value) >= 100) return value.toFixed(0);
+    if (Math.abs(value) >= 10) return value.toFixed(1);
+    return value.toFixed(2);
+}
 
-    const formatMeasurement = value => {
-        if (value === null || value === undefined) return '-';
-        if (Math.abs(value) >= 100) return value.toFixed(0);
-        if (Math.abs(value) >= 10) return value.toFixed(1);
-        return value.toFixed(2);
-    };
-    const renderCells = values => crElementOrder.map(element => {
-        const value = values && values[element] !== null && values[element] !== undefined ? values[element] : null;
-        return `<span>${formatMeasurement(value)} mg/l</span>`;
-    }).join('');
-    const renderMobileCards = () => crElementOrder.map(element => {
+function renderCRElementMobileCards(adjustment) {
+    if (!adjustment.elements || (!adjustment.elements.before && !adjustment.elements.after)) return '';
+    return crElementOrder.map(element => {
         const beforeValue = adjustment.elements.before && adjustment.elements.before[element] !== null && adjustment.elements.before[element] !== undefined
             ? adjustment.elements.before[element]
             : null;
@@ -1768,10 +1764,32 @@ function renderCRElementValues(adjustment) {
         return `
             <div class="cr-element-mobile-card">
                 <strong>${element}</strong>
-                <span>Vorher: ${formatMeasurement(beforeValue)} mg/l</span>
-                <span>Nachher: ${formatMeasurement(afterValue)} mg/l</span>
+                <span>Vorher: ${formatCRMeasurement(beforeValue)} mg/l</span>
+                <span>Nachher: ${formatCRMeasurement(afterValue)} mg/l</span>
             </div>
         `;
+    }).join('');
+}
+
+function renderCRMobileElementPanel(adjustment) {
+    const cards = renderCRElementMobileCards(adjustment);
+    if (!cards) return '';
+    return `
+        <details class="cr-mobile-values-panel" open>
+            <summary>Vorher/Nachher Werte</summary>
+            <div class="cr-element-mobile-grid">
+                ${cards}
+            </div>
+        </details>
+    `;
+}
+
+function renderCRElementValues(adjustment) {
+    if (!adjustment.elements || (!adjustment.elements.before && !adjustment.elements.after)) return '';
+
+    const renderCells = values => crElementOrder.map(element => {
+        const value = values && values[element] !== null && values[element] !== undefined ? values[element] : null;
+        return `<span>${formatCRMeasurement(value)} mg/l</span>`;
     }).join('');
 
     const headerCells = crElementOrder.map(element => `<span>${element}</span>`).join('');
@@ -1797,7 +1815,7 @@ function renderCRElementValues(adjustment) {
                 ` : ''}
             </div>
             <div class="cr-element-mobile-grid">
-                ${renderMobileCards()}
+                ${renderCRElementMobileCards(adjustment)}
             </div>
         </details>
     `;
@@ -1839,21 +1857,24 @@ function renderCRPdfAdjustments() {
         }).join('');
 
         return `
-            <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}">
-                <summary class="cr-adjustment-title">
-                    <span>${escapeHtml(adjustment.label)}</span>
-                    <span>${hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat'}</span>
-                </summary>
-                <div class="cr-adjustment-meta">
-                    ${summary.requiredCount} Position(en) · ${summary.totalRequired.toFixed(2)} ml gesamt
-                </div>
-                ${renderCRWaterInfo(adjustment)}
-                <div class="cr-adjustment-list">${rows}</div>
-                ${renderCRElementValues(adjustment)}
-                <button class="${hasMissing ? 'btn-danger' : 'btn-primary'} btn-animated" onclick="exportCRAdjustment(${index})">
-                    ${escapeHtml(adjustment.label)} auslagern
-                </button>
-            </details>
+            <div class="cr-adjustment-wrap">
+                <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}">
+                    <summary class="cr-adjustment-title">
+                        <span>${escapeHtml(adjustment.label)}</span>
+                        <span>${hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat'}</span>
+                    </summary>
+                    <div class="cr-adjustment-meta">
+                        ${summary.requiredCount} Position(en) · ${summary.totalRequired.toFixed(2)} ml gesamt
+                    </div>
+                    ${renderCRWaterInfo(adjustment)}
+                    <div class="cr-adjustment-list">${rows}</div>
+                    ${renderCRElementValues(adjustment)}
+                    <button class="${hasMissing ? 'btn-danger' : 'btn-primary'} btn-animated" onclick="exportCRAdjustment(${index})">
+                        ${escapeHtml(adjustment.label)} auslagern
+                    </button>
+                </details>
+                ${renderCRMobileElementPanel(adjustment)}
+            </div>
         `;
     }).join('');
 }
