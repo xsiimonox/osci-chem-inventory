@@ -277,6 +277,7 @@ function showTab(tabId) {
     if(tabId === 'log') renderLogs();
     if(tabId === 'nachbestellen') renderNachbestellen();
     if(tabId === 'einstellungen') {
+        setupSettingsAccordions();
         updateNotificationStatus();
         renderCustomProductSettings();
         renderShopLinkSettings();
@@ -299,6 +300,55 @@ function showTab(tabId) {
             }
         }, 0);
     }
+}
+
+function setupSettingsAccordions() {
+    const settings = document.getElementById('einstellungen');
+    if (!settings) return;
+
+    settings.querySelectorAll(':scope > .card').forEach((card, index) => {
+        const firstChild = card.firstElementChild;
+        if (firstChild && firstChild.tagName === 'DETAILS') {
+            firstChild.open = false;
+            return;
+        }
+        if (card.dataset.settingsAccordion === 'true') return;
+
+        const title = card.querySelector('h2, h3');
+        if (!title) return;
+
+        const details = document.createElement('details');
+        details.className = 'settings-accordion';
+        details.id = 'settings-accordion-' + index;
+
+        const summary = document.createElement('summary');
+        summary.className = 'settings-accordion-summary';
+
+        title.parentNode.insertBefore(details, title);
+        details.appendChild(summary);
+        summary.appendChild(title);
+
+        const hint = document.createElement('span');
+        hint.className = 'settings-accordion-hint';
+        hint.innerText = 'aufklappen';
+        summary.appendChild(hint);
+
+        const body = document.createElement('div');
+        body.className = 'settings-accordion-body';
+        while (details.nextSibling) body.appendChild(details.nextSibling);
+        details.appendChild(body);
+
+        details.addEventListener('toggle', () => {
+            hint.innerText = details.open ? 'zuklappen' : 'aufklappen';
+        });
+
+        card.dataset.settingsAccordion = 'true';
+        details.open = false;
+    });
+
+    settings.querySelectorAll('details').forEach(details => {
+        details.open = false;
+    });
 }
 
 // --- DESIGN / THEME STEUERUNG ---
@@ -1781,8 +1831,11 @@ function renderCRElementValues(adjustment) {
 
     const headerCells = crElementOrder.map(element => `<span>${element}</span>`).join('');
     return `
-        <details class="cr-element-values" open>
-            <summary>Vorher/Nachher Werte</summary>
+        <details class="cr-element-values">
+            <summary>
+                <span>Vorher/Nachher Werte</span>
+                <small>${escapeHtml(adjustment.label)}</small>
+            </summary>
             <div class="cr-element-table">
                 <div class="cr-element-grid cr-element-header">
                     <span></span>
@@ -1829,6 +1882,8 @@ function renderCRPdfAdjustments() {
     results.innerHTML = crPdfAdjustments.map((adjustment, index) => {
         const summary = getCRAdjustmentSummary(adjustment);
         const hasMissing = summary.missing.length > 0;
+        const statusText = hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat';
+        const statusClass = hasMissing ? 'missing' : 'ready';
         const rows = adjustment.entries.map(entry => {
             const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
             const isNeeded = entry.amount > 0;
@@ -1852,11 +1907,12 @@ function renderCRPdfAdjustments() {
             <div class="cr-adjustment-wrap">
                 <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}">
                     <summary class="cr-adjustment-title">
-                        <span>${escapeHtml(adjustment.label)}</span>
-                        <span>${hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat'}</span>
+                        <span class="cr-adjustment-name">${escapeHtml(adjustment.label)}</span>
+                        <span class="cr-adjustment-status ${statusClass}">${statusText}</span>
                     </summary>
                     <div class="cr-adjustment-meta">
-                        ${summary.requiredCount} Position(en) · ${summary.totalRequired.toFixed(2)} ml gesamt
+                        <span>${summary.requiredCount} Position(en)</span>
+                        <span>${summary.totalRequired.toFixed(2)} ml gesamt</span>
                     </div>
                     ${renderCRWaterInfo(adjustment)}
                     <div class="cr-adjustment-list">${rows}</div>
