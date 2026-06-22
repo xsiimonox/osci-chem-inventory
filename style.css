@@ -47,6 +47,14 @@ body.theme-badman {
     --danger: #e63946;     /* Rot für Warnungen */
     --success: #4a4a4a;    /* Dunkles Grau für Bestätigungen */
     --border: #4a4a4a;     /* Graue Ränder */
+    background-color: var(--bg);
+    background-image:
+        linear-gradient(rgba(26, 26, 26, 0.76), rgba(26, 26, 26, 0.9)),
+        url("badman.svg");
+    background-repeat: no-repeat;
+    background-position: center 56%;
+    background-size: min(78vw, 620px) auto;
+    background-attachment: fixed;
 }
 
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
@@ -1172,6 +1180,10 @@ body.theme-girl .app-footer {
    ========================================================================== */
 
 /* Eingabefelder, Listen, Protokolle & Blöcke im Badman-Stil */
+body.theme-badman .card {
+    background: rgba(42, 42, 42, 0.93);
+}
+
 body.theme-badman textarea,
 body.theme-badman input[type="number"],
 body.theme-badman input[type="text"],

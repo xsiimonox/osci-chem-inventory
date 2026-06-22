@@ -1,11 +1,12 @@
-const CACHE_NAME = 'osci-pwa-cache-v28';
+const CACHE_NAME = 'osci-pwa-cache-v29';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
-  './icon.png'
+  './icon.png',
+  './badman.svg'
 ];
 
 self.addEventListener('install', (e) => {
