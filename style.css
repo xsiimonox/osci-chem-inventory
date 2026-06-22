@@ -1181,7 +1181,7 @@ body.theme-girl .app-footer {
 
 /* Eingabefelder, Listen, Protokolle & Blöcke im Badman-Stil */
 body.theme-badman .card {
-    background: rgba(42, 42, 42, 0.93);
+    background: rgba(42, 42, 42, 0.9);
 }
 
 body.theme-badman textarea,
@@ -1233,6 +1233,47 @@ body.theme-badman .cross-hint { color: #e63946 !important; }
 @media (min-width: 768px) {
     body.theme-badman .nav-menu { background: #2a2a2a !important; border-bottom: 1px solid #4a4a4a !important; }
     body.theme-badman .nav-links button.active { background: rgba(230, 57, 70, 0.15) !important; color: #e63946 !important; border-bottom: 3px solid #e63946 !important; }
+}
+
+@media (max-width: 767px) {
+    body.theme-badman {
+        background-image:
+            linear-gradient(rgba(26, 26, 26, 0.52), rgba(26, 26, 26, 0.82)),
+            url("badman.svg");
+        background-position: center 92px;
+        background-size: min(128vw, 520px) auto;
+        background-attachment: scroll;
+    }
+
+    body.theme-badman header {
+        background: rgba(26, 26, 26, 0.74) !important;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+
+    body.theme-badman .card {
+        background: rgba(42, 42, 42, 0.84);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+    }
+
+    body.theme-badman textarea,
+    body.theme-badman input[type="number"],
+    body.theme-badman input[type="text"],
+    body.theme-badman input[type="file"],
+    body.theme-badman select,
+    body.theme-badman .log-item,
+    body.theme-badman .stat-block,
+    body.theme-badman #cr-preview-container,
+    body.theme-badman #containerSection {
+        background: rgba(42, 42, 42, 0.82) !important;
+    }
+
+    body.theme-badman .nav-menu {
+        background: rgba(42, 42, 42, 0.88) !important;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
 }
 
 /* Footer Anpassung */
