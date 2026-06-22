@@ -1752,7 +1752,7 @@ function formatCRMeasurement(value) {
     return value.toFixed(2);
 }
 
-function renderCRElementMobileCards(adjustment) {
+function renderCRElementMobileRows(adjustment) {
     if (!adjustment.elements || (!adjustment.elements.before && !adjustment.elements.after)) return '';
     return crElementOrder.map(element => {
         const beforeValue = adjustment.elements.before && adjustment.elements.before[element] !== null && adjustment.elements.before[element] !== undefined
@@ -1762,26 +1762,13 @@ function renderCRElementMobileCards(adjustment) {
             ? adjustment.elements.after[element]
             : null;
         return `
-            <div class="cr-element-mobile-card">
+            <div class="cr-element-mobile-row">
                 <strong>${element}</strong>
-                <span>Vorher: ${formatCRMeasurement(beforeValue)} mg/l</span>
-                <span>Nachher: ${formatCRMeasurement(afterValue)} mg/l</span>
+                <span>${formatCRMeasurement(beforeValue)} mg/l</span>
+                <span>${formatCRMeasurement(afterValue)} mg/l</span>
             </div>
         `;
     }).join('');
-}
-
-function renderCRMobileElementPanel(adjustment) {
-    const cards = renderCRElementMobileCards(adjustment);
-    if (!cards) return '';
-    return `
-        <details class="cr-mobile-values-panel" open>
-            <summary>Vorher/Nachher Werte</summary>
-            <div class="cr-element-mobile-grid">
-                ${cards}
-            </div>
-        </details>
-    `;
 }
 
 function renderCRElementValues(adjustment) {
@@ -1814,8 +1801,13 @@ function renderCRElementValues(adjustment) {
                     </div>
                 ` : ''}
             </div>
-            <div class="cr-element-mobile-grid">
-                ${renderCRElementMobileCards(adjustment)}
+            <div class="cr-element-mobile-table">
+                <div class="cr-element-mobile-row cr-element-mobile-head">
+                    <strong>Element</strong>
+                    <span>Vorher</span>
+                    <span>Nachher</span>
+                </div>
+                ${renderCRElementMobileRows(adjustment)}
             </div>
         </details>
     `;
@@ -1873,7 +1865,6 @@ function renderCRPdfAdjustments() {
                         ${escapeHtml(adjustment.label)} auslagern
                     </button>
                 </details>
-                ${renderCRMobileElementPanel(adjustment)}
             </div>
         `;
     }).join('');
