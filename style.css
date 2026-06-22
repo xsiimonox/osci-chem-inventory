@@ -158,6 +158,19 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
 .stat-grid div strong { display: block; font-size: 0.95rem; color: #fff; margin-bottom: 2px; }
 .prognose-badge { font-size: 0.8rem; color: #ffd60a; background: rgba(255, 214, 10, 0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: 500; }
 
+.cr-experimental-warning {
+    background: rgba(255, 214, 10, 0.1);
+    border: 1px solid rgba(255, 214, 10, 0.35);
+    border-left: 3px solid #ffd60a;
+    color: #ffd60a;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 0.84rem;
+    line-height: 1.35;
+    margin: 0 0 12px;
+    font-weight: 600;
+}
+
 .cr-adjustment-card {
     background: rgba(255,255,255,0.03);
     border: 1px solid var(--border);
