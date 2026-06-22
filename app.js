@@ -1617,12 +1617,13 @@ function parseCRElementTable(blockText) {
     const afterHeader = lines
         .slice(elementIndex + 1)
         .join('\n')
-        .split(/\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0];
-    const beforeMatch = afterHeader.match(/Vorher\s+([\s\S]*?)(?=Nachher\b|$)/i);
-    const afterMatch = afterHeader.match(/Nachher\s+([\s\S]*?)$/i);
+        .split(/\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0]
+        .replace(/mg\s*\/\s*[lI1|]?/gi, 'mg/l');
+    const rowMatches = [...afterHeader.matchAll(/(?:Vorher|Nachher)\s+([\s\S]*?)(?=(?:Vorher|Nachher)\b|$)/gi)];
 
     const parseRow = rowText => {
-        const matches = (rowText || '').match(/-?\d+(?:[\.,]\d+)?\s*mg\/?l?/gi) || [];
+        const withoutUnits = String(rowText || '').replace(/mg\s*\/\s*[lI1|]?/gi, ' ');
+        const matches = withoutUnits.match(/-?\d+(?:[\.,]\d+)?/g) || [];
         if (matches.length < crElementOrder.length) return null;
         return crElementOrder.reduce((values, element, index) => {
             values[element] = parseCRMeasurementToken(matches[index]);
@@ -1630,8 +1631,15 @@ function parseCRElementTable(blockText) {
         }, {});
     };
 
-    const before = parseRow(beforeMatch ? beforeMatch[1] : '');
-    const after = parseRow(afterMatch ? afterMatch[1] : '');
+    let before = null;
+    let after = null;
+    rowMatches.forEach(match => {
+        const label = match[0].trim().toLowerCase().startsWith('vorher') ? 'before' : 'after';
+        const values = parseRow(match[1]);
+        if (label === 'before') before = values;
+        if (label === 'after') after = values;
+    });
+
     if (!before && !after) return null;
     return { before, after };
 }

@@ -65,8 +65,8 @@
 
             <div class="card card-accent">
                 <h3>PDF-Ausgleich importieren</h3>
-                <p class="hint">PDF auswählen oder Text aus der PDF einfügen. Die App erkennt 1ter, 2ter und 3ter Ausgleich und prüft deinen Vorrat pro Wasserwechsel.</p>
-                <input type="file" id="cr-pdf-file" accept="application/pdf,.pdf" onchange="importCRPdfFile(this.files[0])">
+                <p class="hint">PDF auswählen oder Text aus der PDF einfügen. Die Analyse startet automatisch nach der Auswahl und prüft deinen Vorrat pro Wasserwechsel.</p>
+                <input type="file" id="cr-pdf-file" accept="application/pdf,.pdf" onclick="this.value=''" onchange="importCRPdfFile(this.files[0])">
                 <textarea id="cr-pdf-text" placeholder="Optional: PDF-Text hier einfügen, falls die PDF gescannt ist." oninput="parseCRPdfText(this.value)"></textarea>
                 <div class="btn-group" style="margin-bottom: 12px;">
                     <button class="btn-secondary btn-animated" onclick="parseCRPdfTextFromTextarea()">Text auswerten</button>

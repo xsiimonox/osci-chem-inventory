@@ -264,11 +264,14 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
 }
 
 .cr-element-table {
+    display: none;
     overflow-x: auto;
 }
 
 .cr-element-mobile-grid {
-    display: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
 }
 
 .cr-element-mobile-card {
@@ -294,15 +297,13 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
     line-height: 1.35;
 }
 
-@media (max-width: 640px) {
+@media (min-width: 641px) {
     .cr-element-table {
-        display: none;
+        display: block;
     }
 
     .cr-element-mobile-grid {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        display: none;
     }
 }
 
