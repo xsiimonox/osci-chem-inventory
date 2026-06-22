@@ -118,6 +118,153 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
 .stat-grid div strong { display: block; font-size: 0.95rem; color: #fff; margin-bottom: 2px; }
 .prognose-badge { font-size: 0.8rem; color: #ffd60a; background: rgba(255, 214, 10, 0.1); padding: 4px 8px; border-radius: 6px; display: inline-block; margin-top: 8px; font-weight: 500; }
 
+.cr-adjustment-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--success);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+.cr-adjustment-card.has-missing {
+    border-left-color: var(--danger);
+}
+
+.cr-adjustment-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    color: var(--text);
+    font-weight: 700;
+    list-style: none;
+}
+
+.cr-adjustment-title::-webkit-details-marker {
+    display: none;
+}
+
+.cr-adjustment-title span:last-child {
+    color: var(--success);
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+.cr-adjustment-card.has-missing .cr-adjustment-title span:last-child {
+    color: var(--danger);
+}
+
+.cr-adjustment-meta {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin: 8px 0 10px;
+}
+
+.cr-adjustment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.cr-water-info {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+.cr-water-info span {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+
+.cr-element-values {
+    margin: 0 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow-x: auto;
+}
+
+.cr-element-values summary {
+    cursor: pointer;
+    color: var(--secondary);
+    font-weight: 700;
+    font-size: 0.84rem;
+    margin-bottom: 8px;
+}
+
+.cr-element-grid {
+    display: grid;
+    grid-template-columns: 72px repeat(10, minmax(64px, 1fr));
+    gap: 6px;
+    align-items: center;
+    min-width: 760px;
+    padding: 5px 0;
+    color: var(--text);
+    font-size: 0.76rem;
+}
+
+.cr-element-grid span,
+.cr-element-grid strong {
+    white-space: nowrap;
+}
+
+.cr-element-header {
+    color: var(--text-muted);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    font-weight: 700;
+}
+
+.cr-adjustment-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.cr-adjustment-row:first-child {
+    border-top: none;
+}
+
+.cr-adjustment-row small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    margin-top: 2px;
+}
+
+.cr-adjustment-row.missing strong,
+.cr-adjustment-row.missing small {
+    color: var(--danger);
+}
+
+.cr-adjustment-row.empty {
+    opacity: 0.48;
+}
+
+.cr-adjustment-amount {
+    text-align: right;
+}
+
+@media (max-width: 560px) {
+    .cr-adjustment-row {
+        grid-template-columns: 1fr;
+    }
+    .cr-adjustment-amount {
+        text-align: left;
+    }
+}
+
 .btn-group { display: flex; gap: 10px; }
 button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12px; border: none; cursor: pointer; transition: all 0.15s ease; }
 .btn-animated:active { transform: scale(0.96); opacity: 0.8; }

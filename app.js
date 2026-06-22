@@ -23,6 +23,22 @@ const crOrder = [
     { name: "Bor (B)", cat: "C&R Produkte" }
 ];
 
+const crPdfAliases = {
+    "Natriumchlorid (NaCl)": ["NaCl", "Natriumchlorid"],
+    "Magnesiumchlorid (MgCl2)": ["MgCl2", "Magnesiumchlorid"],
+    "Natriumsulfat (Na2SO4)": ["Na2SO4", "Natriumsulfat"],
+    "Magnesiumsulfat (MgSO4)": ["MgSO4", "Magnesiumsulfat"],
+    "Kaliumchlorid (KCl)": ["KCl", "KCL", "Kaliumchlorid"],
+    "Kaliumsulfat (K2SO4)": ["K2SO4", "Kaliumsulfat"],
+    "Kaliumbromid (KBr)": ["KBr", "Kaliumbromid"],
+    "Strontiumchlorid (SrCl2)": ["SrCl2", "Strontiumchlorid"],
+    "Calciumchlorid (CaCl2)": ["CaCl2", "Calciumchlorid"],
+    "Natriumfluorid (NaF)": ["NaF", "Natriumfluorid"],
+    "Bor (B)": ["Bor (B)", "Bor"]
+};
+
+const crElementOrder = ["Na", "Mg", "Ca", "K", "Sr", "F", "Cl", "S", "Br", "B"];
+
 const mixDefinitions = {
     kationen: ["Cobalt (Co)", "Nickel (Ni)", "Eisen (Fe)", "Mangan (Mn)", "Kupfer (Cu)", "Chrom (Cr)", "Zink (Zn)"],
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
@@ -159,6 +175,7 @@ function buildShopUrl(slug, sizeMl) {
 const DB_KEY = 'osci_db_v5';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
+let crPdfAdjustments = [];
 
 // --- INITIALISIERUNG ---
 function applyCustomProductsToCatalog() {
@@ -1430,6 +1447,532 @@ function processCRPaste() {
         let amount = parseFloat(matches[i].replace(/[^\d.]/g, ''));
         if (amount > 0) queue.push({ cat: crOrder[i].cat, item: crOrder[i].name, amount });
     }
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeRegExp(value) {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeCRPdfText(text) {
+    return String(text || '')
+        .replace(/\u00a0/g, ' ')
+        .replace(/\r/g, '\n')
+        .replace(/\b[Il|]ter\s+Ausgleich/gi, '1ter Ausgleich')
+        .replace(/\bZter\s+Ausgleich/gi, '2ter Ausgleich')
+        .replace(/\bSter\s+Ausgleich/gi, '3ter Ausgleich')
+        .replace(/\bAter\s+Ausgleich/gi, '4ter Ausgleich')
+        .replace(/\b[oO0]\s*m[l1i]\b/g, '0 ml')
+        .replace(/\b[oO0]m[l1i]\b/g, '0 ml')
+        .replace(/(\d+(?:[\.,]\d+)?)\s*m[i1]\b/gi, '$1 ml')
+        .replace(/(\d+(?:[\.,]\d+)?)ml\b/gi, '$1 ml')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/\n{3,}/g, '\n\n');
+}
+
+function getAdjustmentLabel(number, fallbackIndex) {
+    const value = number || fallbackIndex + 1;
+    return `${value}. Ausgleich`;
+}
+
+function getAliasAmount(blockText, aliases) {
+    const sortedAliases = [...aliases].sort((a, b) => b.length - a.length);
+    for (let alias of sortedAliases) {
+        const aliasPattern = escapeRegExp(alias).replace(/\\ /g, '\\s+');
+        const pattern = new RegExp(`(?:^|[^A-Za-z0-9])${aliasPattern}(?:\\s*\\([^\\)]*\\))?\\s*[:=-]?\\s*(-?\\d+(?:[\\.,]\\d+)?)\\s*ml`, 'i');
+        const match = blockText.match(pattern);
+        if (match) {
+            const amount = parseFloat(match[1].replace(',', '.'));
+            return isNaN(amount) ? 0 : amount;
+        }
+    }
+    return null;
+}
+
+function parseCRAmountToken(token) {
+    const normalized = String(token || '')
+        .replace(/,/g, '.')
+        .replace(/[oO]/g, '0')
+        .replace(/[^\d.-]/g, '');
+    const amount = parseFloat(normalized);
+    return isNaN(amount) ? 0 : amount;
+}
+
+function parseCRMeasurementToken(token) {
+    const normalized = String(token || '')
+        .replace(/,/g, '.')
+        .replace(/[oO]/g, '0')
+        .replace(/[^\d.-]/g, '');
+    const amount = parseFloat(normalized);
+    return isNaN(amount) ? null : amount;
+}
+
+function normalizeCRHeaderLine(line) {
+    return String(line || '')
+        .toLowerCase()
+        .replace(/[|il]/g, '1')
+        .replace(/[o]/g, '0')
+        .replace(/[s]/g, '5')
+        .replace(/\s+/g, '');
+}
+
+function lineLooksLikeCRHeader(line) {
+    const normalized = normalizeCRHeaderLine(line);
+    const checks = [
+        /nac[1l]/.test(normalized),
+        /mgc[1l]2/.test(normalized) || /mgc[1l]/.test(normalized),
+        /na2[5s]0?4/.test(normalized),
+        /mg[5s]0?4/.test(normalized),
+        /kc[1l]/.test(normalized),
+        /k2[5s]0?4|k2504/.test(normalized),
+        /kbr/.test(normalized),
+        /src[1l]2/.test(normalized) || /src[1l]/.test(normalized),
+        /cac[1l]2/.test(normalized) || /cac[1l]/.test(normalized),
+        /naf/.test(normalized),
+        /b0r|bor/.test(normalized)
+    ];
+    return checks.filter(Boolean).length >= 7;
+}
+
+function findCRTableHeaderIndex(lines) {
+    return lines.findIndex(lineLooksLikeCRHeader);
+}
+
+function parseSequentialCRTable(blockText, label) {
+    const lines = normalizeCRPdfText(blockText)
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean);
+    let headerIndex = findCRTableHeaderIndex(lines);
+    if (headerIndex === -1) {
+        headerIndex = lines.findIndex((line, index) => {
+            const combined = [line, lines[index + 1], lines[index + 2]].filter(Boolean).join(' ');
+            return lineLooksLikeCRHeader(combined);
+        });
+    }
+    if (headerIndex === -1) return null;
+
+    const afterHeader = lines
+        .slice(headerIndex + 1)
+        .join('\n')
+        .split(/\bElement\b|\bVorher\b|\bNachher\b|\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0];
+    const amountMatches = afterHeader.match(/(?:-?\d+(?:[\.,]\d+)?|[oO0])\s*m[l1i]\b/gi) || [];
+
+    if (amountMatches.length < crOrder.length) return null;
+
+    return {
+        label,
+        entries: crOrder.map((item, index) => ({
+            cat: item.cat,
+            item: item.name,
+            amount: parseCRAmountToken(amountMatches[index])
+        }))
+    };
+}
+
+function parseSequentialCRAmountsWithoutHeader(blockText, label) {
+    const beforeElementTable = normalizeCRPdfText(blockText).split(/\bElement\b|\bVorher\b|\bNachher\b/i)[0];
+    const amountMatches = beforeElementTable.match(/(?:-?\d+(?:[\.,]\d+)?|[oO0])\s*m[l1i]\b/gi) || [];
+    if (amountMatches.length < crOrder.length) return null;
+
+    return {
+        label,
+        entries: crOrder.map((item, index) => ({
+            cat: item.cat,
+            item: item.name,
+            amount: parseCRAmountToken(amountMatches[index])
+        }))
+    };
+}
+
+function parseCRWaterValues(blockText) {
+    const entnahmeMatch = blockText.match(/Wassermenge\s+Entnahme\s*=\s*(\d+(?:[\.,]\d+)?)\s*Liter/i);
+    const zugabeMatch = blockText.match(/Reinstwasser\s+Zugabe\s*=\s*(\d+(?:[\.,]\d+)?)\s*Liter/i);
+    return {
+        entnahme: entnahmeMatch ? parseFloat(entnahmeMatch[1].replace(',', '.')) : null,
+        zugabe: zugabeMatch ? parseFloat(zugabeMatch[1].replace(',', '.')) : null
+    };
+}
+
+function parseCRElementTable(blockText) {
+    const lines = normalizeCRPdfText(blockText)
+        .split('\n')
+        .map(line => line.trim())
+        .filter(Boolean);
+    const elementIndex = lines.findIndex(line => {
+        const normalized = line.toLowerCase().replace(/\s+/g, '');
+        return normalized.includes('element') && normalized.includes('na') && normalized.includes('mg') && normalized.includes('br');
+    });
+    if (elementIndex === -1) return null;
+
+    const afterHeader = lines
+        .slice(elementIndex + 1)
+        .join('\n')
+        .split(/\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0];
+    const beforeMatch = afterHeader.match(/Vorher\s+([\s\S]*?)(?=Nachher\b|$)/i);
+    const afterMatch = afterHeader.match(/Nachher\s+([\s\S]*?)$/i);
+
+    const parseRow = rowText => {
+        const matches = (rowText || '').match(/-?\d+(?:[\.,]\d+)?\s*mg\/?l?/gi) || [];
+        if (matches.length < crElementOrder.length) return null;
+        return crElementOrder.reduce((values, element, index) => {
+            values[element] = parseCRMeasurementToken(matches[index]);
+            return values;
+        }, {});
+    };
+
+    const before = parseRow(beforeMatch ? beforeMatch[1] : '');
+    const after = parseRow(afterMatch ? afterMatch[1] : '');
+    if (!before && !after) return null;
+    return { before, after };
+}
+
+function parseCRAdjustmentBlock(label, blockText) {
+    const tableAdjustment = parseSequentialCRTable(blockText, label) || parseSequentialCRAmountsWithoutHeader(blockText, label);
+    const water = parseCRWaterValues(blockText);
+    const elements = parseCRElementTable(blockText);
+    if (tableAdjustment) return { ...tableAdjustment, water, elements };
+
+    const entries = [];
+    let matchedByAlias = false;
+
+    crOrder.forEach(item => {
+        const amount = getAliasAmount(blockText, crPdfAliases[item.name] || [item.name]);
+        if (amount !== null) matchedByAlias = true;
+        entries.push({
+            cat: item.cat,
+            item: item.name,
+            amount: amount !== null ? amount : 0
+        });
+    });
+
+    if (!matchedByAlias) {
+        const amountMatches = blockText.match(/-?\d+(?:[\.,]\d+)?\s*ml/gi) || [];
+        if (amountMatches.length >= crOrder.length) {
+            return {
+                label,
+                water,
+                elements,
+                entries: crOrder.map((item, index) => ({
+                    cat: item.cat,
+                    item: item.name,
+                    amount: parseFloat(amountMatches[index].replace(/[^\d,.-]/g, '').replace(',', '.')) || 0
+                }))
+            };
+        }
+    }
+
+    return { label, water, elements, entries };
+}
+
+function parseCRAdjustmentsFromText(rawText) {
+    const text = normalizeCRPdfText(rawText);
+    if (!text.trim()) return [];
+
+    const markerRegex = /(?:^|\s)(\d+)\s*(?:ter|ten|er|\.|te)?\s*Ausgleich\s*:*/gi;
+    const markers = [];
+    let match;
+    while ((match = markerRegex.exec(text)) !== null) {
+        markers.push({
+            number: match[1],
+            start: match.index,
+            contentStart: markerRegex.lastIndex
+        });
+    }
+
+    if (markers.length === 0) {
+        return [parseCRAdjustmentBlock('Ausgleich', text)].filter(adjustment =>
+            adjustment.entries.some(entry => entry.amount > 0)
+        );
+    }
+
+    return markers.map((marker, index) => {
+        const nextMarker = markers[index + 1];
+        const block = text.slice(marker.contentStart, nextMarker ? nextMarker.start : text.length);
+        return parseCRAdjustmentBlock(getAdjustmentLabel(marker.number, index), block);
+    }).filter(adjustment => adjustment.entries.some(entry => entry.amount > 0));
+}
+
+function getCRAdjustmentSummary(adjustment) {
+    const missing = [];
+    let requiredCount = 0;
+    let totalRequired = 0;
+
+    adjustment.entries.forEach(entry => {
+        if (entry.amount <= 0) return;
+        requiredCount++;
+        totalRequired += entry.amount;
+        const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
+        if (stock < entry.amount) {
+            missing.push({
+                item: entry.item,
+                amount: entry.amount,
+                stock,
+                missing: entry.amount - stock
+            });
+        }
+    });
+
+    return { missing, requiredCount, totalRequired };
+}
+
+function renderCRWaterInfo(adjustment) {
+    if (!adjustment.water || (adjustment.water.entnahme === null && adjustment.water.zugabe === null)) return '';
+    const entnahme = adjustment.water.entnahme !== null ? `${adjustment.water.entnahme.toFixed(2)} L` : '-';
+    const zugabe = adjustment.water.zugabe !== null ? `${adjustment.water.zugabe.toFixed(2)} L` : '-';
+    return `
+        <div class="cr-water-info">
+            <span>Entnahme: <strong>${entnahme}</strong></span>
+            <span>Reinstwasser: <strong>${zugabe}</strong></span>
+        </div>
+    `;
+}
+
+function renderCRElementValues(adjustment) {
+    if (!adjustment.elements || (!adjustment.elements.before && !adjustment.elements.after)) return '';
+
+    const formatMeasurement = value => {
+        if (value === null || value === undefined) return '-';
+        if (Math.abs(value) >= 100) return value.toFixed(0);
+        if (Math.abs(value) >= 10) return value.toFixed(1);
+        return value.toFixed(2);
+    };
+    const renderCells = values => crElementOrder.map(element => {
+        const value = values && values[element] !== null && values[element] !== undefined ? values[element] : null;
+        return `<span>${formatMeasurement(value)} mg/l</span>`;
+    }).join('');
+
+    const headerCells = crElementOrder.map(element => `<span>${element}</span>`).join('');
+    return `
+        <details class="cr-element-values">
+            <summary>Vorher/Nachher Werte</summary>
+            <div class="cr-element-grid cr-element-header">
+                <span></span>
+                ${headerCells}
+            </div>
+            ${adjustment.elements.before ? `
+                <div class="cr-element-grid">
+                    <strong>Vorher</strong>
+                    ${renderCells(adjustment.elements.before)}
+                </div>
+            ` : ''}
+            ${adjustment.elements.after ? `
+                <div class="cr-element-grid">
+                    <strong>Nachher</strong>
+                    ${renderCells(adjustment.elements.after)}
+                </div>
+            ` : ''}
+        </details>
+    `;
+}
+
+function renderCRPdfAdjustments() {
+    const results = document.getElementById('cr-pdf-results');
+    const status = document.getElementById('cr-pdf-status');
+    if (!results) return;
+
+    if (!crPdfAdjustments || crPdfAdjustments.length === 0) {
+        results.innerHTML = '';
+        if (status) status.innerText = 'Keine Ausgleiche erkannt. Prüfe, ob die PDF Text enthält oder füge den Text manuell ein.';
+        return;
+    }
+
+    if (status) status.innerText = `${crPdfAdjustments.length} Ausgleich(e) erkannt.`;
+
+    results.innerHTML = crPdfAdjustments.map((adjustment, index) => {
+        const summary = getCRAdjustmentSummary(adjustment);
+        const hasMissing = summary.missing.length > 0;
+        const rows = adjustment.entries.map(entry => {
+            const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
+            const isNeeded = entry.amount > 0;
+            const isMissing = isNeeded && stock < entry.amount;
+            const amountG = entry.amount * (densityFactors[entry.item] || 1.0);
+            return `
+                <div class="cr-adjustment-row ${isMissing ? 'missing' : ''} ${!isNeeded ? 'empty' : ''}">
+                    <div>
+                        <strong>${escapeHtml(entry.item)}</strong>
+                        <small>Bestand: ${stock.toFixed(1)} ml</small>
+                    </div>
+                    <div class="cr-adjustment-amount">
+                        <strong>${entry.amount.toFixed(2)} ml</strong>
+                        <small>${amountG.toFixed(2)} g${isMissing ? ` · fehlt ${(entry.amount - stock).toFixed(2)} ml` : ''}</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        return `
+            <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}" open>
+                <summary class="cr-adjustment-title">
+                    <span>${escapeHtml(adjustment.label)}</span>
+                    <span>${hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat'}</span>
+                </summary>
+                <div class="cr-adjustment-meta">
+                    ${summary.requiredCount} Position(en) · ${summary.totalRequired.toFixed(2)} ml gesamt
+                </div>
+                ${renderCRWaterInfo(adjustment)}
+                <div class="cr-adjustment-list">${rows}</div>
+                ${renderCRElementValues(adjustment)}
+                <button class="${hasMissing ? 'btn-danger' : 'btn-primary'} btn-animated" onclick="exportCRAdjustment(${index})">
+                    ${escapeHtml(adjustment.label)} auslagern
+                </button>
+            </details>
+        `;
+    }).join('');
+}
+
+function parseCRPdfText(text) {
+    crPdfAdjustments = parseCRAdjustmentsFromText(text);
+    renderCRPdfAdjustments();
+}
+
+function parseCRPdfTextFromTextarea() {
+    const textarea = document.getElementById('cr-pdf-text');
+    parseCRPdfText(textarea ? textarea.value : '');
+}
+
+function setCRPdfStatus(message) {
+    const status = document.getElementById('cr-pdf-status');
+    if (status) status.innerText = message;
+}
+
+function getExtractedPdfTextScore(text) {
+    const normalized = normalizeCRPdfText(text);
+    const hasAdjustment = /\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i.test(normalized);
+    const knownTokens = crOrder.reduce((count, entry) => {
+        const aliases = crPdfAliases[entry.name] || [entry.name];
+        return count + (aliases.some(alias => normalized.toLowerCase().includes(alias.toLowerCase())) ? 1 : 0);
+    }, 0);
+    const mlCount = (normalized.match(/\d+(?:[\.,]\d+)?\s*ml/gi) || []).length;
+    return { hasAdjustment, knownTokens, mlCount };
+}
+
+function shouldRunCRPdfOcr(text) {
+    const score = getExtractedPdfTextScore(text);
+    return !text.trim() || !score.hasAdjustment || score.knownTokens < 5 || score.mlCount < crOrder.length;
+}
+
+async function renderPdfPageToCanvas(page, scale = 2.2) {
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    await page.render({ canvasContext: context, viewport }).promise;
+    return canvas;
+}
+
+async function extractCRPdfTextWithOcr(pdf) {
+    if (!window.Tesseract || !Tesseract.recognize) {
+        throw new Error('Tesseract.js ist nicht geladen.');
+    }
+
+    const pages = [];
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        setCRPdfStatus(`OCR läuft: Seite ${pageNumber} von ${pdf.numPages} ...`);
+        const page = await pdf.getPage(pageNumber);
+        const canvas = await renderPdfPageToCanvas(page);
+        const result = await Tesseract.recognize(canvas, 'deu+eng', {
+            logger: progress => {
+                if (!progress || progress.status !== 'recognizing text') return;
+                const pct = Math.round((progress.progress || 0) * 100);
+                setCRPdfStatus(`OCR läuft: Seite ${pageNumber} von ${pdf.numPages} (${pct}%)`);
+            }
+        });
+        pages.push(result && result.data && result.data.text ? result.data.text : '');
+        canvas.width = 0;
+        canvas.height = 0;
+    }
+    return pages.join('\n\n');
+}
+
+async function importCRPdfFile(file) {
+    const status = document.getElementById('cr-pdf-status');
+    const textarea = document.getElementById('cr-pdf-text');
+    if (!file) return;
+    if (!window.pdfjsLib) {
+        if (status) status.innerText = 'PDF.js konnte nicht geladen werden. Bitte online öffnen oder PDF-Text einfügen.';
+        return;
+    }
+
+    try {
+        if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+
+        if (status) status.innerText = `Lese "${file.name}" ...`;
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const pages = [];
+
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            const page = await pdf.getPage(pageNumber);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(item => item.str).join(' ');
+            pages.push(pageText);
+        }
+
+        let text = pages.join('\n\n');
+        let usedOcr = false;
+
+        if (shouldRunCRPdfOcr(text)) {
+            setCRPdfStatus('Kein lesbarer PDF-Text gefunden. Starte OCR ...');
+            text = await extractCRPdfTextWithOcr(pdf);
+            usedOcr = true;
+        }
+
+        if (textarea) textarea.value = text;
+        parseCRPdfText(text);
+
+        if (crPdfAdjustments.length > 0) {
+            setCRPdfStatus(`${crPdfAdjustments.length} Ausgleich(e) erkannt${usedOcr ? ' per OCR' : ''}.`);
+        } else if (usedOcr) {
+            setCRPdfStatus('OCR abgeschlossen, aber keine Ausgleiche erkannt. Prüfe den erkannten Text im Feld.');
+        }
+    } catch (error) {
+        console.error('PDF Import Fehler:', error);
+        if (status) status.innerText = 'PDF konnte nicht gelesen werden. Bitte Text aus der PDF kopieren und einfügen.';
+    }
+}
+
+function clearCRPdfImport() {
+    crPdfAdjustments = [];
+    const fileInput = document.getElementById('cr-pdf-file');
+    const textarea = document.getElementById('cr-pdf-text');
+    const status = document.getElementById('cr-pdf-status');
+    const results = document.getElementById('cr-pdf-results');
+    if (fileInput) fileInput.value = '';
+    if (textarea) textarea.value = '';
+    if (status) status.innerText = 'Noch keine PDF geladen.';
+    if (results) results.innerHTML = '';
+}
+
+function exportCRAdjustment(index) {
+    const adjustment = crPdfAdjustments[index];
+    if (!adjustment) return;
+
+    const queue = adjustment.entries
+        .filter(entry => entry.amount > 0)
+        .map(entry => ({ cat: entry.cat, item: entry.item, amount: entry.amount }));
+
+    if (queue.length === 0) return alert('Dieser Ausgleich enthält keine Mengen zum Auslagern.');
+
+    const summary = getCRAdjustmentSummary(adjustment);
+    let message = `${adjustment.label} jetzt auslagern?\n\n${queue.length} Position(en), ${summary.totalRequired.toFixed(2)} ml gesamt.`;
+    if (summary.missing.length > 0) {
+        message += `\n\nAchtung: Bei ${summary.missing.length} Position(en) reicht der Vorrat nicht. Die App fragt beim Auslagern einzeln nach.`;
+    }
+    if (!confirm(message)) return;
+
     executeQueueWithConflictHandling(queue, 0);
 }
 

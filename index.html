@@ -6,6 +6,8 @@
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -13,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.0.1</span>
+                <span class="version-badge">v2.0.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -59,6 +61,19 @@
                 </div>
 
                 <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
+            </div>
+
+            <div class="card card-accent">
+                <h3>PDF-Ausgleich importieren</h3>
+                <p class="hint">PDF auswählen oder Text aus der PDF einfügen. Die App erkennt 1ter, 2ter und 3ter Ausgleich und prüft deinen Vorrat pro Wasserwechsel.</p>
+                <input type="file" id="cr-pdf-file" accept="application/pdf,.pdf" onchange="importCRPdfFile(this.files[0])">
+                <textarea id="cr-pdf-text" placeholder="Optional: PDF-Text hier einfügen, falls die PDF gescannt ist." oninput="parseCRPdfText(this.value)"></textarea>
+                <div class="btn-group" style="margin-bottom: 12px;">
+                    <button class="btn-secondary btn-animated" onclick="parseCRPdfTextFromTextarea()">Text auswerten</button>
+                    <button class="btn-secondary btn-animated" onclick="clearCRPdfImport()">Zurücksetzen</button>
+                </div>
+                <div id="cr-pdf-status" class="hint">Noch keine PDF geladen.</div>
+                <div id="cr-pdf-results"></div>
             </div>
         </div>
 
