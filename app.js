@@ -1750,27 +1750,47 @@ function renderCRElementValues(adjustment) {
         const value = values && values[element] !== null && values[element] !== undefined ? values[element] : null;
         return `<span>${formatMeasurement(value)} mg/l</span>`;
     }).join('');
+    const renderMobileCards = () => crElementOrder.map(element => {
+        const beforeValue = adjustment.elements.before && adjustment.elements.before[element] !== null && adjustment.elements.before[element] !== undefined
+            ? adjustment.elements.before[element]
+            : null;
+        const afterValue = adjustment.elements.after && adjustment.elements.after[element] !== null && adjustment.elements.after[element] !== undefined
+            ? adjustment.elements.after[element]
+            : null;
+        return `
+            <div class="cr-element-mobile-card">
+                <strong>${element}</strong>
+                <span>Vorher: ${formatMeasurement(beforeValue)} mg/l</span>
+                <span>Nachher: ${formatMeasurement(afterValue)} mg/l</span>
+            </div>
+        `;
+    }).join('');
 
     const headerCells = crElementOrder.map(element => `<span>${element}</span>`).join('');
     return `
-        <details class="cr-element-values">
+        <details class="cr-element-values" open>
             <summary>Vorher/Nachher Werte</summary>
-            <div class="cr-element-grid cr-element-header">
-                <span></span>
-                ${headerCells}
+            <div class="cr-element-table">
+                <div class="cr-element-grid cr-element-header">
+                    <span></span>
+                    ${headerCells}
+                </div>
+                ${adjustment.elements.before ? `
+                    <div class="cr-element-grid">
+                        <strong>Vorher</strong>
+                        ${renderCells(adjustment.elements.before)}
+                    </div>
+                ` : ''}
+                ${adjustment.elements.after ? `
+                    <div class="cr-element-grid">
+                        <strong>Nachher</strong>
+                        ${renderCells(adjustment.elements.after)}
+                    </div>
+                ` : ''}
             </div>
-            ${adjustment.elements.before ? `
-                <div class="cr-element-grid">
-                    <strong>Vorher</strong>
-                    ${renderCells(adjustment.elements.before)}
-                </div>
-            ` : ''}
-            ${adjustment.elements.after ? `
-                <div class="cr-element-grid">
-                    <strong>Nachher</strong>
-                    ${renderCells(adjustment.elements.after)}
-                </div>
-            ` : ''}
+            <div class="cr-element-mobile-grid">
+                ${renderMobileCards()}
+            </div>
         </details>
     `;
 }
@@ -1811,7 +1831,7 @@ function renderCRPdfAdjustments() {
         }).join('');
 
         return `
-            <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}" open>
+            <details class="cr-adjustment-card ${hasMissing ? 'has-missing' : 'is-ready'}">
                 <summary class="cr-adjustment-title">
                     <span>${escapeHtml(adjustment.label)}</span>
                     <span>${hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat'}</span>
@@ -2954,34 +2974,75 @@ function triggerRefresh() {
 
 // Swipe Gestures for Tab Navigation
 let touchStartX = 0;
+let touchStartY = 0;
 let touchEndX = 0;
+let touchEndY = 0;
+let touchStartTime = 0;
 
 document.addEventListener('touchstart', (e) => {
     touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+    touchStartTime = Date.now();
 });
 
 document.addEventListener('touchend', (e) => {
     touchEndX = e.changedTouches[0].screenX;
+    touchEndY = e.changedTouches[0].screenY;
     handleSwipe();
 });
 
+function getTabLabel(tabId) {
+    const btn = document.getElementById('tab-' + tabId);
+    return btn ? btn.innerText.trim() : tabId;
+}
+
+function showSwipeIndicator(direction, targetTabId) {
+    let indicator = document.getElementById('swipe-indicator');
+    if (!indicator) {
+        indicator = document.createElement('div');
+        indicator.id = 'swipe-indicator';
+        indicator.className = 'swipe-indicator';
+        document.body.appendChild(indicator);
+    }
+
+    indicator.className = `swipe-indicator ${direction === 'next' ? 'next' : 'prev'}`;
+    indicator.innerHTML = `
+        <span class="swipe-indicator-arrow">${direction === 'next' ? '→' : '←'}</span>
+        <span>${getTabLabel(targetTabId)}</span>
+    `;
+    indicator.classList.remove('show');
+    indicator.offsetHeight;
+    indicator.classList.add('show');
+    setTimeout(() => indicator.classList.remove('show'), 700);
+}
+
 function handleSwipe() {
-    const swipeThreshold = 80;
-    const diff = touchStartX - touchEndX;
+    if (window.innerWidth >= 768) return;
+
+    const swipeThreshold = Math.max(120, window.innerWidth * 0.32);
+    const diffX = touchStartX - touchEndX;
+    const diffY = touchStartY - touchEndY;
+    const elapsed = Date.now() - touchStartTime;
+    const isMostlyHorizontal = Math.abs(diffX) > Math.abs(diffY) * 1.8;
+    const isIntentional = Math.abs(diffX) >= swipeThreshold && elapsed <= 900;
     
-    if (Math.abs(diff) < swipeThreshold) return;
+    if (!isMostlyHorizontal || !isIntentional) return;
     
     const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
     const currentTab = document.querySelector('.tab-content.active')?.id;
     const currentIndex = tabs.indexOf(currentTab);
     
-    if (diff > 0 && currentIndex < tabs.length - 1) {
+    if (diffX > 0 && currentIndex < tabs.length - 1) {
         // Swipe left = next tab
-        selectTab(tabs[currentIndex + 1]);
+        const targetTab = tabs[currentIndex + 1];
+        showSwipeIndicator('next', targetTab);
+        selectTab(targetTab);
         hapticFeedback();
-    } else if (diff < 0 && currentIndex > 0) {
+    } else if (diffX < 0 && currentIndex > 0) {
         // Swipe right = previous tab
-        selectTab(tabs[currentIndex - 1]);
+        const targetTab = tabs[currentIndex - 1];
+        showSwipeIndicator('prev', targetTab);
+        selectTab(targetTab);
         hapticFeedback();
     }
 }
