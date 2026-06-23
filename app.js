@@ -1566,6 +1566,14 @@ function parseCRMeasurementToken(token) {
     return isNaN(amount) ? null : amount;
 }
 
+function correctCROcrMeasurement(element, value, referenceValue) {
+    if (value === null || value === undefined) return value;
+    if (element === 'B' && referenceValue !== null && referenceValue !== undefined && referenceValue < 10 && value >= 20 && value < 100 && Number.isInteger(value)) {
+        return value / 10;
+    }
+    return value;
+}
+
 function normalizeCRHeaderLine(line) {
     return String(line || '')
         .toLowerCase()
@@ -1614,7 +1622,7 @@ function parseSequentialCRTable(blockText, label) {
     const afterHeader = lines
         .slice(headerIndex + 1)
         .join('\n')
-        .split(/\bElement\b|\bVorher\b|\bNachher\b|\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0];
+        .split(/\bElement\b|\bVorher\b|\bNachh(?:er)?\b|\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0];
     const amountMatches = afterHeader.match(/(?:-?\d+(?:[\.,]\d+)?|[oO0])\s*m[l1i]\b/gi) || [];
 
     if (amountMatches.length < crOrder.length) return null;
@@ -1630,7 +1638,7 @@ function parseSequentialCRTable(blockText, label) {
 }
 
 function parseSequentialCRAmountsWithoutHeader(blockText, label) {
-    const beforeElementTable = normalizeCRPdfText(blockText).split(/\bElement\b|\bVorher\b|\bNachher\b/i)[0];
+    const beforeElementTable = normalizeCRPdfText(blockText).split(/\bElement\b|\bVorher\b|\bNachh(?:er)?\b/i)[0];
     const amountMatches = beforeElementTable.match(/(?:-?\d+(?:[\.,]\d+)?|[oO0])\s*m[l1i]\b/gi) || [];
     if (amountMatches.length < crOrder.length) return null;
 
@@ -1662,21 +1670,24 @@ function parseCRElementTable(blockText) {
         const normalized = line.toLowerCase().replace(/\s+/g, '');
         return normalized.includes('element') && normalized.includes('na') && normalized.includes('mg') && normalized.includes('br');
     });
-    if (elementIndex === -1) return null;
+    const firstValueRowIndex = lines.findIndex(line => /\b(?:Vorher|Nachh(?:er)?)\b/i.test(line));
+    if (elementIndex === -1 && firstValueRowIndex === -1) return null;
 
     const afterHeader = lines
-        .slice(elementIndex + 1)
+        .slice(elementIndex === -1 ? firstValueRowIndex : elementIndex + 1)
         .join('\n')
         .split(/\d+\s*(?:ter|ten|er|\.|te)?\s*Ausgleich/i)[0]
         .replace(/mg\s*\/\s*[lI1|]?/gi, 'mg/l');
-    const rowMatches = [...afterHeader.matchAll(/\b(Vorher|Nachher)\b\s+([\s\S]*?)(?=\b(?:Vorher|Nachher)\b|$)/gi)];
+    const rowMatches = [...afterHeader.matchAll(/\b(Vorher|Nachh(?:er)?)\b\s+([\s\S]*?)(?=\b(?:Vorher|Nachh(?:er)?|Aner|Anner|Ausgleich)\b|$)/gi)];
 
-    const parseRow = rowText => {
+    const parseRow = (rowText, referenceValues = null) => {
         const withoutUnits = String(rowText || '').replace(/mg\s*\/\s*[lI1|]?/gi, ' ');
         const matches = withoutUnits.match(/-?\d+(?:[\.,]\d+)?/g) || [];
         if (matches.length < crElementOrder.length) return null;
         return crElementOrder.reduce((values, element, index) => {
-            values[element] = parseCRMeasurementToken(matches[index]);
+            const parsedValue = parseCRMeasurementToken(matches[index]);
+            const referenceValue = referenceValues ? referenceValues[element] : null;
+            values[element] = correctCROcrMeasurement(element, parsedValue, referenceValue);
             return values;
         }, {});
     };
@@ -1685,7 +1696,7 @@ function parseCRElementTable(blockText) {
     let after = null;
     rowMatches.forEach(match => {
         const label = match[1].toLowerCase() === 'vorher' ? 'before' : 'after';
-        const values = parseRow(match[2]);
+        const values = parseRow(match[2], label === 'after' ? before : null);
         if (label === 'before') before = values;
         if (label === 'after') after = values;
     });
