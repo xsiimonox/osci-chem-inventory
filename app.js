@@ -54,6 +54,8 @@ const densityFactors = {
     "Vanadium (V)": 1.026, "Zink (Zn)": 1.024, "Iod (I)": 1.097, "Fluor (F)": 1.009, "Lithium (Li)": 1.023
 };
 
+const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
+const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 
 // --- OSCI SHOP BUILT-IN PRODUCT PRESET ---
@@ -173,11 +175,107 @@ function buildShopUrl(slug, sizeMl) {
 }
 
 const DB_KEY = 'osci_db_v5';
+let appState = null;
+let activeWarehouseId = 'main';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
 let crPdfAdjustments = [];
 
 // --- INITIALISIERUNG ---
+function resetCatalogToBase() {
+    Object.keys(catalog).forEach(cat => delete catalog[cat]);
+    Object.assign(catalog, JSON.parse(JSON.stringify(BASE_CATALOG)));
+    Object.keys(densityFactors).forEach(item => delete densityFactors[item]);
+    Object.assign(densityFactors, BASE_DENSITY_FACTORS);
+}
+
+function createWarehouseId() {
+    return 'lager-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+function createWarehouseData(source = {}) {
+    return {
+        inventory: source.inventory || {},
+        stats: source.stats || {},
+        logs: source.logs || [],
+        statsStarted: source.statsStarted || Date.now(),
+        theme: source.theme || (db && db.theme) || 'default',
+        thresholds: source.thresholds || {},
+        settings: source.settings || { forecastWeeks: 4 },
+        notifications: source.notifications || { enabled: false, lastAlertSignature: '', lastSentAt: 0 },
+        alerts: source.alerts || { dismissed: {}, disabled: {} },
+        customProducts: source.customProducts || [],
+        shopLinks: source.shopLinks || {},
+        productPresets: source.productPresets || {}
+    };
+}
+
+function createWarehouseRecord(name, data = {}) {
+    return {
+        id: createWarehouseId(),
+        name: name || 'Neues Lager',
+        createdAt: new Date().toISOString(),
+        lastImportAt: null,
+        lastExportAt: null,
+        data: createWarehouseData(data)
+    };
+}
+
+function migrateToWarehouseState(parsed) {
+    if (parsed && parsed.warehouses && typeof parsed.warehouses === 'object') {
+        return parsed;
+    }
+
+    const record = {
+        id: 'main',
+        name: 'Hauptlager',
+        createdAt: new Date().toISOString(),
+        lastImportAt: null,
+        lastExportAt: null,
+        data: createWarehouseData(parsed || {})
+    };
+
+    return {
+        version: 1,
+        activeWarehouseId: 'main',
+        warehouses: { main: record }
+    };
+}
+
+function getActiveWarehouse() {
+    if (!appState || !appState.warehouses) return null;
+    return appState.warehouses[activeWarehouseId] || Object.values(appState.warehouses)[0] || null;
+}
+
+function normalizeWarehouseData(data) {
+    db = createWarehouseData(data || {});
+    if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
+    if (!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
+    if (db.notifications.enabled === undefined) db.notifications.enabled = false;
+    if (!db.notifications.lastAlertSignature) db.notifications.lastAlertSignature = '';
+    if (!db.notifications.lastSentAt) db.notifications.lastSentAt = 0;
+    if (!db.alerts) db.alerts = {};
+    if (!db.alerts.dismissed) db.alerts.dismissed = {};
+    if (!db.alerts.disabled) db.alerts.disabled = {};
+    if (!db.customProducts) db.customProducts = [];
+    if (!db.shopLinks) db.shopLinks = {};
+    if (!db.productPresets) db.productPresets = {};
+    db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
+
+    resetCatalogToBase();
+    applyCustomProductsToCatalog();
+
+    for (let cat in catalog) {
+        if (!db.inventory[cat]) db.inventory[cat] = {};
+        for (let item in catalog[cat]) {
+            if (db.inventory[cat][item] === undefined) db.inventory[cat][item] = 0;
+            if (db.stats[item] === undefined) db.stats[item] = 0;
+        }
+    }
+
+    return db;
+}
+
 function applyCustomProductsToCatalog() {
     if (!db.customProducts) db.customProducts = [];
 
@@ -192,53 +290,148 @@ function applyCustomProductsToCatalog() {
 }
 
 function initDB() {
+    let parsed = null;
     try {
         let saved = localStorage.getItem(DB_KEY);
         if (!saved) saved = localStorage.getItem('osci_db_v4');
         if (!saved) saved = localStorage.getItem('osci_db_v3');
         if (saved) {
-            let parsed = JSON.parse(saved);
-            if (parsed && typeof parsed === 'object') db = parsed;
+            parsed = JSON.parse(saved);
         }
     } catch (e) { console.error("Fehler beim Laden:", e); }
 
-    if (!db.inventory) db.inventory = {};
-    if (!db.stats) db.stats = {};
-    if (!db.logs) db.logs = [];
-    if (!db.statsStarted) db.statsStarted = Date.now();
-    if (!db.theme) db.theme = 'default';
-    if (!db.thresholds) db.thresholds = {};
-    if (!db.settings) db.settings = {};
-    if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
-    if (!db.notifications) db.notifications = {};
-    if (db.notifications.enabled === undefined) db.notifications.enabled = false;
-    if (!db.notifications.lastAlertSignature) db.notifications.lastAlertSignature = '';
-    if (!db.notifications.lastSentAt) db.notifications.lastSentAt = 0;
-    if (!db.alerts) db.alerts = {};
-    if (!db.alerts.dismissed) db.alerts.dismissed = {};
-    if (!db.alerts.disabled) db.alerts.disabled = {};
-    if (!db.customProducts) db.customProducts = [];
-    if (!db.shopLinks) db.shopLinks = {};
-    if (!db.productPresets) db.productPresets = {};
-    // Always ensure the built-in OSCI preset is present (injected fresh, non-destructive)
-    db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
-
-    applyCustomProductsToCatalog();
-
-    for (let cat in catalog) {
-        if (!db.inventory[cat]) db.inventory[cat] = {};
-        for (let item in catalog[cat]) {
-            if (db.inventory[cat][item] === undefined) db.inventory[cat][item] = 0;
-            if (db.stats[item] === undefined) db.stats[item] = 0;
-        }
+    appState = migrateToWarehouseState(parsed);
+    if (!appState.warehouses || Object.keys(appState.warehouses).length === 0) {
+        const record = createWarehouseRecord('Hauptlager');
+        record.id = 'main';
+        appState.warehouses = { main: record };
     }
+
+    Object.entries(appState.warehouses).forEach(([id, warehouse]) => {
+        warehouse.id = id;
+        if (!warehouse.name) warehouse.name = 'Lager';
+        if (!warehouse.createdAt) warehouse.createdAt = new Date().toISOString();
+        if (warehouse.lastImportAt === undefined) warehouse.lastImportAt = null;
+        if (warehouse.lastExportAt === undefined) warehouse.lastExportAt = null;
+        if (!warehouse.data) warehouse.data = createWarehouseData();
+    });
+
+    activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses)[0];
+    if (!appState.warehouses[activeWarehouseId]) activeWarehouseId = Object.keys(appState.warehouses)[0];
+    appState.activeWarehouseId = activeWarehouseId;
+
+    const warehouse = getActiveWarehouse();
+    warehouse.data = normalizeWarehouseData(warehouse.data);
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
     saveDB();
+    updateWarehouseUI();
 }
 
-function saveDB() { try { localStorage.setItem(DB_KEY, JSON.stringify(db)); } catch(e) {} }
+function saveDB() {
+    try {
+        if (!appState) appState = migrateToWarehouseState(db);
+        const warehouse = getActiveWarehouse();
+        if (warehouse) warehouse.data = db;
+        appState.activeWarehouseId = activeWarehouseId;
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        updateWarehouseUI();
+    } catch(e) {}
+}
+
+function formatWarehouseDate(value) {
+    return value ? new Date(value).toLocaleString('de-DE') : 'noch nie';
+}
+
+function sanitizeFileName(value) {
+    return String(value || 'Lager').replace(/[^a-z0-9äöüß_-]+/gi, '_').replace(/^_+|_+$/g, '') || 'Lager';
+}
+
+function updateWarehouseUI() {
+    const select = document.getElementById('warehouseSelect');
+    const meta = document.getElementById('warehouseMeta');
+    const backupInfo = document.getElementById('warehouseBackupInfo');
+    const warehouses = appState && appState.warehouses ? Object.values(appState.warehouses) : [];
+    const active = getActiveWarehouse();
+
+    if (select) {
+        const previous = select.value;
+        select.innerHTML = warehouses
+            .map(warehouse => `<option value="${warehouse.id}">${warehouse.name}</option>`)
+            .join('');
+        select.value = active ? active.id : previous;
+    }
+
+    if (active) {
+        const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}`;
+        if (meta) meta.innerText = info;
+        if (backupInfo) backupInfo.innerText = `Aktuelles Lager: ${active.name} · ${info}`;
+    }
+}
+
+function renderCurrentWarehouseViews() {
+    renderLager();
+    renderStats();
+    renderLogs();
+    renderCustomProductSettings();
+    renderProductPresets();
+    renderShopLinkSettings();
+    renderNachbestellen();
+    initBulkProductSelect();
+    updateNotificationStatus();
+    clearCRPdfImport();
+}
+
+function switchWarehouse(id) {
+    if (!appState || !appState.warehouses || !appState.warehouses[id] || id === activeWarehouseId) {
+        updateWarehouseUI();
+        return;
+    }
+
+    const current = getActiveWarehouse();
+    if (current) current.data = db;
+    activeWarehouseId = id;
+    appState.activeWarehouseId = id;
+    const next = getActiveWarehouse();
+    next.data = normalizeWarehouseData(next.data);
+    applyTheme(db.theme || 'default', false);
+    saveDB();
+    renderCurrentWarehouseViews();
+}
+
+function createWarehouse() {
+    const name = prompt('Name für das neue Lager:', `Lager ${Object.keys(appState.warehouses || {}).length + 1}`);
+    if (!name || !name.trim()) return;
+    const record = createWarehouseRecord(name.trim(), { theme: db.theme, settings: { forecastWeeks: (db.settings && db.settings.forecastWeeks) || 4 } });
+    appState.warehouses[record.id] = record;
+    switchWarehouse(record.id);
+}
+
+function renameWarehouse() {
+    const warehouse = getActiveWarehouse();
+    if (!warehouse) return;
+    const name = prompt('Neuer Name für dieses Lager:', warehouse.name);
+    if (!name || !name.trim()) return;
+    warehouse.name = name.trim();
+    saveDB();
+}
+
+function deleteWarehouse() {
+    const warehouse = getActiveWarehouse();
+    if (!warehouse) return;
+    const ids = Object.keys(appState.warehouses || {});
+    if (ids.length <= 1) return alert('Es muss mindestens ein Lager vorhanden bleiben.');
+    if (!confirm(`Lager "${warehouse.name}" wirklich löschen? Bestand, Statistik, Protokoll und Einstellungen dieses Lagers werden entfernt.`)) return;
+    delete appState.warehouses[warehouse.id];
+    activeWarehouseId = Object.keys(appState.warehouses)[0];
+    appState.activeWarehouseId = activeWarehouseId;
+    const next = getActiveWarehouse();
+    next.data = normalizeWarehouseData(next.data);
+    applyTheme(db.theme || 'default', false);
+    saveDB();
+    renderCurrentWarehouseViews();
+}
 
 function jsArg(value) {
     return JSON.stringify(value).replace(/'/g, "\\u0027");
@@ -2230,10 +2423,25 @@ function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; if
 function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLager(); updateNotificationStatus(); alert("Lager ist leer."); } }
 
 function exportData() {
-    let blob = new Blob([JSON.stringify(db, null, 2)], { type: "text/plain" });
+    const warehouse = getActiveWarehouse();
+    const exportedAt = new Date().toISOString();
+    if (warehouse) {
+        warehouse.data = db;
+        warehouse.lastExportAt = exportedAt;
+    }
+    const payload = {
+        type: 'osci_warehouse_backup',
+        version: 1,
+        warehouseName: warehouse ? warehouse.name : 'Lager',
+        exportedAt,
+        data: db
+    };
+    saveDB();
+
+    let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "text/plain" });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_Backup_${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `OSCI_${sanitizeFileName(payload.warehouseName)}_${exportedAt.split('T')[0]}.txt`;
     a.click();
 }
 
@@ -2244,30 +2452,71 @@ function importData() {
     reader.onload = e => {
         try {
             let parsed = JSON.parse(e.target.result);
-            if(parsed.inventory) {
-                db = parsed;
-                if(!db.logs) db.logs=[];
-                if(!db.settings) db.settings = {};
-                if(!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
-                if(!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
-                if(!db.alerts) db.alerts = { dismissed: {}, disabled: {} };
-                if(!db.alerts.dismissed) db.alerts.dismissed = {};
-                if(!db.alerts.disabled) db.alerts.disabled = {};
-                if(!db.customProducts) db.customProducts = [];
-                if(!db.shopLinks) db.shopLinks = {};
-                if(!db.productPresets) db.productPresets = {};
-                applyCustomProductsToCatalog();
+            const importPayload = parsed && parsed.type === 'osci_warehouse_backup' ? parsed.data : parsed;
+            const sourceName = parsed && parsed.warehouseName ? parsed.warehouseName : 'Backup';
+            if(importPayload && importPayload.inventory) {
+                const warehouse = getActiveWarehouse();
+                if (!confirm(`Backup "${sourceName}" in das aktuell ausgewählte Lager "${warehouse.name}" importieren? Dieses Lager wird dadurch ersetzt.`)) return;
+                db = normalizeWarehouseData(importPayload);
+                warehouse.data = db;
+                warehouse.lastImportAt = new Date().toISOString();
                 saveDB();
                 applyTheme(db.theme || 'default', false);
-                updateNotificationStatus();
-                alert("Backup geladen!");
-                showTab('lager');
+                renderCurrentWarehouseViews();
+                alert(`Backup in "${warehouse.name}" geladen!`);
+                selectTab('lager');
                 checkAndNotifyStockAlerts();
             } 
             else alert("Ungültiges Backup-Format.");
         } catch(err) { alert("Fehler beim Lesen der Datei."); }
     };
     reader.readAsText(file);
+}
+
+function buildWarehouseInventoryShareText() {
+    const warehouse = getActiveWarehouse();
+    const lines = [
+        `Lagerbestand: ${warehouse ? warehouse.name : 'Lager'}`,
+        `Stand: ${new Date().toLocaleString('de-DE')}`,
+        ''
+    ];
+
+    let hasStock = false;
+    for (let cat in catalog) {
+        const rows = [];
+        for (let item in catalog[cat]) {
+            const stock = db.inventory[cat] && db.inventory[cat][item] ? db.inventory[cat][item] : 0;
+            if (stock > 0) rows.push(`- ${item}: ${formatItemAmount(item, stock)}`);
+        }
+        if (rows.length > 0) {
+            hasStock = true;
+            lines.push(cat);
+            lines.push(...rows);
+            lines.push('');
+        }
+    }
+
+    if (!hasStock) lines.push('Keine Artikel mit Bestand vorhanden.');
+    return lines.join('\n').trim();
+}
+
+async function shareWarehouseInventory() {
+    const warehouse = getActiveWarehouse();
+    const text = buildWarehouseInventoryShareText();
+    const title = `Lagerbestand ${warehouse ? warehouse.name : ''}`.trim();
+
+    if (navigator.share) {
+        try {
+            await navigator.share({ title, text });
+            return;
+        } catch (error) {
+            if (error && error.name === 'AbortError') return;
+        }
+    }
+
+    const subject = encodeURIComponent(title);
+    const body = encodeURIComponent(text);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
 }
 
 // --- AMBIENT PARTY MODE ---

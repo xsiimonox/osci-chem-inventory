@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.0.7</span>
+                <span class="version-badge">v2.1.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -24,6 +24,13 @@
             </button>
         </div>
         <div class="subtitle">Lagerverwaltung &amp; Statistik by xsiimonox</div>
+        <div class="warehouse-switcher">
+            <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
+            <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">＋</button>
+            <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen">✎</button>
+            <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
+        </div>
+        <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
     </header>
 
     <nav class="nav-menu" id="main-nav">
@@ -271,10 +278,12 @@
 
             <div class="card" style="margin-top: 20px;">
                 <h3>Backup</h3>
-                <p class="hint">Exportiere deine Daten oder lies ein vorhandenes JSON-Backup wieder ein.</p>
+                <p class="hint">Exportiere oder importiere das aktuell ausgewählte Lager. Jedes Lager hat seine eigene Backup-Datei.</p>
+                <p class="hint" id="warehouseBackupInfo">Aktuelles Lager: wird geladen ...</p>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                     <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 JSON Backup</button>
                     <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
+                    <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">Lagerbestand teilen</button>
                 </div>
                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border);">
                     <label class="hint" style="display:block; margin-bottom:8px;">Backup einlesen</label>
