@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.0.4</span>
+                <span class="version-badge">v2.0.5</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -122,6 +122,21 @@
                 <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
                     🚀 Neue Version laden 🚀
                 </button>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--danger); margin-bottom: 5px;">Bug melden</h3>
+                <p class="hint">Beschreibe kurz, was passiert ist. Die App erstellt daraus automatisch eine Mail an simon@asbach.tech.</p>
+                <div class="input-group">
+                    <label>Was ist passiert?</label>
+                    <textarea id="bugReportDescription" class="bug-report-textarea" placeholder="z.B. PDF-Analyse erkennt den 3. Ausgleich falsch ..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Wie kann man den Fehler auslösen? optional</label>
+                    <textarea id="bugReportSteps" class="bug-report-textarea bug-report-textarea-small" placeholder="1. C&amp;R öffnen&#10;2. PDF importieren&#10;3. Ergebnis prüfen"></textarea>
+                </div>
+                <button onclick="sendBugReport()" class="btn-danger btn-animated">Fehler per Mail melden</button>
+                <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
             </div>
 
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">

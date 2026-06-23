@@ -396,6 +396,49 @@ async function forceUpdateApp() {
     }
 }
 
+function getActiveTabId() {
+    const activeTab = document.querySelector('.tab-content.active');
+    return activeTab ? activeTab.id : 'unbekannt';
+}
+
+function sendBugReport() {
+    const descriptionEl = document.getElementById('bugReportDescription');
+    const stepsEl = document.getElementById('bugReportSteps');
+    const description = descriptionEl ? descriptionEl.value.trim() : '';
+    const steps = stepsEl ? stepsEl.value.trim() : '';
+
+    if (!description) {
+        alert('Bitte beschreibe kurz, welcher Fehler aufgetreten ist.');
+        if (descriptionEl) descriptionEl.focus();
+        return;
+    }
+
+    const appVersion = document.querySelector('.version-badge')?.innerText || 'unbekannt';
+    const body = [
+        'Bugmeldung OSCI Lager App',
+        '',
+        'Fehlerbeschreibung:',
+        description,
+        '',
+        'Schritte zum Nachstellen:',
+        steps || '-',
+        '',
+        'Technische Infos:',
+        `App-Version: ${appVersion}`,
+        `Aktiver Bereich: ${getActiveTabId()}`,
+        `Design: ${db.theme || 'default'}`,
+        `Party-Modus: ${document.body.classList.contains('party-mode') ? 'aktiv' : 'inaktiv'}`,
+        `URL: ${window.location.href}`,
+        `Zeitpunkt: ${new Date().toLocaleString('de-DE')}`,
+        `Browser: ${navigator.userAgent}`,
+        '',
+        'Hinweis: Diese Meldung enthält keine Lagerbestände oder Backup-Daten.'
+    ].join('\n');
+
+    const subject = `Bugmeldung OSCI Lager App ${appVersion}`;
+    window.location.href = `mailto:simon@asbach.tech?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 // --- NEUE HILFSFUNKTIONEN ---
 function getGrams(itemName, mlAmount) {
     let factor = densityFactors[itemName] || 1.0;
