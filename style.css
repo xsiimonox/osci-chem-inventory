@@ -614,6 +614,15 @@ textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border:
 input[type="number"], input[type="text"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
 
+.disabled-field {
+    opacity: 0.45;
+    filter: grayscale(1);
+}
+
+.disabled-field input {
+    cursor: not-allowed;
+}
+
 .bug-report-textarea {
     min-height: 110px;
     height: 110px;

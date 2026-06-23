@@ -445,6 +445,25 @@ function getGrams(itemName, mlAmount) {
     return (mlAmount * factor).toFixed(1);
 }
 
+function getItemUnit(itemName) {
+    const product = (db.customProducts || []).find(entry => entry.name === itemName);
+    return product && product.sizeUnit ? product.sizeUnit : 'ml';
+}
+
+function getUnitLabel(unit) {
+    if (unit === 'st') return 'Stück';
+    if (unit === 'g') return 'g';
+    return 'ml';
+}
+
+function formatItemAmount(itemName, amount, decimals = 1) {
+    return `${parseFloat(amount || 0).toFixed(decimals)} ${getUnitLabel(getItemUnit(itemName))}`;
+}
+
+function itemUsesPieces(itemName) {
+    return getItemUnit(itemName) === 'st';
+}
+
 function getLogTime(log) {
     return log.timestamp || log.time || null;
 }
@@ -718,7 +737,7 @@ function getAlertSignature(alerts) {
 function buildAlertNotification(alerts) {
     const count = alerts.length;
     const first = alerts[0];
-    let body = `${first.item}: ${first.stock.toFixed(1)} ml`;
+    let body = `${first.item}: ${formatItemAmount(first.item, first.stock)}`;
 
     if (first.weeksLeft !== null && first.stock > 0) {
         body += `, leer in ca. ${first.weeksLeft.toFixed(1)} Wochen`;
@@ -838,10 +857,10 @@ function renderCustomProductSettings() {
     }
 
     list.innerHTML = db.customProducts.map((product, index) => {
-        const unitLabel = product.sizeUnit === 'g' ? 'g' : 'ml';
+        const unitLabel = getUnitLabel(product.sizeUnit);
         const displaySizes = (product.sizesOriginal && product.sizesOriginal.length > 0)
             ? product.sizesOriginal.map(s => s + ' ' + unitLabel).join(', ')
-            : (product.sizes || []).map(s => s.toFixed(1) + ' ml').join(', ') || 'keine';
+            : (product.sizes || []).map(s => s.toFixed(1) + ' ' + unitLabel).join(', ') || 'keine';
         return `
         <div class="custom-product-row">
             <span>
@@ -852,6 +871,26 @@ function renderCustomProductSettings() {
         </div>
     `;
     }).join('');
+}
+
+function toggleCustomProductUnitFields() {
+    const sizeUnitEl = document.getElementById('customProductSizeUnit');
+    const sizesEl = document.getElementById('customProductSizes');
+    const densityEl = document.getElementById('customProductDensity');
+    const sizesGroup = document.getElementById('customProductSizesGroup');
+    const densityGroup = document.getElementById('customProductDensityGroup');
+    const isPieceUnit = sizeUnitEl && sizeUnitEl.value === 'st';
+
+    [sizesEl, densityEl].forEach(input => {
+        if (!input) return;
+        input.disabled = isPieceUnit;
+        if (isPieceUnit) input.value = '';
+    });
+
+    [sizesGroup, densityGroup].forEach(group => {
+        if (!group) return;
+        group.classList.toggle('disabled-field', Boolean(isPieceUnit));
+    });
 }
 
 function addCustomProduct() {
@@ -867,11 +906,11 @@ function addCustomProduct() {
     const cat = newCat || (catEl ? catEl.value : '');
     const sizesRaw = sizesEl ? sizesEl.value : '';
     const sizeUnit = sizeUnitEl ? sizeUnitEl.value : 'ml';
-    const sizes = sizesRaw
+    const sizes = sizeUnit === 'st' ? [] : sizesRaw
         .split(',')
         .map(value => parseFloat(value.trim()))
         .filter(value => !isNaN(value) && value > 0);
-    const densityRaw = densityEl && densityEl.value ? parseFloat(densityEl.value) : 1;
+    const densityRaw = sizeUnit === 'st' ? 1 : (densityEl && densityEl.value ? parseFloat(densityEl.value) : 1);
     const density = (!isNaN(densityRaw) && densityRaw > 0) ? densityRaw : 1;
 
     if (!name || !cat) {
@@ -889,7 +928,7 @@ function addCustomProduct() {
         return;
     }
 
-    // Convert sizes to ml if entered in grams
+    // Convert sizes to ml if entered in grams. Stück bleibt eine reine Anzahl.
     let sizesInMl = sizes;
     if (sizeUnit === 'g') {
         sizesInMl = sizes.map(s => s / density);
@@ -934,7 +973,8 @@ function deleteCustomProduct(index) {
 
 function setThreshold(item) {
     let current = db.thresholds[item] || 0;
-    let val = prompt(`Warnschwelle für ${item} (in ml) festlegen:\nFällt der Bestand auf oder unter diesen Wert, wird die Karte rot markiert.\n(Aktuell: ${current} ml)`, current);
+    const unitLabel = getUnitLabel(getItemUnit(item));
+    let val = prompt(`Warnschwelle für ${item} (in ${unitLabel}) festlegen:\nFällt der Bestand auf oder unter diesen Wert, wird die Karte rot markiert.\n(Aktuell: ${current} ${unitLabel})`, current);
     
     if (val !== null) {
         let parsed = parseFloat(val);
@@ -1004,6 +1044,7 @@ function filterLager() {
                 hasItems = true;
                 let stock = db.inventory[cat][item] || 0;
                 let stockG = getGrams(item, stock); // Umrechnung in Gramm
+                let isPieceItem = itemUsesPieces(item);
                 let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
                 let reachText = formatWeeksLeft(item);
                 let metrics = getUsageMetrics(item);
@@ -1013,7 +1054,7 @@ function filterLager() {
                 let warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
                 let alertsDisabled = db.alerts && db.alerts.disabled && db.alerts.disabled[item];
                 let warningClass = (!alertsDisabled && ((stock <= threshold && threshold > 0) || (stock <= 0 && metrics.totalConsumed > 0) || (weeksLeft !== null && weeksLeft <= warningWeeks))) ? 'card-warning' : '';
-                let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ml</span>` : '';
+                let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ${getUnitLabel(getItemUnit(item))}</span>` : '';
                 let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
                 let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
 
@@ -1036,8 +1077,8 @@ function filterLager() {
                                 <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
                             </span>
                             <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
-                                <span>${stock.toFixed(1)} ml</span>
-                                <span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>
+                                <span>${formatItemAmount(item, stock)}</span>
+                                ${isPieceItem ? '' : `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>`}
                             </span>
                         </h4>
                         ${crossHint}
@@ -1074,11 +1115,11 @@ function renderStockAlerts(container) {
 
     const rows = alerts.map(alert => {
         let reason = 'Bestand leer';
-        if (alert.isUnderThreshold) reason = `unter Warnschwelle (${alert.threshold} ml)`;
+        if (alert.isUnderThreshold) reason = `unter Warnschwelle (${alert.threshold} ${getUnitLabel(getItemUnit(alert.item))})`;
         if (alert.isSoonEmpty && alert.weeksLeft !== null && alert.stock > 0) reason = `leer in ${alert.weeksLeft.toFixed(1)} Wochen`;
         return `
             <div class="alert-row">
-                <span><strong>${alert.item}</strong><small>${alert.cat} · ${alert.stock.toFixed(1)} ml</small></span>
+                <span><strong>${alert.item}</strong><small>${alert.cat} · ${formatItemAmount(alert.item, alert.stock)}</small></span>
                 <span class="alert-reason">${reason}</span>
                 <div class="alert-actions">
                     <button type="button" onclick='dismissStockAlert(${jsArg(alert.item)}, ${jsArg(alert.stateKey)})'>Quittieren</button>
@@ -1174,6 +1215,7 @@ function renderStats() {
             let perWeek = totalConsumed / weeksElapsed;
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
+            let isPieceItem = itemUsesPieces(item);
             
             let currentStock = getStock(item);
             let prognosisText = "";
@@ -1196,10 +1238,10 @@ function renderStats() {
                 <div class="stat-block">
                     <h4 style="margin:0 0 5px 0; color: var(--primary); display:flex; justify-content:space-between;">
                         ${item}
-                        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>
+                        ${isPieceItem ? '' : `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>`}
                     </h4>
                     <div style="font-size:0.85rem; margin-bottom:5px;">
-                        Gesamtverbrauch: <strong>${totalConsumed.toFixed(1)} ml</strong>
+                        Gesamtverbrauch: <strong>${formatItemAmount(item, totalConsumed)}</strong>
                     </div>
                     
                     <div class="visual-bar-bg">
@@ -1208,16 +1250,16 @@ function renderStats() {
 
                     <div class="stat-grid" style="margin-top: 10px;">
                         <div>
-                            <strong>${perWeek.toFixed(1)} ml</strong><br>
-                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo
+                            <strong>${formatItemAmount(item, perWeek)}</strong><br>
+                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Woche</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo`}
                         </div>
                         <div>
-                            <strong>${perMonth.toFixed(1)} ml</strong><br>
-                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo
+                            <strong>${formatItemAmount(item, perMonth)}</strong><br>
+                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Monat</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo`}
                         </div>
                         <div>
-                            <strong>${perYear.toFixed(1)} ml</strong><br>
-                            <span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr
+                            <strong>${formatItemAmount(item, perYear)}</strong><br>
+                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Jahr</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr`}
                         </div>
                     </div>
                     <div class="prognose-badge">${prognosisText}</div>
@@ -1262,6 +1304,7 @@ function renderLogs() {
         
         // Umrechnung in Gramm für das Protokoll
         let gAmount = getGrams(log.item, log.amount);
+        let isPieceItem = itemUsesPieces(log.item);
         
         return `
             <div class="log-item ${log.action}" style="border-left: 4px solid ${actionColor};">
@@ -1270,8 +1313,8 @@ function renderLogs() {
                     <div class="log-date">${new Date(getLogTime(log) || Date.now()).toLocaleString()} | ${actionText}</div>
                 </div>
                 <div style="text-align: right;">
-                    <div style="color: ${actionColor}; font-weight: bold;">${sign}${parseFloat(log.amount).toFixed(1)} ml</div>
-                    <div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>
+                    <div style="color: ${actionColor}; font-weight: bold;">${sign}${formatItemAmount(log.item, log.amount)}</div>
+                    ${isPieceItem ? '' : `<div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>`}
                     <button onclick="undoLog(${originalIndex})" style="background:none; border:none; color: var(--text-muted); text-decoration: underline; font-size: 0.75rem; padding:0; margin-top:4px; cursor:pointer;">Rückgängig</button>
                 </div>
             </div>
@@ -1286,14 +1329,16 @@ function openModal(cat, item, action) {
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
+    const unitOptions = itemUsesPieces(item)
+        ? '<option value="st">Stück</option>'
+        : '<option value="ml">Milliliter (ml)</option><option value="g">Gramm (g)</option>';
     document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
     
     modalBody.innerHTML = `
         <div class="input-group">
             <label>Einheit auswählen:</label>
             <select id="unitSelect" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
-                <option value="ml">Milliliter (ml)</option>
-                <option value="g">Gramm (g)</option>
+                ${unitOptions}
             </select>
         </div>
         
@@ -1355,6 +1400,8 @@ function updateLiveConversion() {
             liveDiv.innerText = `≈ ${finalMl.toFixed(1)} ml`;
             liveDiv.style.color = 'var(--secondary)';
         }
+    } else {
+        liveDiv.innerText = '';
     }
 }
 
@@ -1365,6 +1412,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(themeSelect && db.theme) themeSelect.value = db.theme;
     const forecastSelect = document.getElementById('forecastWeeks');
     if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
+    toggleCustomProductUnitFields();
     initBulkProductSelect();
 });
 
@@ -1436,16 +1484,19 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
     const modalBody = document.getElementById('modal-body');
     document.getElementById('modal-title').innerText = "⚠️ Bestands-Warnung";
     let missing = required - current;
+    const requiredText = formatItemAmount(item, required, 2);
+    const currentText = formatItemAmount(item, current, 2);
+    const missingText = formatItemAmount(item, missing, 2);
     
     modalBody.innerHTML = `
         <div style="background: rgba(255,69,58,0.1); border: 1px solid var(--danger); padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.95rem;">
             Zu wenig Bestand für <strong>${item}</strong>.<br><br>
-            Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${required.toFixed(2)} ml</span><br>
-            Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${current.toFixed(2)} ml</span><br>
-            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missing.toFixed(2)} ml</span><br><br>
-            <span style="font-size:0.88rem; color: var(--text-muted);">Wenn du trotzdem fortfährst, wird der gesamte Restbestand (${current.toFixed(2)} ml) ausgelagert. Der Bestand geht <strong>nicht in den Minusbereich</strong>.</span>
+            Benötigt werden: <span style="color:var(--danger); font-weight:bold;">${requiredText}</span><br>
+            Aktueller Bestand: <span style="color:var(--secondary); font-weight:bold;">${currentText}</span><br>
+            Es fehlen: <span style="color:var(--danger); font-weight:bold;">${missingText}</span><br><br>
+            <span style="font-size:0.88rem; color: var(--text-muted);">Wenn du trotzdem fortfährst, wird der gesamte Restbestand (${currentText}) ausgelagert. Der Bestand geht <strong>nicht in den Minusbereich</strong>.</span>
         </div>
-        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren (${current.toFixed(2)} ml auslagern)</button>
+        <button class="btn-danger btn-animated" id="proceed-conflict-btn">Trotzdem Fortfahren (${currentText} auslagern)</button>
     `;
     document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
     document.getElementById('modal').style.display = 'flex';
@@ -2277,6 +2328,8 @@ function updateBulkQuickButtons() {
     const product = JSON.parse(select.value);
     // Hole die definierten Flaschengrößen direkt aus dem catalog-Objekt
     const sizes = catalog[product.cat][product.item] || [];
+    const unit = getItemUnit(product.item);
+    const unitLabel = getUnitLabel(unit);
     
     if (sizes.length === 0) return;
     
@@ -2301,10 +2354,10 @@ function updateBulkQuickButtons() {
         btn.style.padding = "8px 12px";
         btn.style.fontSize = "0.85rem";
         btn.style.borderRadius = "8px";
-        btn.innerText = `${size} ml`;
+        btn.innerText = `${size} ${unitLabel}`;
         btn.onclick = () => {
             document.getElementById('bulkAmount').value = size;
-            document.getElementById('bulkUnitSelect').value = 'ml';
+            document.getElementById('bulkUnitSelect').value = unit;
             toggleBulkContainerSection();
         };
         btnGroup.appendChild(btn);
@@ -2421,7 +2474,7 @@ function renderBulkCart() {
                 <small style="color: var(--text-muted);">${entry.cat}</small>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
-                <span style="color: var(--success); font-weight:600;">+ ${entry.ml.toFixed(1)} ml</span>
+                <span style="color: var(--success); font-weight:600;">+ ${formatItemAmount(entry.item, entry.ml)}</span>
                 <button onclick="removeFromBulkCart(${index})" style="background:none; color:var(--danger); padding:4px 8px; font-size:1.1rem; border:none; cursor:pointer;">✕</button>
             </div>
         </div>
@@ -2486,7 +2539,8 @@ function renderNachbestellen() {
             const urlEntries = Object.entries(urlMap);
             const sizeBtns = urlEntries.map(([sizeMl, url], idx) => {
                 const s = Number(sizeMl);
-                const label = s >= 1000 ? (s / 1000) + ' L' : s + ' ml';
+                const unit = getItemUnit(item);
+                const label = unit === 'ml' && s >= 1000 ? (s / 1000) + ' L' : s + ' ' + getUnitLabel(unit);
                 const isSelected = idx === 0 ? ' selected' : '';
                 return `<button type="button" class="size-select-btn${isSelected}" data-url="${url}" data-item="${item}" onclick="selectShopSize(this)">${label}</button>`;
             }).join(' ');
@@ -2504,7 +2558,7 @@ function renderNachbestellen() {
                         onchange="updateShopCartBtn()" style="width:20px; height:20px; flex-shrink:0; cursor:pointer;">
                     <div style="flex:1; min-width:160px;">
                         <strong style="color:var(--text);">${item}</strong><br>
-                        <small style="color:${stockColor};">Bestand: ${stock.toFixed(1)} ml${isLow ? ' ⚠️' : ''}</small>
+                        <small style="color:${stockColor};">Bestand: ${formatItemAmount(item, stock)}${isLow ? ' ⚠️' : ''}</small>
                     </div>
                     <div style="display:flex; gap:6px; flex-wrap:wrap;">${sizeBtns}</div>
                 </div>
@@ -2617,7 +2671,8 @@ function renderShopLinkSettings() {
 
             const sizeRows = [...allSizes].sort((a, b) => a - b).map(size => {
                 const currentUrl = dbEntry[size] || urlMap[size] || '';
-                const label = size >= 1000 ? (size / 1000) + ' L' : size ? size + ' ml' : 'Größe';
+                const unit = getItemUnit(item);
+                const label = unit === 'ml' && size >= 1000 ? (size / 1000) + ' L' : size ? size + ' ' + getUnitLabel(unit) : 'Größe';
                 const inputId = `shopurl-${safeId}-${size}`;
                 return `
                     <div style="display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap;">
@@ -3223,13 +3278,13 @@ function showQuickPreview(item, category) {
             <button class="quick-preview-close" onclick="closeQuickPreview()">&times;</button>
         </div>
         <div style="margin-bottom:16px;">
-            <span class="stock" style="font-size:1.2rem;">${stock.toFixed(1)} ml</span>
+            <span class="stock" style="font-size:1.2rem;">${formatItemAmount(item, stock)}</span>
             <span style="color:var(--text-muted); margin-left:8px;">${category}</span>
         </div>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
             <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
                 <div style="font-size:0.75rem; color:var(--text-muted);">Warnschwelle</div>
-                <div style="font-size:1.2rem; font-weight:600;">${threshold} ml</div>
+                <div style="font-size:1.2rem; font-weight:600;">${threshold} ${getUnitLabel(getItemUnit(item))}</div>
             </div>
             <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
                 <div style="font-size:0.75rem; color:var(--text-muted);">Reichweite</div>

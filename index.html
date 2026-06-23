@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.0.5</span>
+                <span class="version-badge">v2.0.7</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -179,16 +179,17 @@
                 </div>
                 <div class="input-group">
                     <label>Einheit für Behältergrößen:</label>
-                    <select id="customProductSizeUnit" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+                    <select id="customProductSizeUnit" onchange="toggleCustomProductUnitFields()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
                         <option value="ml">Milliliter (ml)</option>
                         <option value="g">Gramm (g)</option>
+                        <option value="st">Stück (st)</option>
                     </select>
                 </div>
-                <div class="input-group">
+                <div class="input-group" id="customProductSizesGroup">
                     <label>Behältergrößen:</label>
                     <input type="text" id="customProductSizes" placeholder="30, 100, 1000">
                 </div>
-                <div class="input-group">
+                <div class="input-group" id="customProductDensityGroup">
                     <label>Dichte optional:</label>
                     <input type="number" step="0.001" min="0" id="customProductDensity" placeholder="1.000">
                 </div>
@@ -303,6 +304,7 @@
                     <select id="bulkUnitSelect" onchange="toggleBulkContainerSection()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
                         <option value="ml">Milliliter (ml)</option>
                         <option value="g">Gramm (g)</option>
+                        <option value="st">Stück</option>
                     </select>
                 </div>
 
