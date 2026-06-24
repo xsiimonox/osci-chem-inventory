@@ -105,6 +105,12 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     line-height: 1.35;
 }
 
+header.warehouse-tools-hidden .warehouse-switcher,
+header.warehouse-tools-hidden .warehouse-meta,
+header.warehouse-tools-hidden .warehouse-access-badge {
+    display: none;
+}
+
 .warehouse-access-badge {
     width: fit-content;
     max-width: min(92vw, 420px);
@@ -140,8 +146,9 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 .version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
 
 .update-banner {
-    max-width: 1200px;
-    margin: 0 auto 14px;
+    width: min(1200px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    margin: 12px auto 14px;
     padding: 12px 14px;
     border: 1px solid rgba(255, 214, 10, 0.42);
     border-radius: 14px;
@@ -151,6 +158,8 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    position: relative;
+    z-index: 98;
 }
 
 .update-banner[hidden] {
@@ -1800,7 +1809,7 @@ body.theme-mint.party-mode .card {
     font-weight: 900;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 820px) {
     .tool-grid,
     .resource-link-grid,
     .tool-card-grid {
@@ -1866,6 +1875,9 @@ body.theme-mint.party-mode .card {
     #naclSolutionResult .tool-row > span:last-child {
         text-align: left;
     }
+}
+
+@media (max-width: 600px) {
 
     .sync-friend-row {
         grid-template-columns: 1fr;
@@ -2020,6 +2032,62 @@ body.theme-mint.party-mode .card {
     margin-bottom: 6px;
 }
 
+.tool-tile-card {
+    transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+
+.tool-tile-card > h3 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    margin: 0;
+}
+
+.tool-tile-card > h3::after {
+    content: "⌄";
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    color: var(--secondary);
+    background: rgba(255,255,255,0.04);
+    font-size: 1rem;
+    flex: 0 0 auto;
+    transition: transform 0.18s ease;
+}
+
+.tool-tile-card:not(.tool-tile-collapsed) > h3::after {
+    transform: rotate(180deg);
+}
+
+.tool-tile-card.tool-tile-collapsed {
+    padding: 14px;
+    min-height: 74px;
+    display: flex;
+    align-items: center;
+}
+
+.tool-tile-card.tool-tile-collapsed:hover {
+    transform: translateY(-1px);
+    border-color: rgba(100, 210, 255, 0.34);
+    background: rgba(255,255,255,0.045);
+}
+
+.tool-tile-card.tool-tile-collapsed > *:not(h3) {
+    display: none !important;
+}
+
+.tool-tile-card.tool-tile-collapsed > h3 {
+    width: 100%;
+    font-size: 1rem;
+    line-height: 1.2;
+}
+
 .tool-compact-card .hint {
     margin-bottom: 12px;
 }
@@ -2027,6 +2095,42 @@ body.theme-mint.party-mode .card {
 .tool-compact-card textarea {
     min-height: 76px;
     resize: vertical;
+}
+
+.reef-manager-import-compact {
+    margin-top: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.025);
+    padding: 0;
+}
+
+.reef-manager-import-compact summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    list-style: none;
+    padding: 11px 12px;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+    font-weight: 800;
+}
+
+.reef-manager-import-compact summary::-webkit-details-marker {
+    display: none;
+}
+
+.reef-manager-import-compact[open] {
+    padding-bottom: 12px;
+}
+
+.reef-manager-import-compact .btn-group,
+.reef-manager-import-compact .hint,
+.reef-manager-import-compact .tool-result {
+    margin-left: 12px;
+    margin-right: 12px;
 }
 
 .tool-grid {
@@ -2772,9 +2876,12 @@ header {
 
 @media (max-width: 600px) {
     .update-banner {
-        margin: 0 12px 12px;
+        width: calc(100vw - 24px);
+        max-width: calc(100vw - 24px);
+        margin: 10px 12px 12px;
         align-items: stretch;
         flex-direction: column;
+        padding: 11px 12px;
     }
 
     .update-banner button {
@@ -3269,4 +3376,90 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
 @keyframes hapticPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
+}
+
+/* Final mobile layout hardening */
+@media (max-width: 820px) {
+    #tools .tool-card-grid,
+    #tools .tool-grid,
+    #tools .resource-link-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    #tools .tool-card-grid {
+        padding: 10px !important;
+        gap: 12px !important;
+    }
+
+    #tools .tool-section-summary {
+        align-items: flex-start;
+        padding: 14px !important;
+    }
+
+    #tools .tool-section-summary strong {
+        font-size: 1rem;
+        line-height: 1.2;
+    }
+
+    #tools .tool-section-summary small {
+        font-size: 0.86rem;
+        line-height: 1.35;
+    }
+
+    #tools .tool-compact-card {
+        width: 100%;
+        min-width: 0;
+        padding: 16px !important;
+        border-radius: 14px;
+    }
+
+    #tools .tool-compact-card h3 {
+        font-size: 1.18rem;
+        line-height: 1.22;
+        margin-bottom: 10px;
+    }
+
+    #tools .tool-tile-card.tool-tile-collapsed {
+        min-height: 62px;
+        padding: 14px !important;
+    }
+
+    #tools .tool-tile-card.tool-tile-collapsed h3 {
+        font-size: 1rem;
+        margin-bottom: 0;
+    }
+
+    #tools .tool-compact-card .hint {
+        font-size: 0.92rem;
+        line-height: 1.35;
+    }
+
+    #tools .input-group,
+    #tools .input-group label,
+    #tools .input-group input,
+    #tools .input-group select,
+    #tools .input-group textarea {
+        min-width: 0;
+        width: 100%;
+    }
+
+    #tools .tool-row {
+        grid-template-columns: 1fr !important;
+        gap: 8px;
+        align-items: start;
+    }
+
+    #tools .tool-row > span:last-child {
+        text-align: left !important;
+        justify-self: start;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+}
+
+@media (max-width: 767px) {
+    body:not([data-active-tab="lager"]) .fab,
+    body:not([data-active-tab="lager"]) .fab-menu {
+        display: none !important;
+    }
 }

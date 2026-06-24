@@ -11,11 +11,11 @@
 </head>
 <body>
 
-    <header>
+    <header id="appHeader">
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.49</span>
+                <span class="version-badge">v2.2.58</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -99,16 +99,6 @@
         </div>
 
         <div id="trace-export" class="tab-content">
-            <div class="card card-accent">
-                <h3>Reef Manager Mischung importieren</h3>
-                <p class="hint">Export aus der Reef Manager App hier einfügen. Die Mengen aus Anionen und Kationen werden in die Auslagerungslisten übernommen.</p>
-                <textarea id="reef-manager-import-text" placeholder="REEFMANAGER - MISCHUNGSEXPORT&#10;...&#10;Kation Co Co 33,01&#10;Anion F F 32,18" oninput="previewReefManagerImport()"></textarea>
-                <div class="btn-group" style="margin-bottom: 12px;">
-                    <button class="btn-primary btn-animated" onclick="importReefManagerTrace()">In Trace Listen übernehmen</button>
-                    <button class="btn-secondary btn-animated" onclick="clearReefManagerImport()">Zurücksetzen</button>
-                </div>
-                <div id="reef-manager-import-preview" class="hint">Noch kein Reef Manager Export eingefügt.</div>
-            </div>
             <div class="card">
                 <h3>Kationen Mischung</h3>
                 <div id="kationen-inputs-container"></div>
@@ -119,6 +109,17 @@
                 <div id="anionen-inputs-container"></div>
                 <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
             </div>
+            <details class="reef-manager-import-compact">
+                <summary>
+                    <span>Reef Manager Import</span>
+                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
+                <div class="btn-group" style="margin-bottom: 10px;">
+                    <button class="btn-secondary btn-animated" onclick="importReefManagerTraceFromClipboard()">Aus Zwischenablage importieren</button>
+                    <button class="btn-out btn-animated" onclick="clearReefManagerImport()">Import zurücksetzen</button>
+                </div>
+                <div id="reef-manager-import-preview" class="hint">Noch kein Reef Manager Export importiert.</div>
+            </details>
         </div>
 
         <div id="statistik" class="tab-content">
@@ -151,7 +152,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>KH / Ca Korrektur</h3>
                             <p class="hint">Aktuellen Wert, Zielwert und Produktwirkung eintragen. So bleibt der Rechner mit jedem Produkt nutzbar.</p>
                             <div class="tool-grid">
@@ -190,7 +191,7 @@
                             <div id="majorCorrectionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Verbrauch pro Tag</h3>
                             <p class="hint">Aus zwei Messungen berechnen, wie stark KH, Ca, Mg oder Nährstoffe täglich fallen.</p>
                             <div class="tool-grid">
@@ -220,7 +221,7 @@
                             <div id="consumptionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Test Korrekturfaktor</h3>
                             <p class="hint">Kalibriere deine Heimtests mit ICP oder Referenzlösung. Der Faktor wird pro Test gespeichert.</p>
                             <div class="tool-grid">
@@ -254,7 +255,7 @@
                             <div id="testCorrectionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Wasserwechsel Effekt</h3>
                             <p class="hint">Zeigt, welcher Wert nach einem Wasserwechsel rechnerisch zu erwarten ist.</p>
                             <div class="tool-grid">
@@ -278,7 +279,7 @@
                             <div id="waterChangeResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Salz Korrektur</h3>
                             <p class="hint">Näherung für PSU-Korrektur. Langsam angleichen und Messung kontrollieren.</p>
                             <div class="tool-grid">
@@ -298,7 +299,7 @@
                             <div id="saltCorrectionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Nutrition Rechner</h3>
                             <p class="hint">Dosiermenge für Nitrat, Phosphat und Lanthan anhand der Herstellerangaben.</p>
                             <div class="input-group">
@@ -334,7 +335,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Meerwasser aus C&amp;R anmischen</h3>
                             <p class="hint">Rezept skaliert auf deine gewünschte Meerwassermenge. C&amp;R- und Makro-Produkte können direkt ausgelagert werden.</p>
                             <div class="tool-grid">
@@ -354,7 +355,7 @@
                             <div id="seaWaterMixResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>C&amp;R Natriumchlorid aus NaCl Pulver</h3>
                             <p class="hint">NaCl Pulver mit Osmosewasser zu flüssigem C&amp;R Natriumchlorid ansetzen.</p>
                             <div class="tool-grid">
@@ -378,7 +379,7 @@
                             <div id="naclSolutionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Makro-Elemente anmischen</h3>
                             <p class="hint">Rezept und Zielmenge wählen. Lagergeführte C&amp;R-Produkte können direkt ausgelagert werden.</p>
                             <div class="input-group">
@@ -400,7 +401,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Futter &amp; Nährstoffnotizen</h3>
                             <p class="hint">Fütterung zusammen mit NO3/PO4 dokumentieren, um Muster besser zu erkennen.</p>
                             <div class="tool-grid">
@@ -433,7 +434,7 @@
                             <div id="feedNutrientLogResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Lichtzeit Planer</h3>
                             <p class="hint">Start, Ende und Rampenzeit berechnen. Ideal für vorsichtige Änderungen am Lichtprogramm.</p>
                             <div class="tool-grid">
@@ -457,7 +458,7 @@
                             <div id="lightPlannerResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Strömungsumsatz</h3>
                             <p class="hint">Pumpenleistung addieren und sehen, wie oft das Becken rechnerisch pro Stunde umgewälzt wird.</p>
                             <div class="tool-grid">
@@ -485,7 +486,7 @@
                             <div id="flowCalculatorResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Osmosetank Verwaltung</h3>
                             <p class="hint">Tankgröße und Füllstand pflegen, Verbrauch dokumentieren und rechtzeitig vor leerem Tank warnen lassen.</p>
                             <div class="tool-grid">
@@ -522,7 +523,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Salzgehalt Rechner</h3>
                             <p class="hint">Näherungsrechner für Spindel-Werte. Exakte Korrekturen hängen von Spindel-Kalibrierung und Hersteller-Tabelle ab.</p>
                             <div class="input-group salinity-control">
@@ -563,7 +564,7 @@
                             </div>
                         </div>
 
-                        <div class="card tool-compact-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>OSCI Motion Ressourcen</h3>
                             <p class="hint">Direkte Links zu offiziellen OSCI Motion Anleitungen und weiteren Rechnern.</p>
                             <div class="resource-link-grid">

@@ -1378,6 +1378,9 @@ function showTab(tabId) {
         resolvedTab.classList.add('active');
         resolvedBtn.classList.add('active');
     }
+    const header = document.getElementById('appHeader');
+    if (header) header.classList.toggle('warehouse-tools-hidden', tabId !== 'lager');
+    document.body.dataset.activeTab = tabId;
     db.lastTab = tabId;
     try { localStorage.setItem(LAST_TAB_KEY, tabId); } catch(e) {}
     try {
@@ -2688,7 +2691,6 @@ function renderTraceExportInputs() {
             </div>
         `}).join('');
     }
-    previewReefManagerImport();
 }
 
 function calcTraceGrams(inputId, itemName) {
@@ -2743,13 +2745,12 @@ function parseReefManagerExport(text) {
     return rows;
 }
 
-function previewReefManagerImport() {
+function previewReefManagerImport(text = '') {
     const preview = document.getElementById('reef-manager-import-preview');
     if (!preview) return;
-    const text = document.getElementById('reef-manager-import-text')?.value || '';
     const rows = parseReefManagerExport(text);
     if (rows.length === 0) {
-        preview.innerHTML = 'Noch kein gültiger Reef Manager Export erkannt.';
+        preview.innerHTML = 'Noch kein gültiger Reef Manager Export importiert.';
         return;
     }
     preview.innerHTML = `
@@ -2764,8 +2765,7 @@ function previewReefManagerImport() {
     `;
 }
 
-function importReefManagerTrace() {
-    const text = document.getElementById('reef-manager-import-text')?.value || '';
+function importReefManagerTraceText(text) {
     const rows = parseReefManagerExport(text);
     if (rows.length === 0) return alert('Keine gültigen Anionen/Kationen-Mengen erkannt.');
     if (!db.traceDraft) db.traceDraft = {};
@@ -2774,13 +2774,32 @@ function importReefManagerTrace() {
     });
     saveDB(false);
     renderTraceExportInputs();
+    previewReefManagerImport(text);
     showToast(`${rows.length} Reef Manager Wert(e) übernommen`, 'success');
 }
 
+async function importReefManagerTraceFromClipboard() {
+    let text = '';
+    try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+            text = await navigator.clipboard.readText();
+        }
+    } catch (err) {
+        text = '';
+    }
+    if (!text) {
+        text = prompt('Reef Manager Export einfügen:') || '';
+    }
+    if (!text.trim()) return;
+    importReefManagerTraceText(text);
+}
+
 function clearReefManagerImport() {
-    const area = document.getElementById('reef-manager-import-text');
-    if (area) area.value = '';
-    previewReefManagerImport();
+    if (!confirm('Importierte Trace-Werte zurücksetzen?')) return;
+    db.traceDraft = {};
+    saveDB(false);
+    renderTraceExportInputs();
+    previewReefManagerImport('');
 }
 
 function initTools() {
@@ -2809,7 +2828,52 @@ function initTools() {
     renderImplementationLog();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
+    setupToolTiles();
 }
+
+function setupToolTiles() {
+    document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
+        const title = card.querySelector('h3');
+        if (!title) return;
+        if (card.dataset.tileReady !== 'true') {
+            card.dataset.tileReady = 'true';
+            card.classList.add('tool-tile-card');
+            card.setAttribute('role', 'button');
+            title.setAttribute('role', 'button');
+            title.setAttribute('tabindex', '0');
+            title.addEventListener('keydown', event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    toggleToolTile(card);
+                }
+            });
+        }
+        card.classList.add('tool-tile-collapsed');
+        title.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function toggleToolTile(card) {
+    const willOpen = card.classList.contains('tool-tile-collapsed');
+    const section = card.closest('.tool-section');
+    section?.querySelectorAll('.tool-tile-card').forEach(other => {
+        if (other !== card) {
+            other.classList.add('tool-tile-collapsed');
+            other.querySelector('h3')?.setAttribute('aria-expanded', 'false');
+        }
+    });
+    card.classList.toggle('tool-tile-collapsed', !willOpen);
+    card.querySelector('h3')?.setAttribute('aria-expanded', String(willOpen));
+}
+
+document.addEventListener('click', event => {
+    const title = event.target.closest?.('#tools .tool-tile-card > h3');
+    const collapsedCard = event.target.closest?.('#tools .tool-tile-card.tool-tile-collapsed');
+    const card = title?.closest('.tool-tile-card') || collapsedCard;
+    if (!card) return;
+    event.preventDefault();
+    toggleToolTile(card);
+});
 
 const majorCorrectionDefaultSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
 
@@ -6080,6 +6144,11 @@ setTimeout(checkTodoReminders, 1500);
 setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
 setInterval(checkTodoReminders, 60 * 1000);
 setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
+
+window.addEventListener('hashchange', () => {
+    const hashTab = decodeURIComponent(window.location.hash.slice(1));
+    if (APP_TAB_IDS.includes(hashTab)) showTab(hashTab);
+});
 
 // Initialize Light Mode if saved
 if (db.lightMode) {
