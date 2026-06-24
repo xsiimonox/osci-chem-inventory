@@ -44,6 +44,31 @@ const mixDefinitions = {
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
+const macroRecipes = {
+    'KH-Tag': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 977, unit: 'ml', stock: false },
+        { item: 'Natriumhydrogencarbonat', amount: 60.4, unit: 'g' },
+        { item: 'Natriumcarbonat', amount: 57, unit: 'g' }
+    ],
+    'KH-Nacht': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 972.8, unit: 'ml', stock: false },
+        { item: 'Natriumcarbonat', amount: 189.0, unit: 'g' }
+    ],
+    'Calcium': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 384.7, unit: 'ml', stock: false },
+        { item: 'Calciumchlorid (CaCl2)', amount: 496.3, unit: 'ml' },
+        { item: 'Strontiumchlorid (SrCl2)', amount: 19, unit: 'ml' },
+        { item: 'Bor (B)', amount: 100, unit: 'ml' }
+    ],
+    'Magnesium': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 582.1, unit: 'ml', stock: false },
+        { item: 'Magnesiumsulfat (MgSO4)', amount: 228, unit: 'ml' },
+        { item: 'Magnesiumchlorid (MgCl2)', amount: 99.5, unit: 'ml' },
+        { item: 'Kaliumbromid (KBr)', amount: 10.4, unit: 'ml' },
+        { item: 'Kaliumsulfat (K2SO4)', amount: 80, unit: 'ml' }
+    ]
+};
+
 const densityFactors = {
     "Strontiumchlorid (SrCl2)": 1.154, "Magnesiumsulfat (MgSO4)": 1.224, "Magnesiumchlorid (MgCl2)": 1.289,
     "Kaliumbromid (KBr)": 1.104, "Calciumchlorid (CaCl2)": 1.399, "Kaliumchlorid (KCl)": 1.112,
@@ -175,11 +200,18 @@ function buildShopUrl(slug, sizeMl) {
 }
 
 const DB_KEY = 'osci_db_v5';
+const SYNC_SETTINGS_KEY = 'osci_supabase_sync_v1';
+const DEFAULT_SUPABASE_URL = 'https://ymeszigbnoaoqkwxcbqo.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_4LQDgitTmZeu9tO2Mh8Hew_-EseNuP0';
 let appState = null;
 let activeWarehouseId = 'main';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
 let crPdfAdjustments = [];
+let supabaseClientPromise = null;
+let supabaseClientInstance = null;
+let syncPushTimer = null;
+let syncIsPulling = false;
 
 // --- INITIALISIERUNG ---
 function resetCatalogToBase() {
@@ -205,6 +237,8 @@ function createWarehouseData(source = {}) {
         notifications: source.notifications || { enabled: false, lastAlertSignature: '', lastSentAt: 0 },
         alerts: source.alerts || { dismissed: {}, disabled: {} },
         customProducts: source.customProducts || [],
+        customContainers: source.customContainers || {},
+        hiddenProducts: source.hiddenProducts || {},
         shopLinks: source.shopLinks || {},
         productPresets: source.productPresets || {}
     };
@@ -258,6 +292,8 @@ function normalizeWarehouseData(data) {
     if (!db.alerts.dismissed) db.alerts.dismissed = {};
     if (!db.alerts.disabled) db.alerts.disabled = {};
     if (!db.customProducts) db.customProducts = [];
+    if (!db.customContainers) db.customContainers = {};
+    if (!db.hiddenProducts) db.hiddenProducts = {};
     if (!db.shopLinks) db.shopLinks = {};
     if (!db.productPresets) db.productPresets = {};
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
@@ -282,7 +318,10 @@ function applyCustomProductsToCatalog() {
     db.customProducts.forEach(product => {
         if (!product || !product.name || !product.cat) return;
         if (!catalog[product.cat]) catalog[product.cat] = {};
-        catalog[product.cat][product.name] = Array.isArray(product.sizes) ? product.sizes : [];
+        const productSizes = product.sizeUnit === 'ml'
+            ? product.sizes
+            : (product.sizesOriginal && product.sizesOriginal.length > 0 ? product.sizesOriginal : product.sizes);
+        catalog[product.cat][product.name] = Array.isArray(productSizes) ? productSizes : [];
 
         const density = parseFloat(product.density);
         if (!isNaN(density) && density > 0) densityFactors[product.name] = density;
@@ -337,7 +376,529 @@ function saveDB() {
         appState.activeWarehouseId = activeWarehouseId;
         localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateWarehouseUI();
+        scheduleSupabaseAutoSync();
     } catch(e) {}
+}
+
+function getSupabaseSettings() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(SYNC_SETTINGS_KEY) || '{}');
+        return {
+            url: normalizeSupabaseProjectUrl(parsed.url || DEFAULT_SUPABASE_URL),
+            anonKey: parsed.anonKey || DEFAULT_SUPABASE_ANON_KEY,
+            autoSync: parsed.autoSync === true
+        };
+    } catch (e) {
+        return { url: DEFAULT_SUPABASE_URL, anonKey: DEFAULT_SUPABASE_ANON_KEY, autoSync: false };
+    }
+}
+
+function storeSupabaseSettings(settings) {
+    localStorage.setItem(SYNC_SETTINGS_KEY, JSON.stringify({
+        url: normalizeSupabaseProjectUrl(settings.url || DEFAULT_SUPABASE_URL),
+        anonKey: settings.anonKey || '',
+        autoSync: settings.autoSync === true
+    }));
+}
+
+function normalizeSupabaseProjectUrl(value) {
+    return String(value || '')
+        .trim()
+        .replace(/\/rest\/v1\/?$/i, '')
+        .replace(/\/+$/, '');
+}
+
+function updateSyncStatus(message, type = 'info') {
+    const el = document.getElementById('supabase-sync-status');
+    if (!el) return;
+    el.innerText = message;
+    el.dataset.type = type;
+}
+
+async function loadSupabaseClient() {
+    if (!supabaseClientPromise) {
+        supabaseClientPromise = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+    }
+    return supabaseClientPromise;
+}
+
+async function getSupabaseClient() {
+    const settings = getSupabaseSettings();
+    if (!settings.url || !settings.anonKey) {
+        throw new Error('Bitte Supabase URL und anon public key speichern.');
+    }
+    if (supabaseClientInstance) return supabaseClientInstance;
+    const { createClient } = await loadSupabaseClient();
+    supabaseClientInstance = createClient(settings.url, settings.anonKey, {
+        auth: { persistSession: true, autoRefreshToken: true }
+    });
+    return supabaseClientInstance;
+}
+
+async function getSupabaseUser() {
+    const client = await getSupabaseClient();
+    const { data, error } = await client.auth.getUser();
+    if (error) {
+        const message = String(error.message || '').toLowerCase();
+        if (message.includes('auth session missing') || message.includes('session missing')) {
+            return { client, user: null };
+        }
+        throw error;
+    }
+    return { client, user: data && data.user ? data.user : null };
+}
+
+function getSyncReadyLabel(settings) {
+    if (!settings.url || !settings.anonKey) return 'Nicht verbunden: Supabase URL und anon public key fehlen.';
+    return settings.autoSync ? 'Supabase bereit · Auto-Sync aktiv' : 'Supabase bereit · Auto-Sync aus';
+}
+
+async function renderSupabaseSyncSettings() {
+    const settings = getSupabaseSettings();
+    const autoEl = document.getElementById('supabaseAutoSync');
+    if (autoEl) autoEl.checked = settings.autoSync;
+
+    updateSyncStatus(getSyncReadyLabel(settings), settings.url && settings.anonKey ? 'ok' : 'warn');
+
+    if (settings.url && settings.anonKey) {
+        try {
+            const { user } = await getSupabaseUser();
+            if (user) updateSyncStatus(`${getSyncReadyLabel(settings)} · Eingeloggt als ${user.email}`, 'ok');
+            else updateSyncStatus(`${getSyncReadyLabel(settings)} · Bitte einloggen.`, 'warn');
+            renderSyncFriendsList();
+        } catch (err) {
+            updateSyncStatus(`Supabase nicht erreichbar: ${err.message}`, 'warn');
+        }
+    }
+}
+
+function saveSupabaseSettings() {
+    const existing = getSupabaseSettings();
+    const url = existing.url || DEFAULT_SUPABASE_URL;
+    const anonKey = existing.anonKey || DEFAULT_SUPABASE_ANON_KEY;
+    const autoSync = existing.autoSync === true;
+    storeSupabaseSettings({ url, anonKey, autoSync });
+    supabaseClientPromise = null;
+    supabaseClientInstance = null;
+    updateSyncStatus(getSyncReadyLabel({ url, anonKey, autoSync }), url && anonKey ? 'ok' : 'warn');
+    if (autoSync) scheduleSupabaseAutoSync();
+}
+
+function toggleSupabaseAutoSync(enabled) {
+    const settings = getSupabaseSettings();
+    storeSupabaseSettings({ ...settings, autoSync: enabled === true });
+    updateSyncStatus(enabled ? 'Auto-Sync aktiviert.' : 'Auto-Sync deaktiviert.', enabled ? 'ok' : 'info');
+    if (enabled) scheduleSupabaseAutoSync();
+}
+
+async function supabaseSignUp() {
+    try {
+        saveSupabaseSettings();
+        const client = await getSupabaseClient();
+        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
+        const password = document.getElementById('supabasePassword')?.value || '';
+        if (!email || !password) return alert('Bitte E-Mail und Passwort eintragen.');
+        const { data, error } = await client.auth.signUp({ email, password });
+        if (error) throw error;
+        if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+            updateSyncStatus('Diese E-Mail ist vermutlich bereits registriert. Bitte einloggen oder Passwort zurücksetzen.', 'warn');
+            return;
+        }
+        updateSyncStatus('Registrierung erstellt. Falls Supabase E-Mail-Bestätigung verlangt, bitte Mail bestätigen und danach einloggen.', 'ok');
+    } catch (err) {
+        const msg = String(err.message || '');
+        if (/already|registered|exists/i.test(msg)) {
+            updateSyncStatus('Diese E-Mail ist bereits registriert. Bitte einloggen oder Passwort zurücksetzen.', 'warn');
+            return;
+        }
+        alert('Registrierung fehlgeschlagen: ' + err.message);
+    }
+}
+
+async function supabaseSignIn() {
+    try {
+        saveSupabaseSettings();
+        const client = await getSupabaseClient();
+        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
+        const password = document.getElementById('supabasePassword')?.value || '';
+        if (!email || !password) return alert('Bitte E-Mail und Passwort eintragen.');
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        updateSyncStatus(`Eingeloggt als ${email}.`, 'ok');
+        await syncPullWarehouses(false);
+    } catch (err) {
+        alert('Login fehlgeschlagen: ' + err.message);
+    }
+}
+
+async function supabaseSignOut() {
+    try {
+        const client = await getSupabaseClient();
+        await client.auth.signOut();
+        updateSyncStatus('Ausgeloggt. Lokale Daten bleiben auf diesem Gerät erhalten.', 'info');
+    } catch (err) {
+        alert('Logout fehlgeschlagen: ' + err.message);
+    }
+}
+
+async function supabaseResetPassword() {
+    try {
+        saveSupabaseSettings();
+        const client = await getSupabaseClient();
+        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
+        if (!email) return alert('Bitte E-Mail eintragen.');
+        const redirectTo = window.location.origin && window.location.origin !== 'null'
+            ? `${window.location.origin}${window.location.pathname}`
+            : window.location.href.split('#')[0];
+        const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) throw error;
+        updateSyncStatus('Passwort-Reset-Mail wurde gesendet. Bitte E-Mail öffnen und dem Link folgen.', 'ok');
+    } catch (err) {
+        alert('Passwort-Reset fehlgeschlagen: ' + err.message);
+    }
+}
+
+async function supabaseUpdatePassword() {
+    try {
+        const password = document.getElementById('newSupabasePassword')?.value || '';
+        if (password.length < 6) return alert('Das neue Passwort muss mindestens 6 Zeichen haben.');
+        const client = await getSupabaseClient();
+        const { error } = await client.auth.updateUser({ password });
+        if (error) throw error;
+        document.getElementById('newSupabasePassword').value = '';
+        const box = document.getElementById('passwordRecoveryBox');
+        if (box) box.style.display = 'none';
+        updateSyncStatus('Passwort wurde gespeichert. Du kannst dich jetzt einloggen.', 'ok');
+    } catch (err) {
+        alert('Passwort konnte nicht gespeichert werden: ' + err.message);
+    }
+}
+
+async function detectSupabasePasswordRecovery() {
+    try {
+        const client = await getSupabaseClient();
+        client.auth.onAuthStateChange((event) => {
+            const box = document.getElementById('passwordRecoveryBox');
+            if (event === 'PASSWORD_RECOVERY' && box) {
+                box.style.display = 'block';
+                updateSyncStatus('Passwort-Zurücksetzung erkannt. Bitte neues Passwort speichern.', 'warn');
+            }
+        });
+        if (window.location.hash.includes('type=recovery')) {
+            const box = document.getElementById('passwordRecoveryBox');
+            if (box) box.style.display = 'block';
+        }
+    } catch (err) {}
+}
+
+function decodeJwtPayload(token) {
+    try {
+        const payload = token.split('.')[1];
+        const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+        const json = decodeURIComponent(atob(normalized).split('').map(char => {
+            return '%' + ('00' + char.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(json);
+    } catch (err) {
+        return null;
+    }
+}
+
+function renderDiagnosticsResult(rows) {
+    const el = document.getElementById('supabase-diagnostics-result');
+    if (!el) return;
+    el.innerHTML = rows.map(row => `
+        <div class="sync-diagnostics-row ${row.ok ? 'ok' : 'warn'}">
+            <strong>${escapeHtml(row.label)}</strong>
+            <span>${escapeHtml(row.value)}</span>
+        </div>
+    `).join('');
+}
+
+async function runSupabaseDiagnostics() {
+    const rows = [];
+    const add = (label, value, ok = true) => rows.push({ label, value: String(value), ok });
+    try {
+        saveSupabaseSettings();
+        const settings = getSupabaseSettings();
+        add('App URL', window.location.href, !window.location.protocol.startsWith('file'));
+        add('Origin', window.location.origin || 'file:// ohne echte Origin', window.location.origin !== 'null');
+        add('Supabase URL', settings.url, settings.url === DEFAULT_SUPABASE_URL);
+        add('Key vorhanden', settings.anonKey ? 'ja' : 'nein', Boolean(settings.anonKey));
+
+        const client = await getSupabaseClient();
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        add('Session Fehler', sessionError ? sessionError.message : 'keiner', !sessionError);
+        const session = sessionData && sessionData.session ? sessionData.session : null;
+        add('Session vorhanden', session ? 'ja' : 'nein', Boolean(session));
+
+        const tokenPayload = session && session.access_token ? decodeJwtPayload(session.access_token) : null;
+        add('JWT Rolle', tokenPayload && tokenPayload.role ? tokenPayload.role : '-', tokenPayload && tokenPayload.role === 'authenticated');
+        add('JWT E-Mail', tokenPayload && tokenPayload.email ? tokenPayload.email : '-', Boolean(tokenPayload && tokenPayload.email));
+        add('JWT Ablauf', tokenPayload && tokenPayload.exp ? new Date(tokenPayload.exp * 1000).toLocaleString('de-DE') : '-', Boolean(tokenPayload && tokenPayload.exp && tokenPayload.exp * 1000 > Date.now()));
+
+        const { data: userData, error: userError } = await client.auth.getUser();
+        add('User Fehler', userError ? userError.message : 'keiner', !userError);
+        add('User E-Mail', userData && userData.user ? userData.user.email : '-', Boolean(userData && userData.user));
+
+        if (session) {
+            const { data: inserted, error: insertError } = await client.from('warehouses').insert({
+                name: 'OSCI Sync Diagnose',
+                data: { diagnostic: true, createdAt: new Date().toISOString() },
+                updated_at: new Date().toISOString()
+            }).select('id').single();
+            add('Test-Insert warehouses', insertError ? insertError.message : 'ok', !insertError);
+            if (!insertError && inserted && inserted.id) {
+                const { error: deleteError } = await client.from('warehouses').delete().eq('id', inserted.id);
+                add('Test-Cleanup', deleteError ? deleteError.message : 'ok', !deleteError);
+            }
+        } else {
+            add('Test-Insert warehouses', 'übersprungen, keine Session', false);
+        }
+    } catch (err) {
+        add('Diagnose Fehler', err.message, false);
+    }
+    renderDiagnosticsResult(rows);
+    const failed = rows.filter(row => !row.ok).length;
+    updateSyncStatus(failed ? `Sync Diagnose: ${failed} Auffälligkeit(en).` : 'Sync Diagnose: alles sieht gut aus.', failed ? 'warn' : 'ok');
+}
+
+function createRemoteWarehouseId() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+function scheduleSupabaseAutoSync() {
+    if (syncIsPulling) return;
+    const settings = getSupabaseSettings();
+    if (!settings.autoSync || !settings.url || !settings.anonKey) return;
+    clearTimeout(syncPushTimer);
+    syncPushTimer = setTimeout(() => {
+        syncPushAllWarehouses(false).catch(err => updateSyncStatus('Auto-Sync fehlgeschlagen: ' + err.message, 'warn'));
+    }, 1800);
+}
+
+function getWarehouseSyncPayload(warehouse) {
+    return {
+        id: warehouse.remoteId || null,
+        name: warehouse.name || 'Lager',
+        data: warehouse.data || createWarehouseData(),
+        updated_at: new Date().toISOString()
+    };
+}
+
+async function syncPushAllWarehouses(showAlert = true) {
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) {
+            updateSyncStatus('Bitte zuerst einloggen.', 'warn');
+            if (showAlert) alert('Bitte zuerst bei Supabase einloggen.');
+            return;
+        }
+        const { data: sessionData } = await client.auth.getSession();
+        if (!sessionData || !sessionData.session) {
+            updateSyncStatus('Login-Sitzung fehlt. Bitte ausloggen und neu einloggen.', 'warn');
+            if (showAlert) alert('Login-Sitzung fehlt. Bitte ausloggen und neu einloggen.');
+            return;
+        }
+        const warehouses = appState && appState.warehouses ? Object.values(appState.warehouses) : [];
+        let pushed = 0;
+        for (const warehouse of warehouses) {
+            if (warehouse.readOnly) continue;
+            if (warehouse.id === activeWarehouseId) warehouse.data = db;
+            const payload = getWarehouseSyncPayload(warehouse);
+            if (payload.id) {
+                const { error } = await client
+                    .from('warehouses')
+                    .update({
+                        name: payload.name,
+                        data: payload.data,
+                        updated_at: payload.updated_at
+                    })
+                    .eq('id', payload.id);
+                if (error) throw error;
+            } else {
+                const { data: inserted, error } = await client
+                    .from('warehouses')
+                    .insert({
+                        name: payload.name,
+                        data: payload.data,
+                        updated_at: payload.updated_at
+                    })
+                    .select('id')
+                    .single();
+                if (error) throw error;
+                warehouse.remoteId = inserted.id;
+            }
+            warehouse.lastSyncAt = payload.updated_at;
+            pushed++;
+        }
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        updateWarehouseUI();
+        updateSyncStatus(`${pushed} Lager synchronisiert.`, 'ok');
+        if (showAlert) alert(`${pushed} Lager wurden zu Supabase hochgeladen.`);
+        await renderSyncFriendsList();
+    } catch (err) {
+        updateSyncStatus('Sync fehlgeschlagen: ' + err.message, 'warn');
+        if (showAlert) alert('Sync fehlgeschlagen: ' + err.message);
+    }
+}
+
+function getLocalWarehouseByRemoteId(remoteId) {
+    if (!appState || !appState.warehouses) return null;
+    return Object.values(appState.warehouses).find(warehouse => warehouse.remoteId === remoteId);
+}
+
+async function syncPullWarehouses(showAlert = true) {
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) {
+            updateSyncStatus('Bitte zuerst einloggen.', 'warn');
+            if (showAlert) alert('Bitte zuerst bei Supabase einloggen.');
+            return;
+        }
+        syncIsPulling = true;
+        const { data: rows, error } = await client
+            .from('warehouses')
+            .select('id, owner, name, data, updated_at')
+            .order('updated_at', { ascending: false });
+        if (error) throw error;
+        const remoteIds = (rows || []).map(row => row.id);
+        const { data: memberRows } = remoteIds.length > 0
+            ? await client.from('warehouse_members').select('warehouse_id, role').in('warehouse_id', remoteIds)
+            : { data: [] };
+        const roleByWarehouseId = {};
+        (memberRows || []).forEach(member => {
+            roleByWarehouseId[member.warehouse_id] = member.role;
+        });
+        if (!appState) appState = migrateToWarehouseState(null);
+        if (!appState.warehouses) appState.warehouses = {};
+
+        let loaded = 0;
+        (rows || []).forEach(row => {
+            const existing = getLocalWarehouseByRemoteId(row.id);
+            const localId = existing ? existing.id : createWarehouseId();
+            const isOwner = row.owner === user.id;
+            const shareRole = isOwner ? 'owner' : (roleByWarehouseId[row.id] || 'read');
+            const isReadOnly = !isOwner && shareRole !== 'write';
+            appState.warehouses[localId] = {
+                id: localId,
+                remoteId: row.id,
+                name: row.name || 'Lager',
+                createdAt: existing?.createdAt || new Date().toISOString(),
+                lastImportAt: existing?.lastImportAt || null,
+                lastExportAt: existing?.lastExportAt || null,
+                lastSyncAt: row.updated_at || new Date().toISOString(),
+                isShared: !isOwner,
+                accessRole: shareRole,
+                readOnly: isReadOnly,
+                data: createWarehouseData(row.data || {})
+            };
+            loaded++;
+        });
+
+        if (!appState.warehouses[activeWarehouseId]) {
+            activeWarehouseId = Object.keys(appState.warehouses)[0] || 'main';
+        }
+        appState.activeWarehouseId = activeWarehouseId;
+        const warehouse = getActiveWarehouse();
+        if (warehouse) db = normalizeWarehouseData(warehouse.data);
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        renderCurrentWarehouseViews();
+        updateSyncStatus(`${loaded} Lager von Supabase geladen.`, 'ok');
+        if (showAlert) alert(`${loaded} Lager wurden von Supabase geladen.`);
+    } catch (err) {
+        updateSyncStatus('Laden fehlgeschlagen: ' + err.message, 'warn');
+        if (showAlert) alert('Laden fehlgeschlagen: ' + err.message);
+    } finally {
+        syncIsPulling = false;
+    }
+}
+
+async function ensureActiveWarehouseRemote() {
+    const warehouse = getActiveWarehouse();
+    if (!warehouse) throw new Error('Kein aktives Lager gefunden.');
+    if (!warehouse.remoteId) await syncPushAllWarehouses(false);
+    if (!warehouse.remoteId) throw new Error('Das aktive Lager konnte nicht synchronisiert werden.');
+    return warehouse;
+}
+
+async function addReadOnlyFriend() {
+    try {
+        const email = (document.getElementById('friendEmailInput')?.value || '').trim().toLowerCase();
+        const selectedRole = document.getElementById('friendAccessRole')?.value === 'write' ? 'write' : 'read';
+        if (!email || !email.includes('@')) return alert('Bitte eine gültige E-Mail-Adresse eintragen.');
+        const { client, user } = await getSupabaseUser();
+        if (!user) return alert('Bitte zuerst bei Supabase einloggen.');
+        const warehouse = await ensureActiveWarehouseRemote();
+        if (warehouse.readOnly) return alert('Dieses Lager ist für dich nur lesbar. Du kannst dafür keine Freunde hinzufügen.');
+        const { error } = await client.from('warehouse_members').upsert({
+            warehouse_id: warehouse.remoteId,
+            email,
+            role: selectedRole
+        }, { onConflict: 'warehouse_id,email' });
+        if (error) throw error;
+        document.getElementById('friendEmailInput').value = '';
+        const roleLabel = selectedRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen';
+        updateSyncStatus(`${email} hat ${roleLabel}-Zugriff auf "${warehouse.name}".`, 'ok');
+        await renderSyncFriendsList();
+    } catch (err) {
+        alert('Freund konnte nicht hinzugefügt werden: ' + err.message);
+    }
+}
+
+async function removeReadOnlyFriend(memberId) {
+    if (!confirm('Freund aus der Freigabe entfernen?')) return;
+    try {
+        const { client } = await getSupabaseUser();
+        const { error } = await client.from('warehouse_members').delete().eq('id', memberId);
+        if (error) throw error;
+        await renderSyncFriendsList();
+    } catch (err) {
+        alert('Freigabe konnte nicht entfernt werden: ' + err.message);
+    }
+}
+
+async function renderSyncFriendsList() {
+    const list = document.getElementById('sync-friends-list');
+    if (!list) return;
+    const warehouse = getActiveWarehouse();
+    if (!warehouse || !warehouse.remoteId) {
+        list.innerHTML = '<p class="hint">Freigaben erscheinen, sobald dieses Lager einmal hochgeladen wurde.</p>';
+        return;
+    }
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) {
+            list.innerHTML = '<p class="hint">Logge dich ein, um Freigaben zu sehen.</p>';
+            return;
+        }
+        const { data, error } = await client
+            .from('warehouse_members')
+            .select('id, email, role, created_at')
+            .eq('warehouse_id', warehouse.remoteId)
+            .order('created_at', { ascending: true });
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            list.innerHTML = '<p class="hint">Noch keine Freunde für dieses Lager hinzugefügt.</p>';
+            return;
+        }
+        list.innerHTML = data.map(member => `
+            <div class="sync-friend-row">
+                <div>
+                    <strong>${escapeHtml(member.email)}</strong>
+                    <small>${member.role === 'read' ? 'Nur lesen' : 'Lesen & schreiben'} · seit ${formatWarehouseDate(member.created_at)}</small>
+                </div>
+                ${warehouse.readOnly ? '<span class="hint">Freigabe</span>' : `<button onclick="removeReadOnlyFriend('${member.id}')" class="btn-out btn-animated">Entfernen</button>`}
+            </div>
+        `).join('');
+    } catch (err) {
+        list.innerHTML = `<p class="hint">Freigaben konnten nicht geladen werden: ${err.message}</p>`;
+    }
 }
 
 function formatWarehouseDate(value) {
@@ -352,6 +913,8 @@ function updateWarehouseUI() {
     const select = document.getElementById('warehouseSelect');
     const meta = document.getElementById('warehouseMeta');
     const backupInfo = document.getElementById('warehouseBackupInfo');
+    const accessBadge = document.getElementById('warehouseAccessBadge');
+    const shareHint = document.getElementById('shareActiveWarehouseHint');
     const warehouses = appState && appState.warehouses ? Object.values(appState.warehouses) : [];
     const active = getActiveWarehouse();
 
@@ -364,9 +927,22 @@ function updateWarehouseUI() {
     }
 
     if (active) {
-        const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}`;
+        const isShared = active.isShared || active.readOnly;
+        const accessLabel = !isShared ? 'Eigenes Lager' : (active.readOnly ? 'Geteiltes Lager · Nur lesen' : 'Geteiltes Lager · Schreibzugriff');
+        const access = ` · ${accessLabel}`;
+        const sync = active.remoteId ? ` · Sync: ${formatWarehouseDate(active.lastSyncAt)}` : '';
+        const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}${sync}${access}`;
         if (meta) meta.innerText = info;
         if (backupInfo) backupInfo.innerText = `Aktuelles Lager: ${active.name} · ${info}`;
+        if (accessBadge) {
+            accessBadge.innerText = accessLabel;
+            accessBadge.dataset.access = !isShared ? 'owner' : (active.readOnly ? 'read' : 'write');
+        }
+        if (shareHint) {
+            shareHint.innerText = active.readOnly
+                ? `Du bist in "${active.name}" nur Leser. Du kannst dieses Lager nicht weiter freigeben.`
+                : `Freigegeben wird nur das aktuell ausgewählte Lager: "${active.name}".`;
+        }
     }
 }
 
@@ -375,9 +951,12 @@ function renderCurrentWarehouseViews() {
     renderStats();
     renderLogs();
     renderCustomProductSettings();
+    renderCustomContainers();
+    renderProductVisibilitySettings();
     renderProductPresets();
     renderShopLinkSettings();
     renderNachbestellen();
+    renderSupabaseSyncSettings();
     initBulkProductSelect();
     updateNotificationStatus();
     clearCRPdfImport();
@@ -411,6 +990,7 @@ function createWarehouse() {
 function renameWarehouse() {
     const warehouse = getActiveWarehouse();
     if (!warehouse) return;
+    if (warehouse.isShared || warehouse.readOnly) return alert('Geteilte Lager können lokal nicht umbenannt werden.');
     const name = prompt('Neuer Name für dieses Lager:', warehouse.name);
     if (!name || !name.trim()) return;
     warehouse.name = name.trim();
@@ -420,6 +1000,7 @@ function renameWarehouse() {
 function deleteWarehouse() {
     const warehouse = getActiveWarehouse();
     if (!warehouse) return;
+    if (warehouse.isShared || warehouse.readOnly) return alert('Geteilte Lager können hier nicht gelöscht werden.');
     const ids = Object.keys(appState.warehouses || {});
     if (ids.length <= 1) return alert('Es muss mindestens ein Lager vorhanden bleiben.');
     if (!confirm(`Lager "${warehouse.name}" wirklich löschen? Bestand, Statistik, Protokoll und Einstellungen dieses Lagers werden entfernt.`)) return;
@@ -469,29 +1050,16 @@ function showTab(tabId) {
     if(tabId === 'trace-export') renderTraceExportInputs();
     if(tabId === 'log') renderLogs();
     if(tabId === 'nachbestellen') renderNachbestellen();
+    if(tabId === 'tools') initTools();
     if(tabId === 'einstellungen') {
         setupSettingsAccordions();
         updateNotificationStatus();
         renderCustomProductSettings();
+        renderCustomContainers();
+        renderProductVisibilitySettings();
         renderShopLinkSettings();
         renderProductPresets();
-        // Wire up collapsible toggle hints
-        setTimeout(() => {
-            const det = document.getElementById('shop-links-details');
-            const hint = document.getElementById('shop-links-toggle-hint');
-            if (det && hint) {
-                det.addEventListener('toggle', () => {
-                    hint.innerText = det.open ? 'zuklappen' : 'aufklappen';
-                }, { once: false });
-            }
-            const det2 = document.getElementById('product-presets-details');
-            const hint2 = document.getElementById('product-presets-toggle-hint');
-            if (det2 && hint2) {
-                det2.addEventListener('toggle', () => {
-                    hint2.innerText = det2.open ? 'zuklappen' : 'aufklappen';
-                }, { once: false });
-            }
-        }, 0);
+        renderSupabaseSyncSettings();
     }
 }
 
@@ -500,8 +1068,11 @@ function setupSettingsAccordions() {
     if (!settings) return;
 
     settings.querySelectorAll(':scope > .card').forEach((card, index) => {
+        card.style.display = '';
         const firstChild = card.firstElementChild;
         if (firstChild && firstChild.tagName === 'DETAILS') {
+            const existingTitle = card.querySelector('h2, h3');
+            if (existingTitle) applySettingsMetadata(card, existingTitle.innerText || '');
             firstChild.open = false;
             return;
         }
@@ -523,7 +1094,7 @@ function setupSettingsAccordions() {
 
         const hint = document.createElement('span');
         hint.className = 'settings-accordion-hint';
-        hint.innerText = 'aufklappen';
+        hint.setAttribute('aria-hidden', 'true');
         summary.appendChild(hint);
 
         const body = document.createElement('div');
@@ -531,16 +1102,61 @@ function setupSettingsAccordions() {
         while (details.nextSibling) body.appendChild(details.nextSibling);
         details.appendChild(body);
 
-        details.addEventListener('toggle', () => {
-            hint.innerText = details.open ? 'zuklappen' : 'aufklappen';
-        });
-
         card.dataset.settingsAccordion = 'true';
         details.open = false;
+        applySettingsMetadata(card, title.innerText || '');
     });
+
+    renderSettingsGroupLabels(settings);
 
     settings.querySelectorAll('details').forEach(details => {
         details.open = false;
+    });
+}
+
+function getSettingsMeta(title) {
+    const normalized = String(title || '').toLowerCase();
+    if (/supabase|sync|freunde/.test(normalized)) return { group: 'Sync', hint: 'Cloud-Sync, Login, Freunde, Rechte', keywords: 'supabase sync cloud login freunde teilen nur lesen schreibzugriff readonly write sicherheit rls' };
+    if (/system|backup|bug/.test(normalized)) return { group: 'System', hint: 'Updates, Backup, Fehler melden', keywords: 'system update version backup import export bug fehler melden mail' };
+    if (/benachrichtigung/.test(normalized)) return { group: 'Warnungen', hint: 'Warnzeitraum, Push, deaktivierte Warnungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
+    if (/eigene behälter|produkte ein/.test(normalized)) return { group: 'Lager', hint: 'Tara, Behälter, Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte' };
+    if (/eigene produkte|produkt-presets|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Waren, Presets, Shop-Links', keywords: 'produkt eigene waren preset shop link größe dichte stück gramm ml' };
+    if (/design|effekte/.test(normalized)) return { group: 'Darstellung', hint: 'Design, Theme, Animationen', keywords: 'design theme farbe badman light girl mint effekt animation disco' };
+    if (/reset|löschen/.test(normalized)) return { group: 'Gefahrenzone', hint: 'Daten löschen und zurücksetzen', keywords: 'reset löschen statistik protokoll lagerbestand daten' };
+    return { group: 'Weitere', hint: 'Weitere Einstellungen', keywords: normalized };
+}
+
+function applySettingsMetadata(card, title) {
+    const meta = getSettingsMeta(title);
+    card.dataset.settingsGroup = meta.group;
+    const summary = card.querySelector('.settings-accordion-summary');
+    if (summary && !summary.querySelector('.settings-summary-copy')) {
+        const titleEl = summary.querySelector('h2, h3');
+        const wrap = document.createElement('span');
+        wrap.className = 'settings-summary-copy';
+        if (titleEl) {
+            summary.insertBefore(wrap, titleEl);
+            wrap.appendChild(titleEl);
+            const small = document.createElement('small');
+            small.innerText = meta.hint;
+            wrap.appendChild(small);
+        }
+    }
+}
+
+function renderSettingsGroupLabels(settings) {
+    settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
+    const seen = new Set();
+    settings.querySelectorAll(':scope > .card').forEach(card => {
+        card.style.display = '';
+        const group = card.dataset.settingsGroup || 'Weitere';
+        if (seen.has(group)) return;
+        seen.add(group);
+        const label = document.createElement('div');
+        label.className = 'settings-group-label';
+        label.dataset.settingsGroupLabel = group;
+        label.innerHTML = `<span>${group}</span>`;
+        settings.insertBefore(label, card);
     });
 }
 
@@ -634,6 +1250,7 @@ function sendBugReport() {
 
 // --- NEUE HILFSFUNKTIONEN ---
 function getGrams(itemName, mlAmount) {
+    if (getItemUnit(itemName) === 'g') return parseFloat(mlAmount || 0).toFixed(1);
     let factor = densityFactors[itemName] || 1.0;
     return (mlAmount * factor).toFixed(1);
 }
@@ -655,6 +1272,55 @@ function formatItemAmount(itemName, amount, decimals = 1) {
 
 function itemUsesPieces(itemName) {
     return getItemUnit(itemName) === 'st';
+}
+
+function itemUsesVolume(itemName) {
+    return getItemUnit(itemName) === 'ml';
+}
+
+function convertInputToStoredAmount(itemName, inputUnit, amount, useTara = false, containerValue = null) {
+    let value = parseFloat(amount);
+    if (isNaN(value) || value <= 0) return null;
+
+    if (inputUnit === 'g' && useTara) {
+        value -= getAllContainers()[containerValue] || 0;
+    }
+
+    if (value <= 0) return null;
+
+    const itemUnit = getItemUnit(itemName);
+    const factor = densityFactors[itemName] || 1.0;
+
+    if (itemUnit === inputUnit || itemUnit === 'st') return value;
+    if (itemUnit === 'ml' && inputUnit === 'g') return value / factor;
+    if (itemUnit === 'g' && inputUnit === 'ml') return value * factor;
+    return value;
+}
+
+function formatConvertedInputPreview(itemName, inputUnit, amount, useTara = false, containerValue = null) {
+    const converted = convertInputToStoredAmount(itemName, inputUnit, amount, useTara, containerValue);
+    if (converted === null) return '';
+    return `≈ ${formatItemAmount(itemName, converted)}`;
+}
+
+function getAllContainers() {
+    return { ...containers, ...((db && db.customContainers) || {}) };
+}
+
+function isProductHidden(itemName) {
+    return Boolean(db.hiddenProducts && db.hiddenProducts[itemName]);
+}
+
+function setProductHidden(itemName, hidden) {
+    if (!db.hiddenProducts) db.hiddenProducts = {};
+    if (hidden) db.hiddenProducts[itemName] = true;
+    else delete db.hiddenProducts[itemName];
+    if (db.notifications) db.notifications.lastAlertSignature = '';
+    saveDB();
+    renderLager();
+    renderProductVisibilitySettings();
+    updateNotificationStatus();
+    initBulkProductSelect();
 }
 
 function getLogTime(log) {
@@ -720,6 +1386,7 @@ function getStockAlerts() {
 
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
             if (db.alerts && db.alerts.disabled && db.alerts.disabled[item]) continue;
 
             const stock = db.inventory[cat][item] || 0;
@@ -1060,7 +1727,10 @@ function renderCustomProductSettings() {
                 <strong>${product.name}</strong>
                 <small>${product.cat} · ${displaySizes} · Dichte ${product.density || 1}</small>
             </span>
-            <button type="button" onclick="deleteCustomProduct(${index})">Löschen</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" onclick="editCustomProduct(${index})">Bearbeiten</button>
+                <button type="button" onclick="deleteCustomProduct(${index})">Löschen</button>
+            </div>
         </div>
     `;
     }).join('');
@@ -1121,13 +1791,7 @@ function addCustomProduct() {
         return;
     }
 
-    // Convert sizes to ml if entered in grams. Stück bleibt eine reine Anzahl.
-    let sizesInMl = sizes;
-    if (sizeUnit === 'g') {
-        sizesInMl = sizes.map(s => s / density);
-    }
-
-    db.customProducts.push({ name, cat, sizes: sizesInMl, sizeUnit, sizesOriginal: sizes, density });
+    db.customProducts.push({ name, cat, sizes, sizeUnit, sizesOriginal: sizes, density });
     applyCustomProductsToCatalog();
 
     if (!db.inventory[cat]) db.inventory[cat] = {};
@@ -1147,6 +1811,68 @@ function addCustomProduct() {
     alert("Produkt wurde angelegt.");
 }
 
+function editCustomProduct(index) {
+    const product = db.customProducts && db.customProducts[index];
+    if (!product) return;
+
+    const name = prompt('Produktname:', product.name);
+    if (!name || !name.trim()) return;
+    const cat = prompt('Kategorie:', product.cat);
+    if (!cat || !cat.trim()) return;
+    const unit = prompt('Einheit (ml, g oder st):', product.sizeUnit || 'ml');
+    if (!['ml', 'g', 'st'].includes(unit)) return alert('Bitte ml, g oder st eingeben.');
+    const currentSizes = (product.sizesOriginal || product.sizes || []).join(', ');
+    const sizesRaw = unit === 'st' ? '' : prompt('Behältergrößen, mit Komma getrennt:', currentSizes);
+    if (sizesRaw === null) return;
+    const densityRaw = unit === 'st' ? '1' : prompt('Dichte:', product.density || 1);
+    if (densityRaw === null) return;
+
+    const sizes = unit === 'st' ? [] : sizesRaw
+        .split(',')
+        .map(value => parseFloat(value.trim()))
+        .filter(value => !isNaN(value) && value > 0);
+    const density = parseFloat(densityRaw) > 0 ? parseFloat(densityRaw) : 1;
+    const oldName = product.name;
+    const oldCat = product.cat;
+
+    product.name = name.trim();
+    product.cat = cat.trim();
+    product.sizeUnit = unit;
+    product.sizes = sizes;
+    product.sizesOriginal = sizes;
+    product.density = density;
+
+    if (oldName !== product.name || oldCat !== product.cat) {
+        const oldStock = db.inventory[oldCat] ? db.inventory[oldCat][oldName] : 0;
+        if (db.inventory[oldCat]) delete db.inventory[oldCat][oldName];
+        if (!db.inventory[product.cat]) db.inventory[product.cat] = {};
+        db.inventory[product.cat][product.name] = db.inventory[product.cat][product.name] || oldStock || 0;
+        db.stats[product.name] = db.stats[oldName] || db.stats[product.name] || 0;
+        if (oldName !== product.name) delete db.stats[oldName];
+        if (db.thresholds && db.thresholds[oldName] !== undefined) {
+            db.thresholds[product.name] = db.thresholds[oldName];
+            delete db.thresholds[oldName];
+        }
+        if (db.hiddenProducts && db.hiddenProducts[oldName]) {
+            db.hiddenProducts[product.name] = true;
+            delete db.hiddenProducts[oldName];
+        }
+        (db.logs || []).forEach(log => {
+            if (log.item === oldName) {
+                log.item = product.name;
+                log.cat = product.cat;
+            }
+        });
+    }
+
+    saveDB();
+    normalizeWarehouseData(db);
+    renderCustomProductSettings();
+    renderProductVisibilitySettings();
+    renderLager();
+    initBulkProductSelect();
+}
+
 function deleteCustomProduct(index) {
     const product = db.customProducts && db.customProducts[index];
     if (!product) return;
@@ -1162,6 +1888,85 @@ function deleteCustomProduct(index) {
     saveDB();
 
     window.location.reload();
+}
+
+function renderCustomContainers() {
+    const list = document.getElementById('custom-containers-list');
+    if (!list) return;
+    const entries = Object.entries(db.customContainers || {});
+    if (entries.length === 0) {
+        list.innerHTML = '<p class="hint" style="margin-top: 12px;">Noch keine eigenen Behälter angelegt.</p>';
+        return;
+    }
+    list.innerHTML = entries.map(([name, weight]) => `
+        <div class="custom-product-row">
+            <span><strong>${name}</strong><small>Leergewicht: ${parseFloat(weight).toFixed(1)} g</small></span>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button type="button" onclick='editCustomContainer(${jsArg(name)})'>Bearbeiten</button>
+                <button type="button" onclick='deleteCustomContainer(${jsArg(name)})'>Löschen</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function addCustomContainer() {
+    const nameEl = document.getElementById('customContainerName');
+    const weightEl = document.getElementById('customContainerWeight');
+    const name = nameEl ? nameEl.value.trim() : '';
+    const weight = weightEl ? parseFloat(weightEl.value) : NaN;
+    if (!name || isNaN(weight) || weight < 0) return alert('Bitte Behältername und Leergewicht eingeben.');
+    if (!db.customContainers) db.customContainers = {};
+    db.customContainers[name] = weight;
+    saveDB();
+    if (nameEl) nameEl.value = '';
+    if (weightEl) weightEl.value = '';
+    renderCustomContainers();
+    initBulkProductSelect();
+}
+
+function editCustomContainer(name) {
+    if (!db.customContainers || db.customContainers[name] === undefined) return;
+    const newName = prompt('Behältername:', name);
+    if (!newName || !newName.trim()) return;
+    const newWeightRaw = prompt('Leergewicht in g:', db.customContainers[name]);
+    if (newWeightRaw === null) return;
+    const newWeight = parseFloat(newWeightRaw);
+    if (isNaN(newWeight) || newWeight < 0) return alert('Bitte ein gültiges Leergewicht eingeben.');
+    if (newName.trim() !== name) delete db.customContainers[name];
+    db.customContainers[newName.trim()] = newWeight;
+    saveDB();
+    renderCustomContainers();
+    initBulkProductSelect();
+}
+
+function deleteCustomContainer(name) {
+    if (!db.customContainers || db.customContainers[name] === undefined) return;
+    if (!confirm(`Behälter "${name}" löschen?`)) return;
+    delete db.customContainers[name];
+    saveDB();
+    renderCustomContainers();
+    initBulkProductSelect();
+}
+
+function renderProductVisibilitySettings() {
+    const container = document.getElementById('product-visibility-list');
+    if (!container) return;
+    let html = '';
+    for (let cat in catalog) {
+        let rows = '';
+        for (let item in catalog[cat]) {
+            const hidden = isProductHidden(item);
+            rows += `
+                <label class="visibility-row">
+                    <input type="checkbox" ${hidden ? '' : 'checked'} onchange='setProductHidden(${jsArg(item)}, !this.checked)'>
+                    <span>${item}</span>
+                    <small>${hidden ? 'ausgeblendet' : 'sichtbar'}</small>
+                </label>
+            `;
+        }
+        html += `<div class="visibility-group"><strong>${cat}</strong>${rows}</div>`;
+    }
+    container.innerHTML = html;
 }
 
 function setThreshold(item) {
@@ -1233,11 +2038,12 @@ function filterLager() {
         let hasItems = false;
         
         for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
             if (item.toLowerCase().includes(term)) {
                 hasItems = true;
                 let stock = db.inventory[cat][item] || 0;
                 let stockG = getGrams(item, stock); // Umrechnung in Gramm
-                let isPieceItem = itemUsesPieces(item);
+                let showMassSubline = itemUsesVolume(item);
                 let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
                 let reachText = formatWeeksLeft(item);
                 let metrics = getUsageMetrics(item);
@@ -1271,7 +2077,7 @@ function filterLager() {
                             </span>
                             <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
                                 <span>${formatItemAmount(item, stock)}</span>
-                                ${isPieceItem ? '' : `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>`}
+                                ${showMassSubline ? `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>` : ''}
                             </span>
                         </h4>
                         ${crossHint}
@@ -1378,6 +2184,144 @@ function calcTraceGrams(inputId, itemName) {
     }
 }
 
+function initTools() {
+    const select = document.getElementById('macroRecipeSelect');
+    if (select && select.options.length === 0) {
+        select.innerHTML = Object.keys(macroRecipes)
+            .map(name => `<option value="${name}">${name}</option>`)
+            .join('');
+    }
+    renderMacroRecipe();
+    updateSalinityCalculator();
+    updateSimpleSalinityConverter();
+}
+
+function resolveRecipeItem(entry) {
+    if (!entry.item) return null;
+    const cat = findCat(entry.item);
+    if (catalog[cat] && catalog[cat][entry.item] !== undefined) return { cat, item: entry.item };
+    return null;
+}
+
+function renderMacroRecipe() {
+    const select = document.getElementById('macroRecipeSelect');
+    const litersEl = document.getElementById('macroRecipeLiters');
+    const result = document.getElementById('macroRecipeResult');
+    if (!select || !litersEl || !result) return;
+    const recipe = macroRecipes[select.value] || [];
+    const liters = Math.max(0.1, parseFloat(litersEl.value) || 1);
+    const rows = recipe.map(entry => {
+        const amount = entry.amount * liters;
+        const resolved = resolveRecipeItem(entry);
+        const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
+        const missing = resolved && stock < amount;
+        return `
+            <div class="tool-row ${missing ? 'missing' : ''}">
+                <span>
+                    <strong>${entry.item || entry.label}</strong>
+                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}` : 'nicht lagergeführt'}</small>
+                </span>
+                <span>${amount.toFixed(1)} ${entry.unit}</span>
+            </div>
+        `;
+    }).join('');
+    result.innerHTML = `
+        <div class="tool-result">${rows}</div>
+        <button class="btn-danger btn-animated" onclick="bookMacroRecipe()">Lagergeführte Zutaten auslagern</button>
+    `;
+}
+
+function bookMacroRecipe() {
+    const select = document.getElementById('macroRecipeSelect');
+    const litersEl = document.getElementById('macroRecipeLiters');
+    if (!select || !litersEl) return;
+    const liters = Math.max(0.1, parseFloat(litersEl.value) || 1);
+    const queue = (macroRecipes[select.value] || [])
+        .map(entry => {
+            const resolved = resolveRecipeItem(entry);
+            if (!resolved) return null;
+            const amount = convertInputToStoredAmount(resolved.item, entry.unit, entry.amount * liters);
+            return amount > 0 ? { ...resolved, amount } : null;
+        })
+        .filter(Boolean);
+    if (queue.length === 0) return alert('Dieses Rezept enthält keine lagergeführten Zutaten.');
+    if (!confirm(`${select.value} für ${liters} L anmischen und ${queue.length} lagergeführte Zutat(en) auslagern?`)) return;
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function calculateApproxPsu(density, temp) {
+    const densityAt25 = density + (temp - 25) * 0.00030;
+    return 35 + ((densityAt25 - 1.0233) / 0.000742);
+}
+
+function densityFromApproxPsu(psu) {
+    return 1.0233 + ((psu - 35) * 0.000742);
+}
+
+function clampNumber(value, min, max, fallback) {
+    const parsed = parseFloat(value);
+    if (isNaN(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+}
+
+function updateSalinityCalculator(source = '') {
+    const densityEl = document.getElementById('salinityDensity');
+    const tempEl = document.getElementById('salinityTemp');
+    const densityNumberEl = document.getElementById('salinityDensityNumber');
+    const tempNumberEl = document.getElementById('salinityTempNumber');
+    const result = document.getElementById('salinityResult');
+    if (!densityEl || !tempEl || !result) return;
+
+    const densityMin = parseFloat(densityEl.min) || 1.0150;
+    const densityMax = parseFloat(densityEl.max) || 1.0350;
+    const tempMin = parseFloat(tempEl.min) || 15;
+    const tempMax = parseFloat(tempEl.max) || 32;
+
+    const densitySource = source === 'densityNumber' && densityNumberEl ? densityNumberEl.value : densityEl.value;
+    const tempSource = source === 'tempNumber' && tempNumberEl ? tempNumberEl.value : tempEl.value;
+    const density = clampNumber(densitySource, densityMin, densityMax, 1.0233);
+    const temp = clampNumber(tempSource, tempMin, tempMax, 25);
+
+    densityEl.value = density.toFixed(4);
+    tempEl.value = temp.toFixed(1);
+    if (densityNumberEl && source !== 'densityNumber') densityNumberEl.value = density.toFixed(4);
+    if (tempNumberEl && source !== 'tempNumber') tempNumberEl.value = temp.toFixed(1);
+
+    const psu = calculateApproxPsu(density, temp);
+    const conductivity = 53.06 * (psu / 35);
+    result.innerHTML = `
+        <div class="salinity-value">${psu.toFixed(1)} PSU</div>
+        <small>Näherung: Leitfähigkeit ca. ${conductivity.toFixed(2)} mS/cm. Referenz: 1.0233 kg/l bei 25 °C = 35 PSU.</small>
+    `;
+}
+
+function updateSimpleSalinityConverter(source = 'psu') {
+    const psuInput = document.getElementById('simplePsuInput');
+    const densityInput = document.getElementById('simpleDensityInput');
+    const result = document.getElementById('simpleSalinityResult');
+    if (!psuInput || !densityInput || !result) return;
+
+    let psu = parseFloat(psuInput.value);
+    let density = parseFloat(densityInput.value);
+
+    if (source === 'psu' && !isNaN(psu)) {
+        density = densityFromApproxPsu(psu);
+        densityInput.value = density.toFixed(4);
+    } else if (source === 'density' && !isNaN(density)) {
+        psu = calculateApproxPsu(density, 25);
+        psuInput.value = psu.toFixed(1);
+    }
+
+    if (isNaN(psu) && isNaN(density)) {
+        result.innerText = '';
+        return;
+    }
+
+    const densityText = isNaN(density) ? '-' : `${density.toFixed(4)} kg/l`;
+    const psuText = isNaN(psu) ? '-' : `${psu.toFixed(1)} PSU`;
+    result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Jeweils bei 25 °C Referenz.</small>`;
+}
+
 function countOutsForElement(itemName) {
     if (!db.logs) return 0;
     return db.logs.filter(log => log.item === itemName && log.action === 'out').length;
@@ -1408,7 +2352,7 @@ function renderStats() {
             let perWeek = totalConsumed / weeksElapsed;
             let perMonth = totalConsumed / monthsElapsed;
             let perYear = totalConsumed / yearsElapsed;
-            let isPieceItem = itemUsesPieces(item);
+            let showMassSubline = itemUsesVolume(item);
             
             let currentStock = getStock(item);
             let prognosisText = "";
@@ -1431,7 +2375,7 @@ function renderStats() {
                 <div class="stat-block">
                     <h4 style="margin:0 0 5px 0; color: var(--primary); display:flex; justify-content:space-between;">
                         ${item}
-                        ${isPieceItem ? '' : `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>`}
+                        ${showMassSubline ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>` : ''}
                     </h4>
                     <div style="font-size:0.85rem; margin-bottom:5px;">
                         Gesamtverbrauch: <strong>${formatItemAmount(item, totalConsumed)}</strong>
@@ -1444,15 +2388,15 @@ function renderStats() {
                     <div class="stat-grid" style="margin-top: 10px;">
                         <div>
                             <strong>${formatItemAmount(item, perWeek)}</strong><br>
-                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Woche</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo`}
+                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo` : '<span style="font-size:0.7rem; opacity:0.7;">pro Woche</span>'}
                         </div>
                         <div>
                             <strong>${formatItemAmount(item, perMonth)}</strong><br>
-                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Monat</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo`}
+                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo` : '<span style="font-size:0.7rem; opacity:0.7;">pro Monat</span>'}
                         </div>
                         <div>
                             <strong>${formatItemAmount(item, perYear)}</strong><br>
-                            ${isPieceItem ? '<span style="font-size:0.7rem; opacity:0.7;">pro Jahr</span>' : `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr`}
+                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr` : '<span style="font-size:0.7rem; opacity:0.7;">pro Jahr</span>'}
                         </div>
                     </div>
                     <div class="prognose-badge">${prognosisText}</div>
@@ -1461,6 +2405,79 @@ function renderStats() {
         }
     }
     container.innerHTML = content || '<p class="hint">Noch keine Verbräuche aufgezeichnet.</p>';
+}
+
+function exportConsumptionPdf() {
+    const warehouse = getActiveWarehouse();
+    const rows = [];
+    let maxConsumed = 0;
+    for (let item in db.stats) {
+        if (isProductHidden(item)) continue;
+        const consumed = db.stats[item] || 0;
+        if (consumed > maxConsumed) maxConsumed = consumed;
+    }
+
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
+            const stock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
+            const consumed = db.stats[item] || 0;
+            const threshold = (db.thresholds && db.thresholds[item]) || 0;
+            const weeksLeft = getWeeksLeft(item);
+            rows.push({ cat, item, stock, consumed, threshold, weeksLeft });
+        }
+    }
+
+    const htmlRows = rows
+        .sort((a, b) => b.consumed - a.consumed)
+        .map(row => {
+            const width = maxConsumed > 0 ? Math.max(2, (row.consumed / maxConsumed) * 100) : 2;
+            const reorder = row.threshold > 0 && row.stock <= row.threshold;
+            return `
+                <tr>
+                    <td>${row.cat}</td>
+                    <td>${row.item}</td>
+                    <td>${formatItemAmount(row.item, row.stock)}</td>
+                    <td>${formatItemAmount(row.item, row.consumed)}</td>
+                    <td><div class="bar"><span style="width:${width}%"></span></div></td>
+                    <td>${row.weeksLeft === null ? '-' : row.weeksLeft.toFixed(1) + ' Wochen'}</td>
+                    <td class="${reorder ? 'danger' : ''}">${reorder ? 'Nachbestellen' : 'ok'}</td>
+                </tr>
+            `;
+        }).join('');
+
+    const report = window.open('', '_blank');
+    if (!report) return alert('Popup wurde blockiert. Bitte Popups für diese App erlauben.');
+    report.document.write(`
+        <!doctype html>
+        <html>
+        <head>
+            <title>Verbrauchsbericht ${warehouse ? warehouse.name : ''}</title>
+            <style>
+                body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:28px;color:#111}
+                h1{margin:0 0 4px;font-size:24px}
+                .meta{color:#666;margin-bottom:22px}
+                table{width:100%;border-collapse:collapse;font-size:12px}
+                th,td{text-align:left;border-bottom:1px solid #ddd;padding:8px;vertical-align:middle}
+                th{background:#f3f5f7}
+                .bar{height:9px;background:#e8edf2;border-radius:999px;overflow:hidden;min-width:80px}
+                .bar span{display:block;height:100%;background:#2563eb;border-radius:999px}
+                .danger{color:#b91c1c;font-weight:700}
+                @media print{button{display:none}}
+            </style>
+        </head>
+        <body>
+            <button onclick="window.print()">Als PDF sichern / drucken</button>
+            <h1>Verbrauchsbericht</h1>
+            <div class="meta">${warehouse ? warehouse.name : 'Lager'} · ${new Date().toLocaleString('de-DE')}</div>
+            <table>
+                <thead><tr><th>Kategorie</th><th>Produkt</th><th>Bestand</th><th>Verbrauch</th><th>Grafik</th><th>Reichweite</th><th>Status</th></tr></thead>
+                <tbody>${htmlRows}</tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    report.document.close();
 }
 
 function findCat(itemName) {
@@ -1497,7 +2514,7 @@ function renderLogs() {
         
         // Umrechnung in Gramm für das Protokoll
         let gAmount = getGrams(log.item, log.amount);
-        let isPieceItem = itemUsesPieces(log.item);
+        let showMassSubline = itemUsesVolume(log.item);
         
         return `
             <div class="log-item ${log.action}" style="border-left: 4px solid ${actionColor};">
@@ -1507,7 +2524,7 @@ function renderLogs() {
                 </div>
                 <div style="text-align: right;">
                     <div style="color: ${actionColor}; font-weight: bold;">${sign}${formatItemAmount(log.item, log.amount)}</div>
-                    ${isPieceItem ? '' : `<div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>`}
+                    ${showMassSubline ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>` : ''}
                     <button onclick="undoLog(${originalIndex})" style="background:none; border:none; color: var(--text-muted); text-decoration: underline; font-size: 0.75rem; padding:0; margin-top:4px; cursor:pointer;">Rückgängig</button>
                 </div>
             </div>
@@ -1524,7 +2541,9 @@ function openModal(cat, item, action) {
     const modalBody = document.getElementById('modal-body');
     const unitOptions = itemUsesPieces(item)
         ? '<option value="st">Stück</option>'
-        : '<option value="ml">Milliliter (ml)</option><option value="g">Gramm (g)</option>';
+        : (getItemUnit(item) === 'g'
+            ? '<option value="g">Gramm (g)</option><option value="ml">Milliliter (ml)</option>'
+            : '<option value="ml">Milliliter (ml)</option><option value="g">Gramm (g)</option>');
     document.getElementById('modal-title').innerText = action === 'in' ? `${item} einlagern` : `${item} auslagern`;
     
     modalBody.innerHTML = `
@@ -1541,7 +2560,7 @@ function openModal(cat, item, action) {
                 Behälter-Gewicht (Tara) abziehen
             </label>
             <select id="containerSelect" onchange="updateLiveConversion();" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
-                ${Object.keys(containers).map(c => `<option value="${c}">${c} (wiegt ${containers[c]}g)</option>`).join('')}
+                ${Object.entries(getAllContainers()).map(([c, weight]) => `<option value="${c}">${c} (wiegt ${weight}g)</option>`).join('')}
             </select>
         </div>
 
@@ -1574,27 +2593,15 @@ function updateLiveConversion() {
     }
 
     let unit = document.getElementById('unitSelect').value;
-    let factor = densityFactors[currentAction.item] || 1.0;
+    const useTara = unit === 'g' && document.getElementById('useContainer') && document.getElementById('useContainer').checked;
+    const containerValue = document.getElementById('containerSelect') ? document.getElementById('containerSelect').value : null;
+    const preview = formatConvertedInputPreview(currentAction.item, unit, rawAmount, useTara, containerValue);
 
-    if (unit === 'ml') {
-        let finalG = rawAmount * factor;
-        liveDiv.innerText = `≈ ${finalG.toFixed(1)} g`;
-    } else if (unit === 'g') {
-        let netG = rawAmount;
-        if (document.getElementById('useContainer').checked) {
-            let containerWeight = containers[document.getElementById('containerSelect').value];
-            netG -= containerWeight;
-        }
-        if (netG < 0) {
-            liveDiv.innerText = `⚠️ Behälter ist schwerer als Eingabe!`;
-            liveDiv.style.color = 'var(--danger)';
-        } else {
-            let finalMl = netG / factor;
-            liveDiv.innerText = `≈ ${finalMl.toFixed(1)} ml`;
-            liveDiv.style.color = 'var(--secondary)';
-        }
-    } else {
+    if (!preview || getItemUnit(currentAction.item) === unit) {
         liveDiv.innerText = '';
+    } else {
+        liveDiv.innerText = preview;
+        liveDiv.style.color = 'var(--secondary)';
     }
 }
 
@@ -1607,6 +2614,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
     toggleCustomProductUnitFields();
     initBulkProductSelect();
+    detectSupabasePasswordRecovery();
 });
 
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -1618,18 +2626,11 @@ function executeAction() {
     
     if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
     
-    let finalMl = rawAmount;
-    
-    if (unit === 'g') {
-        if (document.getElementById('useContainer').checked) {
-            let containerWeight = containers[document.getElementById('containerSelect').value];
-            finalMl -= containerWeight;
-        }
-        let factor = densityFactors[item] || 1.0;
-        finalMl = finalMl / factor;
-    }
+    const useTara = unit === 'g' && document.getElementById('useContainer') && document.getElementById('useContainer').checked;
+    const containerValue = document.getElementById('containerSelect') ? document.getElementById('containerSelect').value : null;
+    let finalMl = convertInputToStoredAmount(item, unit, rawAmount, useTara, containerValue);
 
-    if (finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
+    if (finalMl === null || finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
 
     if (action === 'in') {
                 db.inventory[cat][item] += finalMl;
@@ -2485,6 +3486,7 @@ function buildWarehouseInventoryShareText() {
     for (let cat in catalog) {
         const rows = [];
         for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
             const stock = db.inventory[cat] && db.inventory[cat][item] ? db.inventory[cat][item] : 0;
             if (stock > 0) rows.push(`- ${item}: ${formatItemAmount(item, stock)}`);
         }
@@ -2543,6 +3545,7 @@ function initBulkProductSelect() {
         optGroup.label = category;
         
         for (let item in catalog[category]) {
+            if (isProductHidden(item)) continue;
             let option = document.createElement('option');
             option.value = JSON.stringify({ cat: category, item: item });
             option.innerText = item;
@@ -2553,17 +3556,37 @@ function initBulkProductSelect() {
     
     // Behälter-Dropdown befüllen
     const bulkContainerSelect = document.getElementById('bulkContainerSelect');
-    if (bulkContainerSelect && bulkContainerSelect.options.length === 0) {
-        for (let c in containers) {
+    if (bulkContainerSelect) {
+        bulkContainerSelect.innerHTML = '';
+        const allContainers = getAllContainers();
+        for (let c in allContainers) {
             let opt = document.createElement('option');
             opt.value = c;
-            opt.innerText = `${c} (wiegt ${containers[c]}g)`;
+            opt.innerText = `${c} (wiegt ${allContainers[c]}g)`;
             bulkContainerSelect.appendChild(opt);
         }
     }
     
     // Event Listener für automatischen Wechsel der Schnellauswahl-Buttons
     select.onchange = updateBulkQuickButtons;
+}
+
+function updateBulkUnitSelectForProduct(itemName) {
+    const unitSelect = document.getElementById('bulkUnitSelect');
+    if (!unitSelect) return;
+    const itemUnit = getItemUnit(itemName);
+    const options = itemUnit === 'st'
+        ? [{ value: 'st', label: 'Stück' }]
+        : [
+            { value: 'ml', label: 'Milliliter (ml)' },
+            { value: 'g', label: 'Gramm (g)' }
+        ];
+
+    unitSelect.innerHTML = options
+        .map(option => `<option value="${option.value}">${option.label}</option>`)
+        .join('');
+    unitSelect.value = itemUnit === 'g' ? 'g' : options[0].value;
+    toggleBulkContainerSection();
 }
 
 function updateBulkQuickButtons() {
@@ -2575,6 +3598,7 @@ function updateBulkQuickButtons() {
     if (!select.value) return;
     
     const product = JSON.parse(select.value);
+    updateBulkUnitSelectForProduct(product.item);
     // Hole die definierten Flaschengrößen direkt aus dem catalog-Objekt
     const sizes = catalog[product.cat][product.item] || [];
     const unit = getItemUnit(product.item);
@@ -2643,7 +3667,7 @@ function updateBulkTaraPreview() {
     const isChecked = useTaraEl && useTaraEl.checked;
     if (!isChecked) { preview.innerText = ''; return; }
     const selVal = document.getElementById('bulkContainerSelect').value;
-    const taraG = containers[selVal];
+    const taraG = getAllContainers()[selVal];
     if (taraG === undefined) return;
     const amountRaw = parseFloat(document.getElementById('bulkAmount').value);
     if (!isNaN(amountRaw) && amountRaw > 0) {
@@ -2668,21 +3692,13 @@ function addToBulkCart() {
     }
     
     const product = JSON.parse(productDataRaw);
-    let finalMl = amountRaw;
-    
-    if (unit === 'g') {
-        let netG = amountRaw;
-        const useTara = document.getElementById('bulkUseTara') && document.getElementById('bulkUseTara').checked;
-        if (useTara) {
-            const containerVal = document.getElementById('bulkContainerSelect').value;
-            const taraG = containers[containerVal] || 0;
-            netG -= taraG;
-            if (netG <= 0) {
-                return alert(`Fehler: Das Behälter-Gewicht (${taraG} g) ist größer oder gleich der eingegebenen Menge. Bitte prüfe die Eingabe.`);
-            }
-        }
-        let factor = densityFactors[product.item] || 1.0;
-        finalMl = netG / factor;
+    const useTara = unit === 'g' && document.getElementById('bulkUseTara') && document.getElementById('bulkUseTara').checked;
+    const containerVal = document.getElementById('bulkContainerSelect') ? document.getElementById('bulkContainerSelect').value : null;
+    let finalMl = convertInputToStoredAmount(product.item, unit, amountRaw, useTara, containerVal);
+
+    if (finalMl === null) {
+        const taraG = getAllContainers()[containerVal] || 0;
+        return alert(`Fehler: Das Behälter-Gewicht (${taraG} g) ist größer oder gleich der eingegebenen Menge. Bitte prüfe die Eingabe.`);
     }
     
     let existingIndex = bulkCart.findIndex(c => c.cat === product.cat && c.item === product.item);
@@ -2760,6 +3776,7 @@ function renderNachbestellen() {
     const allItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
             allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
         }
     }
@@ -2888,6 +3905,7 @@ function renderShopLinkSettings() {
     const allItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
             allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
         }
     }
@@ -3250,8 +4268,9 @@ function exportToCSV() {
     let csv = 'Kategorie,Produkt,Bestand,Einheit\n';
     for (let cat in db.inventory) {
         for (let item in db.inventory[cat]) {
+            if (isProductHidden(item)) continue;
             const stock = db.inventory[cat][item];
-            csv += `"${cat}","${item}",${stock},ml\n`;
+            csv += `"${cat}","${item}",${stock},${getUnitLabel(getItemUnit(item))}\n`;
         }
     }
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -3283,7 +4302,7 @@ document.addEventListener('keydown', (e) => {
     }
     // Number keys 1-8 for tabs (when not in input)
     if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'einstellungen' };
+        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'tools', '9': 'einstellungen' };
         if (tabMap[e.key]) {
             selectTab(tabMap[e.key]);
         }
@@ -3462,7 +4481,7 @@ function handleSwipe() {
     
     if (!isMostlyHorizontal || !isIntentional) return;
     
-    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'einstellungen'];
     const currentTab = document.querySelector('.tab-content.active')?.id;
     const currentIndex = tabs.indexOf(currentTab);
     

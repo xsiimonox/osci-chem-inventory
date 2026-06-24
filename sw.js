@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osci-pwa-cache-v36';
+const CACHE_NAME = 'osci-pwa-cache-v57';
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,8 @@ const ASSETS = [
   './app.js',
   './manifest.json',
   './icon.png',
-  './badman.svg'
+  './badman.svg',
+  './supabase-sync.sql'
 ];
 
 self.addEventListener('install', (e) => {

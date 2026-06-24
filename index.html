@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.1.0</span>
+                <span class="version-badge">v2.2.19</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -31,6 +31,7 @@
             <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
         </div>
         <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
+        <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
     </header>
 
     <nav class="nav-menu" id="main-nav">
@@ -44,8 +45,9 @@
             <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
-			<button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
-			<button onclick="selectTab('nachbestellen')" id="tab-nachbestellen">Nachbestellen</button>
+            <button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
+            <button onclick="selectTab('nachbestellen')" id="tab-nachbestellen">Nachbestellen</button>
+            <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
             <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
             
         </div>
@@ -104,7 +106,10 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h3>Verbrauchsstatistik &amp; Prognose</h3>
-                    <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
+                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; max-width: 170px;" onclick="exportConsumptionPdf()">PDF-Bericht</button>
+                        <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
+                    </div>
                 </div>
                 <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
                 <div id="stats-container"></div>
@@ -116,6 +121,49 @@
                 <h3>Aktionsprotokoll</h3>
                 <p class="hint">Hier siehst du alle vergangenen Buchungen und kannst sie bei Bedarf rückgängig machen:</p>
                 <div id="log-container"></div>
+            </div>
+        </div>
+
+        <div id="tools" class="tab-content">
+            <div class="card">
+                <h3>Makro-Elemente anmischen</h3>
+                <p class="hint">Wähle ein Rezept und die Zielmenge. C&amp;R-Produkte werden gegen deinen Bestand geprüft und können direkt ausgelagert werden.</p>
+                <div class="input-group">
+                    <label>Rezept:</label>
+                    <select id="macroRecipeSelect" onchange="renderMacroRecipe()"></select>
+                </div>
+                <div class="input-group">
+                    <label>Zielmenge in Liter:</label>
+                    <input type="number" id="macroRecipeLiters" min="0.1" step="0.1" value="1" oninput="renderMacroRecipe()">
+                </div>
+                <div id="macroRecipeResult"></div>
+            </div>
+
+            <div class="card">
+                <h3>Salzgehalt Rechner</h3>
+                <p class="hint">Näherungsrechner für Spindel-Werte. Exakte Korrekturen hängen von Spindel-Kalibrierung und Hersteller-Tabelle ab.</p>
+                <div class="input-group salinity-control">
+                    <div class="salinity-control-head">
+                        <label for="salinityDensity">Dichte abgelesen (kg/l)</label>
+                        <input type="number" id="salinityDensityNumber" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densityNumber')">
+                    </div>
+                    <input type="range" id="salinityDensity" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densitySlider')">
+                </div>
+                <div class="input-group salinity-control">
+                    <div class="salinity-control-head">
+                        <label for="salinityTemp">Temperatur (°C)</label>
+                        <input type="number" id="salinityTempNumber" min="15" max="32" step="0.1" value="25.0" oninput="updateSalinityCalculator('tempNumber')">
+                    </div>
+                    <input type="range" id="salinityTemp" min="15" max="32" step="0.1" value="25" oninput="updateSalinityCalculator('tempSlider')">
+                </div>
+                <div id="salinityResult" class="tool-result"></div>
+                <div class="input-group" style="margin-top:14px;">
+                    <label>Einfacher Umrechner PSU → Dichte:</label>
+                    <input type="number" id="simplePsuInput" step="0.1" value="35" oninput="updateSimpleSalinityConverter('psu')">
+                    <label>Dichte → PSU:</label>
+                    <input type="number" id="simpleDensityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('density')">
+                    <div id="simpleSalinityResult" class="tool-result"></div>
+                </div>
             </div>
         </div>
 
@@ -144,6 +192,62 @@
                 </div>
                 <button onclick="sendBugReport()" class="btn-danger btn-animated">Fehler per Mail melden</button>
                 <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Supabase Sync &amp; Freunde</h3>
+                <p class="hint">Synchronisiere deine Lager zwischen Geräten. Freunde werden per E-Mail hinzugefügt und können Nur-Lesen- oder Schreibzugriff bekommen.</p>
+                <div class="sync-privacy-note">
+                    <strong>Account &amp; Datenschutz</strong>
+                    <span>Du registrierst dich über Supabase. Die App speichert dein Passwort nicht. Der Betreiber dieses Supabase-Projekts kann technische Datenbankeinträge administrieren; deine Login-Daten bleiben bei Supabase.</span>
+                </div>
+                <div id="supabase-sync-status" class="notification-status">Sync-Status wird geladen ...</div>
+
+                <div class="input-group" style="margin-top:14px;">
+                    <label>E-Mail:</label>
+                    <input type="text" id="supabaseEmail" placeholder="deine@email.de">
+                    <label>Passwort:</label>
+                    <input type="password" id="supabasePassword" placeholder="Mindestens 6 Zeichen">
+                </div>
+                <div class="switch-container">
+                    <span style="font-weight: 600; font-size: 0.95rem;">Automatisch synchronisieren</span>
+                    <label class="switch">
+                        <input type="checkbox" id="supabaseAutoSync" onchange="toggleSupabaseAutoSync(this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="btn-group" style="flex-wrap:wrap;">
+                    <button onclick="supabaseSignUp()" class="btn-secondary btn-animated" style="flex:1;">Registrieren</button>
+                    <button onclick="supabaseSignIn()" class="btn-in btn-animated" style="flex:1;">Einloggen</button>
+                    <button onclick="supabaseSignOut()" class="btn-out btn-animated" style="flex:1;">Ausloggen</button>
+                    <button onclick="supabaseResetPassword()" class="btn-secondary btn-animated" style="flex:1;">Passwort zurücksetzen</button>
+                </div>
+                <div id="passwordRecoveryBox" class="sync-password-recovery" style="display:none;">
+                    <label>Neues Passwort:</label>
+                    <input type="password" id="newSupabasePassword" placeholder="Neues Passwort">
+                    <button onclick="supabaseUpdatePassword()" class="btn-primary btn-animated">Neues Passwort speichern</button>
+                </div>
+
+                <div class="btn-group" style="flex-wrap:wrap; margin-top:12px;">
+                    <button onclick="syncPushAllWarehouses(true)" class="btn-primary btn-animated" style="flex:1;">Jetzt hochladen</button>
+                    <button onclick="syncPullWarehouses(true)" class="btn-secondary btn-animated" style="flex:1;">Jetzt laden</button>
+                    <button onclick="runSupabaseDiagnostics()" class="btn-secondary btn-animated" style="flex:1;">Sync Diagnose</button>
+                </div>
+                <div id="supabase-diagnostics-result" class="sync-diagnostics-result"></div>
+
+                <div class="input-group" style="margin-top:14px;">
+                    <label>Freund für aktuelles Lager hinzufügen:</label>
+                    <p class="hint" id="shareActiveWarehouseHint">Freigegeben wird nur das aktuell ausgewählte Lager.</p>
+                    <input type="text" id="friendEmailInput" placeholder="freund@email.de">
+                    <label>Zugriff:</label>
+                    <select id="friendAccessRole">
+                        <option value="read">Nur lesen</option>
+                        <option value="write">Lesen &amp; schreiben</option>
+                    </select>
+                    <button onclick="addReadOnlyFriend()" class="btn-secondary btn-animated">Freund hinzufügen</button>
+                    <p class="hint">Die Sicherheit wird in Supabase per Row Level Security erzwungen. Nur-Lesen-Freunde können nicht speichern, Freunde mit Schreibzugriff dürfen das Lager synchronisieren.</p>
+                </div>
+                <div id="sync-friends-list"></div>
             </div>
 
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
@@ -204,12 +308,33 @@
                 <div id="custom-products-list" class="custom-products-list"></div>
             </div>
 
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Behälter</h3>
+                <p class="hint">Lege Behälter mit Leergewicht an. Diese stehen danach beim Tara-Abzug zur Auswahl.</p>
+                <div class="input-group">
+                    <label>Behältername:</label>
+                    <input type="text" id="customContainerName" placeholder="z.B. Eimer 25 kg">
+                </div>
+                <div class="input-group">
+                    <label>Leergewicht in g:</label>
+                    <input type="number" step="0.1" min="0" id="customContainerWeight" placeholder="z.B. 840">
+                </div>
+                <button onclick="addCustomContainer()" class="btn-primary btn-animated">Behälter anlegen</button>
+                <div id="custom-containers-list" class="custom-products-list"></div>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ein-/ausblenden</h3>
+                <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Masseneingang, Nachbestellen und Warnungen.</p>
+                <div id="product-visibility-list"></div>
+            </div>
+
             <!-- PRODUKT-PRESETS -->
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <details id="product-presets-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
                         <h3 style="color: var(--secondary); margin:0;">Produkt-Presets</h3>
-                        <span style="color:var(--secondary); font-size:0.85rem;" id="product-presets-toggle-hint">aufklappen</span>
+                        <span class="settings-accordion-hint" id="product-presets-toggle-hint" aria-hidden="true"></span>
                     </summary>
                     <p class="hint" style="margin-top:10px;">Speichere deine aktuellen eigenen Produkte als Preset und lade sie später wieder — z.B. für verschiedene Becken-Konfigurationen. Presets werden im Backup gespeichert.</p>
                     <div class="input-group" style="margin-top:10px;">
@@ -228,7 +353,7 @@
                 <details id="shop-links-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
                         <h3 style="color: var(--success); margin:0;">Shop-Links verwalten</h3>
-                        <span style="color:var(--success); font-size:0.85rem;" id="shop-links-toggle-hint">aufklappen</span>
+                        <span class="settings-accordion-hint" id="shop-links-toggle-hint" aria-hidden="true"></span>
                     </summary>
                     <p class="hint" style="margin-top:10px;">Trage hier den vollständigen Shop-Link für jedes Produkt und jede Größe ein. Beispiel: <code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">https://osci-motion.de/product/custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter</code></p>
                     <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
@@ -382,7 +507,7 @@
 
     <!-- Keyboard Shortcuts Hint -->
     <div class="keyboard-shortcuts-hint">
-        ⌨️ <kbd>Ctrl+S</kbd> Backup · <kbd>Ctrl+F</kbd> Suche · <kbd>Ctrl+Z</kbd> Undo · <kbd>1-8</kbd> Tabs
+        ⌨️ <kbd>Ctrl+S</kbd> Backup · <kbd>Ctrl+F</kbd> Suche · <kbd>Ctrl+Z</kbd> Undo · <kbd>1-9</kbd> Tabs
     </div>
 
     <div id="modal" class="modal">
