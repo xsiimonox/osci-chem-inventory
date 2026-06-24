@@ -807,8 +807,8 @@ async function syncPushAllWarehouses(showAlert = true) {
         updateWarehouseUI();
         const skipText = skippedReadOnly ? ` · ${skippedReadOnly} Nur-Lesen-Lager übersprungen` : '';
         const deleteText = deleted ? ` · ${deleted} gelöschte Lager entfernt` : '';
-        updateSyncStatus(`${pushed} Lager synchronisiert.${deleteText}${skipText}`, 'ok');
-        if (showAlert) alert(`${pushed} Lager wurden zu Supabase hochgeladen.${deleted ? `\n${deleted} gelöschte Lager wurden auch aus Supabase entfernt.` : ''}${skippedReadOnly ? `\n${skippedReadOnly} Nur-Lesen-Lager wurden übersprungen, weil du dafür keinen Schreibzugriff hast.` : ''}`);
+        updateSyncStatus(`Daten Upload abgeschlossen: ${pushed} Lager synchronisiert.${deleteText}${skipText}`, 'ok');
+        if (showAlert) alert(`Daten Upload abgeschlossen.\n${pushed} Lager wurden synchronisiert.${deleted ? `\n${deleted} gelöschte Lager wurden auch aus Supabase entfernt.` : ''}${skippedReadOnly ? `\n${skippedReadOnly} Nur-Lesen-Lager wurden übersprungen, weil du dafür keinen Schreibzugriff hast.` : ''}`);
         await renderSyncFriendsList();
     } catch (err) {
         updateSyncStatus('Sync fehlgeschlagen: ' + err.message, 'warn');
@@ -891,10 +891,12 @@ async function syncPullWarehouses(showAlert = true) {
         const warehouse = getActiveWarehouse();
         if (warehouse) db = normalizeWarehouseData(warehouse.data);
         localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        const lagerTab = document.getElementById('lager');
+        if (lagerTab) lagerTab.innerHTML = '';
         renderCurrentWarehouseViews();
         const sharedText = loadedShared ? ` · ${loadedShared} geteilte Lager` : '';
-        updateSyncStatus(`${loaded} Lager von Supabase geladen.${sharedText}`, 'ok');
-        if (showAlert) alert(`${loaded} Lager wurden von Supabase geladen.${loadedShared ? `\n${loadedShared} davon sind mit dir geteilt.` : ''}`);
+        updateSyncStatus(`Daten Download abgeschlossen: ${loaded} Lager geladen.${sharedText}`, 'ok');
+        if (showAlert) alert(`Daten Download abgeschlossen.\n${loaded} Lager wurden geladen.${loadedShared ? `\n${loadedShared} davon sind mit dir geteilt.` : ''}`);
     } catch (err) {
         const message = /list_accessible_warehouses/i.test(String(err.message || ''))
             ? 'Laden fehlgeschlagen: Bitte die aktuelle supabase-sync.sql in Supabase ausführen. Die Funktion list_accessible_warehouses fehlt noch.'

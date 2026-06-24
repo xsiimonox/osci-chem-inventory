@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.29</span>
+                <span class="version-badge">v2.2.31</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -195,7 +195,7 @@
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Supabase Sync &amp; Freunde</h3>
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Cloud Login &amp; Share</h3>
                 <p class="hint">Synchronisiere deine Lager zwischen Geräten. Freunde werden per E-Mail hinzugefügt und können Nur-Lesen- oder Schreibzugriff bekommen.</p>
                 <div class="sync-privacy-note">
                     <strong>Account &amp; Datenschutz</strong>
@@ -239,8 +239,8 @@
                 </div>
 
                 <div class="btn-group" style="flex-wrap:wrap; margin-top:12px;">
-                    <button onclick="syncPushAllWarehouses(true)" class="btn-primary btn-animated" style="flex:1;">Jetzt hochladen</button>
-                    <button onclick="syncPullWarehouses(true)" class="btn-secondary btn-animated" style="flex:1;">Jetzt laden</button>
+                    <button onclick="syncPushAllWarehouses(true)" class="btn-primary btn-animated" style="flex:1;">Daten Upload</button>
+                    <button onclick="syncPullWarehouses(true)" class="btn-secondary btn-animated" style="flex:1;">Daten Download</button>
                     <button onclick="runSupabaseDiagnostics()" class="btn-secondary btn-animated" style="flex:1;">Sync Diagnose</button>
                 </div>
                 <div id="supabase-diagnostics-result" class="sync-diagnostics-result"></div>
