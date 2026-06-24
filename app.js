@@ -296,6 +296,7 @@ function createWarehouseData(source = {}) {
         testCorrections: source.testCorrections || {},
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
+        toolSettings: source.toolSettings || { lastSection: '' },
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -2829,16 +2830,44 @@ function initTools() {
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
     setupToolTiles();
+    setupToolSections();
+    filterTools(document.getElementById('toolSearchInput')?.value || '');
+}
+
+function getToolSettings() {
+    if (!db.toolSettings) db.toolSettings = { lastSection: '' };
+    if (!db.toolSettings.lastSection) db.toolSettings.lastSection = '';
+    return db.toolSettings;
+}
+
+function slugifyToolTitle(title) {
+    return (title || '')
+        .toLowerCase()
+        .replace(/&/g, ' und ')
+        .replace(/ä/g, 'ae')
+        .replace(/ö/g, 'oe')
+        .replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'tool';
+}
+
+function getToolCardTitle(card) {
+    return card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim() || card?.querySelector('h3')?.textContent?.trim() || '';
 }
 
 function setupToolTiles() {
+    const settings = getToolSettings();
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
         const title = card.querySelector('h3');
         if (!title) return;
+        const toolTitle = getToolCardTitle(card);
+        const toolId = card.dataset.toolId || slugifyToolTitle(toolTitle);
+        card.dataset.toolId = toolId;
+        card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''}`.toLowerCase();
         if (card.dataset.tileReady !== 'true') {
             card.dataset.tileReady = 'true';
             card.classList.add('tool-tile-card');
-            card.setAttribute('role', 'button');
             title.setAttribute('role', 'button');
             title.setAttribute('tabindex', '0');
             title.addEventListener('keydown', event => {
@@ -2848,8 +2877,51 @@ function setupToolTiles() {
                 }
             });
         }
+        applyToolReviewBadge(card, toolTitle);
         card.classList.add('tool-tile-collapsed');
         title.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function applyToolReviewBadge(card, title) {
+    if (card.querySelector('.tool-experimental-badge')) return;
+    const needsReview = /korrektur|salz|wasserwechsel|spindel|psu/i.test(title);
+    if (!needsReview) return;
+    const hint = card.querySelector('.hint');
+    if (!hint) return;
+    hint.insertAdjacentHTML('beforebegin', '<span class="tool-experimental-badge">Bitte Ergebnis prüfen</span>');
+}
+
+function setupToolSections() {
+    const settings = getToolSettings();
+    document.querySelectorAll('#tools .tool-section').forEach((section, index) => {
+        const title = section.querySelector('.tool-section-summary strong')?.textContent?.trim() || `section-${index}`;
+        const sectionId = section.dataset.sectionId || slugifyToolTitle(title);
+        section.dataset.sectionId = sectionId;
+        if (section.dataset.sectionReady !== 'true') {
+            section.dataset.sectionReady = 'true';
+            section.addEventListener('toggle', () => {
+                if (section.open) {
+                    getToolSettings().lastSection = sectionId;
+                    saveDB(false);
+                }
+            });
+        }
+        section.open = settings.lastSection === sectionId;
+    });
+}
+
+function filterTools(query = '') {
+    const normalized = query.trim().toLowerCase();
+    document.querySelectorAll('#tools .tool-section').forEach(section => {
+        let matchesInSection = 0;
+        section.querySelectorAll('.tool-compact-card').forEach(card => {
+            const matches = !normalized || (card.dataset.toolSearch || '').includes(normalized);
+            card.classList.toggle('tool-card-hidden', !matches);
+            if (matches) matchesInSection += 1;
+        });
+        section.classList.toggle('tool-section-hidden', normalized && matchesInSection === 0);
+        if (normalized && matchesInSection > 0) section.open = true;
     });
 }
 

@@ -1965,16 +1965,74 @@ body.theme-mint.party-mode .card {
 }
 
 .tool-result {
-    background: rgba(255,255,255,0.04);
+    background: linear-gradient(135deg, rgba(255,255,255,0.065), rgba(255,255,255,0.025));
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
-    margin: 10px 0 12px;
+    border-radius: 12px;
+    padding: 13px;
+    margin: 12px 0 14px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 .tools-shell {
     display: grid;
     gap: 14px;
+}
+
+.tools-command-bar {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255,255,255,0.025);
+}
+
+.tools-search-wrap {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.045);
+    padding: 0 12px;
+}
+
+.tools-search-wrap span {
+    color: var(--secondary);
+    font-size: 1.15rem;
+    line-height: 1;
+}
+
+.tools-search-wrap input {
+    border: 0;
+    background: transparent;
+    margin: 0;
+    padding: 12px 0;
+    min-height: 44px;
+}
+
+.tools-search-wrap input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.tool-card-hidden,
+.tool-section-hidden {
+    display: none !important;
+}
+
+.tool-experimental-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid rgba(255, 209, 102, 0.34);
+    color: #ffd166;
+    background: rgba(255, 209, 102, 0.1);
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.74rem;
+    font-weight: 800;
+    margin-bottom: 10px;
 }
 
 .tool-section {
@@ -2039,14 +2097,14 @@ body.theme-mint.party-mode .card {
 .tool-tile-card > h3 {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 10px;
     cursor: pointer;
     margin: 0;
 }
 
 .tool-tile-card > h3::after {
-    content: "⌄";
+    content: "";
     width: 30px;
     height: 30px;
     border-radius: 999px;
@@ -2058,7 +2116,14 @@ body.theme-mint.party-mode .card {
     background: rgba(255,255,255,0.04);
     font-size: 1rem;
     flex: 0 0 auto;
+    margin-left: 0;
     transition: transform 0.18s ease;
+    background-image:
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position: calc(50% - 4px) 52%, calc(50% + 4px) 52%;
+    background-size: 8px 8px, 8px 8px;
+    background-repeat: no-repeat;
 }
 
 .tool-tile-card:not(.tool-tile-collapsed) > h3::after {
@@ -2299,8 +2364,14 @@ body.theme-mint.party-mode .card {
     grid-template-columns: 1fr auto;
     gap: 10px;
     align-items: center;
-    padding: 8px 0;
+    padding: 9px 0;
     border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.tool-row > span:last-child {
+    font-weight: 900;
+    color: var(--secondary);
+    text-align: right;
 }
 
 .tool-row > button {
@@ -2311,6 +2382,11 @@ body.theme-mint.party-mode .card {
 
 .tool-row:first-child {
     border-top: none;
+    padding-top: 2px;
+}
+
+.tool-row:first-child strong {
+    font-size: 1.02rem;
 }
 
 .tool-row small {

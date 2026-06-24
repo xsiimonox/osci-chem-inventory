@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.2.69">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.59</span>
+                <span class="version-badge">v2.2.69</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -146,6 +146,12 @@
 
         <div id="tools" class="tab-content">
             <div class="tools-shell">
+                <div class="tools-command-bar">
+                    <div class="tools-search-wrap">
+                        <span aria-hidden="true">⌕</span>
+                        <input type="search" id="toolSearchInput" placeholder="Tool suchen..." oninput="filterTools(this.value)">
+                    </div>
+                </div>
                 <details class="tool-section">
                     <summary class="tool-section-summary">
                         <span><strong>Wasserwerte &amp; Dosierung</strong><small>Korrektur, Verbrauch, Nährstoffe, Wasserwechsel und Salz</small></span>
@@ -1080,7 +1086,7 @@
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
     <div class="custom-cursor-dot" id="customCursorDot" aria-hidden="true"></div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=2.2.69"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')
