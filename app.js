@@ -2593,6 +2593,7 @@ function initTools() {
     renderNutritionCalculator();
     renderSeaWaterPresetSelect();
     renderSeaWaterMix();
+    renderNaclSolutionCalculator();
     renderImplementationLog();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
@@ -2747,6 +2748,55 @@ function bookSeaWaterMix() {
     executeQueueWithConflictHandling(queue, 0);
 }
 
+function renderNaclSolutionCalculator() {
+    const result = document.getElementById('naclSolutionResult');
+    if (!result) return;
+    const solutionLiters = Math.max(0, parseFloat(document.getElementById('naclSolutionLiters')?.value) || 0);
+    const tankLiters = Math.max(0, parseFloat(document.getElementById('naclTankLiters')?.value) || 0);
+    const doseMl = Math.max(0, parseFloat(document.getElementById('naclDoseMl')?.value) || 0);
+    const targetNa = Math.max(0, parseFloat(document.getElementById('naclTargetNa')?.value) || 0);
+    if (!solutionLiters) {
+        result.innerHTML = '<p class="hint">Trage ein, wie viele Liter C&amp;R Natriumchlorid Lösung du herstellen möchtest.</p>';
+        return;
+    }
+
+    const scale = solutionLiters / 10;
+    const naclKg = 3.05 * scale;
+    const roLiters = 8.86 * scale;
+    const naclGramsPerLiter = (naclKg * 1000) / solutionLiters;
+
+    const doseFactor = tankLiters > 0 ? (doseMl / 100) * (100 / tankLiters) : 0;
+    const naIncrease = 120 * doseFactor;
+    const clIncrease = 185 * doseFactor;
+    const doseForTargetNa = tankLiters > 0 && targetNa > 0 ? (targetNa / 120) * (tankLiters / 100) * 100 : 0;
+    const targetClIncrease = targetNa > 0 ? targetNa * (185 / 120) : 0;
+
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Ansatz für ${solutionLiters.toFixed(1)} L Lösung</strong><small>Basis: 10 L = 3,05 kg NaCl Pulver + 8,86 L Osmosewasser</small></span>
+                <span>${naclKg.toFixed(3)} kg NaCl</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Osmosewasser</strong><small>NaCl langsam einrühren, vollständig lösen lassen.</small></span>
+                <span>${roLiters.toFixed(2)} L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Konzentration</strong><small>Rechnerisch bezogen auf die fertige Zielmenge.</small></span>
+                <span>${naclGramsPerLiter.toFixed(1)} g/L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Dosierwirkung</strong><small>${doseMl.toFixed(1)} ml auf ${tankLiters.toFixed(0)} L Aquariumwasser</small></span>
+                <span>Na +${naIncrease.toFixed(1)} mg/l · Cl +${clIncrease.toFixed(1)} mg/l</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Dosis für Ziel-Na</strong><small>Bei +${targetNa.toFixed(1)} mg/l Na steigt Cl rechnerisch um +${targetClIncrease.toFixed(1)} mg/l.</small></span>
+                <span>${doseForTargetNa.toFixed(1)} ml</span>
+            </div>
+        </div>
+    `;
+}
+
 function resolveRecipeItem(entry) {
     if (!entry.item) return null;
     const cat = findCat(entry.item);
@@ -2818,11 +2868,19 @@ function renderLogBook() {
     const todoCategory = document.getElementById('todoCategory');
     const dateInput = document.getElementById('logBookDate');
     const dueInput = document.getElementById('todoDueAt');
+    const entryCount = document.getElementById('logBookEntryCount');
+    const openCount = document.getElementById('todoOpenCount');
+    const dueCount = document.getElementById('todoDueCount');
     const options = db.logBookCategories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
     if (categorySelect) categorySelect.innerHTML = options;
     if (todoCategory) todoCategory.innerHTML = options;
     if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
     if (dueInput && !dueInput.value) dueInput.value = formatDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+    const todos = db.aquariumTodos || [];
+    const now = Date.now();
+    if (entryCount) entryCount.innerText = String((db.logBookEntries || []).length);
+    if (openCount) openCount.innerText = String(todos.filter(todo => !todo.done).length);
+    if (dueCount) dueCount.innerText = String(todos.filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= now).length);
     updateTodoIntervalLabel();
     renderLogBookCategories();
     renderLogBookEntries();

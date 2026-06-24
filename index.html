@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.39</span>
+                <span class="version-badge">v2.2.41</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -190,6 +190,30 @@
             </div>
 
             <div class="card">
+                <h3>C&amp;R Natriumchlorid aus NaCl Pulver</h3>
+                <p class="hint">Rechnet den Ansatz von NaCl Pulver mit Osmosewasser zu flüssigem C&amp;R Natriumchlorid und zeigt die spätere Dosierwirkung im Aquarium.</p>
+                <div class="tool-grid">
+                    <div class="input-group">
+                        <label>Zielmenge Lösung (L):</label>
+                        <input type="number" id="naclSolutionLiters" min="0.1" step="0.1" value="10" oninput="renderNaclSolutionCalculator()">
+                    </div>
+                    <div class="input-group">
+                        <label>Aquariumgröße (L):</label>
+                        <input type="number" id="naclTankLiters" min="1" step="1" value="100" oninput="renderNaclSolutionCalculator()">
+                    </div>
+                    <div class="input-group">
+                        <label>Dosierung Lösung (ml):</label>
+                        <input type="number" id="naclDoseMl" min="0" step="1" value="100" oninput="renderNaclSolutionCalculator()">
+                    </div>
+                    <div class="input-group">
+                        <label>Ziel Na-Erhöhung (mg/l):</label>
+                        <input type="number" id="naclTargetNa" min="0" step="1" value="120" oninput="renderNaclSolutionCalculator()">
+                    </div>
+                </div>
+                <div id="naclSolutionResult"></div>
+            </div>
+
+            <div class="card">
                 <h3>Makro-Elemente anmischen</h3>
                 <p class="hint">Wähle ein Rezept und die Zielmenge. C&amp;R-Produkte werden gegen deinen Bestand geprüft und können direkt ausgelagert werden.</p>
                 <div class="input-group">
@@ -233,12 +257,23 @@
 
         <div id="logbuch" class="tab-content">
             <div class="card logbook-hero">
-                <h3>Log Buch</h3>
-                <p class="hint">Dokumentiere Pflege, Messungen, Besatz, Technik und alle Arbeiten am Meerwasser-Aquarium.</p>
+                <div>
+                    <h3>Log Buch</h3>
+                    <p class="hint">Pflege, Messungen, Besatz, Technik und Aufgaben am Aquarium sauber nachvollziehen.</p>
+                </div>
+                <div class="logbook-metrics">
+                    <div><strong id="logBookEntryCount">0</strong><span>Logs</span></div>
+                    <div><strong id="todoOpenCount">0</strong><span>offen</span></div>
+                    <div><strong id="todoDueCount">0</strong><span>fällig</span></div>
+                </div>
             </div>
 
-            <div class="card">
-                <h3>Eintrag dokumentieren</h3>
+            <div class="logbook-layout">
+            <div class="card logbook-card logbook-document-card">
+                <div class="logbook-section-title">
+                    <h3>Eintrag dokumentieren</h3>
+                    <span>Log</span>
+                </div>
                 <div class="tool-grid">
                     <div class="input-group">
                         <label>Kategorie:</label>
@@ -257,7 +292,7 @@
                     <label>Notiz:</label>
                     <textarea id="logBookNote" placeholder="Was wurde gemacht? Welche Werte, Beobachtungen oder nächsten Schritte sind wichtig?"></textarea>
                 </div>
-                <button class="btn-primary btn-animated" onclick="saveLogBookEntry()">Log speichern</button>
+                <button class="btn-primary btn-animated logbook-primary-action" onclick="saveLogBookEntry()">Log speichern</button>
                 <details class="logbook-list-details">
                     <summary class="logbook-summary">
                         <span>Dokumentation anzeigen</span>
@@ -267,7 +302,7 @@
                 </details>
             </div>
 
-            <div class="card">
+            <div class="card logbook-card logbook-category-card">
                 <details>
                     <summary class="logbook-summary">
                         <span>Kategorien verwalten</span>
@@ -282,9 +317,11 @@
                 </details>
             </div>
 
-            <div class="card">
-                <h3>ToDo &amp; Erinnerungen</h3>
-                <p class="hint">Wiederkehrende Aufgaben wie Wasserwechsel, Tests, Pumpenreinigung oder Futterkontrolle planen.</p>
+            <div class="card logbook-card logbook-todo-card">
+                <div class="logbook-section-title">
+                    <h3>ToDo &amp; Erinnerungen</h3>
+                    <span>Plan</span>
+                </div>
                 <div class="tool-grid">
                     <div class="input-group">
                         <label>Aufgabe:</label>
@@ -326,6 +363,7 @@
                     <button class="btn-in btn-animated" onclick="enableStockNotifications()" style="flex:1;">Push aktivieren</button>
                 </div>
                 <div id="aquarium-todo-list"></div>
+            </div>
             </div>
         </div>
 
