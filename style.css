@@ -139,6 +139,51 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 .header-title-container { display: flex; align-items: center; gap: 8px; }
 .version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
 
+.update-banner {
+    max-width: 1200px;
+    margin: 0 auto 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 214, 10, 0.42);
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 214, 10, 0.16), rgba(100, 210, 255, 0.09));
+    box-shadow: 0 12px 30px rgba(0,0,0,0.24);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.update-banner[hidden] {
+    display: none !important;
+}
+
+.update-banner strong,
+.update-banner span {
+    display: block;
+}
+
+.update-banner strong {
+    color: #ffd60a;
+    font-size: 0.95rem;
+}
+
+.update-banner span {
+    color: var(--text);
+    font-size: 0.82rem;
+    margin-top: 2px;
+}
+
+.update-banner button {
+    width: auto;
+    min-width: 118px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 214, 10, 0.5);
+    background: rgba(255, 214, 10, 0.18);
+    color: #fff;
+    font-weight: 900;
+}
+
 .menu-toggle { background: none; border: none; cursor: pointer; padding: 4px; display: flex; flex-direction: column; gap: 5px; z-index: 101; }
 .menu-toggle .bar { width: 24px; height: 2.5px; background-color: var(--primary); border-radius: 2px; transition: 0.3s; }
 
@@ -1757,8 +1802,26 @@ body.theme-mint.party-mode .card {
 
 @media (max-width: 600px) {
     .tool-grid,
-    .resource-link-grid {
+    .resource-link-grid,
+    .tool-card-grid {
         grid-template-columns: 1fr;
+    }
+
+    .tool-card-grid {
+        padding: 10px;
+    }
+
+    .tool-section-summary {
+        padding: 13px 14px;
+    }
+
+    .tool-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .tool-row > span:last-child {
+        text-align: left;
     }
 
     .logbook-hero,
@@ -1897,6 +1960,75 @@ body.theme-mint.party-mode .card {
     margin: 10px 0 12px;
 }
 
+.tools-shell {
+    display: grid;
+    gap: 14px;
+}
+
+.tool-section {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.025);
+    overflow: hidden;
+}
+
+.tool-section-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+    cursor: pointer;
+    list-style: none;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.tool-section-summary::-webkit-details-marker {
+    display: none;
+}
+
+.tool-section-summary strong,
+.tool-section-summary small {
+    display: block;
+}
+
+.tool-section-summary strong {
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.tool-section-summary small {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin-top: 3px;
+    line-height: 1.35;
+}
+
+.tool-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 12px;
+}
+
+.tool-compact-card {
+    margin: 0;
+    padding: 14px;
+}
+
+.tool-compact-card h3 {
+    margin-bottom: 6px;
+}
+
+.tool-compact-card .hint {
+    margin-bottom: 12px;
+}
+
+.tool-compact-card textarea {
+    min-height: 76px;
+    resize: vertical;
+}
+
 .tool-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1976,6 +2108,12 @@ body.theme-mint.party-mode .card {
     border-top: 1px solid rgba(255,255,255,0.06);
 }
 
+.tool-row > button {
+    width: auto;
+    padding: 7px 10px;
+    font-size: 0.75rem;
+}
+
 .tool-row:first-child {
     border-top: none;
 }
@@ -1989,6 +2127,11 @@ body.theme-mint.party-mode .card {
 
 .tool-row.missing {
     color: var(--danger);
+}
+
+.tool-result.missing {
+    border-color: rgba(255, 69, 58, 0.45);
+    background: rgba(255, 69, 58, 0.08);
 }
 
 .dose-plan {
@@ -2567,6 +2710,76 @@ header {
 @keyframes toastSlideOut {
     from { opacity: 1; transform: translateY(0) scale(1); }
     to { opacity: 0; transform: translateY(-10px) scale(0.9); }
+}
+
+@media (pointer: fine) and (hover: hover) {
+    body.custom-cursor-enabled,
+    body.custom-cursor-enabled * {
+        cursor: none !important;
+    }
+
+    .custom-cursor,
+    .custom-cursor-dot {
+        position: fixed;
+        top: 0;
+        left: 0;
+        pointer-events: none;
+        z-index: 2147483647;
+        opacity: 0;
+        transform: translate3d(-50%, -50%, 0);
+        transition: opacity 0.16s ease, width 0.16s ease, height 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+        will-change: transform;
+    }
+
+    .custom-cursor {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.58);
+        background: rgba(255, 255, 255, 0.075);
+        box-shadow: 0 8px 22px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.05);
+        backdrop-filter: blur(10px) saturate(1.25);
+        -webkit-backdrop-filter: blur(10px) saturate(1.25);
+    }
+
+    .custom-cursor-dot {
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.88);
+        box-shadow: 0 1px 6px rgba(0,0,0,0.22);
+    }
+
+    body.cursor-visible .custom-cursor,
+    body.cursor-visible .custom-cursor-dot {
+        opacity: 1;
+    }
+
+    body.cursor-hover .custom-cursor {
+        width: 28px;
+        height: 28px;
+        border-color: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: 0 10px 28px rgba(0,0,0,0.24), inset 0 0 0 1px rgba(255,255,255,0.07);
+    }
+
+    body.cursor-down .custom-cursor {
+        width: 14px;
+        height: 14px;
+        background: rgba(255,255,255,0.16);
+    }
+}
+
+@media (max-width: 600px) {
+    .update-banner {
+        margin: 0 12px 12px;
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .update-banner button {
+        width: 100%;
+    }
 }
 
 /* ==========================================================================

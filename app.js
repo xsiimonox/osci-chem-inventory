@@ -242,6 +242,7 @@ function buildShopUrl(slug, sizeMl) {
 
 const DB_KEY = 'osci_db_v5';
 const SYNC_SETTINGS_KEY = 'osci_supabase_sync_v1';
+const LAST_TAB_KEY = 'osci_last_active_tab';
 const DEFAULT_SUPABASE_URL = 'https://ymeszigbnoaoqkwxcbqo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_4LQDgitTmZeu9tO2Mh8Hew_-EseNuP0';
 let appState = null;
@@ -253,6 +254,7 @@ let supabaseClientPromise = null;
 let supabaseClientInstance = null;
 let syncPushTimer = null;
 let syncIsPulling = false;
+const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'logbuch', 'einstellungen'];
 
 // --- INITIALISIERUNG ---
 function resetCatalogToBase() {
@@ -288,6 +290,12 @@ function createWarehouseData(source = {}) {
         logBookCategories: source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
         logBookEntries: source.logBookEntries || [],
         aquariumTodos: source.aquariumTodos || [],
+        feedNutrientLog: source.feedNutrientLog || [],
+        osmoseTank: source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 },
+        traceDraft: source.traceDraft || {},
+        testCorrections: source.testCorrections || {},
+        majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
+        psuCorrectionOffset: source.psuCorrectionOffset || 0,
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -352,6 +360,17 @@ function normalizeWarehouseData(data) {
     if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];
     if (!db.logBookEntries) db.logBookEntries = [];
     if (!db.aquariumTodos) db.aquariumTodos = [];
+    if (!db.feedNutrientLog) db.feedNutrientLog = [];
+    if (!db.osmoseTank) db.osmoseTank = { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 };
+    if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
+    if (!db.traceDraft) db.traceDraft = {};
+    if (!db.testCorrections) db.testCorrections = {};
+    if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
+    if (!db.majorCorrectionSettings.strengths) db.majorCorrectionSettings.strengths = { KH: 0.05, Ca: 1 };
+    if (db.majorCorrectionSettings.strengths.KH === undefined) db.majorCorrectionSettings.strengths.KH = 0.05;
+    if (db.majorCorrectionSettings.strengths.Ca === undefined) db.majorCorrectionSettings.strengths.Ca = 1;
+    if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = 100;
+    if (db.psuCorrectionOffset === undefined) db.psuCorrectionOffset = 0;
     if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
     if (!db.warehouseEvents) db.warehouseEvents = [];
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
@@ -1342,19 +1361,30 @@ function selectTab(tabId) {
 }
 
 function showTab(tabId) {
+    const targetTab = document.getElementById(tabId);
+    const targetBtn = document.getElementById('tab-' + tabId);
+    if (!targetTab || !targetBtn) tabId = 'lager';
+
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.nav-links button').forEach(el => el.classList.remove('active'));
     
-    const targetTab = document.getElementById(tabId);
-    const targetBtn = document.getElementById('tab-' + tabId);
-    if (targetTab && targetBtn) {
+    const resolvedTab = document.getElementById(tabId);
+    const resolvedBtn = document.getElementById('tab-' + tabId);
+    if (resolvedTab && resolvedBtn) {
         // Re-trigger the slide-in animation by briefly removing the class
-        targetTab.style.animation = 'none';
-        targetTab.offsetHeight; // Force reflow
-        targetTab.style.animation = '';
-        targetTab.classList.add('active');
-        targetBtn.classList.add('active');
+        resolvedTab.style.animation = 'none';
+        resolvedTab.offsetHeight; // Force reflow
+        resolvedTab.style.animation = '';
+        resolvedTab.classList.add('active');
+        resolvedBtn.classList.add('active');
     }
+    db.lastTab = tabId;
+    try { localStorage.setItem(LAST_TAB_KEY, tabId); } catch(e) {}
+    try {
+        const nextHash = '#' + encodeURIComponent(tabId);
+        if (window.location.hash !== nextHash) history.replaceState(null, '', nextHash);
+    } catch(e) {}
+    saveDB(false);
     
     if(tabId === 'lager') renderLager();
     if(tabId === 'statistik') renderStats();
@@ -1490,8 +1520,57 @@ function applyTheme(themeName, shouldSave = true) {
 }
 
 // --- AUTOMATISCHES CACHE LEEREN & FORCE UPDATE ---
-async function forceUpdateApp() {
-    if (confirm("Möchtest du ein App-Update erzwingen? Dabei wird der interne Zwischenspeicher (Cache) geleert und die allerneueste Version geladen. Deine Bestandsdaten bleiben erhalten!")) {
+function getCurrentAppVersion() {
+    return document.querySelector('.version-badge')?.innerText?.trim() || '';
+}
+
+function compareVersionLabels(a, b) {
+    const parse = value => String(value || '').replace(/^v/i, '').split('.').map(num => parseInt(num, 10) || 0);
+    const left = parse(a);
+    const right = parse(b);
+    const length = Math.max(left.length, right.length);
+    for (let i = 0; i < length; i++) {
+        if ((left[i] || 0) > (right[i] || 0)) return 1;
+        if ((left[i] || 0) < (right[i] || 0)) return -1;
+    }
+    return 0;
+}
+
+function showUpdateBanner(latestVersion) {
+    const banner = document.getElementById('update-banner');
+    const text = document.getElementById('update-banner-text');
+    if (!banner) return;
+    const current = getCurrentAppVersion();
+    if (text) text.innerText = latestVersion ? `Installiert: ${current} · Neu: ${latestVersion}` : 'Eine neuere App-Version kann geladen werden.';
+    banner.hidden = false;
+}
+
+function hideUpdateBanner() {
+    const banner = document.getElementById('update-banner');
+    if (banner) banner.hidden = true;
+}
+
+async function checkForAppUpdate(showIfCurrent = false) {
+    try {
+        const response = await fetch(`index.html?version-check=${Date.now()}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const html = await response.text();
+        const match = html.match(/class=["']version-badge["'][^>]*>\s*(v[0-9.]+)\s*</i);
+        const latest = match ? match[1] : '';
+        const current = getCurrentAppVersion();
+        if (latest && current && compareVersionLabels(latest, current) > 0) {
+            showUpdateBanner(latest);
+        } else {
+            hideUpdateBanner();
+            if (showIfCurrent) showToast('Du nutzt bereits die aktuelle Version.', 'success');
+        }
+    } catch (err) {
+        if (showIfCurrent) showToast('Versionsprüfung gerade nicht möglich.', 'warning');
+    }
+}
+
+async function forceUpdateApp(ask = true) {
+    if (!ask || confirm("Möchtest du ein App-Update erzwingen? Dabei wird der interne Zwischenspeicher (Cache) geleert und die allerneueste Version geladen. Deine Bestandsdaten bleiben erhalten!")) {
         // 1. Service Worker deregistrieren
         if ('serviceWorker' in navigator) {
             try {
@@ -1558,6 +1637,43 @@ function sendBugReport() {
 
     const subject = `Bugmeldung OSCI Lager App ${appVersion}`;
     window.location.href = `mailto:simon@asbach.tech?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+function initCustomCursor() {
+    const finePointer = window.matchMedia && window.matchMedia('(pointer: fine) and (hover: hover)').matches;
+    const cursor = document.getElementById('customCursor');
+    const dot = document.getElementById('customCursorDot');
+    if (!finePointer || !cursor || !dot) return;
+
+    document.body.classList.add('custom-cursor-enabled');
+    let targetX = window.innerWidth / 2;
+    let targetY = window.innerHeight / 2;
+    let cursorX = targetX;
+    let cursorY = targetY;
+
+    const move = event => {
+        targetX = event.clientX;
+        targetY = event.clientY;
+        dot.style.transform = `translate3d(${targetX}px, ${targetY}px, 0) translate(-50%, -50%)`;
+        document.body.classList.add('cursor-visible');
+    };
+
+    const animate = () => {
+        cursorX += (targetX - cursorX) * 0.34;
+        cursorY += (targetY - cursorY) * 0.34;
+        cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0) translate(-50%, -50%)`;
+        requestAnimationFrame(animate);
+    };
+
+    document.addEventListener('mousemove', move, { passive: true });
+    document.addEventListener('mouseleave', () => document.body.classList.remove('cursor-visible'));
+    document.addEventListener('mouseenter', () => document.body.classList.add('cursor-visible'));
+    document.addEventListener('mousedown', () => document.body.classList.add('cursor-down'));
+    document.addEventListener('mouseup', () => document.body.classList.remove('cursor-down'));
+    document.addEventListener('mouseover', event => {
+        document.body.classList.toggle('cursor-hover', Boolean(event.target.closest('button, a, input, select, textarea, summary, label, .resource-link-card')));
+    });
+    requestAnimationFrame(animate);
 }
 
 // --- NEUE HILFSFUNKTIONEN ---
@@ -2540,17 +2656,19 @@ function renderStockAlerts(container) {
 function renderTraceExportInputs() {
     const katContainer = document.getElementById('kationen-inputs-container');
     const anContainer = document.getElementById('anionen-inputs-container');
+    if (!db.traceDraft) db.traceDraft = {};
     
     if (katContainer) {
         katContainer.innerHTML = mixDefinitions.kationen.map(item => {
             let id = 'mix-kat-' + item.replace(/[^a-zA-Z]/g, '');
+            const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" oninput="calcTraceGrams('${id}', '${item}')">
+                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
                 <div style="display:flex; flex-direction:column; align-items:flex-end;">
                     <span class="unit-label">ml</span>
-                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">0.00 g</span>
+                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
                 </div>
             </div>
         `}).join('');
@@ -2558,17 +2676,19 @@ function renderTraceExportInputs() {
     if (anContainer) {
         anContainer.innerHTML = mixDefinitions.anionen.map(item => {
             let id = 'mix-an-' + item.replace(/[^a-zA-Z]/g, '');
+            const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
                 <label>${item}</label>
-                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" oninput="calcTraceGrams('${id}', '${item}')">
+                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
                 <div style="display:flex; flex-direction:column; align-items:flex-end;">
                     <span class="unit-label">ml</span>
-                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">0.00 g</span>
+                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
                 </div>
             </div>
         `}).join('');
     }
+    previewReefManagerImport();
 }
 
 function calcTraceGrams(inputId, itemName) {
@@ -2580,6 +2700,87 @@ function calcTraceGrams(inputId, itemName) {
         let g = ml * factor;
         gramEl.innerText = g.toFixed(2) + ' g';
     }
+}
+
+function updateTraceDraft(inputId, itemName) {
+    if (!db.traceDraft) db.traceDraft = {};
+    const inputEl = document.getElementById(inputId);
+    const value = parseFloat(inputEl?.value);
+    if (value > 0) db.traceDraft[itemName] = inputEl.value;
+    else delete db.traceDraft[itemName];
+    calcTraceGrams(inputId, itemName);
+    saveDB(false);
+}
+
+const reefManagerSymbolMap = {
+    Co: 'Cobalt (Co)',
+    Ni: 'Nickel (Ni)',
+    Fe: 'Eisen (Fe)',
+    Mn: 'Mangan (Mn)',
+    Cu: 'Kupfer (Cu)',
+    Cr: 'Chrom (Cr)',
+    Zn: 'Zink (Zn)',
+    F: 'Fluor (F)',
+    I: 'Iod (I)',
+    Se: 'Selen (Se)',
+    V: 'Vanadium (V)'
+};
+
+function parseReefManagerExport(text) {
+    const rows = [];
+    String(text || '').split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (!/^(Kation|Anion)\b/i.test(trimmed)) return;
+        const normalized = trimmed.replace(/\t/g, ' ');
+        const match = normalized.match(/^(Kation|Anion)\s+([^\s]+)\s+([A-Za-z]+)\s+([0-9]+(?:[,.][0-9]+)?)/i);
+        if (!match) return;
+        const type = match[1].toLowerCase();
+        const symbol = match[3];
+        const amount = parseFloat(match[4].replace(',', '.'));
+        const item = reefManagerSymbolMap[symbol];
+        if (item && amount > 0) rows.push({ type, symbol, item, amount });
+    });
+    return rows;
+}
+
+function previewReefManagerImport() {
+    const preview = document.getElementById('reef-manager-import-preview');
+    if (!preview) return;
+    const text = document.getElementById('reef-manager-import-text')?.value || '';
+    const rows = parseReefManagerExport(text);
+    if (rows.length === 0) {
+        preview.innerHTML = 'Noch kein gültiger Reef Manager Export erkannt.';
+        return;
+    }
+    preview.innerHTML = `
+        <div class="tool-result">
+            ${rows.map(row => `
+                <div class="tool-row">
+                    <span><strong>${escapeHtml(row.item)}</strong><small>${row.type === 'kation' ? 'Kation' : 'Anion'} · ${escapeHtml(row.symbol)}</small></span>
+                    <span>${row.amount.toFixed(2)} ml</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function importReefManagerTrace() {
+    const text = document.getElementById('reef-manager-import-text')?.value || '';
+    const rows = parseReefManagerExport(text);
+    if (rows.length === 0) return alert('Keine gültigen Anionen/Kationen-Mengen erkannt.');
+    if (!db.traceDraft) db.traceDraft = {};
+    rows.forEach(row => {
+        db.traceDraft[row.item] = String(row.amount.toFixed(2));
+    });
+    saveDB(false);
+    renderTraceExportInputs();
+    showToast(`${rows.length} Reef Manager Wert(e) übernommen`, 'success');
+}
+
+function clearReefManagerImport() {
+    const area = document.getElementById('reef-manager-import-text');
+    if (area) area.value = '';
+    previewReefManagerImport();
 }
 
 function initTools() {
@@ -2594,9 +2795,542 @@ function initTools() {
     renderSeaWaterPresetSelect();
     renderSeaWaterMix();
     renderNaclSolutionCalculator();
+    syncMajorCorrectionInputsFromSettings(true);
+    renderMajorCorrectionCalculator();
+    renderConsumptionCalculator();
+    renderTestCorrectionTool();
+    renderWaterChangeCalculator();
+    renderSaltCorrectionCalculator();
+    renderFeedNutrientLog();
+    renderLightPlanner();
+    renderFlowCalculator();
+    renderOsmoseTank();
+    renderPsuCorrectionSettings();
     renderImplementationLog();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
+}
+
+const majorCorrectionDefaultSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
+
+function getMajorCorrectionUnit(element) {
+    return element === 'KH' ? 'dKH' : 'mg/l';
+}
+
+function getMajorCorrectionSettings() {
+    if (!db.majorCorrectionSettings) db.majorCorrectionSettings = JSON.parse(JSON.stringify(majorCorrectionDefaultSettings));
+    if (!db.majorCorrectionSettings.strengths) db.majorCorrectionSettings.strengths = {};
+    ['KH', 'Ca'].forEach(element => {
+        if (db.majorCorrectionSettings.strengths[element] === undefined) {
+            db.majorCorrectionSettings.strengths[element] = majorCorrectionDefaultSettings.strengths[element];
+        }
+    });
+    if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = majorCorrectionDefaultSettings.tankLiters;
+    return db.majorCorrectionSettings;
+}
+
+function syncMajorCorrectionInputsFromSettings(force = false) {
+    const settings = getMajorCorrectionSettings();
+    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
+    const litersEl = document.getElementById('majorCorrectionLiters');
+    const strengthEl = document.getElementById('majorCorrectionStrength');
+    if (litersEl && (force || !litersEl.value)) {
+        litersEl.value = settings.tankLiters;
+    }
+    if (strengthEl && (force || !strengthEl.value)) {
+        strengthEl.value = settings.strengths[element];
+    }
+}
+
+function selectMajorCorrectionElement() {
+    syncMajorCorrectionInputsFromSettings(true);
+    renderMajorCorrectionCalculator();
+}
+
+function saveMajorCorrectionDefaults() {
+    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
+    const tankLiters = Math.max(1, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || majorCorrectionDefaultSettings.tankLiters);
+    const strength = Math.max(0.0001, parseFloat(document.getElementById('majorCorrectionStrength')?.value) || majorCorrectionDefaultSettings.strengths[element]);
+    const settings = getMajorCorrectionSettings();
+    settings.tankLiters = tankLiters;
+    settings.strengths[element] = strength;
+    saveDB();
+    renderMajorCorrectionCalculator();
+    showToast('Korrektur-Voreinstellung gespeichert', 'success');
+}
+
+function resetMajorCorrectionDefaults() {
+    if (!confirm('KH/CA Korrektur-Voreinstellungen zurücksetzen?')) return;
+    db.majorCorrectionSettings = JSON.parse(JSON.stringify(majorCorrectionDefaultSettings));
+    saveDB();
+    syncMajorCorrectionInputsFromSettings(true);
+    renderMajorCorrectionCalculator();
+}
+
+function renderMajorCorrectionCalculator() {
+    const result = document.getElementById('majorCorrectionResult');
+    if (!result) return;
+    syncMajorCorrectionInputsFromSettings();
+    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
+    const liters = Math.max(0, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || 0);
+    const current = parseFloat(document.getElementById('majorCorrectionCurrent')?.value);
+    const target = parseFloat(document.getElementById('majorCorrectionTarget')?.value);
+    const strength = Math.max(0, parseFloat(document.getElementById('majorCorrectionStrength')?.value) || 0);
+    const days = Math.max(1, parseInt(document.getElementById('majorCorrectionDays')?.value, 10) || 1);
+    const unit = getMajorCorrectionUnit(element);
+    const label = document.getElementById('majorCorrectionStrengthLabel');
+    if (label) label.innerText = `Produktwirkung pro 1 ml / 100 L (${unit}):`;
+    if (!liters || Number.isNaN(current) || Number.isNaN(target) || !strength) {
+        result.innerHTML = '<p class="hint">Bitte Beckenvolumen, Werte und Produktwirkung eintragen.</p>';
+        return;
+    }
+    const diff = target - current;
+    const totalMl = diff > 0 ? (diff / strength) * (liters / 100) : 0;
+    const dailyMl = totalMl / days;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>${element} Änderung</strong><small>${current.toFixed(2)} → ${target.toFixed(2)} ${unit}</small></span>
+                <span>${diff >= 0 ? '+' : ''}${diff.toFixed(2)} ${unit}</span>
+            </div>
+            <div class="tool-row ${diff <= 0 ? 'missing' : ''}">
+                <span><strong>Dosiermenge</strong><small>Produktwirkung: ${strength} ${unit} pro 1 ml / 100 L</small></span>
+                <span>${diff > 0 ? totalMl.toFixed(2) + ' ml' : 'keine Erhöhung nötig'}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Schonend aufteilen</strong><small>${days} Tag(e)</small></span>
+                <span>${diff > 0 ? dailyMl.toFixed(2) + ' ml/Tag' : '-'}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderConsumptionCalculator() {
+    const result = document.getElementById('consumptionResult');
+    if (!result) return;
+    const element = document.getElementById('consumptionElement')?.value || 'KH';
+    const start = parseFloat(document.getElementById('consumptionStart')?.value);
+    const end = parseFloat(document.getElementById('consumptionEnd')?.value);
+    const days = Math.max(0, parseFloat(document.getElementById('consumptionDays')?.value) || 0);
+    const unit = element === 'KH' ? 'dKH' : 'mg/l';
+    if (Number.isNaN(start) || Number.isNaN(end) || !days) {
+        result.innerHTML = '<p class="hint">Bitte beide Messwerte und den Zeitraum eintragen.</p>';
+        return;
+    }
+    const change = end - start;
+    const daily = change / days;
+    const trend = daily < 0 ? 'Verbrauch / Abnahme' : daily > 0 ? 'Anstieg' : 'stabil';
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>${element} ${trend}</strong><small>${start.toFixed(2)} → ${end.toFixed(2)} ${unit} in ${days.toFixed(1)} Tag(en)</small></span>
+                <span>${daily.toFixed(3)} ${unit}/Tag</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Wöchentliche Veränderung</strong><small>Zur groben Planung von Messintervallen und Dosierung.</small></span>
+                <span>${(daily * 7).toFixed(3)} ${unit}/Woche</span>
+            </div>
+        </div>
+    `;
+}
+
+const testCorrectionMeta = {
+    KH: { label: 'KH Alkalinität', unit: 'dKH', defaultValue: 7.5 },
+    Ca: { label: 'CA Calcium', unit: 'mg/l', defaultValue: 425 },
+    Mg: { label: 'MG Magnesium', unit: 'mg/l', defaultValue: 1350 },
+    PO4: { label: 'PO4 Phosphat', unit: 'mg/l', defaultValue: 0.05 },
+    NO3: { label: 'NO3 Nitrat', unit: 'mg/l', defaultValue: 5 }
+};
+
+function selectTestCorrectionElement() {
+    const element = document.getElementById('testCorrectionElement')?.value || 'KH';
+    const meta = testCorrectionMeta[element] || testCorrectionMeta.KH;
+    ['testCorrectionHome', 'testCorrectionReference', 'testCorrectionMeasured'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = meta.defaultValue;
+    });
+    renderTestCorrectionTool();
+}
+
+function getTestCorrection(element) {
+    if (!db.testCorrections) db.testCorrections = {};
+    return db.testCorrections[element] || null;
+}
+
+function renderTestCorrectionTool() {
+    const result = document.getElementById('testCorrectionResult');
+    if (!result) return;
+    const element = document.getElementById('testCorrectionElement')?.value || 'KH';
+    const home = parseFloat(document.getElementById('testCorrectionHome')?.value);
+    const reference = parseFloat(document.getElementById('testCorrectionReference')?.value);
+    const measured = parseFloat(document.getElementById('testCorrectionMeasured')?.value);
+    const saved = getTestCorrection(element);
+    const factorPreview = !Number.isNaN(home) && home !== 0 && !Number.isNaN(reference) ? reference / home : null;
+    const activeFactor = saved ? saved.factor : factorPreview;
+    const meta = testCorrectionMeta[element] || testCorrectionMeta.KH;
+    const corrected = activeFactor && !Number.isNaN(measured) ? measured * activeFactor : null;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>${meta.label}</strong><small>${saved ? `Gespeichert am ${formatWarehouseDate(saved.updatedAt)}` : 'Noch kein Faktor gespeichert'}</small></span>
+                <span>${saved ? saved.factor.toFixed(4) : '-'}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Neuer Faktor aus Referenz</strong><small>${Number.isFinite(factorPreview) ? `${reference} / ${home}` : 'Heimtest und Referenz eintragen'}</small></span>
+                <span>${Number.isFinite(factorPreview) ? factorPreview.toFixed(4) : '-'}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Korrigierter Messwert</strong><small>${saved ? 'Mit gespeichertem Faktor berechnet' : 'Vorschau mit neuem Faktor'}</small></span>
+                <span>${Number.isFinite(corrected) ? corrected.toFixed(element === 'KH' ? 2 : 3) + ' ' + meta.unit : '-'}</span>
+            </div>
+        </div>
+    `;
+}
+
+function saveTestCorrectionFactor() {
+    const element = document.getElementById('testCorrectionElement')?.value || 'KH';
+    const home = parseFloat(document.getElementById('testCorrectionHome')?.value);
+    const reference = parseFloat(document.getElementById('testCorrectionReference')?.value);
+    if (!home || Number.isNaN(home) || Number.isNaN(reference)) return alert('Bitte Heimtest-Wert und Referenzwert eintragen.');
+    if (!db.testCorrections) db.testCorrections = {};
+    db.testCorrections[element] = {
+        factor: reference / home,
+        home,
+        reference,
+        updatedAt: new Date().toISOString()
+    };
+    saveDB();
+    renderTestCorrectionTool();
+    showToast('Korrekturfaktor gespeichert', 'success');
+}
+
+function deleteTestCorrectionFactor() {
+    const element = document.getElementById('testCorrectionElement')?.value || 'KH';
+    if (!db.testCorrections || !db.testCorrections[element]) return alert('Für diesen Test ist kein Faktor gespeichert.');
+    if (!confirm('Korrekturfaktor für diesen Test löschen?')) return;
+    delete db.testCorrections[element];
+    saveDB();
+    renderTestCorrectionTool();
+}
+
+function renderWaterChangeCalculator() {
+    const result = document.getElementById('waterChangeResult');
+    if (!result) return;
+    const tank = Math.max(0, parseFloat(document.getElementById('waterChangeTankLiters')?.value) || 0);
+    const change = Math.max(0, parseFloat(document.getElementById('waterChangeLiters')?.value) || 0);
+    const current = parseFloat(document.getElementById('waterChangeCurrent')?.value);
+    const fresh = parseFloat(document.getElementById('waterChangeNew')?.value);
+    if (!tank || Number.isNaN(current) || Number.isNaN(fresh)) {
+        result.innerHTML = '<p class="hint">Bitte Beckenvolumen und Werte eintragen.</p>';
+        return;
+    }
+    const clampedChange = Math.min(change, tank);
+    const ratio = clampedChange / tank;
+    const after = current * (1 - ratio) + fresh * ratio;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Wasserwechsel Anteil</strong><small>${clampedChange.toFixed(1)} L von ${tank.toFixed(1)} L</small></span>
+                <span>${(ratio * 100).toFixed(1)} %</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Erwarteter Wert danach</strong><small>Rechnerisch direkt nach vollständiger Durchmischung.</small></span>
+                <span>${after.toFixed(3)}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Änderung</strong><small>Von ${current} auf ${after.toFixed(3)}</small></span>
+                <span>${(after - current).toFixed(3)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderSaltCorrectionCalculator() {
+    const result = document.getElementById('saltCorrectionResult');
+    if (!result) return;
+    const liters = Math.max(0, parseFloat(document.getElementById('saltCorrectionLiters')?.value) || 0);
+    const current = Math.max(0, parseFloat(document.getElementById('saltCorrectionCurrent')?.value) || 0);
+    const target = Math.max(0, parseFloat(document.getElementById('saltCorrectionTarget')?.value) || 0);
+    if (!liters || !current || !target) {
+        result.innerHTML = '<p class="hint">Bitte Volumen, aktuelle PSU und Ziel-PSU eintragen.</p>';
+        return;
+    }
+    const diff = target - current;
+    let action = '';
+    if (diff > 0) {
+        action = `
+            <div class="tool-row">
+                <span><strong>Salz ergänzen</strong><small>Näherung: 1 PSU entspricht etwa 1 g Salz pro Liter.</small></span>
+                <span>${(diff * liters).toFixed(0)} g</span>
+            </div>
+        `;
+    } else if (diff < 0) {
+        const roLiters = liters * (1 - target / current);
+        action = `
+            <div class="tool-row">
+                <span><strong>Mit Osmosewasser senken</strong><small>So viel Beckenwasser entnehmen und durch Osmosewasser ersetzen.</small></span>
+                <span>${Math.max(0, roLiters).toFixed(1)} L</span>
+            </div>
+        `;
+    } else {
+        action = '<div class="tool-row"><span><strong>Keine Korrektur nötig</strong><small>Aktuelle PSU entspricht Zielwert.</small></span><span>0</span></div>';
+    }
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Salzgehalt Änderung</strong><small>${current.toFixed(1)} → ${target.toFixed(1)} PSU</small></span>
+                <span>${diff >= 0 ? '+' : ''}${diff.toFixed(1)} PSU</span>
+            </div>
+            ${action}
+        </div>
+    `;
+}
+
+function renderFeedNutrientLog() {
+    const dateEl = document.getElementById('feedLogDate');
+    const result = document.getElementById('feedNutrientLogResult');
+    if (dateEl && !dateEl.value) dateEl.value = formatDateTimeLocal();
+    if (!result) return;
+    const entries = (db.feedNutrientLog || []).slice(0, 20);
+    if (!entries.length) {
+        result.innerHTML = '<p class="hint">Noch keine Futter- oder Nährstoffnotizen gespeichert.</p>';
+        return;
+    }
+    result.innerHTML = `
+        <div class="tool-result">
+            ${entries.map(entry => `
+                <div class="tool-row">
+                    <span>
+                        <strong>${escapeHtml(entry.food || 'Eintrag')}</strong>
+                        <small>${formatWarehouseDate(entry.at)} · ${escapeHtml(entry.amount || '-')} · NO3 ${entry.no3 || '-'} · PO4 ${entry.po4 || '-'}</small>
+                        ${entry.note ? `<small>${escapeHtml(entry.note)}</small>` : ''}
+                    </span>
+                    <button class="btn-out" onclick="deleteFeedNutrientLog('${entry.id}')">Löschen</button>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function saveFeedNutrientLog() {
+    if (!db.feedNutrientLog) db.feedNutrientLog = [];
+    const food = (document.getElementById('feedLogFood')?.value || '').trim();
+    const amount = (document.getElementById('feedLogAmount')?.value || '').trim();
+    const note = (document.getElementById('feedLogNote')?.value || '').trim();
+    const atValue = document.getElementById('feedLogDate')?.value;
+    const no3 = document.getElementById('feedLogNo3')?.value || '';
+    const po4 = document.getElementById('feedLogPo4')?.value || '';
+    if (!food && !amount && !note && !no3 && !po4) return alert('Bitte Futter, Werte oder eine Notiz eintragen.');
+    db.feedNutrientLog.unshift({
+        id: createWarehouseId(),
+        at: atValue ? new Date(atValue).toISOString() : new Date().toISOString(),
+        food,
+        amount,
+        no3,
+        po4,
+        note,
+        createdAt: new Date().toISOString()
+    });
+    saveDB();
+    ['feedLogFood', 'feedLogAmount', 'feedLogNo3', 'feedLogPo4', 'feedLogNote'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    renderFeedNutrientLog();
+}
+
+function deleteFeedNutrientLog(id) {
+    if (!confirm('Eintrag löschen?')) return;
+    db.feedNutrientLog = (db.feedNutrientLog || []).filter(entry => entry.id !== id);
+    saveDB();
+    renderFeedNutrientLog();
+}
+
+function parseTimeMinutes(value) {
+    const [hours, minutes] = String(value || '00:00').split(':').map(num => parseInt(num, 10) || 0);
+    return hours * 60 + minutes;
+}
+
+function formatDuration(minutes) {
+    const safe = Math.max(0, Math.round(minutes));
+    const h = Math.floor(safe / 60);
+    const m = safe % 60;
+    return `${h} h ${String(m).padStart(2, '0')} min`;
+}
+
+function renderLightPlanner() {
+    const result = document.getElementById('lightPlannerResult');
+    if (!result) return;
+    const start = parseTimeMinutes(document.getElementById('lightStart')?.value || '10:00');
+    let end = parseTimeMinutes(document.getElementById('lightEnd')?.value || '21:00');
+    if (end <= start) end += 24 * 60;
+    const rampUp = Math.max(0, parseFloat(document.getElementById('lightRampUp')?.value) || 0);
+    const rampDown = Math.max(0, parseFloat(document.getElementById('lightRampDown')?.value) || 0);
+    const total = end - start;
+    const peak = Math.max(0, total - rampUp - rampDown);
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Gesamte Lichtzeit</strong><small>Von Start bis Ende inklusive Rampen.</small></span>
+                <span>${formatDuration(total)}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Volle Beleuchtung</strong><small>Nach Abzug von Ramp-Up und Ramp-Down.</small></span>
+                <span>${formatDuration(peak)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderFlowCalculator() {
+    const result = document.getElementById('flowCalculatorResult');
+    if (!result) return;
+    const liters = Math.max(0, parseFloat(document.getElementById('flowTankLiters')?.value) || 0);
+    const totalFlow = [1, 2, 3, 4].reduce((sum, index) => sum + Math.max(0, parseFloat(document.getElementById(`flowPump${index}`)?.value) || 0), 0);
+    const turnover = liters > 0 ? totalFlow / liters : 0;
+    let hint = 'Sanft bis mittel';
+    if (turnover >= 40) hint = 'Sehr stark, eher SPS-orientiert';
+    else if (turnover >= 20) hint = 'Kräftig, für viele Riffbecken passend';
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Gesamtleistung</strong><small>Summe aller eingetragenen Strömungspumpen.</small></span>
+                <span>${totalFlow.toFixed(0)} L/h</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Umsatz pro Stunde</strong><small>${hint}</small></span>
+                <span>${turnover.toFixed(1)} x</span>
+            </div>
+        </div>
+    `;
+}
+
+function getOsmoseTank() {
+    if (!db.osmoseTank) db.osmoseTank = { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 };
+    if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
+    return db.osmoseTank;
+}
+
+function calculateOsmoseDailyUsage() {
+    const tank = getOsmoseTank();
+    const entries = (tank.usageLog || []).slice().sort((a, b) => new Date(a.at) - new Date(b.at));
+    if (entries.length === 0) return 0;
+    const total = entries.reduce((sum, entry) => sum + (parseFloat(entry.liters) || 0), 0);
+    if (entries.length === 1) return total;
+    const first = new Date(entries[0].at).getTime();
+    const last = new Date(entries[entries.length - 1].at).getTime();
+    const days = Math.max(1, (last - first) / (24 * 60 * 60 * 1000));
+    return total / days;
+}
+
+function syncOsmoseTankInputs() {
+    const tank = getOsmoseTank();
+    const capacity = document.getElementById('osmoseTankCapacity');
+    const current = document.getElementById('osmoseTankCurrent');
+    const warn = document.getElementById('osmoseTankWarnDays');
+    if (capacity && !capacity.matches(':focus')) capacity.value = tank.capacityLiters ?? 50;
+    if (current && !current.matches(':focus')) current.value = tank.currentLiters ?? tank.capacityLiters ?? 50;
+    if (warn && !warn.matches(':focus')) warn.value = tank.warnDays ?? 2;
+}
+
+function updateOsmoseTankSettings() {
+    const tank = getOsmoseTank();
+    const capacity = Math.max(0, parseFloat(document.getElementById('osmoseTankCapacity')?.value) || 0);
+    const current = Math.max(0, parseFloat(document.getElementById('osmoseTankCurrent')?.value) || 0);
+    const warnDays = Math.max(0, parseInt(document.getElementById('osmoseTankWarnDays')?.value, 10) || 0);
+    tank.capacityLiters = capacity;
+    tank.currentLiters = Math.min(current, capacity || current);
+    tank.warnDays = warnDays;
+    saveDB(false);
+    renderOsmoseTank(false);
+}
+
+function addOsmoseTankUsage() {
+    const tank = getOsmoseTank();
+    const input = document.getElementById('osmoseTankUsageLiters');
+    const liters = Math.max(0, parseFloat(input?.value) || 0);
+    if (!liters) return alert('Bitte Verbrauch in Litern eintragen.');
+    tank.currentLiters = Math.max(0, (parseFloat(tank.currentLiters) || 0) - liters);
+    tank.usageLog.unshift({ id: createWarehouseId(), liters, at: new Date().toISOString() });
+    tank.lastAlertSignature = '';
+    if (input) input.value = '';
+    addWarehouseEvent('osmose', `Osmosewasser verbraucht: ${liters.toFixed(1)} L`);
+    saveDB();
+    renderOsmoseTank();
+    checkOsmoseTankReminder('manual');
+}
+
+function fillOsmoseTank() {
+    const tank = getOsmoseTank();
+    const capacity = Math.max(0, parseFloat(document.getElementById('osmoseTankCapacity')?.value) || tank.capacityLiters || 0);
+    if (!capacity) return alert('Bitte zuerst die Tankgröße eintragen.');
+    tank.capacityLiters = capacity;
+    tank.currentLiters = capacity;
+    tank.lastAlertSignature = '';
+    addWarehouseEvent('osmose', `Osmosetank gefüllt: ${capacity.toFixed(1)} L`);
+    saveDB();
+    renderOsmoseTank();
+    showToast('Osmosetank als voll gespeichert', 'success');
+}
+
+function renderOsmoseTank(updateInputs = true) {
+    const result = document.getElementById('osmoseTankResult');
+    if (!result) return;
+    const tank = getOsmoseTank();
+    if (updateInputs) syncOsmoseTankInputs();
+    const capacity = parseFloat(tank.capacityLiters) || 0;
+    const current = Math.min(parseFloat(tank.currentLiters) || 0, capacity || parseFloat(tank.currentLiters) || 0);
+    const daily = calculateOsmoseDailyUsage();
+    const daysLeft = daily > 0 ? current / daily : null;
+    const fillPercent = capacity > 0 ? Math.max(0, Math.min(100, (current / capacity) * 100)) : 0;
+    const warning = daysLeft !== null && daysLeft <= (tank.warnDays || 0);
+    const recentRows = (tank.usageLog || []).slice(0, 5).map(entry => `
+        <div class="tool-row">
+            <span><strong>${formatWarehouseDate(entry.at)}</strong><small>Verbrauch dokumentiert</small></span>
+            <span>${(parseFloat(entry.liters) || 0).toFixed(1)} L</span>
+        </div>
+    `).join('');
+    result.innerHTML = `
+        <div class="tool-result ${warning ? 'missing' : ''}">
+            <div class="tool-row">
+                <span><strong>Füllstand</strong><small>${fillPercent.toFixed(0)} % von ${capacity.toFixed(1)} L</small></span>
+                <span>${current.toFixed(1)} L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Ø Verbrauch</strong><small>Aus deinen dokumentierten Entnahmen berechnet.</small></span>
+                <span>${daily > 0 ? daily.toFixed(2) + ' L/Tag' : 'noch keine Daten'}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Reicht noch ca.</strong><small>Warnung ab ${tank.warnDays || 0} Tag(en) Restreichweite.</small></span>
+                <span>${daysLeft !== null ? daysLeft.toFixed(1) + ' Tage' : 'unbekannt'}</span>
+            </div>
+            ${recentRows ? `<div style="margin-top:8px;">${recentRows}</div>` : ''}
+        </div>
+    `;
+}
+
+function checkOsmoseTankReminder(trigger = 'auto') {
+    if (!db || !db.notifications || !db.notifications.enabled) return;
+    const tank = getOsmoseTank();
+    const daily = calculateOsmoseDailyUsage();
+    if (!daily) return;
+    const current = parseFloat(tank.currentLiters) || 0;
+    const daysLeft = current / daily;
+    if (daysLeft > (tank.warnDays || 0)) return;
+    const signature = `${Math.round(current * 10) / 10}:${Math.round(daysLeft * 10) / 10}:${tank.warnDays}`;
+    const now = Date.now();
+    const pause = trigger === 'manual' ? 0 : 1000 * 60 * 60 * 12;
+    if (tank.lastAlertSignature === signature && now - (tank.lastAlertAt || 0) < pause) return;
+    const title = 'Osmosetank bald leer';
+    const body = `Noch ca. ${current.toFixed(1)} L, reicht etwa ${daysLeft.toFixed(1)} Tag(e).`;
+    if (db.notifications.inAppOnly || !supportsNotifications() || Notification.permission !== 'granted') {
+        showToast(`${title}: ${body}`, 'warning', 6000);
+    } else {
+        showLocalNotification(title, body);
+    }
+    tank.lastAlertSignature = signature;
+    tank.lastAlertAt = now;
+    saveDB(false);
 }
 
 function renderNutritionCalculator() {
@@ -3239,12 +3973,15 @@ function updateSalinityCalculator(source = '') {
     if (densityNumberEl && source !== 'densityNumber') densityNumberEl.value = density.toFixed(4);
     if (tempNumberEl && source !== 'tempNumber') tempNumberEl.value = temp.toFixed(1);
 
-    const psu = calculateApproxPsu(density, temp);
+    const offset = parseFloat(db.psuCorrectionOffset) || 0;
+    const rawPsu = calculateApproxPsu(density, temp);
+    const psu = rawPsu + offset;
     const conductivity = 53.06 * (psu / 35);
     result.innerHTML = `
         <div class="salinity-value">${psu.toFixed(1)} PSU</div>
-        <small>Näherung: Leitfähigkeit ca. ${conductivity.toFixed(2)} mS/cm. Referenz: 1.0233 kg/l bei 25 °C = 35 PSU.</small>
+        <small>Rohwert ${rawPsu.toFixed(1)} PSU${offset ? ` · Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)} PSU` : ''}. Leitfähigkeit ca. ${conductivity.toFixed(2)} mS/cm.</small>
     `;
+    renderPsuCorrectionSettings();
 }
 
 function updateSimpleSalinityConverter(source = 'psu') {
@@ -3256,11 +3993,13 @@ function updateSimpleSalinityConverter(source = 'psu') {
     let psu = parseFloat(psuInput.value);
     let density = parseFloat(densityInput.value);
 
+    const offset = parseFloat(db.psuCorrectionOffset) || 0;
+
     if (source === 'psu' && !isNaN(psu)) {
-        density = densityFromApproxPsu(psu);
+        density = densityFromApproxPsu(psu - offset);
         densityInput.value = density.toFixed(4);
     } else if (source === 'density' && !isNaN(density)) {
-        psu = calculateApproxPsu(density, 25);
+        psu = calculateApproxPsu(density, 25) + offset;
         psuInput.value = psu.toFixed(1);
     }
 
@@ -3271,7 +4010,39 @@ function updateSimpleSalinityConverter(source = 'psu') {
 
     const densityText = isNaN(density) ? '-' : `${density.toFixed(4)} kg/l`;
     const psuText = isNaN(psu) ? '-' : `${psu.toFixed(1)} PSU`;
-    result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Jeweils bei 25 °C Referenz.</small>`;
+    result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Bei 25 °C Referenz${offset ? ` · PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)}` : ''}.</small>`;
+}
+
+function renderPsuCorrectionSettings() {
+    const input = document.getElementById('psuCorrectionOffset');
+    const example = document.getElementById('psuCorrectionExample');
+    if (!input && !example) return;
+    const saved = parseFloat(db.psuCorrectionOffset) || 0;
+    if (input && document.activeElement !== input) input.value = saved.toFixed(1);
+    const current = input ? (parseFloat(input.value) || 0) : saved;
+    if (example) {
+        example.value = current ? `35,0 wird ${(35 + current).toFixed(1).replace('.', ',')} PSU` : 'Keine Korrektur';
+    }
+}
+
+function savePsuCorrectionOffset() {
+    const input = document.getElementById('psuCorrectionOffset');
+    const value = parseFloat(input?.value) || 0;
+    db.psuCorrectionOffset = value;
+    saveDB();
+    renderPsuCorrectionSettings();
+    updateSalinityCalculator();
+    updateSimpleSalinityConverter('density');
+    showToast('PSU-Korrektur gespeichert', 'success');
+}
+
+function deletePsuCorrectionOffset() {
+    if (!confirm('PSU-Korrektur löschen?')) return;
+    db.psuCorrectionOffset = 0;
+    saveDB();
+    renderPsuCorrectionSettings();
+    updateSalinityCalculator();
+    updateSimpleSalinityConverter('density');
 }
 
 function countOutsForElement(itemName) {
@@ -5293,11 +6064,22 @@ document.addEventListener('keydown', (e) => {
 
 // APP START
 initDB();
-renderLager();
+let startupTab = db.lastTab || 'lager';
+try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
+if (window.location.hash) {
+    const hashTab = decodeURIComponent(window.location.hash.slice(1));
+    if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
+}
+showTab(startupTab);
 updateNotificationStatus();
+initCustomCursor();
+setTimeout(checkForAppUpdate, 2500);
+setInterval(checkForAppUpdate, 30 * 60 * 1000);
 setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
 setTimeout(checkTodoReminders, 1500);
+setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
 setInterval(checkTodoReminders, 60 * 1000);
+setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
 
 // Initialize Light Mode if saved
 if (db.lightMode) {
@@ -5484,19 +6266,6 @@ function hapticFeedback(pattern = [10]) {
     // Visual feedback fallback
     document.body.classList.add('haptic-flash');
     setTimeout(() => document.body.classList.remove('haptic-flash'), 150);
-}
-
-// Remember Last Tab on tab change
-const originalShowTab = showTab;
-showTab = function(tabId) {
-    originalShowTab(tabId);
-    db.lastTab = tabId;
-    saveDB();
-};
-
-// Remember Last Tab
-if (db.lastTab) {
-    setTimeout(() => selectTab(db.lastTab), 100);
 }
 
 // Quick Preview Modal
