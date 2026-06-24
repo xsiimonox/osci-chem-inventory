@@ -1,4 +1,4 @@
-const CACHE_NAME = 'osci-pwa-cache-v96';
+const CACHE_NAME = 'osci-pwa-cache-v97';
 const ASSETS = [
   './',
   './index.html',

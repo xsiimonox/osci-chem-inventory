@@ -2097,6 +2097,97 @@ body.theme-mint.party-mode .card {
     resize: vertical;
 }
 
+@media (min-width: 821px) {
+    #tools {
+        max-width: 1220px;
+        margin: 0 auto;
+    }
+
+    #tools .tools-shell {
+        gap: 18px;
+    }
+
+    #tools .tool-section {
+        border-radius: 16px;
+        background:
+            linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.015)),
+            var(--card-bg);
+        box-shadow: 0 14px 38px rgba(0,0,0,0.16);
+    }
+
+    #tools .tool-section[open] {
+        border-color: color-mix(in srgb, var(--secondary) 34%, var(--border));
+    }
+
+    #tools .tool-section-summary {
+        padding: 17px 20px;
+        min-height: 76px;
+    }
+
+    #tools .tool-section-summary strong {
+        font-size: 1.08rem;
+    }
+
+    #tools .tool-section-summary small {
+        font-size: 0.84rem;
+    }
+
+    #tools .tool-card-grid {
+        grid-template-columns: repeat(3, minmax(230px, 1fr));
+        align-items: start;
+        gap: 14px;
+        padding: 16px;
+    }
+
+    #tools .tool-tile-card {
+        border-radius: 13px;
+        min-width: 0;
+    }
+
+    #tools .tool-tile-card.tool-tile-collapsed {
+        min-height: 68px;
+        padding: 15px 16px;
+        cursor: pointer;
+    }
+
+    #tools .tool-tile-card.tool-tile-collapsed h3 {
+        font-size: 0.98rem;
+        letter-spacing: 0;
+    }
+
+    #tools .tool-tile-card:not(.tool-tile-collapsed) {
+        grid-column: 1 / -1;
+        padding: 20px;
+        border-color: color-mix(in srgb, var(--secondary) 38%, var(--border));
+        background: rgba(255,255,255,0.045);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    }
+
+    #tools .tool-tile-card:not(.tool-tile-collapsed) > h3 {
+        padding-bottom: 12px;
+        margin-bottom: 14px;
+        border-bottom: 1px solid var(--border);
+        font-size: 1.18rem;
+    }
+
+    #tools .tool-tile-card:not(.tool-tile-collapsed) > .hint {
+        max-width: 780px;
+    }
+
+    #tools .tool-grid {
+        grid-template-columns: repeat(4, minmax(160px, 1fr));
+        gap: 12px;
+    }
+
+    #tools .salinity-control {
+        max-width: 760px;
+    }
+
+    #tools .tool-result {
+        max-width: 900px;
+    }
+}
+
 .reef-manager-import-compact {
     margin-top: 12px;
     border: 1px solid var(--border);
