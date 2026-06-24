@@ -96,37 +96,6 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     line-height: 1.35;
 }
 
-.warehouse-access-badge {
-    width: fit-content;
-    max-width: min(92vw, 420px);
-    margin-top: 7px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: rgba(255,255,255,0.045);
-    color: var(--text-muted);
-    font-size: 0.74rem;
-    font-weight: 800;
-}
-
-.warehouse-access-badge[data-access="owner"] {
-    color: var(--success);
-    border-color: rgba(48, 209, 88, 0.36);
-    background: rgba(48, 209, 88, 0.08);
-}
-
-.warehouse-access-badge[data-access="write"] {
-    color: var(--secondary);
-    border-color: rgba(100, 210, 255, 0.34);
-    background: rgba(100, 210, 255, 0.08);
-}
-
-.warehouse-access-badge[data-access="read"] {
-    color: var(--danger);
-    border-color: rgba(255, 69, 58, 0.34);
-    background: rgba(255, 69, 58, 0.08);
-}
-
 .header-title-container { display: flex; align-items: center; gap: 8px; }
 .version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
 
@@ -672,7 +641,7 @@ button { font-weight: 600; font-size: 0.95rem; border-radius: 10px; padding: 12p
 .btn-cancel { background: #2c2c2e; color: #fff; width: 100%; margin-top: 12px; }
 
 textarea { width: 100%; height: 120px; background: #2c2c2e; color: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 0.95rem; resize: none; margin-bottom: 15px; }
-input[type="number"], input[type="text"], input[type="password"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
+input[type="number"], input[type="text"], input[type="file"], select { width: 100%; padding: 12px; background: #2c2c2e; border: none; color: #fff; border-radius: 10px; font-size: 1rem; margin-bottom: 15px; }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
 
 .disabled-field {
@@ -706,40 +675,6 @@ input[type="number"], input[type="text"], input[type="password"], input[type="fi
     gap: 12px;
     cursor: pointer;
     list-style: none;
-    border-radius: 12px;
-    padding: 2px 2px 2px 0;
-    transition: background-color 0.2s ease;
-}
-
-.settings-accordion-summary:hover {
-    background: rgba(255, 255, 255, 0.035);
-}
-
-.settings-group-label {
-    color: var(--text-muted);
-    font-size: 0.78rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 18px 2px 8px;
-}
-
-.settings-group-label span {
-    border-left: 3px solid var(--primary);
-    padding-left: 8px;
-}
-
-.settings-summary-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.settings-summary-copy small {
-    color: var(--text-muted);
-    font-size: 0.74rem;
-    font-weight: 500;
 }
 
 .settings-accordion-summary::-webkit-details-marker {
@@ -752,37 +687,10 @@ input[type="number"], input[type="text"], input[type="password"], input[type="fi
 }
 
 .settings-accordion-hint {
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    flex: 0 0 28px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid var(--border);
     color: var(--text-muted);
-    transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-}
-
-.settings-accordion-hint::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-right: 2px solid currentColor;
-    border-bottom: 2px solid currentColor;
-    transform: rotate(45deg) translate(-1px, -1px);
-    transition: transform 0.2s ease;
-}
-
-details[open] > summary .settings-accordion-hint {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: var(--primary);
-    color: var(--primary);
-}
-
-details[open] > summary .settings-accordion-hint::before {
-    transform: rotate(-135deg) translate(-1px, -1px);
+    font-size: 0.82rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .settings-accordion-body {
@@ -790,93 +698,7 @@ details[open] > summary .settings-accordion-hint::before {
 }
 
 #einstellungen > .card > details > summary {
-    min-height: 34px;
-}
-
-#einstellungen > .card {
-    margin-bottom: 8px;
-    border-radius: 13px !important;
-    background: rgba(255, 255, 255, 0.035) !important;
-    border: 1px solid var(--border) !important;
-    box-shadow: none !important;
-}
-
-#einstellungen > .card:hover {
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-#einstellungen > .card h2,
-#einstellungen > .card h3 {
-    color: var(--text) !important;
-}
-
-#einstellungen > .card .hint,
-#einstellungen > .card .subtitle,
-#einstellungen > .card small {
-    color: var(--text-muted) !important;
-}
-
-#einstellungen .switch-container,
-#einstellungen .preset-row,
-#einstellungen .custom-product-row,
-#einstellungen .visibility-product-row,
-#einstellungen .container-preset-row {
-    background: rgba(255, 255, 255, 0.035) !important;
-    border-color: var(--border) !important;
-}
-
-#einstellungen input[type="number"],
-#einstellungen input[type="text"],
-#einstellungen input[type="password"],
-#einstellungen input[type="file"],
-#einstellungen select,
-#einstellungen textarea {
-    background: rgba(255, 255, 255, 0.055) !important;
-    border: 1px solid var(--border) !important;
-    color: var(--text) !important;
-    box-shadow: none !important;
-}
-
-#einstellungen code {
-    background: rgba(255, 255, 255, 0.07) !important;
-    color: var(--text) !important;
-}
-
-body.theme-girl #einstellungen > .card {
-    background: rgba(255, 255, 255, 0.82) !important;
-    border-color: #ffd4e2 !important;
-}
-
-body.theme-girl .settings-group-label span {
-    border-left-color: #ff66a4;
-}
-
-body.theme-mint #einstellungen > .card {
-    background: rgba(10, 37, 64, 0.78) !important;
-    border-color: #174a76 !important;
-}
-
-body.theme-mint .settings-group-label span {
-    border-left-color: #00f0ff;
-}
-
-body.theme-badman #einstellungen > .card {
-    background: rgba(42, 42, 42, 0.84) !important;
-    border-color: rgba(230, 57, 70, 0.34) !important;
-}
-
-body.theme-badman .settings-group-label span {
-    border-left-color: #e63946;
-}
-
-body.theme-light #einstellungen > .card {
-    background: #ffffff !important;
-    border-color: #e5e5ea !important;
-}
-
-body.theme-light .settings-group-label span {
-    border-left-color: #007aff;
+    min-height: 28px;
 }
 
 .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
@@ -929,7 +751,6 @@ body.party-mode button.btn-animated {
 body.theme-girl textarea,
 body.theme-girl input[type="number"],
 body.theme-girl input[type="text"],
-body.theme-girl input[type="password"],
 body.theme-girl input[type="file"],
 body.theme-girl select,
 body.theme-girl .log-item,
@@ -1004,7 +825,6 @@ body.theme-girl.party-mode .card {
 body.theme-mint textarea,
 body.theme-mint input[type="number"],
 body.theme-mint input[type="text"],
-body.theme-mint input[type="password"],
 body.theme-mint input[type="file"],
 body.theme-mint select,
 body.theme-mint .log-item,
@@ -1308,75 +1128,6 @@ body.theme-mint.party-mode .card {
     line-height: 1.4;
 }
 
-.notification-status[data-type="ok"] {
-    color: var(--success);
-    border-color: rgba(48, 209, 88, 0.35);
-    background: rgba(48, 209, 88, 0.08);
-}
-
-.notification-status[data-type="warn"] {
-    color: var(--danger);
-    border-color: rgba(255, 69, 58, 0.35);
-    background: rgba(255, 69, 58, 0.08);
-}
-
-.sync-privacy-note,
-.sync-password-recovery {
-    margin: 12px 0;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    background: rgba(255, 255, 255, 0.035);
-    font-size: 0.86rem;
-    line-height: 1.4;
-}
-
-.sync-privacy-note strong {
-    display: block;
-    margin-bottom: 4px;
-}
-
-.sync-privacy-note span {
-    color: var(--text-muted);
-}
-
-.sync-password-recovery label {
-    display: block;
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    margin-bottom: 6px;
-}
-
-.sync-friend-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 10px;
-    align-items: center;
-    padding: 10px 0;
-    border-top: 1px solid var(--border);
-    font-size: 0.88rem;
-}
-
-.sync-friend-row small {
-    display: block;
-    color: var(--text-muted);
-    font-size: 0.75rem;
-    margin-top: 2px;
-}
-
-.sync-friend-row button {
-    width: auto;
-    padding: 8px 10px;
-    font-size: 0.78rem;
-}
-
-@media (max-width: 600px) {
-    .sync-friend-row {
-        grid-template-columns: 1fr;
-        gap: 6px;
-    }
-}
-
 .disabled-alert-products,
 .custom-products-list {
     margin-top: 12px;
@@ -1412,204 +1163,6 @@ body.theme-mint.party-mode .card {
     color: var(--text-muted);
     font-size: 0.75rem;
     margin-top: 2px;
-}
-
-.visibility-group {
-    border-top: 1px solid var(--border);
-    padding-top: 10px;
-    margin-top: 12px;
-}
-
-.visibility-group strong {
-    display: block;
-    margin-bottom: 8px;
-    color: var(--secondary);
-}
-
-.visibility-row {
-    display: grid;
-    grid-template-columns: 26px 1fr auto;
-    gap: 8px;
-    align-items: center;
-    padding: 7px 0;
-    color: var(--text);
-    font-size: 0.86rem;
-}
-
-.visibility-row input {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-}
-
-.visibility-row small {
-    color: var(--text-muted);
-    font-size: 0.72rem;
-}
-
-.tool-result {
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px;
-    margin: 10px 0 12px;
-}
-
-.sync-diagnostics-result {
-    margin-top: 12px;
-}
-
-.sync-diagnostics-row {
-    display: grid;
-    grid-template-columns: minmax(120px, 0.42fr) minmax(0, 1fr);
-    gap: 10px;
-    align-items: start;
-    padding: 9px 10px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: rgba(255,255,255,0.035);
-    margin-bottom: 6px;
-    font-size: 0.82rem;
-}
-
-.sync-diagnostics-row span {
-    color: var(--text-muted);
-    overflow-wrap: anywhere;
-}
-
-.sync-diagnostics-row.ok {
-    border-color: rgba(48, 209, 88, 0.32);
-}
-
-.sync-diagnostics-row.warn {
-    border-color: rgba(255, 69, 58, 0.42);
-}
-
-.sync-diagnostics-row.warn strong {
-    color: var(--danger);
-}
-
-.tool-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
-    align-items: center;
-    padding: 8px 0;
-    border-top: 1px solid rgba(255,255,255,0.06);
-}
-
-.tool-row:first-child {
-    border-top: none;
-}
-
-.tool-row small {
-    display: block;
-    color: var(--text-muted);
-    font-size: 0.74rem;
-    margin-top: 2px;
-}
-
-.tool-row.missing {
-    color: var(--danger);
-}
-
-.salinity-control {
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.035);
-}
-
-.salinity-control-head {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 132px;
-    gap: 12px;
-    align-items: center;
-    margin-bottom: 12px;
-}
-
-.salinity-control-head label {
-    margin: 0;
-    font-weight: 700;
-}
-
-.salinity-control-head input[type="number"] {
-    margin: 0;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.06);
-}
-
-.salinity-control input[type="range"] {
-    width: 100%;
-    height: 34px;
-    margin: 0;
-    padding: 0;
-    appearance: none;
-    -webkit-appearance: none;
-    background: transparent;
-    cursor: pointer;
-}
-
-.salinity-control input[type="range"]::-webkit-slider-runnable-track {
-    height: 12px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.22);
-}
-
-.salinity-control input[type="range"]::-webkit-slider-thumb {
-    width: 30px;
-    height: 30px;
-    margin-top: -10px;
-    border-radius: 50%;
-    border: 3px solid var(--card-bg);
-    background: var(--primary);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-    appearance: none;
-    -webkit-appearance: none;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.salinity-control input[type="range"]:active::-webkit-slider-thumb {
-    transform: scale(1.08);
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-}
-
-.salinity-control input[type="range"]::-moz-range-track {
-    height: 12px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: linear-gradient(90deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.22);
-}
-
-.salinity-control input[type="range"]::-moz-range-thumb {
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    border: 3px solid var(--card-bg);
-    background: var(--primary);
-    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
-}
-
-.salinity-value {
-    font-size: 1.8rem;
-    color: var(--primary);
-    font-weight: 800;
-}
-
-@media (max-width: 640px) {
-    .salinity-control-head {
-        grid-template-columns: 1fr;
-        gap: 8px;
-    }
-
-    .salinity-control-head input[type="number"] {
-        text-align: left;
-    }
 }
 
 /* Warn-Karten (Wenn Bestand unter Schwelle) */
@@ -1689,7 +1242,6 @@ body.theme-badman .card {
 body.theme-badman textarea,
 body.theme-badman input[type="number"],
 body.theme-badman input[type="text"],
-body.theme-badman input[type="password"],
 body.theme-badman input[type="file"],
 body.theme-badman select,
 body.theme-badman .log-item,
@@ -1774,7 +1326,6 @@ body.theme-badman .cross-hint { color: #e63946 !important; }
     body.theme-badman textarea,
     body.theme-badman input[type="number"],
     body.theme-badman input[type="text"],
-    body.theme-badman input[type="password"],
     body.theme-badman input[type="file"],
     body.theme-badman select,
     body.theme-badman .log-item,
@@ -2299,7 +1850,6 @@ body.theme-light {
 body.theme-light textarea,
 body.theme-light input[type="number"],
 body.theme-light input[type="text"],
-body.theme-light input[type="password"],
 body.theme-light input[type="file"],
 body.theme-light select,
 body.theme-light .log-item,
