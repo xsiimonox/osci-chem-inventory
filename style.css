@@ -1490,7 +1490,171 @@ body.theme-mint.party-mode .card {
     margin-bottom: 0;
 }
 
+.sync-subpanel {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.03);
+}
+
+.sync-subpanel h4 {
+    margin: 0 0 8px;
+    color: var(--secondary);
+}
+
+.overview-group {
+    margin-top: 10px;
+}
+
+.overview-group > strong {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--text);
+}
+
+.overview-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.86rem;
+}
+
+.overview-row small {
+    color: var(--text-muted);
+    text-align: right;
+}
+
+.favorite-btn.active {
+    color: #ffd60a;
+}
+
+.logbook-hero {
+    border-color: rgba(100, 210, 255, 0.36) !important;
+    background: linear-gradient(135deg, rgba(100,210,255,0.10), rgba(48,209,88,0.06)) !important;
+}
+
+.logbook-entry,
+.todo-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-top: 1px solid var(--border);
+}
+
+.logbook-entry small,
+.todo-row small,
+.logbook-entry p {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    margin: 3px 0 0;
+}
+
+.todo-row.due {
+    border-left: 3px solid var(--danger);
+    padding-left: 10px;
+}
+
+.todo-row.done {
+    opacity: 0.58;
+}
+
+.logbook-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.logbook-actions button {
+    width: auto;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+}
+
+.logbook-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    cursor: pointer;
+    list-style: none;
+    font-weight: 900;
+    color: var(--secondary);
+    margin-bottom: 10px;
+    padding: 10px 0;
+    transition: color 0.2s ease, background 0.2s ease;
+}
+
+.logbook-summary:hover {
+    color: var(--primary);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.logbook-summary::-webkit-details-marker {
+    display: none;
+}
+
+.interval-picker {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.interval-picker button {
+    min-height: 44px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.interval-picker button:hover {
+    transform: translateY(-1px);
+    border-color: var(--secondary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.interval-picker button.active {
+    border-color: var(--primary);
+    background: linear-gradient(135deg, rgba(10, 132, 255, 0.28), rgba(48, 209, 88, 0.2));
+    color: #fff;
+    box-shadow: 0 8px 22px rgba(10, 132, 255, 0.18);
+}
+
 @media (max-width: 600px) {
+    .tool-grid,
+    .resource-link-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .logbook-entry,
+    .todo-row {
+        grid-template-columns: 1fr;
+    }
+
+    .logbook-actions {
+        justify-content: stretch;
+    }
+
+    .logbook-actions button {
+        flex: 1;
+    }
+
+    .interval-picker {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .sync-friend-row {
         grid-template-columns: 1fr;
         gap: 6px;
@@ -1584,6 +1748,42 @@ body.theme-mint.party-mode .card {
     margin: 10px 0 12px;
 }
 
+.tool-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.resource-link-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.resource-link-card {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    text-decoration: none;
+    transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.resource-link-card:hover {
+    transform: translateY(-1px);
+    border-color: rgba(100, 210, 255, 0.42);
+    background: rgba(100, 210, 255, 0.08);
+}
+
+.resource-link-card span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
 .sync-diagnostics-result {
     margin-top: 12px;
 }
@@ -1640,6 +1840,49 @@ body.theme-mint.party-mode .card {
 
 .tool-row.missing {
     color: var(--danger);
+}
+
+.dose-plan {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.dose-plan-row {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.035);
+}
+
+.dose-plan-row input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+}
+
+.dose-plan-row:has(input:checked) {
+    opacity: 0.62;
+}
+
+.dose-plan-row:has(input:checked) span {
+    text-decoration: line-through;
+}
+
+.tool-action-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.tool-action-row button {
+    flex: 1;
+    min-width: 160px;
 }
 
 .salinity-control {

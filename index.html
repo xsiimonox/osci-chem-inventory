@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.31</span>
+                <span class="version-badge">v2.2.39</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -48,6 +48,7 @@
             <button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
             <button onclick="selectTab('nachbestellen')" id="tab-nachbestellen">Nachbestellen</button>
             <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
+            <button onclick="selectTab('logbuch')" id="tab-logbuch">Log Buch</button>
             <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
             
         </div>
@@ -126,6 +127,69 @@
 
         <div id="tools" class="tab-content">
             <div class="card">
+                <h3>OSCI Motion Ressourcen</h3>
+                <p class="hint">Direkte Links zu offiziellen OSCI Motion Anleitungen und weiteren Rechnern.</p>
+                <div class="resource-link-grid">
+                    <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
+                        <strong>Anleitungen</strong>
+                        <span>Bedienungsanleitungen, Rezepte und Produktinformationen</span>
+                    </a>
+                    <a href="https://osci-motion.de/tools/" target="_blank" rel="noopener" class="resource-link-card">
+                        <strong>OSCI Tools</strong>
+                        <span>Weitere offizielle Rechner und Plausibilitäts-Tools</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Nutrition Rechner</h3>
+                <p class="hint">Berechnet die Dosiermenge für OSCI Nutrition Nitrat, Phosphat und Lanthan anhand der Hersteller-Dosierangaben.</p>
+                <div class="input-group">
+                    <label>Element:</label>
+                    <select id="nutritionElement" onchange="renderNutritionCalculator()">
+                        <option value="Nitrat">Nitrat</option>
+                        <option value="Phosphat">Phosphat</option>
+                        <option value="Lanthan">Lanthan</option>
+                    </select>
+                </div>
+                <div class="tool-grid">
+                    <div class="input-group">
+                        <label>Aquariumgröße (L):</label>
+                        <input type="number" id="nutritionTankLiters" min="1" step="1" value="100" oninput="renderNutritionCalculator()">
+                    </div>
+                    <div class="input-group">
+                        <label id="nutritionTargetLabel">Zieländerung (mg/l):</label>
+                        <input type="number" id="nutritionIncrease" min="0" step="0.01" value="1" oninput="renderNutritionCalculator()">
+                    </div>
+                    <div class="input-group">
+                        <label>Dosierplan Tage:</label>
+                        <input type="number" id="nutritionPlanDays" min="1" step="1" value="3" oninput="renderNutritionCalculator()">
+                    </div>
+                </div>
+                <div id="nutritionResult"></div>
+            </div>
+
+            <div class="card">
+                <h3>Meerwasser aus C&amp;R anmischen</h3>
+                <p class="hint">Rezept skaliert auf deine gewünschte Meerwassermenge. C&amp;R- und Makro-Produkte können direkt aus dem Lager ausgelagert werden.</p>
+                <div class="tool-grid">
+                    <div class="input-group">
+                        <label>Zielmenge Meerwasser (L):</label>
+                        <input type="number" id="seaWaterLiters" min="1" step="1" value="100" oninput="renderSeaWaterMix()">
+                    </div>
+                    <div class="input-group">
+                        <label>Preset:</label>
+                        <select id="seaWaterPresetSelect" onchange="loadSeaWaterPreset(this.value)"></select>
+                    </div>
+                </div>
+                <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                    <button class="btn-secondary btn-animated" onclick="saveSeaWaterPreset()">Preset speichern</button>
+                    <button class="btn-secondary btn-animated" onclick="deleteSeaWaterPreset()">Preset löschen</button>
+                </div>
+                <div id="seaWaterMixResult"></div>
+            </div>
+
+            <div class="card">
                 <h3>Makro-Elemente anmischen</h3>
                 <p class="hint">Wähle ein Rezept und die Zielmenge. C&amp;R-Produkte werden gegen deinen Bestand geprüft und können direkt ausgelagert werden.</p>
                 <div class="input-group">
@@ -164,6 +228,104 @@
                     <input type="number" id="simpleDensityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('density')">
                     <div id="simpleSalinityResult" class="tool-result"></div>
                 </div>
+            </div>
+        </div>
+
+        <div id="logbuch" class="tab-content">
+            <div class="card logbook-hero">
+                <h3>Log Buch</h3>
+                <p class="hint">Dokumentiere Pflege, Messungen, Besatz, Technik und alle Arbeiten am Meerwasser-Aquarium.</p>
+            </div>
+
+            <div class="card">
+                <h3>Eintrag dokumentieren</h3>
+                <div class="tool-grid">
+                    <div class="input-group">
+                        <label>Kategorie:</label>
+                        <select id="logBookCategory"></select>
+                    </div>
+                    <div class="input-group">
+                        <label>Titel:</label>
+                        <input type="text" id="logBookTitle" placeholder="z.B. PO4 angepasst, Abschäumer gereinigt">
+                    </div>
+                    <div class="input-group">
+                        <label>Datum/Uhrzeit:</label>
+                        <input type="datetime-local" id="logBookDate">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Notiz:</label>
+                    <textarea id="logBookNote" placeholder="Was wurde gemacht? Welche Werte, Beobachtungen oder nächsten Schritte sind wichtig?"></textarea>
+                </div>
+                <button class="btn-primary btn-animated" onclick="saveLogBookEntry()">Log speichern</button>
+                <details class="logbook-list-details">
+                    <summary class="logbook-summary">
+                        <span>Dokumentation anzeigen</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div id="log-book-list"></div>
+                </details>
+            </div>
+
+            <div class="card">
+                <details>
+                    <summary class="logbook-summary">
+                        <span>Kategorien verwalten</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="input-group">
+                        <label>Neue Kategorie:</label>
+                        <input type="text" id="logBookNewCategory" placeholder="z.B. ICP, Fütterung, Ableger">
+                    </div>
+                    <button class="btn-secondary btn-animated" onclick="addLogBookCategory()">Kategorie anlegen</button>
+                    <div id="log-book-category-list"></div>
+                </details>
+            </div>
+
+            <div class="card">
+                <h3>ToDo &amp; Erinnerungen</h3>
+                <p class="hint">Wiederkehrende Aufgaben wie Wasserwechsel, Tests, Pumpenreinigung oder Futterkontrolle planen.</p>
+                <div class="tool-grid">
+                    <div class="input-group">
+                        <label>Aufgabe:</label>
+                        <input type="text" id="todoTitle" placeholder="z.B. KH messen, Filtervlies prüfen">
+                    </div>
+                    <div class="input-group">
+                        <label>Kategorie:</label>
+                        <select id="todoCategory"></select>
+                    </div>
+                    <div class="input-group">
+                        <label>Fällig am:</label>
+                        <input type="datetime-local" id="todoDueAt">
+                    </div>
+                    <div class="input-group">
+                        <label>Intervall:</label>
+                        <input type="hidden" id="todoInterval" value="7">
+                        <div class="interval-picker" id="todoIntervalPicker">
+                            <button type="button" onclick="setTodoInterval(0)">Einmalig</button>
+                            <button type="button" onclick="setTodoInterval(1)">1 Tag</button>
+                            <button type="button" onclick="setTodoInterval(2)">2 Tage</button>
+                            <button type="button" onclick="setTodoInterval(3)">3 Tage</button>
+                            <button type="button" onclick="setTodoInterval(7)">7 Tage</button>
+                            <button type="button" onclick="setTodoInterval(14)">14 Tage</button>
+                            <button type="button" onclick="setTodoInterval(30)">30 Tage</button>
+                            <button type="button" onclick="setTodoInterval(90)">90 Tage</button>
+                        </div>
+                        <input type="number" id="todoIntervalCustom" min="0" step="1" placeholder="Eigene Tage" oninput="setTodoInterval(this.value)">
+                        <div id="todoIntervalLabel" class="tool-result">Alle 7 Tage</div>
+                    </div>
+                    <div class="input-group">
+                        <label style="display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="todoNotifyEnabled" checked style="width:18px; height:18px; margin:0;">
+                            Für dieses ToDo erinnern
+                        </label>
+                    </div>
+                </div>
+                <div class="btn-group" style="flex-wrap:wrap;">
+                    <button class="btn-secondary btn-animated" onclick="saveAquariumTodo()" style="flex:1;">ToDo speichern</button>
+                    <button class="btn-in btn-animated" onclick="enableStockNotifications()" style="flex:1;">Push aktivieren</button>
+                </div>
+                <div id="aquarium-todo-list"></div>
             </div>
         </div>
 
@@ -259,6 +421,14 @@
                     <p class="hint">Die Sicherheit wird in Supabase per Row Level Security erzwungen. Nur-Lesen-Freunde können nicht speichern, Freunde mit Schreibzugriff dürfen das Lager synchronisieren.</p>
                 </div>
                 <div id="sync-friends-list"></div>
+                <div class="sync-subpanel">
+                    <h4>Cloud-Freigabe Übersicht</h4>
+                    <div id="cloud-share-overview"></div>
+                </div>
+                <div class="sync-subpanel">
+                    <h4>Lagerverlauf</h4>
+                    <div id="warehouse-event-log"></div>
+                </div>
             </div>
 
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
@@ -340,6 +510,12 @@
                 <div id="product-visibility-list"></div>
             </div>
 
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Geteilte Lager anzeigen</h3>
+                <p class="hint">Wähle pro Person, ob ihre geteilten Lager in deiner Lagerauswahl sichtbar sein sollen. Standard ist sichtbar.</p>
+                <div id="shared-owner-visibility-list"></div>
+            </div>
+
             <!-- PRODUKT-PRESETS -->
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <details id="product-presets-details">
@@ -406,6 +582,12 @@
                 </div>
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
                     <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
+                </div>
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <button onclick="clearLogBookEntries()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Logbuch leeren</button>
+                </div>
+                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
+                    <button onclick="clearAquariumTodos()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">ToDos leeren</button>
                 </div>
                 <div>
                     <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand löschen</button>

@@ -69,6 +69,47 @@ const macroRecipes = {
     ]
 };
 
+const seaWaterRecipePer100L = [
+    { label: 'Osmosewasser', amount: 86952.2, unit: 'ml', stock: false },
+    { item: 'Natriumchlorid (NaCl)', amount: 8998.7, unit: 'ml' },
+    { item: 'Magnesiumsulfat (MgSO4)', amount: 1164.4, unit: 'ml' },
+    { item: 'Magnesiumchlorid (MgCl2)', amount: 737.8, unit: 'ml' },
+    { item: 'Kaliumsulfat (K2SO4)', amount: 929.3, unit: 'ml' },
+    { item: 'Kaliumbromid (KBr)', amount: 68.0, unit: 'ml' },
+    { item: 'Strontiumchlorid (SrCl2)', amount: 8.2, unit: 'ml' },
+    { item: 'Calciumchlorid (CaCl2)', amount: 212.5, unit: 'ml' },
+    { item: 'Natriumfluorid (NaF)', amount: 28.9, unit: 'ml' },
+    { item: 'Bor (B)', amount: 900.0, unit: 'ml' },
+    { item: 'KH Tag', amount: 140.0, unit: 'ml' }
+];
+
+const nutritionDoseRules = {
+    Nitrat: {
+        action: 'erhöht',
+        targetLabel: 'NO3 erhöhen um (mg/l):',
+        primary: 'Nitrat (NO3)',
+        mlPer100L: 1,
+        primaryChange: 1.1,
+        product: 'Stickstoff (N)'
+    },
+    Phosphat: {
+        action: 'erhöht',
+        targetLabel: 'PO4 erhöhen um (mg/l):',
+        primary: 'Phosphat (PO4)',
+        mlPer100L: 1,
+        primaryChange: 0.1,
+        product: 'Phosphor (P)'
+    },
+    Lanthan: {
+        action: 'senkt',
+        targetLabel: 'PO4 senken um (mg/l):',
+        primary: 'Phosphat (PO4)',
+        mlPer100L: 1,
+        primaryChange: 0.1,
+        product: 'Lanthan (La)'
+    }
+};
+
 const densityFactors = {
     "Strontiumchlorid (SrCl2)": 1.154, "Magnesiumsulfat (MgSO4)": 1.224, "Magnesiumchlorid (MgCl2)": 1.289,
     "Kaliumbromid (KBr)": 1.104, "Calciumchlorid (CaCl2)": 1.399, "Kaliumchlorid (KCl)": 1.112,
@@ -240,7 +281,15 @@ function createWarehouseData(source = {}) {
         customContainers: source.customContainers || {},
         hiddenProducts: source.hiddenProducts || {},
         shopLinks: source.shopLinks || {},
-        productPresets: source.productPresets || {}
+        productPresets: source.productPresets || {},
+        crSeaWaterPresets: source.crSeaWaterPresets || {},
+        favoriteProducts: source.favoriteProducts || {},
+        implementationLog: source.implementationLog || source.dosePlanArchive || [],
+        logBookCategories: source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
+        logBookEntries: source.logBookEntries || [],
+        aquariumTodos: source.aquariumTodos || [],
+        warehouseEvents: source.warehouseEvents || [],
+        localUpdatedAt: source.localUpdatedAt || null
     };
 }
 
@@ -297,6 +346,14 @@ function normalizeWarehouseData(data) {
     if (!db.hiddenProducts) db.hiddenProducts = {};
     if (!db.shopLinks) db.shopLinks = {};
     if (!db.productPresets) db.productPresets = {};
+    if (!db.crSeaWaterPresets) db.crSeaWaterPresets = {};
+    if (!db.favoriteProducts) db.favoriteProducts = {};
+    if (!db.implementationLog) db.implementationLog = db.dosePlanArchive || [];
+    if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];
+    if (!db.logBookEntries) db.logBookEntries = [];
+    if (!db.aquariumTodos) db.aquariumTodos = [];
+    if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
+    if (!db.warehouseEvents) db.warehouseEvents = [];
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
 
     resetCatalogToBase();
@@ -342,6 +399,8 @@ function initDB() {
 
     appState = migrateToWarehouseState(parsed);
     if (!Array.isArray(appState.pendingDeletedRemoteIds)) appState.pendingDeletedRemoteIds = [];
+    if (!appState.hiddenSharedOwners || typeof appState.hiddenSharedOwners !== 'object') appState.hiddenSharedOwners = {};
+    if (!appState.knownSharedOwners || typeof appState.knownSharedOwners !== 'object') appState.knownSharedOwners = {};
     if (!appState.warehouses || Object.keys(appState.warehouses).length === 0) {
         const record = createWarehouseRecord('Hauptlager');
         record.id = 'main';
@@ -366,20 +425,80 @@ function initDB() {
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
-    saveDB();
+    saveDB(false);
     updateWarehouseUI();
 }
 
-function saveDB() {
+function saveDB(markDirty = true) {
     try {
         if (!appState) appState = migrateToWarehouseState(db);
         const warehouse = getActiveWarehouse();
-        if (warehouse) warehouse.data = db;
+        if (warehouse) {
+            if (markDirty) db.localUpdatedAt = new Date().toISOString();
+            warehouse.data = db;
+            warehouse.localUpdatedAt = db.localUpdatedAt;
+        }
         appState.activeWarehouseId = activeWarehouseId;
         localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateWarehouseUI();
         scheduleSupabaseAutoSync();
     } catch(e) {}
+}
+
+function addWarehouseEvent(type, text, meta = {}) {
+    if (!db.warehouseEvents) db.warehouseEvents = [];
+    db.warehouseEvents.unshift({
+        type,
+        text,
+        meta,
+        at: new Date().toISOString()
+    });
+    db.warehouseEvents = db.warehouseEvents.slice(0, 120);
+}
+
+function addImplementationLogEntry(type, name, amount, note = '') {
+    if (!db.implementationLog) db.implementationLog = [];
+    db.implementationLog.unshift({
+        type,
+        name,
+        amount,
+        note,
+        at: new Date().toISOString()
+    });
+    db.implementationLog = db.implementationLog.slice(0, 120);
+    addWarehouseEvent('doku', `${type}: ${name} umgesetzt`, { amount, note });
+    saveDB();
+    renderImplementationLog();
+}
+
+function isSharedOwnerHidden(email) {
+    return Boolean(email && appState && appState.hiddenSharedOwners && appState.hiddenSharedOwners[email]);
+}
+
+function setSharedOwnerHidden(email, hidden) {
+    if (!email) return;
+    if (!appState.hiddenSharedOwners) appState.hiddenSharedOwners = {};
+    if (!appState.knownSharedOwners) appState.knownSharedOwners = {};
+    appState.knownSharedOwners[email] = true;
+    if (hidden) appState.hiddenSharedOwners[email] = true;
+    else delete appState.hiddenSharedOwners[email];
+    if (hidden && appState.warehouses) {
+        Object.values(appState.warehouses).forEach(warehouse => {
+            if (warehouse.ownerEmail === email && (warehouse.isShared || warehouse.readOnly)) {
+                delete appState.warehouses[warehouse.id];
+            }
+        });
+        if (!appState.warehouses[activeWarehouseId]) {
+            activeWarehouseId = Object.keys(appState.warehouses)[0] || 'main';
+            appState.activeWarehouseId = activeWarehouseId;
+            const active = getActiveWarehouse();
+            if (active) db = normalizeWarehouseData(active.data);
+        }
+    }
+    localStorage.setItem(DB_KEY, JSON.stringify(appState));
+    updateWarehouseUI();
+    renderCurrentWarehouseViews();
+    renderSharedOwnerVisibilitySettings();
 }
 
 function getSupabaseSettings() {
@@ -808,6 +927,8 @@ async function syncPushAllWarehouses(showAlert = true) {
         const skipText = skippedReadOnly ? ` · ${skippedReadOnly} Nur-Lesen-Lager übersprungen` : '';
         const deleteText = deleted ? ` · ${deleted} gelöschte Lager entfernt` : '';
         updateSyncStatus(`Daten Upload abgeschlossen: ${pushed} Lager synchronisiert.${deleteText}${skipText}`, 'ok');
+        addWarehouseEvent('cloud', `Daten Upload: ${pushed} Lager synchronisiert${deleted ? `, ${deleted} gelöscht` : ''}`);
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         if (showAlert) alert(`Daten Upload abgeschlossen.\n${pushed} Lager wurden synchronisiert.${deleted ? `\n${deleted} gelöschte Lager wurden auch aus Supabase entfernt.` : ''}${skippedReadOnly ? `\n${skippedReadOnly} Nur-Lesen-Lager wurden übersprungen, weil du dafür keinen Schreibzugriff hast.` : ''}`);
         await renderSyncFriendsList();
     } catch (err) {
@@ -838,6 +959,22 @@ async function syncPullWarehouses(showAlert = true) {
         const { data: rows, error } = await client.rpc('list_accessible_warehouses');
         if (error) throw error;
         const sortedRows = (rows || []).slice().sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
+        const conflicts = sortedRows.filter(row => {
+            const local = getLocalWarehouseByRemoteId(row.id);
+            if (!local || !local.remoteId) return false;
+            const cloudTime = new Date(row.updated_at || 0).getTime();
+            const lastSync = new Date(local.lastSyncAt || 0).getTime();
+            const localTime = new Date(local.localUpdatedAt || local.data?.localUpdatedAt || 0).getTime();
+            return cloudTime > lastSync && localTime > lastSync;
+        });
+        if (showAlert && conflicts.length > 0) {
+            const names = conflicts.map(row => row.name || 'Lager').join(', ');
+            if (!confirm(`Cloud-Konflikt erkannt bei: ${names}\n\nDie Cloud und dieses Gerät wurden seit dem letzten Sync geändert. Daten Download überschreibt den lokalen Stand mit der Cloud-Version. Fortfahren?`)) {
+                updateSyncStatus('Daten Download abgebrochen: Cloud-Konflikt erkannt.', 'warn');
+                return;
+            }
+            addWarehouseEvent('conflict', `Cloud-Konflikt bestätigt: ${names}`);
+        }
         const returnedRemoteIds = new Set(sortedRows.map(row => row.id));
         if (!appState) appState = migrateToWarehouseState(null);
         if (!appState.warehouses) appState.warehouses = {};
@@ -860,6 +997,16 @@ async function syncPullWarehouses(showAlert = true) {
             const shareRole = row.access_role || (row.owner === user.id ? 'owner' : 'read');
             const isOwner = shareRole === 'owner';
             const isReadOnly = !isOwner && shareRole !== 'write';
+            const ownerEmail = row.owner_email || '';
+            if (!isOwner && ownerEmail) {
+                if (!appState.knownSharedOwners) appState.knownSharedOwners = {};
+                appState.knownSharedOwners[ownerEmail] = true;
+            }
+            const hiddenByOwner = !isOwner && isSharedOwnerHidden(ownerEmail);
+            if (hiddenByOwner) {
+                if (existing) delete appState.warehouses[existing.id];
+                return;
+            }
             if (!firstLoadedLocalId) firstLoadedLocalId = localId;
             if (!isOwner) loadedShared++;
             appState.warehouses[localId] = {
@@ -867,7 +1014,7 @@ async function syncPullWarehouses(showAlert = true) {
                 remoteId: row.id,
                 name: row.name || 'Lager',
                 ownerId: row.owner || null,
-                ownerEmail: row.owner_email || '',
+                ownerEmail,
                 createdAt: existing?.createdAt || new Date().toISOString(),
                 lastImportAt: existing?.lastImportAt || null,
                 lastExportAt: existing?.lastExportAt || null,
@@ -896,6 +1043,8 @@ async function syncPullWarehouses(showAlert = true) {
         renderCurrentWarehouseViews();
         const sharedText = loadedShared ? ` · ${loadedShared} geteilte Lager` : '';
         updateSyncStatus(`Daten Download abgeschlossen: ${loaded} Lager geladen.${sharedText}`, 'ok');
+        addWarehouseEvent('cloud', `Daten Download: ${loaded} Lager geladen${loadedShared ? `, ${loadedShared} geteilt` : ''}`);
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         if (showAlert) alert(`Daten Download abgeschlossen.\n${loaded} Lager wurden geladen.${loadedShared ? `\n${loadedShared} davon sind mit dir geteilt.` : ''}`);
     } catch (err) {
         const message = /list_accessible_warehouses/i.test(String(err.message || ''))
@@ -933,6 +1082,8 @@ async function addReadOnlyFriend() {
         if (error) throw error;
         document.getElementById('friendEmailInput').value = '';
         const roleLabel = selectedRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen';
+        addWarehouseEvent('share', `${email} für "${warehouse.name}" freigegeben: ${roleLabel}`);
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateSyncStatus(`${email} hat ${roleLabel}-Zugriff auf das Lager "${warehouse.name}".`, 'ok');
         alert(`${email} wurde für "${warehouse.name}" freigegeben.\nZugriff: ${roleLabel}`);
         await renderSyncFriendsList();
@@ -947,6 +1098,8 @@ async function removeReadOnlyFriend(memberId) {
         const { client } = await getSupabaseUser();
         const { error } = await client.from('warehouse_members').delete().eq('id', memberId);
         if (error) throw error;
+        addWarehouseEvent('share', 'Freigabe entfernt');
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         await renderSyncFriendsList();
     } catch (err) {
         alert('Freigabe konnte nicht entfernt werden: ' + err.message);
@@ -962,6 +1115,8 @@ async function updateFriendAccessRole(memberId, role) {
             .update({ role: nextRole })
             .eq('id', memberId);
         if (error) throw error;
+        addWarehouseEvent('share', `Freigabe geändert: ${nextRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen'}`);
+        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateSyncStatus(`Freigabe aktualisiert: ${nextRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen'}.`, 'ok');
         await renderSyncFriendsList();
     } catch (err) {
@@ -1099,10 +1254,14 @@ function renderCurrentWarehouseViews() {
     renderCustomProductSettings();
     renderCustomContainers();
     renderProductVisibilitySettings();
+    renderSharedOwnerVisibilitySettings();
+    renderCloudShareOverview();
+    renderWarehouseEventLog();
     renderProductPresets();
     renderShopLinkSettings();
     renderNachbestellen();
     renderSupabaseSyncSettings();
+    renderLogBook();
     initBulkProductSelect();
     updateNotificationStatus();
     clearCRPdfImport();
@@ -1122,7 +1281,7 @@ function switchWarehouse(id) {
     next.data = normalizeWarehouseData(next.data);
     db = next.data;
     applyTheme(db.theme || 'default', false);
-    saveDB();
+    saveDB(false);
     renderCurrentWarehouseViews();
 }
 
@@ -1151,6 +1310,7 @@ function deleteWarehouse() {
     const ids = Object.keys(appState.warehouses || {});
     if (ids.length <= 1) return alert('Es muss mindestens ein Lager vorhanden bleiben.');
     if (!confirm(`Lager "${warehouse.name}" wirklich löschen? Bestand, Statistik, Protokoll und Einstellungen dieses Lagers werden entfernt.`)) return;
+    const deletedWarehouseName = warehouse.name;
     queueDeletedWarehouseRemoteId(warehouse.remoteId);
     delete appState.warehouses[warehouse.id];
     activeWarehouseId = Object.keys(appState.warehouses)[0];
@@ -1158,6 +1318,7 @@ function deleteWarehouse() {
     const next = getActiveWarehouse();
     next.data = normalizeWarehouseData(next.data);
     db = next.data;
+    addWarehouseEvent('lager', `Lager "${deletedWarehouseName}" gelöscht`);
     applyTheme(db.theme || 'default', false);
     saveDB();
     renderCurrentWarehouseViews();
@@ -1201,6 +1362,7 @@ function showTab(tabId) {
     if(tabId === 'log') renderLogs();
     if(tabId === 'nachbestellen') renderNachbestellen();
     if(tabId === 'tools') initTools();
+    if(tabId === 'logbuch') renderLogBook();
     if(tabId === 'einstellungen') {
         setupSettingsAccordions();
         updateNotificationStatus();
@@ -2119,6 +2281,65 @@ function renderProductVisibilitySettings() {
     container.innerHTML = html;
 }
 
+function renderSharedOwnerVisibilitySettings() {
+    const container = document.getElementById('shared-owner-visibility-list');
+    if (!container) return;
+    const ownerEmails = [...new Set(
+        [
+            ...Object.keys(appState?.knownSharedOwners || {}),
+            ...Object.values(appState?.warehouses || {})
+            .filter(warehouse => (warehouse.isShared || warehouse.readOnly) && warehouse.ownerEmail)
+            .map(warehouse => warehouse.ownerEmail)
+        ]
+    )].sort((a, b) => a.localeCompare(b, 'de'));
+
+    if (ownerEmails.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine geteilten Lager mit Besitzer-Info geladen.</p>';
+        return;
+    }
+
+    container.innerHTML = ownerEmails.map(email => {
+        const visible = !isSharedOwnerHidden(email);
+        const count = Object.values(appState.warehouses || {}).filter(warehouse => warehouse.ownerEmail === email).length;
+        return `
+            <label class="visibility-row">
+                <input type="checkbox" ${visible ? 'checked' : ''} onchange='setSharedOwnerHidden(${jsArg(email)}, !this.checked)'>
+                <span>${escapeHtml(email)}</span>
+                <small>${visible ? 'sichtbar' : 'ausgeblendet'} · ${count} Lager</small>
+            </label>
+        `;
+    }).join('');
+}
+
+function renderCloudShareOverview() {
+    const container = document.getElementById('cloud-share-overview');
+    if (!container) return;
+    const own = Object.values(appState?.warehouses || {}).filter(warehouse => !(warehouse.isShared || warehouse.readOnly));
+    const shared = Object.values(appState?.warehouses || {}).filter(warehouse => warehouse.isShared || warehouse.readOnly);
+    const ownRows = own.map(warehouse => `<div class="overview-row"><span>${escapeHtml(warehouse.name)}</span><small>Eigenes Lager${warehouse.remoteId ? ' · Cloud' : ' · lokal'}</small></div>`).join('');
+    const sharedRows = shared.map(warehouse => `<div class="overview-row"><span>${escapeHtml(warehouse.name)}</span><small>${warehouse.readOnly ? 'Nur lesen' : 'Schreibzugriff'} · von ${escapeHtml(warehouse.ownerEmail || 'unbekannt')}</small></div>`).join('');
+    container.innerHTML = `
+        <div class="overview-group"><strong>Eigene Lager</strong>${ownRows || '<p class="hint">Keine eigenen Lager.</p>'}</div>
+        <div class="overview-group"><strong>Mit mir geteilt</strong>${sharedRows || '<p class="hint">Keine geteilten Lager sichtbar.</p>'}</div>
+    `;
+}
+
+function renderWarehouseEventLog() {
+    const container = document.getElementById('warehouse-event-log');
+    if (!container) return;
+    const events = (db.warehouseEvents || []).slice(0, 20);
+    if (events.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine Cloud-, Share- oder Plan-Ereignisse.</p>';
+        return;
+    }
+    container.innerHTML = events.map(event => `
+        <div class="overview-row">
+            <span>${escapeHtml(event.text)}</span>
+            <small>${formatWarehouseDate(event.at)} · ${escapeHtml(event.type || 'Info')}</small>
+        </div>
+    `).join('');
+}
+
 function setThreshold(item) {
     let current = db.thresholds[item] || 0;
     const unitLabel = getUnitLabel(getItemUnit(item));
@@ -2135,6 +2356,67 @@ function setThreshold(item) {
             alert("Bitte eine gültige Zahl eingeben.");
         }
     }
+}
+
+function isFavoriteProduct(item) {
+    return Boolean(db.favoriteProducts && db.favoriteProducts[item]);
+}
+
+function toggleFavoriteProduct(item) {
+    if (!db.favoriteProducts) db.favoriteProducts = {};
+    if (db.favoriteProducts[item]) delete db.favoriteProducts[item];
+    else db.favoriteProducts[item] = true;
+    saveDB();
+    filterLager();
+}
+
+function renderProductCard(cat, item) {
+    let stock = db.inventory[cat][item] || 0;
+    let stockG = getGrams(item, stock);
+    let showMassSubline = itemUsesVolume(item);
+    let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+    let reachText = formatWeeksLeft(item);
+    let metrics = getUsageMetrics(item);
+    let weeksLeft = getWeeksLeft(item);
+    let warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+    let alertsDisabled = db.alerts && db.alerts.disabled && db.alerts.disabled[item];
+    let warningClass = (!alertsDisabled && ((stock <= threshold && threshold > 0) || (stock <= 0 && metrics.totalConsumed > 0) || (weeksLeft !== null && weeksLeft <= warningWeeks))) ? 'card-warning' : '';
+    let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ${getUnitLabel(getItemUnit(item))}</span>` : '';
+    let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
+    let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
+    let favorite = isFavoriteProduct(item);
+    let crossHint = "";
+    if (item === "Fluor (F)" && stock === 0) {
+        let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
+        crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
+    } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
+        let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
+        crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
+    }
+    return `
+        <div class="card ${warningClass}">
+            <h4>
+                <span style="display:flex; align-items:center; gap:8px; min-width:0;">
+                    ${warningClass ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;"></span>' : ''}
+                    <button class="threshold-btn favorite-btn ${favorite ? 'active' : ''}" onclick='toggleFavoriteProduct(${jsArg(item)})' title="Favorit umschalten">${favorite ? '★' : '☆'}</button>
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item}</span>
+                    <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
+                </span>
+                <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <span>${formatItemAmount(item, stock)}</span>
+                    ${showMassSubline ? `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>` : ''}
+                </span>
+            </h4>
+            ${crossHint}
+            ${prognosisHint}
+            ${thresholdHint}
+            ${disabledHint}
+            <div class="btn-group" style="margin-top: 10px;">
+                <button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
+                <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>
+            </div>
+        </div>
+    `;
 }
 
 // --- RENDER FUNKTIONEN ---
@@ -2180,6 +2462,20 @@ function filterLager() {
     if (!listContainer) return;
     listContainer.innerHTML = '';
     renderStockAlerts(alertsContainer);
+
+    const favoriteRows = [];
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
+            if (!isFavoriteProduct(item)) continue;
+            if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
+            if (!item.toLowerCase().includes(term)) continue;
+            favoriteRows.push(renderProductCard(cat, item));
+        }
+    }
+    if (favoriteRows.length > 0) {
+        listContainer.innerHTML += `<h2 class="category-title">Favoriten</h2>${favoriteRows.join('')}`;
+    }
     
     for (let cat in catalog) {
         if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
@@ -2191,55 +2487,7 @@ function filterLager() {
             if (isProductHidden(item)) continue;
             if (item.toLowerCase().includes(term)) {
                 hasItems = true;
-                let stock = db.inventory[cat][item] || 0;
-                let stockG = getGrams(item, stock); // Umrechnung in Gramm
-                let showMassSubline = itemUsesVolume(item);
-                let threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
-                let reachText = formatWeeksLeft(item);
-                let metrics = getUsageMetrics(item);
-                
-                // Warn-Logik
-                let weeksLeft = getWeeksLeft(item);
-                let warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
-                let alertsDisabled = db.alerts && db.alerts.disabled && db.alerts.disabled[item];
-                let warningClass = (!alertsDisabled && ((stock <= threshold && threshold > 0) || (stock <= 0 && metrics.totalConsumed > 0) || (weeksLeft !== null && weeksLeft <= warningWeeks))) ? 'card-warning' : '';
-                let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ${getUnitLabel(getItemUnit(item))}</span>` : '';
-                let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
-                let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
-
-                // Kreuz-Check für Fluor/NaF
-                let crossHint = "";
-                if (item === "Fluor (F)" && stock === 0) {
-                    let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
-                    crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
-                } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
-                    let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
-                    crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
-                }
-
-                catHTML += `
-                    <div class="card ${warningClass}">
-                        <h4>
-                            <span style="display:flex; align-items:center; gap:8px; min-width:0;">
-                                ${warningClass ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;"></span>' : ''}
-                                <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item}</span>
-                                <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
-                            </span>
-                            <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
-                                <span>${formatItemAmount(item, stock)}</span>
-                                ${showMassSubline ? `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>` : ''}
-                            </span>
-                        </h4>
-                        ${crossHint}
-                        ${prognosisHint}
-                        ${thresholdHint}
-                        ${disabledHint}
-                        <div class="btn-group" style="margin-top: 10px;">
-                            <button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
-                            <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>
-                        </div>
-                    </div>
-                `;
+                catHTML += renderProductCard(cat, item);
             }
         }
         if (hasItems) {
@@ -2342,8 +2590,161 @@ function initTools() {
             .join('');
     }
     renderMacroRecipe();
+    renderNutritionCalculator();
+    renderSeaWaterPresetSelect();
+    renderSeaWaterMix();
+    renderImplementationLog();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
+}
+
+function renderNutritionCalculator() {
+    const result = document.getElementById('nutritionResult');
+    if (!result) return;
+    const element = document.getElementById('nutritionElement')?.value || 'Nitrat';
+    const rule = nutritionDoseRules[element] || nutritionDoseRules.Nitrat;
+    const label = document.getElementById('nutritionTargetLabel');
+    if (label) label.innerText = rule.targetLabel;
+    const liters = Math.max(0, parseFloat(document.getElementById('nutritionTankLiters')?.value) || 0);
+    const targetChange = Math.max(0, parseFloat(document.getElementById('nutritionIncrease')?.value) || 0);
+    const days = Math.max(1, parseInt(document.getElementById('nutritionPlanDays')?.value, 10) || 1);
+    if (!liters || !targetChange) {
+        result.innerHTML = '<p class="hint">Trage Aquariumgröße und gewünschte Zieländerung ein.</p>';
+        return;
+    }
+    const totalMl = (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
+    const dailyMl = totalMl / days;
+    const resolved = resolveRecipeItem({ item: rule.product });
+    const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
+    const stockHint = resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}` : 'nicht lagergeführt';
+    const missingClass = resolved && stock < totalMl ? ' missing' : '';
+    const planRows = Array.from({ length: days }, (_, index) => `
+        <label class="dose-plan-row">
+            <input type="checkbox">
+            <span>Tag ${index + 1}</span>
+            <strong>${dailyMl.toFixed(2)} ml</strong>
+        </label>
+    `).join('');
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row${missingClass}">
+                <span><strong>${element}</strong><small>${rule.primary} ${rule.action} um ${targetChange} mg/l · ${stockHint}</small></span>
+                <span>${totalMl.toFixed(2)} ml</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Dosierbasis</strong><small>1 ml pro 100 L ${rule.action} ${rule.primary} um ${rule.primaryChange} mg/l</small></span>
+                <span>${dailyMl.toFixed(2)} ml/Tag</span>
+            </div>
+            <div class="dose-plan">${planRows}</div>
+        </div>
+        <div class="tool-action-row">
+            <button class="btn-danger btn-animated" onclick="bookNutritionDose()">Aus Lager auslagern</button>
+        </div>
+    `;
+}
+
+function bookNutritionDose() {
+    const element = document.getElementById('nutritionElement')?.value || 'Nitrat';
+    const rule = nutritionDoseRules[element] || nutritionDoseRules.Nitrat;
+    const liters = Math.max(0, parseFloat(document.getElementById('nutritionTankLiters')?.value) || 0);
+    const targetChange = Math.max(0, parseFloat(document.getElementById('nutritionIncrease')?.value) || 0);
+    const totalMl = (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
+    const resolved = resolveRecipeItem({ item: rule.product });
+    if (!resolved) return alert(`${rule.product} ist nicht lagergeführt.`);
+    if (!totalMl) return alert('Bitte erst Aquariumgröße und Zieländerung eintragen.');
+    if (!confirm(`${totalMl.toFixed(2)} ml ${rule.product} auslagern?`)) return;
+    executeQueueWithConflictHandling([{ ...resolved, amount: totalMl }], 0);
+}
+
+function getSeaWaterScale() {
+    return Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0) / 100;
+}
+
+function renderSeaWaterPresetSelect() {
+    const select = document.getElementById('seaWaterPresetSelect');
+    if (!select) return;
+    const presets = db.crSeaWaterPresets || {};
+    const names = Object.keys(presets).sort((a, b) => a.localeCompare(b, 'de'));
+    select.innerHTML = `<option value="">Preset wählen ...</option>${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)} · ${presets[name]} L</option>`).join('')}`;
+}
+
+function renderSeaWaterMix() {
+    const result = document.getElementById('seaWaterMixResult');
+    if (!result) return;
+    const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
+    const scale = liters / 100;
+    if (!liters) {
+        result.innerHTML = '<p class="hint">Trage die gewünschte Meerwassermenge ein.</p>';
+        return;
+    }
+    const rows = seaWaterRecipePer100L.map(entry => {
+        const amount = entry.amount * scale;
+        const resolved = resolveRecipeItem(entry);
+        const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
+        const missing = resolved && stock < amount;
+        const density = entry.item ? (densityFactors[entry.item] || 1) : 1;
+        const grams = amount * density;
+        const amountLabel = `${amount.toFixed(1)} ${entry.unit} · ${grams.toFixed(1)} g`;
+        return `
+            <div class="tool-row ${missing ? 'missing' : ''}">
+                <span>
+                    <strong>${entry.item || entry.label}</strong>
+                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)} · Dichte ${density.toFixed(3)} g/ml` : 'nicht lagergeführt · ca. 1.000 g/ml'}</small>
+                </span>
+                <span>${amountLabel}</span>
+            </div>
+        `;
+    }).join('');
+    result.innerHTML = `
+        <div class="tool-result">${rows}</div>
+        <button class="btn-danger btn-animated" onclick="bookSeaWaterMix()">Lagergeführte Zutaten auslagern</button>
+    `;
+}
+
+function saveSeaWaterPreset() {
+    const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
+    if (!liters) return alert('Bitte erst eine Meerwassermenge eintragen.');
+    const name = prompt('Preset-Name:', `${liters} L Meerwasser`);
+    if (!name || !name.trim()) return;
+    if (!db.crSeaWaterPresets) db.crSeaWaterPresets = {};
+    db.crSeaWaterPresets[name.trim()] = liters;
+    saveDB();
+    renderSeaWaterPresetSelect();
+    alert(`Preset "${name.trim()}" gespeichert.`);
+}
+
+function loadSeaWaterPreset(name) {
+    if (!name || !db.crSeaWaterPresets || !db.crSeaWaterPresets[name]) return;
+    const input = document.getElementById('seaWaterLiters');
+    if (input) input.value = db.crSeaWaterPresets[name];
+    renderSeaWaterMix();
+}
+
+function deleteSeaWaterPreset() {
+    const select = document.getElementById('seaWaterPresetSelect');
+    const name = select?.value || '';
+    if (!name) return alert('Bitte zuerst ein Preset auswählen.');
+    if (!confirm(`Preset "${name}" löschen?`)) return;
+    delete db.crSeaWaterPresets[name];
+    saveDB();
+    renderSeaWaterPresetSelect();
+    renderSeaWaterMix();
+}
+
+function bookSeaWaterMix() {
+    const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
+    const scale = liters / 100;
+    const queue = seaWaterRecipePer100L
+        .map(entry => {
+            const resolved = resolveRecipeItem(entry);
+            if (!resolved) return null;
+            const amount = convertInputToStoredAmount(resolved.item, entry.unit, entry.amount * scale);
+            return amount > 0 ? { ...resolved, amount } : null;
+        })
+        .filter(Boolean);
+    if (queue.length === 0) return alert('Dieses Rezept enthält keine lagergeführten Zutaten.');
+    if (!confirm(`${liters} L Meerwasser anmischen und ${queue.length} lagergeführte Zutat(en) auslagern?`)) return;
+    executeQueueWithConflictHandling(queue, 0);
 }
 
 function resolveRecipeItem(entry) {
@@ -2397,6 +2798,349 @@ function bookMacroRecipe() {
     if (queue.length === 0) return alert('Dieses Rezept enthält keine lagergeführten Zutaten.');
     if (!confirm(`${select.value} für ${liters} L anmischen und ${queue.length} lagergeführte Zutat(en) auslagern?`)) return;
     executeQueueWithConflictHandling(queue, 0);
+}
+
+function formatDateTimeLocal(value) {
+    const date = value ? new Date(value) : new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function ensureLogBookDefaults() {
+    if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];
+    if (!db.logBookEntries) db.logBookEntries = [];
+    if (!db.aquariumTodos) db.aquariumTodos = [];
+}
+
+function renderLogBook() {
+    ensureLogBookDefaults();
+    const categorySelect = document.getElementById('logBookCategory');
+    const todoCategory = document.getElementById('todoCategory');
+    const dateInput = document.getElementById('logBookDate');
+    const dueInput = document.getElementById('todoDueAt');
+    const options = db.logBookCategories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
+    if (categorySelect) categorySelect.innerHTML = options;
+    if (todoCategory) todoCategory.innerHTML = options;
+    if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
+    if (dueInput && !dueInput.value) dueInput.value = formatDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+    updateTodoIntervalLabel();
+    renderLogBookCategories();
+    renderLogBookEntries();
+    renderAquariumTodos();
+}
+
+function addLogBookCategory() {
+    ensureLogBookDefaults();
+    const input = document.getElementById('logBookNewCategory');
+    const name = (input?.value || '').trim();
+    if (!name) return alert('Bitte einen Kategorienamen eintragen.');
+    if (db.logBookCategories.includes(name)) return alert('Diese Kategorie existiert bereits.');
+    db.logBookCategories.push(name);
+    saveDB();
+    if (input) input.value = '';
+    renderLogBook();
+}
+
+function editLogBookCategory(category) {
+    const next = prompt('Kategorie umbenennen:', category);
+    if (!next || !next.trim() || next.trim() === category) return;
+    if (db.logBookCategories.includes(next.trim())) return alert('Diese Kategorie existiert bereits.');
+    db.logBookCategories = db.logBookCategories.map(cat => cat === category ? next.trim() : cat);
+    (db.logBookEntries || []).forEach(entry => {
+        if (entry.category === category) entry.category = next.trim();
+    });
+    (db.aquariumTodos || []).forEach(todo => {
+        if (todo.category === category) todo.category = next.trim();
+    });
+    saveDB();
+    renderLogBook();
+}
+
+function deleteLogBookCategory(category) {
+    if (!confirm(`Kategorie "${category}" löschen? Bestehende Einträge bleiben erhalten und werden auf Sonstiges gesetzt.`)) return;
+    db.logBookCategories = (db.logBookCategories || []).filter(cat => cat !== category);
+    if (!db.logBookCategories.includes('Sonstiges')) db.logBookCategories.push('Sonstiges');
+    (db.logBookEntries || []).forEach(entry => {
+        if (entry.category === category) entry.category = 'Sonstiges';
+    });
+    (db.aquariumTodos || []).forEach(todo => {
+        if (todo.category === category) todo.category = 'Sonstiges';
+    });
+    saveDB();
+    renderLogBook();
+}
+
+function renderLogBookCategories() {
+    const container = document.getElementById('log-book-category-list');
+    if (!container) return;
+    container.innerHTML = (db.logBookCategories || []).map(category => `
+        <div class="overview-row">
+            <span>${escapeHtml(category)}</span>
+            <div class="logbook-actions">
+                <button onclick='editLogBookCategory(${jsArg(category)})'>Bearbeiten</button>
+                <button onclick='deleteLogBookCategory(${jsArg(category)})' class="btn-out">Löschen</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateTodoIntervalLabel() {
+    const input = document.getElementById('todoInterval');
+    const label = document.getElementById('todoIntervalLabel');
+    if (!input || !label) return;
+    const days = parseInt(input.value || '0', 10);
+    label.innerText = days <= 0 ? 'Einmalig' : `Alle ${days} Tag(e)`;
+    document.querySelectorAll('#todoIntervalPicker button').forEach(btn => {
+        const buttonDays = btn.textContent === 'Einmalig' ? 0 : parseInt(btn.textContent, 10);
+        btn.classList.toggle('active', buttonDays === days);
+    });
+}
+
+function setTodoInterval(value) {
+    const input = document.getElementById('todoInterval');
+    const custom = document.getElementById('todoIntervalCustom');
+    const days = Math.max(0, parseInt(value, 10) || 0);
+    if (input) input.value = String(days);
+    if (custom && document.activeElement !== custom) custom.value = '';
+    updateTodoIntervalLabel();
+}
+
+function saveLogBookEntry(editId = null) {
+    ensureLogBookDefaults();
+    const categoryEl = document.getElementById('logBookCategory');
+    const titleEl = document.getElementById('logBookTitle');
+    const noteEl = document.getElementById('logBookNote');
+    const dateEl = document.getElementById('logBookDate');
+    const category = categoryEl?.value || 'Sonstiges';
+    const title = (titleEl?.value || '').trim();
+    const note = (noteEl?.value || '').trim();
+    const at = dateEl?.value ? new Date(dateEl.value).toISOString() : new Date().toISOString();
+    if (!title && !note) return alert('Bitte Titel oder Notiz eintragen.');
+    if (editId) {
+        const entry = db.logBookEntries.find(item => item.id === editId);
+        if (!entry) return;
+        Object.assign(entry, { category, title, note, at, updatedAt: new Date().toISOString() });
+    } else {
+        db.logBookEntries.unshift({ id: createWarehouseId(), category, title: title || category, note, at, createdAt: new Date().toISOString() });
+    }
+    saveDB();
+    if (titleEl) titleEl.value = '';
+    if (noteEl) noteEl.value = '';
+    if (dateEl) dateEl.value = formatDateTimeLocal();
+    renderLogBook();
+}
+
+function editLogBookEntry(id) {
+    const entry = (db.logBookEntries || []).find(item => item.id === id);
+    if (!entry) return;
+    const title = prompt('Titel:', entry.title || '');
+    if (title === null) return;
+    const note = prompt('Notiz:', entry.note || '');
+    if (note === null) return;
+    const category = prompt('Kategorie:', entry.category || 'Sonstiges');
+    if (category === null) return;
+    entry.title = title.trim() || category.trim() || 'Log';
+    entry.note = note.trim();
+    entry.category = category.trim() || 'Sonstiges';
+    entry.updatedAt = new Date().toISOString();
+    if (!db.logBookCategories.includes(entry.category)) db.logBookCategories.push(entry.category);
+    saveDB();
+    renderLogBook();
+}
+
+function deleteLogBookEntry(id) {
+    if (!confirm('Log-Eintrag löschen?')) return;
+    db.logBookEntries = (db.logBookEntries || []).filter(entry => entry.id !== id);
+    saveDB();
+    renderLogBook();
+}
+
+function renderLogBookEntries() {
+    const container = document.getElementById('log-book-list');
+    if (!container) return;
+    const entries = (db.logBookEntries || []).slice(0, 80);
+    if (entries.length === 0) {
+        container.innerHTML = '<p class="hint">Noch keine Logbuch-Einträge.</p>';
+        return;
+    }
+    container.innerHTML = entries.map(entry => `
+        <div class="logbook-entry">
+            <div>
+                <strong>${escapeHtml(entry.title || entry.category)}</strong>
+                <small>${formatWarehouseDate(entry.at)} · ${escapeHtml(entry.category || 'Sonstiges')}</small>
+                ${entry.note ? `<p>${escapeHtml(entry.note)}</p>` : ''}
+            </div>
+            <div class="logbook-actions">
+                <button onclick="editLogBookEntry('${entry.id}')">Bearbeiten</button>
+                <button onclick="deleteLogBookEntry('${entry.id}')" class="btn-out">Löschen</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function saveAquariumTodo(editId = null) {
+    ensureLogBookDefaults();
+    const title = (document.getElementById('todoTitle')?.value || '').trim();
+    const category = document.getElementById('todoCategory')?.value || 'Wartung';
+    const dueValue = document.getElementById('todoDueAt')?.value;
+    const intervalDays = parseInt(document.getElementById('todoInterval')?.value || '0', 10);
+    const notifyEnabled = document.getElementById('todoNotifyEnabled')?.checked !== false;
+    if (!title) return alert('Bitte eine Aufgabe eintragen.');
+    const dueAt = dueValue ? new Date(dueValue).toISOString() : new Date().toISOString();
+    if (editId) {
+        const todo = db.aquariumTodos.find(item => item.id === editId);
+        if (!todo) return;
+        Object.assign(todo, { title, category, dueAt, intervalDays, notifyEnabled, done: false, remindedAt: null, updatedAt: new Date().toISOString() });
+    } else {
+        db.aquariumTodos.unshift({ id: createWarehouseId(), title, category, dueAt, intervalDays, notifyEnabled, done: false, remindedAt: null, lastDoneAt: null, createdAt: new Date().toISOString() });
+    }
+    saveDB();
+    document.getElementById('todoTitle').value = '';
+    document.getElementById('todoDueAt').value = formatDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+    renderAquariumTodos();
+}
+
+function completeAquariumTodo(id) {
+    const todo = (db.aquariumTodos || []).find(item => item.id === id);
+    if (!todo) return;
+    const doneValue = prompt('Wann wurde die Aktion ausgeführt? (YYYY-MM-DD oder leer = jetzt)', new Date().toISOString().slice(0, 10));
+    if (doneValue === null) return;
+    const doneAt = doneValue.trim() ? new Date(doneValue.trim()).toISOString() : new Date().toISOString();
+    todo.lastDoneAt = doneAt;
+    if (todo.intervalDays > 0) {
+        todo.dueAt = new Date(new Date(doneAt).getTime() + todo.intervalDays * 24 * 60 * 60 * 1000).toISOString();
+        todo.done = false;
+        todo.remindedAt = null;
+    } else {
+        todo.done = true;
+    }
+    addWarehouseEvent('todo', `ToDo erledigt: ${todo.title}`);
+    saveDB();
+    renderAquariumTodos();
+}
+
+function snoozeAquariumTodo(id) {
+    const todo = (db.aquariumTodos || []).find(item => item.id === id);
+    if (!todo) return;
+    const days = prompt('In wie vielen Tagen erneut erinnern?', '1');
+    if (days === null) return;
+    const parsed = Math.max(1, parseInt(days, 10) || 1);
+    todo.dueAt = new Date(Date.now() + parsed * 24 * 60 * 60 * 1000).toISOString();
+    todo.remindedAt = null;
+    todo.done = false;
+    addWarehouseEvent('todo', `ToDo verschoben: ${todo.title} (${parsed} Tag(e))`);
+    saveDB();
+    renderAquariumTodos();
+}
+
+function toggleTodoNotification(id) {
+    const todo = (db.aquariumTodos || []).find(item => item.id === id);
+    if (!todo) return;
+    todo.notifyEnabled = todo.notifyEnabled === false;
+    todo.remindedAt = null;
+    saveDB();
+    renderAquariumTodos();
+}
+
+function editAquariumTodo(id) {
+    const todo = (db.aquariumTodos || []).find(item => item.id === id);
+    if (!todo) return;
+    const title = prompt('Aufgabe:', todo.title);
+    if (title === null) return;
+    const category = prompt('Kategorie:', todo.category || 'Wartung');
+    if (category === null) return;
+    const due = prompt('Fällig am (YYYY-MM-DD oder leer = unverändert):', todo.dueAt ? new Date(todo.dueAt).toISOString().slice(0, 10) : '');
+    if (due === null) return;
+    const interval = prompt('Intervall in Tagen (0 = einmalig):', String(todo.intervalDays || 0));
+    if (interval === null) return;
+    const notification = prompt('Erinnerung aktiv? (ja/nein):', todo.notifyEnabled === false ? 'nein' : 'ja');
+    if (notification === null) return;
+    todo.title = title.trim() || todo.title;
+    todo.category = category.trim() || todo.category;
+    if (due.trim()) {
+        const nextDue = new Date(due.trim());
+        if (!Number.isNaN(nextDue.getTime())) todo.dueAt = nextDue.toISOString();
+    }
+    todo.intervalDays = Math.max(0, parseInt(interval, 10) || 0);
+    todo.notifyEnabled = !/^n(ein)?$/i.test(notification.trim());
+    todo.remindedAt = null;
+    todo.updatedAt = new Date().toISOString();
+    if (!db.logBookCategories.includes(todo.category)) db.logBookCategories.push(todo.category);
+    saveDB();
+    renderLogBook();
+}
+
+function deleteAquariumTodo(id) {
+    if (!confirm('ToDo löschen?')) return;
+    db.aquariumTodos = (db.aquariumTodos || []).filter(todo => todo.id !== id);
+    saveDB();
+    renderAquariumTodos();
+}
+
+function clearLogBookEntries() {
+    if (!confirm('Alle Logbuch-Einträge löschen? Kategorien bleiben erhalten.')) return;
+    db.logBookEntries = [];
+    saveDB();
+    renderLogBook();
+    alert('Logbuch ist leer.');
+}
+
+function clearAquariumTodos() {
+    if (!confirm('Alle ToDos und Erinnerungen löschen?')) return;
+    db.aquariumTodos = [];
+    saveDB();
+    renderLogBook();
+    alert('ToDo-Liste ist leer.');
+}
+
+function renderAquariumTodos() {
+    const container = document.getElementById('aquarium-todo-list');
+    if (!container) return;
+    const todos = (db.aquariumTodos || []).slice().sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
+    if (todos.length === 0) {
+        container.innerHTML = '<p class="hint">Keine ToDos geplant.</p>';
+        return;
+    }
+    const now = Date.now();
+    container.innerHTML = todos.map(todo => {
+        const due = new Date(todo.dueAt).getTime();
+        const state = todo.done ? 'done' : (due <= now ? 'due' : 'open');
+        const label = todo.done ? 'erledigt' : (due <= now ? 'fällig' : 'geplant');
+        const notify = todo.notifyEnabled !== false;
+        return `
+            <div class="todo-row ${state}">
+                <div>
+                    <strong>${escapeHtml(todo.title)}</strong>
+                    <small>Kategorie: ${escapeHtml(todo.category || 'Wartung')} · Intervall: ${todo.intervalDays ? `alle ${todo.intervalDays} Tage` : 'einmalig'} · ${label} · Erinnerung ${notify ? 'an' : 'aus'}</small>
+                    <small>Zuletzt erledigt: ${todo.lastDoneAt ? formatWarehouseDate(todo.lastDoneAt) : 'noch nie'} · Wieder anstehend: ${formatWarehouseDate(todo.dueAt)}</small>
+                </div>
+                <div class="logbook-actions">
+                    <button onclick="completeAquariumTodo('${todo.id}')">Erledigt</button>
+                    <button onclick="snoozeAquariumTodo('${todo.id}')">Erinnern in...</button>
+                    <button onclick="toggleTodoNotification('${todo.id}')">${notify ? 'Erinnerung aus' : 'Erinnerung an'}</button>
+                    <button onclick="editAquariumTodo('${todo.id}')">Bearbeiten</button>
+                    <button onclick="deleteAquariumTodo('${todo.id}')" class="btn-out">Löschen</button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function checkTodoReminders() {
+    if (!db || !db.aquariumTodos) return;
+    const now = Date.now();
+    let changed = false;
+    db.aquariumTodos.forEach(todo => {
+        if (todo.done || !todo.dueAt || todo.notifyEnabled === false) return;
+        const due = new Date(todo.dueAt).getTime();
+        const reminded = todo.remindedAt ? new Date(todo.remindedAt).getTime() : 0;
+        if (due <= now && now - reminded > 6 * 60 * 60 * 1000) {
+            showLocalNotification('Aquarium ToDo fällig', `${todo.title} · ${todo.category}`);
+            todo.remindedAt = new Date().toISOString();
+            changed = true;
+        }
+    });
+    if (changed) saveDB(false);
 }
 
 function calculateApproxPsu(density, temp) {
@@ -3944,6 +4688,7 @@ function renderNachbestellen() {
         byCat[cat].push({ item, sizes, urlMap: urlMap || {} });
     });
 
+    const suggestedItems = new Set();
     let html = '';
     for (let cat in byCat) {
         let catRows = '';
@@ -3966,6 +4711,7 @@ function renderNachbestellen() {
             const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
             const isLow = (threshold > 0 && stock <= threshold) || (weeksLeft !== null && weeksLeft <= warningWeeks) || stock <= 0;
             const stockColor = isLow ? 'var(--danger)' : 'var(--success)';
+            if (isLow) suggestedItems.add(item);
 
             catRows += `
                 <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap;">
@@ -3985,9 +4731,29 @@ function renderNachbestellen() {
 
     if (!html) {
         html = '<p class="hint">Keine Shop-Links konfiguriert. Bitte unter Einstellungen &rarr; Shop-Links verwalten die Links einpflegen.</p>';
+    } else if (suggestedItems.size > 0) {
+        html = `
+            <div class="alert-summary" style="margin-bottom:12px;">
+                Bestellvorschlag: ${suggestedItems.size} kritische Artikel erkannt.
+                <button type="button" onclick="selectSuggestedShopItems()" style="margin-top:8px;">Vorschlag markieren</button>
+            </div>
+        ` + html;
     }
 
     container.innerHTML = html;
+    updateShopCartBtn();
+}
+
+function selectSuggestedShopItems() {
+    const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
+    document.querySelectorAll('#nachbestellen-container input[type=checkbox][data-item]').forEach(cb => {
+        const item = cb.dataset.item;
+        const cat = findCat(item);
+        const stock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
+        const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
+        const weeksLeft = getWeeksLeft(item);
+        cb.checked = (threshold > 0 && stock <= threshold) || (weeksLeft !== null && weeksLeft <= warningWeeks) || stock <= 0;
+    });
     updateShopCartBtn();
 }
 
@@ -4452,7 +5218,7 @@ document.addEventListener('keydown', (e) => {
     }
     // Number keys 1-8 for tabs (when not in input)
     if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'tools', '9': 'einstellungen' };
+        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'tools', '9': 'logbuch' };
         if (tabMap[e.key]) {
             selectTab(tabMap[e.key]);
         }
@@ -4472,6 +5238,8 @@ initDB();
 renderLager();
 updateNotificationStatus();
 setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
+setTimeout(checkTodoReminders, 1500);
+setInterval(checkTodoReminders, 60 * 1000);
 
 // Initialize Light Mode if saved
 if (db.lightMode) {
@@ -4631,7 +5399,7 @@ function handleSwipe() {
     
     if (!isMostlyHorizontal || !isIntentional) return;
     
-    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'einstellungen'];
+    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'logbuch', 'einstellungen'];
     const currentTab = document.querySelector('.tab-content.active')?.id;
     const currentIndex = tabs.indexOf(currentTab);
     
