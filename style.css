@@ -408,30 +408,6 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
     font-style: normal;
     font-weight: 800;
 }
-.app-status-strip {
-    position: fixed;
-    left: 12px;
-    bottom: 12px;
-    z-index: 850;
-    display: flex;
-    gap: 6px;
-    max-width: calc(100vw - 120px);
-    overflow: auto;
-    scrollbar-width: none;
-}
-.app-status-strip::-webkit-scrollbar { display: none; }
-.app-status-strip button {
-    width: auto;
-    white-space: nowrap;
-    padding: 7px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: rgba(28,28,30,0.72);
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-}
 .mobile-bottom-nav {
     display: none;
 }
@@ -3976,16 +3952,6 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     }
     .dashboard-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    .app-status-strip {
-        left: 10px;
-        right: 10px;
-        bottom: 70px;
-        max-width: none;
-        padding-bottom: 2px;
-    }
-    .app-status-strip button {
-        background: rgba(28,28,30,0.84);
     }
     .mobile-bottom-nav {
         position: fixed;

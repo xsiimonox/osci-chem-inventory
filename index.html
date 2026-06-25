@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=2.3.1">
+    <link rel="stylesheet" href="style.css?v=2.3.2">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.3.1</span>
+                <span class="version-badge">v2.3.2</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -1082,7 +1082,6 @@
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
     <div class="custom-cursor-dot" id="customCursorDot" aria-hidden="true"></div>
 
-    <div class="app-status-strip" id="appStatusStrip" aria-live="polite"></div>
     <nav class="mobile-bottom-nav" aria-label="Hauptnavigation">
         <button type="button" onclick="selectTab('lager')" data-tab="lager"><span>▦</span>Lager</button>
         <button type="button" onclick="selectTab('cr-export')" data-tab="cr-export"><span>C</span>C&amp;R</button>
@@ -1091,7 +1090,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.3.1"></script>
+    <script src="app.js?v=2.3.2"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')

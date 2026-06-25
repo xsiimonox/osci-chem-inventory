@@ -684,7 +684,6 @@ function updateSyncStatus(message, type = 'info') {
         el.innerText = message;
         el.dataset.type = type;
     }
-    updateAppStatusStrip();
 }
 
 function updateAuthState(user) {
@@ -700,7 +699,6 @@ function updateAuthState(user) {
         el.dataset.state = 'out';
         if (activationNote) activationNote.style.display = '';
     }
-    updateAppStatusStrip();
 }
 
 function togglePasswordVisibility(inputId, button) {
@@ -1527,25 +1525,6 @@ function finishOnboarding() {
     renderDashboard();
 }
 
-function getAuthStatusLabel() {
-    const status = document.getElementById('supabase-auth-state')?.innerText?.trim();
-    if (status) return status;
-    return 'Cloud: nicht angemeldet';
-}
-
-function updateAppStatusStrip() {
-    const strip = document.getElementById('appStatusStrip');
-    if (!strip) return;
-    const warehouse = getActiveWarehouse();
-    const access = getWarehouseAccessLabel(warehouse);
-    const sync = warehouse?.lastSyncAt ? `Sync ${formatWarehouseDate(warehouse.lastSyncAt)}` : 'Noch kein Sync';
-    strip.innerHTML = `
-        <button type="button" onclick="selectTab('einstellungen')">${escapeHtml(getAuthStatusLabel())}</button>
-        <button type="button" onclick="selectTab('lager')">${escapeHtml(access)}</button>
-        <button type="button" onclick="triggerRefresh()">${escapeHtml(sync)}</button>
-    `;
-}
-
 function openQuickActionMenu() {
     const activeTab = getActiveTabId();
     const actions = [
@@ -1712,7 +1691,6 @@ function showTab(tabId) {
         renderSupabaseSyncSettings();
         renderMenuOrderSettings();
     }
-    updateAppStatusStrip();
 }
 
 function setupSettingsAccordions() {
@@ -5103,7 +5081,6 @@ function undoLog(index, silent = false) {
     renderLager();
     renderLogs();
     renderDashboard();
-    updateAppStatusStrip();
 }
 
 // --- QUEUE & LISTEN VERARBEITUNG ---
