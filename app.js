@@ -255,6 +255,8 @@ let supabaseClientInstance = null;
 let syncPushTimer = null;
 let syncIsPulling = false;
 const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const CR_PDF_IMPORT_ENABLED = false;
+const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
 const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const TAB_LABELS = {
@@ -5531,6 +5533,12 @@ function renderCRPdfAdjustments() {
     const results = document.getElementById('cr-pdf-results');
     const status = document.getElementById('cr-pdf-status');
     if (!results) return;
+    if (!CR_PDF_IMPORT_ENABLED) {
+        crPdfAdjustments = [];
+        results.innerHTML = '';
+        if (status) status.innerText = CR_PDF_MAINTENANCE_MESSAGE;
+        return;
+    }
 
     if (!crPdfAdjustments || crPdfAdjustments.length === 0) {
         results.innerHTML = '';
@@ -5588,6 +5596,13 @@ function renderCRPdfAdjustments() {
 }
 
 function parseCRPdfText(text) {
+    if (!CR_PDF_IMPORT_ENABLED) {
+        crPdfAdjustments = [];
+        setCRPdfStatus(CR_PDF_MAINTENANCE_MESSAGE);
+        const results = document.getElementById('cr-pdf-results');
+        if (results) results.innerHTML = '';
+        return;
+    }
     crPdfAdjustments = parseCRAdjustmentsFromText(text);
     renderCRPdfAdjustments();
 }
@@ -5656,6 +5671,13 @@ async function importCRPdfFile(file) {
     const status = document.getElementById('cr-pdf-status');
     const textarea = document.getElementById('cr-pdf-text');
     if (!file) return;
+    if (!CR_PDF_IMPORT_ENABLED) {
+        crPdfAdjustments = [];
+        if (textarea) textarea.value = '';
+        if (status) status.innerText = CR_PDF_MAINTENANCE_MESSAGE;
+        renderCRPdfAdjustments();
+        return;
+    }
     if (!window.pdfjsLib) {
         if (status) status.innerText = 'PDF.js konnte nicht geladen werden. Bitte online öffnen oder PDF-Text einfügen.';
         return;
@@ -5709,11 +5731,16 @@ function clearCRPdfImport() {
     const results = document.getElementById('cr-pdf-results');
     if (fileInput) fileInput.value = '';
     if (textarea) textarea.value = '';
-    if (status) status.innerText = 'Noch keine PDF geladen.';
+    if (status) status.innerText = CR_PDF_IMPORT_ENABLED ? 'Noch keine PDF geladen.' : CR_PDF_MAINTENANCE_MESSAGE;
     if (results) results.innerHTML = '';
 }
 
 function exportCRAdjustment(index) {
+    if (!CR_PDF_IMPORT_ENABLED) {
+        setCRPdfStatus(CR_PDF_MAINTENANCE_MESSAGE);
+        alert(CR_PDF_MAINTENANCE_MESSAGE);
+        return;
+    }
     const adjustment = crPdfAdjustments[index];
     if (!adjustment) return;
 

@@ -468,6 +468,25 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
     line-height: 1;
 }
 
+.cr-maintenance-warning {
+    margin: 12px 0 14px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 214, 10, 0.44);
+    border-radius: 12px;
+    background: rgba(255, 214, 10, 0.1);
+    color: #ffd60a;
+    font-weight: 800;
+    line-height: 1.35;
+}
+
+.cr-pdf-card input:disabled,
+.cr-pdf-card textarea:disabled,
+.cr-pdf-card button:disabled {
+    opacity: 0.48;
+    cursor: not-allowed;
+    filter: grayscale(0.45);
+}
+
 .menu-order-list {
     display: grid;
     gap: 8px;
