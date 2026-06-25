@@ -296,7 +296,7 @@ function createWarehouseData(source = {}) {
         testCorrections: source.testCorrections || {},
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
-        toolSettings: source.toolSettings || { lastSection: '' },
+        toolSettings: source.toolSettings || { lastSection: '', favorites: [] },
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -489,6 +489,26 @@ function addImplementationLogEntry(type, name, amount, note = '') {
     addWarehouseEvent('doku', `${type}: ${name} umgesetzt`, { amount, note });
     saveDB();
     renderImplementationLog();
+}
+
+function renderImplementationLog() {
+    const container = document.getElementById('implementationLogResult');
+    if (!container) return;
+    const entries = db.implementationLog || [];
+    if (!entries.length) {
+        container.innerHTML = '<p class="hint">Noch keine Umsetzung dokumentiert.</p>';
+        return;
+    }
+    container.innerHTML = `
+        <div class="tool-result">
+            ${entries.slice(0, 8).map(entry => `
+                <div class="tool-row">
+                    <span><strong>${escapeHtml(entry.name || entry.type || 'Eintrag')}</strong><small>${formatWarehouseDate(entry.at)} · ${escapeHtml(entry.note || '')}</small></span>
+                    <span>${escapeHtml(String(entry.amount || '-'))}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 
 function isSharedOwnerHidden(email) {
@@ -1735,6 +1755,18 @@ function formatConvertedInputPreview(itemName, inputUnit, amount, useTara = fals
     return `≈ ${formatItemAmount(itemName, converted)}`;
 }
 
+function formatBidirectionalMassVolumePreview(itemName, inputUnit, amount, useTara = false, containerValue = null) {
+    if (inputUnit === 'st') return '';
+    let value = parseFloat(amount);
+    if (isNaN(value) || value <= 0) return '';
+    const factor = densityFactors[itemName] || 1.0;
+    if (inputUnit === 'g' && useTara) value -= getAllContainers()[containerValue] || 0;
+    if (value <= 0) return 'Tara ist größer als die Eingabe';
+    if (inputUnit === 'ml') return `≈ ${(value * factor).toFixed(2)} g`;
+    if (inputUnit === 'g') return `≈ ${(value / factor).toFixed(2)} ml`;
+    return '';
+}
+
 function getAllContainers() {
     return { ...containers, ...((db && db.customContainers) || {}) };
 }
@@ -2831,11 +2863,13 @@ function initTools() {
     updateSimpleSalinityConverter();
     setupToolTiles();
     setupToolSections();
+    renderToolFavorites();
     filterTools(document.getElementById('toolSearchInput')?.value || '');
 }
 
 function getToolSettings() {
-    if (!db.toolSettings) db.toolSettings = { lastSection: '' };
+    if (!db.toolSettings) db.toolSettings = { lastSection: '', favorites: [] };
+    if (!Array.isArray(db.toolSettings.favorites)) db.toolSettings.favorites = [];
     if (!db.toolSettings.lastSection) db.toolSettings.lastSection = '';
     return db.toolSettings;
 }
@@ -2870,6 +2904,11 @@ function setupToolTiles() {
             card.classList.add('tool-tile-card');
             title.setAttribute('role', 'button');
             title.setAttribute('tabindex', '0');
+            const favButton = title.querySelector('.tool-inline-fav');
+            if (favButton) {
+                favButton.addEventListener('click', event => toggleToolFavoriteFromButton(event, favButton.dataset.toolId));
+                favButton.addEventListener('pointerdown', event => event.stopPropagation());
+            }
             title.addEventListener('keydown', event => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
@@ -2880,6 +2919,16 @@ function setupToolTiles() {
         applyToolReviewBadge(card, toolTitle);
         card.classList.add('tool-tile-collapsed');
         title.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function updateInlineToolFavoriteButtons() {
+    const settings = getToolSettings();
+    document.querySelectorAll('#tools .tool-inline-fav').forEach(button => {
+        const active = settings.favorites.includes(button.dataset.toolId);
+        button.classList.toggle('active', active);
+        button.textContent = active ? '★ Fav' : '☆ Fav';
+        button.setAttribute('aria-pressed', String(active));
     });
 }
 
@@ -2911,6 +2960,78 @@ function setupToolSections() {
     });
 }
 
+function getToolFavoriteOptions() {
+    return Array.from(document.querySelectorAll('#tools .tool-compact-card')).map(card => ({
+        id: card.dataset.toolId,
+        title: getToolCardTitle(card)
+    })).filter(option => option.id && option.title);
+}
+
+function renderToolFavorites() {
+    const settings = getToolSettings();
+    const options = getToolFavoriteOptions();
+    const optionMap = new Map(options.map(option => [option.id, option]));
+    settings.favorites = settings.favorites.filter(id => optionMap.has(id));
+
+    const list = document.getElementById('toolFavoritesList');
+    if (list) {
+        list.innerHTML = settings.favorites.length
+            ? settings.favorites.map(id => {
+                const option = optionMap.get(id);
+                return `
+                    <div class="tool-favorite-item">
+                        <button type="button" class="tool-favorite-open" onclick="openToolFavorite('${id}')">★ ${option.title}</button>
+                        <button type="button" class="tool-favorite-remove" onclick="removeToolFavorite('${id}')" aria-label="${option.title} entfernen">×</button>
+                    </div>
+                `;
+            }).join('')
+            : '<span class="tools-favorites-empty">Noch keine Favoriten ausgewählt.</span>';
+    }
+    updateInlineToolFavoriteButtons();
+}
+
+function toggleToolFavoriteFromButton(event, toolId) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!toolId) return;
+    const settings = getToolSettings();
+    if (settings.favorites.includes(toolId)) settings.favorites = settings.favorites.filter(id => id !== toolId);
+    else settings.favorites.push(toolId);
+    saveDB();
+    renderToolFavorites();
+}
+
+function removeToolFavorite(toolId) {
+    const settings = getToolSettings();
+    settings.favorites = settings.favorites.filter(id => id !== toolId);
+    saveDB();
+    renderToolFavorites();
+}
+
+function openToolFavorite(toolId) {
+    const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
+    if (!card) return;
+    const section = card.closest('.tool-section');
+    if (section) {
+        section.open = true;
+        getToolSettings().lastSection = section.dataset.sectionId || '';
+        saveDB(false);
+    }
+    document.querySelectorAll('#tools .tool-card-hidden').forEach(el => el.classList.remove('tool-card-hidden'));
+    document.querySelectorAll('#tools .tool-section-hidden').forEach(el => el.classList.remove('tool-section-hidden'));
+    const search = document.getElementById('toolSearchInput');
+    if (search) search.value = '';
+    if (card.classList.contains('tool-tile-collapsed')) toggleToolTile(card);
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+Object.assign(window, {
+    toggleToolFavoriteFromButton,
+    removeToolFavorite,
+    openToolFavorite,
+    filterTools
+});
+
 function filterTools(query = '') {
     const normalized = query.trim().toLowerCase();
     document.querySelectorAll('#tools .tool-section').forEach(section => {
@@ -2939,6 +3060,7 @@ function toggleToolTile(card) {
 }
 
 document.addEventListener('click', event => {
+    if (event.target.closest?.('.tool-inline-fav')) return;
     const title = event.target.closest?.('#tools .tool-tile-card > h3');
     const collapsedCard = event.target.closest?.('#tools .tool-tile-card.tool-tile-collapsed');
     const card = title?.closest('.tool-tile-card') || collapsedCard;
@@ -4459,13 +4581,13 @@ function updateLiveConversion() {
     let unit = document.getElementById('unitSelect').value;
     const useTara = unit === 'g' && document.getElementById('useContainer') && document.getElementById('useContainer').checked;
     const containerValue = document.getElementById('containerSelect') ? document.getElementById('containerSelect').value : null;
-    const preview = formatConvertedInputPreview(currentAction.item, unit, rawAmount, useTara, containerValue);
+    const preview = formatBidirectionalMassVolumePreview(currentAction.item, unit, rawAmount, useTara, containerValue);
 
-    if (!preview || getItemUnit(currentAction.item) === unit) {
+    if (!preview) {
         liveDiv.innerText = '';
     } else {
         liveDiv.innerText = preview;
-        liveDiv.style.color = 'var(--secondary)';
+        liveDiv.style.color = preview.includes('Tara') ? 'var(--danger)' : 'var(--secondary)';
     }
 }
 
