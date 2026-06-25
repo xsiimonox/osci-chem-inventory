@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=2.2.77">
+    <link rel="stylesheet" href="style.css?v=2.3.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.2.77</span>
+                <span class="version-badge">v2.3.0</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -24,14 +24,6 @@
             </button>
         </div>
         <div class="subtitle">Lagerverwaltung &amp; Statistik by xsiimonox</div>
-        <div class="warehouse-switcher">
-            <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
-            <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">＋</button>
-            <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen">✎</button>
-            <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
-        </div>
-        <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
-        <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
     </header>
 
     <div id="update-banner" class="update-banner" hidden>
@@ -55,12 +47,12 @@
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
             <button onclick="selectTab('cr-export')" id="tab-cr-export">C&amp;R</button>
             <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
+            <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
+            <button onclick="selectTab('logbuch')" id="tab-logbuch">Logbuch</button>
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
-            <button onclick="selectTab('masseneingang')" id="tab-masseneingang">Masseneingang</button>
+            <button onclick="selectTab('masseneingang')" id="tab-masseneingang">Wareneingang</button>
             <button onclick="selectTab('nachbestellen')" id="tab-nachbestellen">Nachbestellen</button>
-            <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
-            <button onclick="selectTab('logbuch')" id="tab-logbuch">Log Buch</button>
             <button onclick="selectTab('einstellungen')" id="tab-einstellungen">Einstellungen</button>
             
         </div>
@@ -69,6 +61,7 @@
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
     <main id="app">
+        <div id="uebersicht" class="tab-content"></div>
         <div id="lager" class="tab-content active"></div>
 
         <div id="cr-export" class="tab-content">
@@ -603,7 +596,7 @@
         <div id="logbuch" class="tab-content">
             <div class="card logbook-hero">
                 <div>
-                    <h3>Log Buch</h3>
+                    <h3>Logbuch</h3>
                     <p class="hint">Pflege, Messungen, Besatz, Technik und Aufgaben am Aquarium sauber nachvollziehen.</p>
                 </div>
                 <div class="logbook-metrics">
@@ -722,6 +715,12 @@
                 <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
                     🚀 Neue Version laden 🚀
                 </button>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.03); margin-bottom: 20px;">
+                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü-Reihenfolge</h3>
+                <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
+                <div id="menu-order-settings"></div>
             </div>
 
             <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
@@ -889,7 +888,7 @@
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ein-/ausblenden</h3>
-                <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Masseneingang, Nachbestellen und Warnungen.</p>
+                <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Wareneingang, Nachbestellen und Warnungen.</p>
                 <div id="product-visibility-list"></div>
             </div>
 
@@ -993,10 +992,10 @@
                 </div>
             </div>
         </div>
-        <!-- Masseneingang (Warenkorb) Tab Content -->
+        <!-- Wareneingang (Warenkorb) Tab Content -->
         <div id="masseneingang" class="tab-content">
             <div class="card">
-                <h2>📦 Massen-Wareneingang</h2>
+                <h2>📦 Wareneingang</h2>
                 <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
                     Wähle ein Produkt aus. Die verfügbaren Behältergrößen erscheinen automatisch als Schnellauswahl.
                 </p>
@@ -1097,7 +1096,17 @@
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
     <div class="custom-cursor-dot" id="customCursorDot" aria-hidden="true"></div>
 
-    <script src="app.js?v=2.2.77"></script>
+    <div class="app-status-strip" id="appStatusStrip" aria-live="polite"></div>
+    <button type="button" class="quick-action-fab" id="quickActionFab" onclick="openQuickActionMenu()" aria-label="Schnellaktion">＋</button>
+    <nav class="mobile-bottom-nav" aria-label="Hauptnavigation">
+        <button type="button" onclick="selectTab('lager')" data-tab="lager"><span>▦</span>Lager</button>
+        <button type="button" onclick="selectTab('cr-export')" data-tab="cr-export"><span>C</span>C&amp;R</button>
+        <button type="button" onclick="selectTab('trace-export')" data-tab="trace-export"><span>T</span>Trace</button>
+        <button type="button" onclick="selectTab('tools')" data-tab="tools"><span>◇</span>Tools</button>
+        <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
+    </nav>
+
+    <script src="app.js?v=2.3.0"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')

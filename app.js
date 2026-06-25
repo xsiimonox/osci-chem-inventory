@@ -254,7 +254,115 @@ let supabaseClientPromise = null;
 let supabaseClientInstance = null;
 let syncPushTimer = null;
 let syncIsPulling = false;
-const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'logbuch', 'einstellungen'];
+const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
+const MENU_ORDER_KEY = 'osci_menu_order_v1';
+const TAB_LABELS = {
+    lager: 'Lager',
+    'cr-export': 'C&R',
+    'trace-export': 'Trace',
+    tools: 'Tools',
+    logbuch: 'Logbuch',
+    statistik: 'Statistik',
+    log: 'Protokoll',
+    masseneingang: 'Wareneingang',
+    nachbestellen: 'Nachbestellen',
+    einstellungen: 'Einstellungen'
+};
+const TAB_ICONS = {
+    lager: '▦',
+    'cr-export': 'C',
+    'trace-export': 'T',
+    tools: '◇',
+    logbuch: '✓',
+    statistik: '◷',
+    log: '≡',
+    masseneingang: '□',
+    nachbestellen: '!',
+    einstellungen: '⚙'
+};
+
+function getMenuOrder() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(MENU_ORDER_KEY) || '[]');
+        const valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+        return [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
+    } catch (err) {
+        return [...DEFAULT_MENU_ORDER];
+    }
+}
+
+function saveMenuOrder(order) {
+    const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : DEFAULT_MENU_ORDER;
+    const normalized = [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
+    localStorage.setItem(MENU_ORDER_KEY, JSON.stringify(normalized));
+    applyMenuOrder();
+    renderMenuOrderSettings();
+}
+
+function moveMenuItem(tabId, direction) {
+    const order = getMenuOrder();
+    const index = order.indexOf(tabId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= order.length) return;
+    [order[index], order[nextIndex]] = [order[nextIndex], order[index]];
+    saveMenuOrder(order);
+}
+
+function resetMenuOrder() {
+    localStorage.removeItem(MENU_ORDER_KEY);
+    applyMenuOrder();
+    renderMenuOrderSettings();
+}
+
+function applyMenuOrder() {
+    const order = getMenuOrder();
+    const nav = document.querySelector('.nav-links');
+    if (nav) {
+        order.forEach(tabId => {
+            const button = document.getElementById('tab-' + tabId);
+            if (!button) return;
+            button.textContent = TAB_LABELS[tabId] || tabId;
+            nav.appendChild(button);
+        });
+    }
+    renderMobileBottomNav(order);
+    const activeTab = getActiveTabId();
+    document.querySelectorAll('.mobile-bottom-nav button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === activeTab);
+    });
+}
+
+function renderMobileBottomNav(order = getMenuOrder()) {
+    const nav = document.querySelector('.mobile-bottom-nav');
+    if (!nav) return;
+    const quickTabs = order.slice(0, 4);
+    nav.innerHTML = quickTabs.map(tabId => `
+        <button type="button" onclick="selectTab('${tabId}')" data-tab="${tabId}">
+            <span>${TAB_ICONS[tabId] || '•'}</span>${TAB_LABELS[tabId] || tabId}
+        </button>
+    `).join('') + '<button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>';
+}
+
+function renderMenuOrderSettings() {
+    const container = document.getElementById('menu-order-settings');
+    if (!container) return;
+    const order = getMenuOrder();
+    container.innerHTML = `
+        <div class="menu-order-list">
+            ${order.map((tabId, index) => `
+                <div class="menu-order-row">
+                    <span><strong>${index + 1}. ${TAB_LABELS[tabId] || tabId}</strong><small>${index < 4 ? 'Mobile Schnellnavigation' : 'Menü'}</small></span>
+                    <div>
+                        <button type="button" onclick="moveMenuItem('${tabId}', -1)" ${index === 0 ? 'disabled' : ''}>↑</button>
+                        <button type="button" onclick="moveMenuItem('${tabId}', 1)" ${index === order.length - 1 ? 'disabled' : ''}>↓</button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        <button type="button" class="btn-secondary btn-animated" onclick="resetMenuOrder()">Standard-Reihenfolge wiederherstellen</button>
+    `;
+}
 
 // --- INITIALISIERUNG ---
 function resetCatalogToBase() {
@@ -572,9 +680,11 @@ function normalizeSupabaseProjectUrl(value) {
 
 function updateSyncStatus(message, type = 'info') {
     const el = document.getElementById('supabase-sync-status');
-    if (!el) return;
-    el.innerText = message;
-    el.dataset.type = type;
+    if (el) {
+        el.innerText = message;
+        el.dataset.type = type;
+    }
+    updateAppStatusStrip();
 }
 
 function updateAuthState(user) {
@@ -590,6 +700,7 @@ function updateAuthState(user) {
         el.dataset.state = 'out';
         if (activationNote) activationNote.style.display = '';
     }
+    updateAppStatusStrip();
 }
 
 function togglePasswordVisibility(inputId, button) {
@@ -1288,6 +1399,7 @@ function updateWarehouseUI() {
 }
 
 function renderCurrentWarehouseViews() {
+    renderDashboard();
     renderLager();
     renderStats();
     renderLogs();
@@ -1305,6 +1417,173 @@ function renderCurrentWarehouseViews() {
     initBulkProductSelect();
     updateNotificationStatus();
     clearCRPdfImport();
+}
+
+function getDashboardNextTodo() {
+    const now = Date.now();
+    return (db.aquariumTodos || [])
+        .filter(todo => !todo.done && todo.dueAt)
+        .sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt))
+        .map(todo => ({
+            ...todo,
+            dueTime: new Date(todo.dueAt).getTime(),
+            isDue: new Date(todo.dueAt).getTime() <= now
+        }))[0] || null;
+}
+
+function renderDashboard() {
+    const container = document.getElementById('uebersicht');
+    if (!container) return;
+    const warehouse = getActiveWarehouse();
+    const alerts = getStockAlerts();
+    const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
+    const nextTodo = getDashboardNextTodo();
+    const lastLog = (db.logs || []).slice().reverse()[0];
+    const lastLogText = lastLog
+        ? `${lastLog.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${lastLog.item} · ${formatItemAmount(lastLog.item, lastLog.amount)}`
+        : 'Noch keine Buchung';
+    const activeProducts = Object.keys(catalog).reduce((sum, cat) => {
+        return sum + Object.keys(catalog[cat]).filter(item => !isProductHidden(item)).length;
+    }, 0);
+    const criticalRows = alerts.slice(0, 4).map(alert => `
+        <button type="button" class="dashboard-list-row" onclick="selectTab('lager'); setTimeout(() => focusProductInLager(${jsArg(alert.item)}), 80)">
+            <span><strong>${escapeHtml(alert.item)}</strong><small>${escapeHtml(alert.cat)} · ${formatItemAmount(alert.item, alert.stock)}</small></span>
+            <em>${alert.weeksLeft === null ? 'prüfen' : `${alert.weeksLeft.toFixed(1)} Wochen`}</em>
+        </button>
+    `).join('');
+    const onboarding = db.onboardingDone ? '' : `
+        <section class="dashboard-onboarding">
+            <div>
+                <strong>Ersteinrichtung</strong>
+                <p>Prüfe Lagername, Aquariumgröße, sichtbare Produkte, Warnschwellen und Cloud Login.</p>
+            </div>
+            <div>
+                <button onclick="selectTab('lager')">Produkte prüfen</button>
+                <button onclick="selectTab('einstellungen')">Einstellungen</button>
+                <button onclick="finishOnboarding()">Erledigt</button>
+            </div>
+        </section>
+    `;
+    container.innerHTML = `
+        <section class="dashboard-hero">
+            <div>
+                <small>Heute im Blick</small>
+                <h2>${escapeHtml(warehouse?.name || 'Lager')}</h2>
+                <p>${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
+            </div>
+            <button type="button" onclick="triggerRefresh()" class="dashboard-refresh">Aktualisieren</button>
+        </section>
+
+        ${onboarding}
+
+        <section class="dashboard-grid">
+            <button type="button" class="dashboard-tile ${alerts.length ? 'warn' : 'ok'}" onclick="selectTab('lager')">
+                <span>Bestand</span><strong>${alerts.length}</strong><small>${alerts.length ? 'Warnung(en)' : 'alles ruhig'}</small>
+            </button>
+            <button type="button" class="dashboard-tile ${dueTodos.length ? 'warn' : 'ok'}" onclick="selectTab('logbuch')">
+                <span>ToDos</span><strong>${dueTodos.length}</strong><small>${dueTodos.length ? 'fällig' : 'nichts fällig'}</small>
+            </button>
+            <button type="button" class="dashboard-tile" onclick="selectTab('einstellungen')">
+                <span>Cloud</span><strong>${warehouse?.remoteId ? 'An' : 'Lokal'}</strong><small>${formatWarehouseDate(warehouse?.lastSyncAt)}</small>
+            </button>
+            <button type="button" class="dashboard-tile" onclick="selectTab('lager')">
+                <span>Produkte</span><strong>${activeProducts}</strong><small>sichtbar</small>
+            </button>
+        </section>
+
+        <section class="dashboard-actions">
+            <button onclick="selectTab('lager')">Lager öffnen</button>
+            <button onclick="openSmartStockModal('in')">Einlagern</button>
+            <button onclick="openSmartStockModal('out')">Auslagern</button>
+            <button onclick="selectTab('tools')">Tools</button>
+        </section>
+
+        <section class="dashboard-panels">
+            <div class="dashboard-panel">
+                <h3>Kritische Produkte</h3>
+                ${criticalRows || '<p class="hint">Keine kritischen Lagerwaren im aktuellen Warnzeitraum.</p>'}
+            </div>
+            <div class="dashboard-panel">
+                <h3>Nächste Aufgabe</h3>
+                ${nextTodo ? `
+                    <div class="dashboard-next">
+                        <strong>${escapeHtml(nextTodo.title)}</strong>
+                        <small>${escapeHtml(nextTodo.category || 'Wartung')} · ${formatWarehouseDate(nextTodo.dueAt)}</small>
+                        <button onclick="completeAquariumTodo('${nextTodo.id}')">Erledigt</button>
+                    </div>
+                ` : '<p class="hint">Keine ToDos geplant.</p>'}
+            </div>
+            <div class="dashboard-panel">
+                <h3>Letzte Buchung</h3>
+                <p class="hint">${escapeHtml(lastLogText)}</p>
+            </div>
+        </section>
+    `;
+}
+
+function finishOnboarding() {
+    db.onboardingDone = true;
+    saveDB();
+    renderDashboard();
+}
+
+function getAuthStatusLabel() {
+    const status = document.getElementById('supabase-auth-state')?.innerText?.trim();
+    if (status) return status;
+    return 'Cloud: nicht angemeldet';
+}
+
+function updateAppStatusStrip() {
+    const strip = document.getElementById('appStatusStrip');
+    if (!strip) return;
+    const warehouse = getActiveWarehouse();
+    const access = getWarehouseAccessLabel(warehouse);
+    const sync = warehouse?.lastSyncAt ? `Sync ${formatWarehouseDate(warehouse.lastSyncAt)}` : 'Noch kein Sync';
+    strip.innerHTML = `
+        <button type="button" onclick="selectTab('einstellungen')">${escapeHtml(getAuthStatusLabel())}</button>
+        <button type="button" onclick="selectTab('lager')">${escapeHtml(access)}</button>
+        <button type="button" onclick="triggerRefresh()">${escapeHtml(sync)}</button>
+    `;
+}
+
+function openQuickActionMenu() {
+    const activeTab = getActiveTabId();
+    const actions = [
+        { label: 'Einlagern', run: () => openSmartStockModal('in') },
+        { label: 'Auslagern', run: () => openSmartStockModal('out') },
+        { label: 'Neuer Log', run: () => selectTab('logbuch') },
+        { label: 'Tool öffnen', run: () => selectTab('tools') }
+    ];
+    if (activeTab === 'logbuch') actions.unshift({ label: 'Neue ToDo', run: () => { selectTab('logbuch'); document.getElementById('todoTitle')?.focus(); } });
+    if (activeTab === 'tools') actions.unshift({ label: 'Tool suchen', run: () => { selectTab('tools'); document.getElementById('toolSearchInput')?.focus(); } });
+    const choice = prompt(`Schnellaktion:\n${actions.map((action, index) => `${index + 1}. ${action.label}`).join('\n')}\n\nNummer eingeben:`, '1');
+    if (choice === null) return;
+    const selected = actions[(parseInt(choice, 10) || 1) - 1];
+    if (selected) selected.run();
+}
+
+function openSmartStockModal(action) {
+    const visibleItems = [];
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            if (!isProductHidden(item)) visibleItems.push({ cat, item });
+        }
+    }
+    const term = prompt(`${action === 'in' ? 'Einlagern' : 'Auslagern'}: Produktname suchen`, '');
+    if (term === null) return;
+    const query = term.trim().toLowerCase();
+    const matches = visibleItems.filter(entry => entry.item.toLowerCase().includes(query)).slice(0, 8);
+    if (matches.length === 0) return alert('Kein passendes Produkt gefunden.');
+    const selectedIndex = matches.length === 1 ? 0 : (parseInt(prompt(matches.map((entry, index) => `${index + 1}. ${entry.item}`).join('\n') + '\n\nNummer auswählen:', '1'), 10) || 1) - 1;
+    const selected = matches[selectedIndex];
+    if (selected) openModal(selected.cat, selected.item, action);
+}
+
+function focusProductInLager(item) {
+    const input = document.getElementById('searchInput');
+    if (input) input.value = item;
+    filterLager();
+    document.getElementById('lager-container')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function switchWarehouse(id) {
@@ -1382,6 +1661,7 @@ function selectTab(tabId) {
 }
 
 function showTab(tabId) {
+    applyMenuOrder();
     const targetTab = document.getElementById(tabId);
     const targetBtn = document.getElementById('tab-' + tabId);
     if (!targetTab || !targetBtn) tabId = 'lager';
@@ -1399,6 +1679,9 @@ function showTab(tabId) {
         resolvedTab.classList.add('active');
         resolvedBtn.classList.add('active');
     }
+    document.querySelectorAll('.mobile-bottom-nav button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+    });
     const header = document.getElementById('appHeader');
     if (header) header.classList.toggle('warehouse-tools-hidden', tabId !== 'lager');
     document.body.dataset.activeTab = tabId;
@@ -1410,6 +1693,7 @@ function showTab(tabId) {
     } catch(e) {}
     saveDB(false);
     
+    if(tabId === 'uebersicht') renderDashboard();
     if(tabId === 'lager') renderLager();
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
@@ -1426,7 +1710,9 @@ function showTab(tabId) {
         renderShopLinkSettings();
         renderProductPresets();
         renderSupabaseSyncSettings();
+        renderMenuOrderSettings();
     }
+    updateAppStatusStrip();
 }
 
 function setupSettingsAccordions() {
@@ -1565,7 +1851,11 @@ function showUpdateBanner(latestVersion) {
     const text = document.getElementById('update-banner-text');
     if (!banner) return;
     const current = getCurrentAppVersion();
-    if (text) text.innerText = latestVersion ? `Installiert: ${current} · Neu: ${latestVersion}` : 'Eine neuere App-Version kann geladen werden.';
+    if (text) {
+        text.innerText = latestVersion && /^v[0-9.]+$/i.test(String(latestVersion))
+            ? `Installiert: ${current} · Neu: ${latestVersion}`
+            : 'Eine neuere App-Version kann geladen werden.';
+    }
     banner.hidden = false;
 }
 
@@ -1576,6 +1866,12 @@ function hideUpdateBanner() {
 
 async function checkForAppUpdate(showIfCurrent = false) {
     try {
+        if ('serviceWorker' in navigator) {
+            try {
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) await registration.update();
+            } catch (err) {}
+        }
         const response = await fetch(`index.html?version-check=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) return;
         const html = await response.text();
@@ -1590,6 +1886,31 @@ async function checkForAppUpdate(showIfCurrent = false) {
         }
     } catch (err) {
         if (showIfCurrent) showToast('Versionsprüfung gerade nicht möglich.', 'warning');
+    }
+}
+
+function initLiveUpdateChecks() {
+    const runCheck = () => checkForAppUpdate(false);
+    window.addEventListener('focus', runCheck);
+    window.addEventListener('online', runCheck);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) runCheck();
+    });
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.addEventListener('updatefound', () => {
+                const worker = registration.installing;
+                if (!worker) return;
+                worker.addEventListener('statechange', () => {
+                    if (worker.state === 'installed' && navigator.serviceWorker.controller) {
+                        showUpdateBanner('neue Version');
+                    }
+                });
+            });
+        }).catch(() => {});
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            checkForAppUpdate(false);
+        });
     }
 }
 
@@ -2537,6 +2858,12 @@ function renderProductCard(cat, item) {
     let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
     let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
     let favorite = isFavoriteProduct(item);
+    const recentLogs = (db.logs || [])
+        .filter(log => log.item === item)
+        .slice(-3)
+        .reverse()
+        .map(log => `<li>${log.action === 'out' ? '-' : '+'}${formatItemAmount(item, log.amount)} · ${new Date(getLogTime(log) || Date.now()).toLocaleDateString('de-DE')}</li>`)
+        .join('');
     let crossHint = "";
     if (item === "Fluor (F)" && stock === 0) {
         let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
@@ -2563,6 +2890,14 @@ function renderProductCard(cat, item) {
             ${prognosisHint}
             ${thresholdHint}
             ${disabledHint}
+            <details class="product-history">
+                <summary>Verlauf & Prognose</summary>
+                <div>
+                    <span>Verbrauch: ${metrics.perDay ? `${formatItemAmount(item, metrics.perDay * 7, 2)} / Woche` : 'noch keine Daten'}</span>
+                    <span>Reichweite: ${reachText}</span>
+                    <ul>${recentLogs || '<li>Noch keine Buchungen</li>'}</ul>
+                </div>
+            </details>
             <div class="btn-group" style="margin-top: 10px;">
                 <button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
                 <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>
@@ -2582,6 +2917,22 @@ function renderLager() {
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
         container.innerHTML = `
+            <section class="warehouse-control-card">
+                <div class="warehouse-control-head">
+                    <div>
+                        <span>Lagerauswahl</span>
+                        <strong>Aktives Lager verwalten</strong>
+                    </div>
+                    <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
+                </div>
+                <div class="warehouse-switcher">
+                    <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
+                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">＋</button>
+                    <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen">✎</button>
+                    <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
+                </div>
+                <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
+            </section>
             <div class="lager-toolbar">
                 <div class="toolbar-field">
                     <span class="toolbar-icon">🔍</span>
@@ -2596,10 +2947,26 @@ function renderLager() {
                     </select>
                 </div>
             </div>
+            <div class="lager-filter-chips">
+                <button type="button" class="active" data-filter="all" onclick="setLagerQuickFilter('all')">Alle</button>
+                <button type="button" data-filter="low" onclick="setLagerQuickFilter('low')">Knapp</button>
+                <button type="button" data-filter="favorites" onclick="setLagerQuickFilter('favorites')">Favoriten</button>
+            </div>
             <div id="stock-alerts"></div>
             <div id="lager-container"></div>
         `;
+        updateWarehouseUI();
     }
+    filterLager();
+}
+
+let lagerQuickFilter = 'all';
+
+function setLagerQuickFilter(filter) {
+    lagerQuickFilter = filter || 'all';
+    document.querySelectorAll('.lager-filter-chips button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === lagerQuickFilter);
+    });
     filterLager();
 }
 
@@ -2610,6 +2977,7 @@ function filterLager() {
     const alertsContainer = document.getElementById('stock-alerts');
     const term = searchInput ? searchInput.value.toLowerCase() : '';
     const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
+    const alertItems = new Set(getStockAlerts().map(alert => alert.item));
     
     if (!listContainer) return;
     listContainer.innerHTML = '';
@@ -2620,12 +2988,13 @@ function filterLager() {
         for (let item in catalog[cat]) {
             if (isProductHidden(item)) continue;
             if (!isFavoriteProduct(item)) continue;
+            if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
             if (!item.toLowerCase().includes(term)) continue;
             favoriteRows.push(renderProductCard(cat, item));
         }
     }
-    if (favoriteRows.length > 0) {
+    if (lagerQuickFilter === 'all' && favoriteRows.length > 0) {
         listContainer.innerHTML += `<h2 class="category-title">Favoriten</h2>${favoriteRows.join('')}`;
     }
     
@@ -2637,6 +3006,8 @@ function filterLager() {
         
         for (let item in catalog[cat]) {
             if (isProductHidden(item)) continue;
+            if (lagerQuickFilter === 'favorites' && !isFavoriteProduct(item)) continue;
+            if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (item.toLowerCase().includes(term)) {
                 hasItems = true;
                 catHTML += renderProductCard(cat, item);
@@ -4544,6 +4915,7 @@ function openModal(cat, item, action) {
             <label style="display:flex; align-items:center; gap:10px; color:#fff;">
                 <input type="checkbox" id="useContainer" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:20px; height:20px; margin:0;"> 
                 Behälter-Gewicht (Tara) abziehen
+                <button type="button" class="mini-help" onclick="showHelp('tara')" aria-label="Tara Hilfe">?</button>
             </label>
             <select id="containerSelect" onchange="updateLiveConversion();" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
                 ${Object.entries(getAllContainers()).map(([c, weight]) => `<option value="${c}">${c} (wiegt ${weight}g)</option>`).join('')}
@@ -4605,6 +4977,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
 
+function showHelp(topic) {
+    const texts = {
+        tara: 'Tara bedeutet: Du wiegst den vollen Behälter, wählst den passenden leeren Behälter aus und die App zieht dessen Leergewicht automatisch ab.'
+    };
+    alert(texts[topic] || 'Für dieses Feld gibt es noch keinen Hilfetext.');
+}
+
 function executeAction() {
     let rawAmount = parseFloat(document.getElementById('amount').value);
     let unit = document.getElementById('unitSelect').value;
@@ -4620,10 +4999,11 @@ function executeAction() {
 
     if (action === 'in') {
                 db.inventory[cat][item] += finalMl;
-                addLog(cat, item, 'in', finalMl);
+                const log = addLog(cat, item, 'in', finalMl);
                 saveDB();
                 closeModal();
                 renderLager();
+                showBookingUndoToast(log);
                 checkAndNotifyStockAlerts();
             } 
     else {
@@ -4642,20 +5022,22 @@ function executeAction() {
         showConflictModal(cat, item, finalMl, stock, () => {
                 db.inventory[cat][item] = 0;
                 db.stats[item] += stock;
-                addLog(cat, item, 'out', stock);
+                const log = addLog(cat, item, 'out', stock);
                 saveDB();
                 closeModal();
                 renderLager();
+                showBookingUndoToast(log);
                 checkAndNotifyStockAlerts();
             });
             return;
         }
         db.inventory[cat][item] -= finalMl;
         db.stats[item] += finalMl;
-        addLog(cat, item, 'out', finalMl);
+        const log = addLog(cat, item, 'out', finalMl);
         saveDB();
         closeModal();
         renderLager();
+        showBookingUndoToast(log);
         checkAndNotifyStockAlerts();
     }
 }
@@ -4685,11 +5067,25 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
 function addLog(cat, item, action, amount) {
     if(!db.logs) db.logs = [];
     const now = Date.now();
-    db.logs.push({ cat, item, action, amount, timestamp: now, time: now });
+    const log = { id: createWarehouseId(), cat, item, action, amount, timestamp: now, time: now };
+    db.logs.push(log);
     if (db.logs.length > 200) db.logs.shift();
+    return log;
 }
 
-function undoLog(index) {
+function showBookingUndoToast(log) {
+    if (!log) return;
+    pushUndoAction({
+        undo: () => {
+            const index = (db.logs || []).findIndex(entry => entry.id === log.id);
+            if (index >= 0) undoLog(index, true);
+        }
+    });
+    const text = `${log.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${log.item} · ${formatItemAmount(log.item, log.amount)}`;
+    showUndoToast(text);
+}
+
+function undoLog(index, silent = false) {
     let log = db.logs[index];
     if (!log) return;
     if (log.action === 'in') {
@@ -4703,8 +5099,11 @@ function undoLog(index) {
     }
     db.logs.splice(index, 1);
     saveDB();
-    alert("Aktion erfolgreich rückgängig gemacht!");
+    if (!silent) alert("Aktion erfolgreich rückgängig gemacht!");
+    renderLager();
     renderLogs();
+    renderDashboard();
+    updateAppStatusStrip();
 }
 
 // --- QUEUE & LISTEN VERARBEITUNG ---
@@ -5748,7 +6147,7 @@ function submitBulkCart() {
     renderLager();
     checkAndNotifyStockAlerts();
     
-    alert("Massen-Wareneingang erfolgreich verbucht!");
+    alert("Wareneingang erfolgreich verbucht!");
     showTab('lager');
 }
 
@@ -6308,9 +6707,13 @@ document.addEventListener('keydown', (e) => {
             if (searchInput) searchInput.focus();
         }, 200);
     }
-    // Number keys 1-8 for tabs (when not in input)
+    // Number keys follow the personal menu order
     if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        const tabMap = { '1': 'lager', '2': 'cr-export', '3': 'trace-export', '4': 'statistik', '5': 'log', '6': 'masseneingang', '7': 'nachbestellen', '8': 'tools', '9': 'logbuch' };
+        const order = getMenuOrder();
+        const tabMap = {};
+        order.slice(0, 9).forEach((tabId, index) => {
+            tabMap[String(index + 1)] = tabId;
+        });
         if (tabMap[e.key]) {
             selectTab(tabMap[e.key]);
         }
@@ -6336,6 +6739,7 @@ if (window.location.hash) {
 showTab(startupTab);
 updateNotificationStatus();
 initCustomCursor();
+initLiveUpdateChecks();
 setTimeout(checkForAppUpdate, 2500);
 setInterval(checkForAppUpdate, 30 * 60 * 1000);
 setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
@@ -6590,7 +6994,7 @@ function handleSwipe() {
     
     if (!isMostlyHorizontal || !isIntentional) return;
     
-    const tabs = ['lager', 'cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'tools', 'logbuch', 'einstellungen'];
+    const tabs = getMenuOrder();
     const currentTab = document.querySelector('.tab-content.active')?.id;
     const currentIndex = tabs.indexOf(currentTab);
     
