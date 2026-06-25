@@ -3686,13 +3686,18 @@ function renderMacroRecipe() {
         const resolved = resolveRecipeItem(entry);
         const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
         const missing = resolved && stock < amount;
+        const density = entry.item ? (densityFactors[entry.item] || 1) : 1;
+        const grams = amount * density;
+        const amountLabel = entry.unit === 'ml' && entry.item
+            ? `${amount.toFixed(1)} ml · ${grams.toFixed(1)} g`
+            : `${amount.toFixed(1)} ${entry.unit}`;
         return `
             <div class="tool-row ${missing ? 'missing' : ''}">
                 <span>
                     <strong>${entry.item || entry.label}</strong>
-                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}` : 'nicht lagergeführt'}</small>
+                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}${entry.unit === 'ml' && entry.item ? ` · Dichte ${density.toFixed(3)} g/ml` : ''}` : 'nicht lagergeführt'}</small>
                 </span>
-                <span>${amount.toFixed(1)} ${entry.unit}</span>
+                <span>${amountLabel}</span>
             </div>
         `;
     }).join('');
