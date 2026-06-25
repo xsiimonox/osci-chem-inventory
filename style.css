@@ -3570,29 +3570,41 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
 /* Pull to Refresh */
 .pull-to-refresh-indicator {
     position: fixed;
-    top: -60px;
+    top: 14px;
     left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 40px;
+    transform: translateX(-50%) translateY(-84px) scale(0.86);
+    width: 52px;
+    height: 52px;
     border-radius: 50%;
     background: var(--card-bg);
-    border: 2px solid var(--primary);
+    background: color-mix(in srgb, var(--card-bg) 84%, transparent);
+    border: 1px solid var(--primary);
+    border-color: color-mix(in srgb, var(--primary) 72%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    transition: top 0.3s ease;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    opacity: 0;
+    pointer-events: none;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    color: var(--primary);
+    font-size: 1.55rem;
+    font-weight: 800;
+    transition: transform 0.22s ease, opacity 0.22s ease, border-color 0.22s ease;
+    box-shadow: 0 14px 34px rgba(0,0,0,0.34);
 }
 .pull-to-refresh-indicator.visible {
-    top: 20px;
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
 }
 .pull-to-refresh-indicator.refreshing {
     animation: spinRefresh 1s linear infinite;
+    border-color: var(--success);
+    color: var(--success);
 }
 @keyframes spinRefresh {
-    to { transform: translateX(-50%) rotate(360deg); }
+    to { transform: translateX(-50%) translateY(0) scale(1) rotate(360deg); }
 }
 
 @media (max-width: 767px) {

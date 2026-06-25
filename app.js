@@ -6419,36 +6419,119 @@ function animateCounter(element, targetValue, duration = 1000) {
 let pullStartY = 0;
 let pullDistance = 0;
 let isPulling = false;
+let isPullRefreshing = false;
+const PULL_REFRESH_THRESHOLD = 86;
+const PULL_REFRESH_MAX = 170;
+
+function shouldIgnorePullToRefreshTarget(target) {
+    return Boolean(target && target.closest(
+        'input, textarea, select, button, a, summary, label, .modal, .nav-menu, .update-banner'
+    ));
+}
+
+function setPullToRefreshIndicator(progress, refreshing = false) {
+    const indicator = document.getElementById('pullToRefreshIndicator');
+    if (!indicator) return;
+    const clamped = Math.max(0, Math.min(progress, 1));
+    indicator.classList.toggle('visible', clamped > 0 || refreshing);
+    indicator.classList.toggle('refreshing', refreshing);
+    if (!refreshing) {
+        const offset = -84 + (84 * clamped);
+        const scale = 0.86 + (0.14 * clamped);
+        indicator.style.transform = `translateX(-50%) translateY(${offset}px) scale(${scale})`;
+        indicator.style.opacity = String(clamped);
+    } else {
+        indicator.style.transform = '';
+        indicator.style.opacity = '';
+    }
+}
+
+function refreshVisibleViewAfterPull() {
+    const activeTab = getActiveTabId();
+    if (activeTab === 'lager') renderLager();
+    if (activeTab === 'statistik') renderStats();
+    if (activeTab === 'trace-export') renderTraceExportInputs();
+    if (activeTab === 'log') renderLogs();
+    if (activeTab === 'nachbestellen') renderNachbestellen();
+    if (activeTab === 'tools') initTools();
+    if (activeTab === 'logbuch') renderLogBook();
+    if (activeTab === 'einstellungen') {
+        renderCustomProductSettings();
+        renderCustomContainers();
+        renderProductVisibilitySettings();
+        renderSharedOwnerVisibilitySettings();
+        renderCloudShareOverview();
+        renderWarehouseEventLog();
+        renderSupabaseSyncSettings();
+    }
+    updateWarehouseUI();
+}
 
 document.addEventListener('touchstart', (e) => {
-    if (window.scrollY === 0) {
+    if (isPullRefreshing || e.touches.length !== 1 || shouldIgnorePullToRefreshTarget(e.target)) return;
+    if (window.scrollY <= 0) {
         pullStartY = e.touches[0].clientY;
         isPulling = true;
+        pullDistance = 0;
     }
-});
+}, { passive: true });
 
 document.addEventListener('touchmove', (e) => {
-    if (!isPulling) return;
+    if (!isPulling || isPullRefreshing || e.touches.length !== 1) return;
     pullDistance = e.touches[0].clientY - pullStartY;
-    if (pullDistance > 0 && pullDistance < 150) {
-        document.body.style.transform = `translateY(${pullDistance * 0.3}px)`;
+    if (pullDistance > 0 && window.scrollY <= 0) {
+        const easedDistance = Math.min(pullDistance, PULL_REFRESH_MAX);
+        const progress = easedDistance / PULL_REFRESH_THRESHOLD;
+        e.preventDefault();
+        document.body.style.transform = `translateY(${Math.min(easedDistance * 0.22, 34)}px)`;
+        setPullToRefreshIndicator(progress);
     }
-});
+}, { passive: false });
 
 document.addEventListener('touchend', () => {
-    if (pullDistance > 80) {
+    if (!isPulling) return;
+    if (pullDistance >= PULL_REFRESH_THRESHOLD) {
         triggerRefresh();
+    } else {
+        setPullToRefreshIndicator(0);
     }
     document.body.style.transform = '';
     isPulling = false;
     pullDistance = 0;
-});
+}, { passive: true });
 
-function triggerRefresh() {
-    showToast('Aktualisiere...', 'info', 2000);
+document.addEventListener('touchcancel', () => {
+    document.body.style.transform = '';
+    setPullToRefreshIndicator(0);
+    isPulling = false;
+    pullDistance = 0;
+}, { passive: true });
+
+async function triggerRefresh() {
+    if (isPullRefreshing) return;
+    isPullRefreshing = true;
+    setPullToRefreshIndicator(1, true);
+    showToast('Aktualisiere Lager & Version...', 'info', 2200);
     hapticFeedback();
-    renderLager();
-    setTimeout(() => showToast('Aktualisiert!', 'success'), 500);
+    let syncOk = true;
+    try {
+        await syncPullWarehouses(false);
+    } catch (err) {
+        syncOk = false;
+        updateSyncStatus('Daten Download fehlgeschlagen: ' + err.message, 'warn');
+    }
+    try {
+        await checkForAppUpdate(false);
+    } catch (err) {}
+    refreshVisibleViewAfterPull();
+    launchConfetti(36);
+    setTimeout(() => {
+        showToast(syncOk ? 'Aktualisiert!' : 'Lokal aktualisiert. Cloud-Download prüfen.', syncOk ? 'success' : 'warning', 2600);
+    }, 250);
+    setTimeout(() => {
+        isPullRefreshing = false;
+        setPullToRefreshIndicator(0);
+    }, 650);
 }
 
 // Swipe Gestures for Tab Navigation
