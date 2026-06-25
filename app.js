@@ -2927,7 +2927,7 @@ function renderLager() {
                 </div>
                 <div class="warehouse-switcher">
                     <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
-                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">＋</button>
+                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">Neu</button>
                     <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen">✎</button>
                     <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
                 </div>
@@ -6124,7 +6124,7 @@ function renderBulkCart() {
                 <small style="color: var(--text-muted);">${entry.cat}</small>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
-                <span style="color: var(--success); font-weight:600;">+ ${formatItemAmount(entry.item, entry.ml)}</span>
+                <span style="color: var(--success); font-weight:600;">${formatItemAmount(entry.item, entry.ml)}</span>
                 <button onclick="removeFromBulkCart(${index})" style="background:none; color:var(--danger); padding:4px 8px; font-size:1.1rem; border:none; cursor:pointer;">✕</button>
             </div>
         </div>
@@ -6546,41 +6546,6 @@ function createSkeletonCards(count = 3) {
         `;
     }
     return html;
-}
-
-// ==========================================================================
-// 🎯 FLOATING ACTION BUTTON (FAB)
-// ==========================================================================
-let fabOpen = false;
-function toggleFab() {
-    fabOpen = !fabOpen;
-    const menu = document.getElementById('fab-menu');
-    const fab = document.getElementById('fab-main');
-    if (menu) menu.classList.toggle('open', fabOpen);
-    if (fab) fab.style.transform = fabOpen ? 'rotate(45deg)' : '';
-}
-
-function fabAddProduct() {
-    toggleFab();
-    selectTab('einstellungen');
-    setTimeout(() => {
-        const nameInput = document.getElementById('customProductName');
-        if (nameInput) {
-            nameInput.focus();
-            nameInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-    }, 300);
-}
-
-function fabQuickStock() {
-    toggleFab();
-    selectTab('lager');
-    showToast('Schnellbuchung bereit - wähle ein Produkt aus', 'info');
-}
-
-function fabExport() {
-    toggleFab();
-    exportData();
 }
 
 // ==========================================================================
@@ -7060,8 +7025,8 @@ function showQuickPreview(item, category) {
             </div>
         </div>
         <div style="margin-top:16px; display:flex; gap:10px;">
-            <button class="btn-in btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'in');">+ Einlagern</button>
-            <button class="btn-out btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'out');">- Auslagern</button>
+            <button class="btn-in btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'in');">Einlagern</button>
+            <button class="btn-out btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'out');">Auslagern</button>
         </div>
     `;
     
