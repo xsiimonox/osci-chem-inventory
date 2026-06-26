@@ -319,7 +319,6 @@ function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
     if (CLOUD_SYNC_ENABLED) return true;
     updateSyncStatus(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warn');
     showToast(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warning', 3800);
-    if (actionLabel) alert(`${actionLabel} ist aktuell deaktiviert.\n\n${CLOUD_SYNC_MAINTENANCE_MESSAGE}`);
     return false;
 }
 
