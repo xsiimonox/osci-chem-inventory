@@ -123,6 +123,25 @@ const densityFactors = {
 const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
+const measurementUiState = { selectedEntryId: null, editingEntryId: null };
+const AQUARIUM_FIELD_KEYS = [
+    'implementationLog',
+    'logBookCategories',
+    'logBookEntries',
+    'aquariumTodos',
+    'dosingContainers',
+    'measurementTypes',
+    'measurementEntries',
+    'feedNutrientLog',
+    'osmoseTank',
+    'traceDraft',
+    'testCorrections',
+    'majorCorrectionSettings',
+    'psuCorrectionOffset',
+    'toolSettings',
+    'crSeaWaterPresets'
+];
+const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen']);
 
 // --- OSCI SHOP BUILT-IN PRODUCT PRESET ---
 // This preset is always available and cannot be permanently deleted.
@@ -245,8 +264,11 @@ const SYNC_SETTINGS_KEY = 'osci_supabase_sync_v1';
 const LAST_TAB_KEY = 'osci_last_active_tab';
 const DEFAULT_SUPABASE_URL = 'https://ymeszigbnoaoqkwxcbqo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_4LQDgitTmZeu9tO2Mh8Hew_-EseNuP0';
+const COMMUNITY_MAP_DEFAULT_CENTER = { lat: 51.2, lng: 10.45 };
+const COMMUNITY_MAP_GRID_STEP = 0.1;
 let appState = null;
 let activeWarehouseId = 'main';
+let activeAquariumId = 'aquarium-main';
 let db = { inventory: {}, stats: {}, logs: [], statsStarted: Date.now(), theme: 'default' };
 let currentAction = {};
 let crPdfAdjustments = [];
@@ -254,9 +276,15 @@ let supabaseClientPromise = null;
 let supabaseClientInstance = null;
 let syncPushTimer = null;
 let syncIsPulling = false;
+let startupSyncAttempted = false;
+let communityMapLoading = false;
+let otpCooldownUntil = 0;
+let otpCooldownTimer = null;
 const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
+const CLOUD_SYNC_ENABLED = false;
+const CLOUD_SYNC_MAINTENANCE_MESSAGE = 'Cloud Login & Share ist wegen Wartungsarbeiten voruebergehend deaktiviert.';
 const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const TAB_LABELS = {
@@ -283,6 +311,17 @@ const TAB_ICONS = {
     nachbestellen: '!',
     einstellungen: '⚙'
 };
+const communityUiState = {
+    selectedProfileId: null
+};
+
+function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
+    if (CLOUD_SYNC_ENABLED) return true;
+    updateSyncStatus(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warn');
+    showToast(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warning', 3800);
+    if (actionLabel) alert(`${actionLabel} ist aktuell deaktiviert.\n\n${CLOUD_SYNC_MAINTENANCE_MESSAGE}`);
+    return false;
+}
 
 function getMenuOrder() {
     try {
@@ -400,6 +439,15 @@ function createWarehouseData(source = {}) {
         logBookCategories: source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
         logBookEntries: source.logBookEntries || [],
         aquariumTodos: source.aquariumTodos || [],
+        dosingContainers: source.dosingContainers || [],
+        measurementTypes: source.measurementTypes || [
+            { id: 'KH', label: 'KH', unit: 'dKH' },
+            { id: 'CA', label: 'CA', unit: 'mg/l' },
+            { id: 'MG', label: 'MG', unit: 'mg/l' },
+            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
+            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
+        ],
+        measurementEntries: source.measurementEntries || [],
         feedNutrientLog: source.feedNutrientLog || [],
         osmoseTank: source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 },
         traceDraft: source.traceDraft || {},
@@ -409,6 +457,54 @@ function createWarehouseData(source = {}) {
         toolSettings: source.toolSettings || { lastSection: '', favorites: [] },
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
+    };
+}
+
+function cloneSerializable(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function createAquariumId() {
+    return 'aquarium-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
+}
+
+function createAquariumData(source = {}) {
+    return {
+        implementationLog: cloneSerializable(source.implementationLog || source.dosePlanArchive || []),
+        logBookCategories: cloneSerializable(source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges']),
+        logBookEntries: cloneSerializable(source.logBookEntries || []),
+        aquariumTodos: cloneSerializable(source.aquariumTodos || []),
+        dosingContainers: cloneSerializable(source.dosingContainers || []),
+        measurementTypes: cloneSerializable(source.measurementTypes || [
+            { id: 'KH', label: 'KH', unit: 'dKH' },
+            { id: 'CA', label: 'CA', unit: 'mg/l' },
+            { id: 'MG', label: 'MG', unit: 'mg/l' },
+            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
+            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
+        ]),
+        measurementEntries: cloneSerializable(source.measurementEntries || []),
+        feedNutrientLog: cloneSerializable(source.feedNutrientLog || []),
+        osmoseTank: cloneSerializable(source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 }),
+        traceDraft: cloneSerializable(source.traceDraft || {}),
+        testCorrections: cloneSerializable(source.testCorrections || {}),
+        majorCorrectionSettings: cloneSerializable(source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } }),
+        psuCorrectionOffset: source.psuCorrectionOffset || 0,
+        toolSettings: cloneSerializable(source.toolSettings || { lastSection: '', favorites: [] }),
+        crSeaWaterPresets: cloneSerializable(source.crSeaWaterPresets || {}),
+        localUpdatedAt: source.localUpdatedAt || null
+    };
+}
+
+function normalizeAquariumData(data) {
+    return createAquariumData(data || {});
+}
+
+function createAquariumRecord(name, data = {}) {
+    return {
+        id: createAquariumId(),
+        name: name || 'Aquarium',
+        createdAt: new Date().toISOString(),
+        data: createAquariumData(data)
     };
 }
 
@@ -440,14 +536,48 @@ function migrateToWarehouseState(parsed) {
     return {
         version: 1,
         activeWarehouseId: 'main',
+        activeAquariumId: 'aquarium-main',
         pendingDeletedRemoteIds: [],
-        warehouses: { main: record }
+        communityMapProfileDraft: {},
+        warehouses: { main: record },
+        aquariums: {
+            'aquarium-main': {
+                id: 'aquarium-main',
+                name: 'Hauptaquarium',
+                createdAt: new Date().toISOString(),
+                data: createAquariumData(parsed || {})
+            }
+        }
     };
 }
 
 function getActiveWarehouse() {
     if (!appState || !appState.warehouses) return null;
     return appState.warehouses[activeWarehouseId] || Object.values(appState.warehouses)[0] || null;
+}
+
+function getActiveAquarium() {
+    if (!appState || !appState.aquariums) return null;
+    return appState.aquariums[activeAquariumId] || Object.values(appState.aquariums)[0] || null;
+}
+
+function syncActiveAquariumDataFromDb(markDirty = true) {
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    if (!aquarium.data) aquarium.data = createAquariumData();
+    if (markDirty) aquarium.data.localUpdatedAt = new Date().toISOString();
+    AQUARIUM_FIELD_KEYS.forEach(key => {
+        aquarium.data[key] = cloneSerializable(db[key]);
+    });
+}
+
+function overlayActiveAquariumData() {
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    aquarium.data = normalizeAquariumData(aquarium.data);
+    AQUARIUM_FIELD_KEYS.forEach(key => {
+        db[key] = cloneSerializable(aquarium.data[key]);
+    });
 }
 
 function normalizeWarehouseData(data) {
@@ -471,6 +601,15 @@ function normalizeWarehouseData(data) {
     if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];
     if (!db.logBookEntries) db.logBookEntries = [];
     if (!db.aquariumTodos) db.aquariumTodos = [];
+    if (!db.dosingContainers) db.dosingContainers = [];
+    if (!db.measurementTypes) db.measurementTypes = [
+        { id: 'KH', label: 'KH', unit: 'dKH' },
+        { id: 'CA', label: 'CA', unit: 'mg/l' },
+        { id: 'MG', label: 'MG', unit: 'mg/l' },
+        { id: 'PO4', label: 'PO4', unit: 'mg/l' },
+        { id: 'NO3', label: 'NO3', unit: 'mg/l' }
+    ];
+    if (!db.measurementEntries) db.measurementEntries = [];
     if (!db.feedNutrientLog) db.feedNutrientLog = [];
     if (!db.osmoseTank) db.osmoseTank = { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 };
     if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
@@ -529,6 +668,7 @@ function initDB() {
 
     appState = migrateToWarehouseState(parsed);
     if (!Array.isArray(appState.pendingDeletedRemoteIds)) appState.pendingDeletedRemoteIds = [];
+    if (!appState.communityMapProfileDraft || typeof appState.communityMapProfileDraft !== 'object') appState.communityMapProfileDraft = {};
     if (!appState.hiddenSharedOwners || typeof appState.hiddenSharedOwners !== 'object') appState.hiddenSharedOwners = {};
     if (!appState.knownSharedOwners || typeof appState.knownSharedOwners !== 'object') appState.knownSharedOwners = {};
     if (!appState.warehouses || Object.keys(appState.warehouses).length === 0) {
@@ -546,12 +686,29 @@ function initDB() {
         if (!warehouse.data) warehouse.data = createWarehouseData();
     });
 
+    const firstWarehouseData = Object.values(appState.warehouses)[0]?.data || parsed || {};
+    if (!appState.aquariums || Object.keys(appState.aquariums).length === 0) {
+        const aquariumRecord = createAquariumRecord('Hauptaquarium', firstWarehouseData);
+        aquariumRecord.id = 'aquarium-main';
+        appState.aquariums = { 'aquarium-main': aquariumRecord };
+    }
+    Object.entries(appState.aquariums).forEach(([id, aquarium]) => {
+        aquarium.id = id;
+        if (!aquarium.name) aquarium.name = 'Aquarium';
+        if (!aquarium.createdAt) aquarium.createdAt = new Date().toISOString();
+        aquarium.data = normalizeAquariumData(aquarium.data || firstWarehouseData || {});
+    });
+
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses)[0];
     if (!appState.warehouses[activeWarehouseId]) activeWarehouseId = Object.keys(appState.warehouses)[0];
     appState.activeWarehouseId = activeWarehouseId;
+    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums)[0];
+    if (!appState.aquariums[activeAquariumId]) activeAquariumId = Object.keys(appState.aquariums)[0];
+    appState.activeAquariumId = activeAquariumId;
 
     const warehouse = getActiveWarehouse();
     warehouse.data = normalizeWarehouseData(warehouse.data);
+    overlayActiveAquariumData();
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
@@ -562,6 +719,7 @@ function initDB() {
 function saveDB(markDirty = true) {
     try {
         if (!appState) appState = migrateToWarehouseState(db);
+        syncActiveAquariumDataFromDb(markDirty);
         const warehouse = getActiveWarehouse();
         if (warehouse) {
             if (markDirty) db.localUpdatedAt = new Date().toISOString();
@@ -569,6 +727,7 @@ function saveDB(markDirty = true) {
             warehouse.localUpdatedAt = db.localUpdatedAt;
         }
         appState.activeWarehouseId = activeWarehouseId;
+        appState.activeAquariumId = activeAquariumId;
         localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateWarehouseUI();
         scheduleSupabaseAutoSync();
@@ -746,15 +905,28 @@ async function getSupabaseUser() {
 
 function getSyncReadyLabel(settings) {
     if (!settings.url || !settings.anonKey) return 'Nicht verbunden: Supabase URL und anon public key fehlen.';
+    if (window.location.protocol === 'file:') return 'Cloud Login nur auf localhost oder echter Web-URL nutzen. file:// ist fuer Supabase-Auth unzuverlaessig.';
     return settings.autoSync ? 'Supabase bereit · Auto-Sync aktiv' : 'Supabase bereit · Auto-Sync aus';
 }
 
 async function renderSupabaseSyncSettings() {
+    if (!CLOUD_SYNC_ENABLED) {
+        updateAuthState(null);
+        updateSyncStatus(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warn');
+        const autoEl = document.getElementById('supabaseAutoSync');
+        if (autoEl) autoEl.checked = false;
+        const friends = document.getElementById('sync-friends-list');
+        if (friends) friends.innerHTML = '<p class="hint">Cloud-Funktionen sind aktuell deaktiviert.</p>';
+        const diagnostics = document.getElementById('supabase-diagnostics-result');
+        if (diagnostics) diagnostics.innerHTML = '';
+        return;
+    }
     const settings = getSupabaseSettings();
     const autoEl = document.getElementById('supabaseAutoSync');
     const autoRow = document.getElementById('syncAutoRow');
     if (autoEl) autoEl.checked = settings.autoSync;
     if (autoRow) autoRow.classList.toggle('sync-auto-active', settings.autoSync);
+    renderOtpCooldownState();
 
     updateSyncStatus(getSyncReadyLabel(settings), settings.url && settings.anonKey ? 'ok' : 'warn');
 
@@ -793,106 +965,164 @@ function toggleSupabaseAutoSync(enabled) {
     if (enabled) scheduleSupabaseAutoSync();
 }
 
-async function supabaseSignUp() {
-    try {
-        saveSupabaseSettings();
-        const client = await getSupabaseClient();
-        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
-        const password = document.getElementById('supabasePassword')?.value || '';
-        if (!email || !password) return alert('Bitte E-Mail und Passwort eintragen.');
-        const { data, error } = await client.auth.signUp({ email, password });
-        if (error) throw error;
-        if (data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-            updateSyncStatus('Diese E-Mail ist vermutlich bereits registriert. Bitte einloggen oder Passwort zurücksetzen.', 'warn');
-            return;
+function getOtpHintElement() {
+    return document.getElementById('supabaseOtpHint');
+}
+
+function setOtpHint(message) {
+    const el = getOtpHintElement();
+    if (el) el.innerText = message;
+}
+
+function renderOtpCooldownState() {
+    const button = document.getElementById('supabaseOtpRequestBtn');
+    if (!button) return;
+    const remainingMs = otpCooldownUntil - Date.now();
+    if (remainingMs > 0) {
+        const remainingSeconds = Math.ceil(remainingMs / 1000);
+        button.disabled = true;
+        button.innerText = `Neuer Code in ${remainingSeconds}s`;
+    } else {
+        button.disabled = false;
+        button.innerText = 'Code anfordern';
+        otpCooldownUntil = 0;
+        if (otpCooldownTimer) {
+            clearInterval(otpCooldownTimer);
+            otpCooldownTimer = null;
         }
-        updateSyncStatus('Registrierung erstellt. Bitte Account über die Bestätigungs-Mail aktivieren. Schau auch im Spam-Ordner nach.', 'ok');
-    } catch (err) {
-        const msg = String(err.message || '');
-        if (/already|registered|exists/i.test(msg)) {
-            updateSyncStatus('Diese E-Mail ist bereits registriert. Bitte einloggen oder Passwort zurücksetzen.', 'warn');
-            return;
-        }
-        alert('Registrierung fehlgeschlagen: ' + err.message);
     }
 }
 
-async function supabaseSignIn() {
+function startOtpCooldown(seconds = 60) {
+    otpCooldownUntil = Date.now() + (seconds * 1000);
+    renderOtpCooldownState();
+    if (otpCooldownTimer) clearInterval(otpCooldownTimer);
+    otpCooldownTimer = setInterval(renderOtpCooldownState, 1000);
+}
+
+function formatSupabaseOtpError(err) {
+    const candidates = [
+        err?.message,
+        err?.error_description,
+        err?.error,
+        err?.msg,
+        err?.description,
+        err?.details,
+        err?.name
+    ].filter(value => typeof value === 'string' && value.trim());
+    let message = candidates[0] || '';
+    if (!message && err && typeof err === 'object') {
+        try {
+            const plainObject = {};
+            Object.getOwnPropertyNames(err).forEach(key => {
+                plainObject[key] = err[key];
+            });
+            const json = JSON.stringify(plainObject);
+            if (json && json !== '{}') message = json;
+        } catch (serializationError) {}
+    }
+    if (!message) {
+        message = typeof err === 'string' ? err : '';
+    }
+    if (!message) {
+        message = 'Supabase hat einen leeren Fehler zurueckgegeben. Bitte pruefe in Supabase, ob E-Mail-OTP aktiviert ist, dein SMTP korrekt gespeichert wurde und das OTP-Template den Platzhalter {{ .Token }} nutzt.';
+    }
+    if (/rate limit/i.test(message)) {
+        return 'Zu viele Code-Mails angefordert. Bitte kurz warten und dann erneut versuchen.';
+    }
+    if (/smtp|mailer|email provider/i.test(message)) {
+        return 'Der E-Mail-Versand ist in Supabase noch nicht sauber konfiguriert. Bitte SMTP-Einstellungen und E-Mail-Provider pruefen.';
+    }
+    if (/otp|one-time|email login|provider.+disabled/i.test(message)) {
+        return 'E-Mail-OTP scheint in Supabase noch nicht vollstaendig aktiviert zu sein. Bitte den E-Mail-Login in Auth pruefen.';
+    }
+    if (/not authorized|address not authorized/i.test(message)) {
+        return 'Diese E-Mail-Adresse darf aktuell nicht angeschrieben werden. Bitte SMTP/Domain pruefen oder eine andere Adresse testen.';
+    }
+    if (/invalid login credentials|token/i.test(message)) {
+        return 'Der Code ist ungueltig oder abgelaufen. Bitte einen neuen Code anfordern.';
+    }
+    return message;
+}
+
+async function requestSupabaseOtp() {
     try {
+        if (!ensureCloudSyncEnabled('Code-Anforderung')) return;
+        if (window.location.protocol === 'file:') {
+            const message = 'Cloud Login per E-Mail-Code bitte ueber localhost testen, nicht ueber file://. Oeffne die App z. B. unter http://127.0.0.1:8111/index.html';
+            updateSyncStatus(message, 'warn');
+            setOtpHint('Bitte auf localhost wechseln und dort den Code anfordern.');
+            return alert(message);
+        }
         saveSupabaseSettings();
         const client = await getSupabaseClient();
-        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
-        const password = document.getElementById('supabasePassword')?.value || '';
-        if (!email || !password) return alert('Bitte E-Mail und Passwort eintragen.');
-        const { error } = await client.auth.signInWithPassword({ email, password });
+        const email = (document.getElementById('supabaseEmail')?.value || '').trim().toLowerCase();
+        if (!email || !email.includes('@')) return alert('Bitte eine gueltige E-Mail eintragen.');
+        const { error } = await client.auth.signInWithOtp({
+            email,
+            options: {
+                shouldCreateUser: true
+            }
+        });
         if (error) throw error;
-        updateAuthState({ email });
-        updateSyncStatus(`Eingeloggt.`, 'ok');
-        await syncPullWarehouses(false);
+        startOtpCooldown(60);
+        updateSyncStatus('Code wurde per E-Mail angefordert. Bitte Postfach und Spam-Ordner pruefen.', 'ok');
+        setOtpHint('Den 6-stelligen Code aus der Mail hier eingeben und bestaetigen.');
     } catch (err) {
-        alert('Login fehlgeschlagen: ' + err.message);
+        console.error('Supabase OTP request failed:', err);
+        const message = formatSupabaseOtpError(err);
+        updateSyncStatus(message, 'warn');
+        alert('Code-Anforderung fehlgeschlagen: ' + message);
+    }
+}
+
+async function verifySupabaseOtp() {
+    try {
+        if (!ensureCloudSyncEnabled('Code-Bestaetigung')) return;
+        if (window.location.protocol === 'file:') {
+            const message = 'Die Code-Bestaetigung bitte ueber localhost ausfuehren, nicht ueber file://.';
+            updateSyncStatus(message, 'warn');
+            setOtpHint('Bitte auf localhost wechseln und dort den OTP-Code bestaetigen.');
+            return alert(message);
+        }
+        saveSupabaseSettings();
+        const client = await getSupabaseClient();
+        const email = (document.getElementById('supabaseEmail')?.value || '').trim().toLowerCase();
+        const token = (document.getElementById('supabaseOtpCode')?.value || '').trim();
+        if (!email || !email.includes('@')) return alert('Bitte eine gueltige E-Mail eintragen.');
+        if (!token || token.length < 6) return alert('Bitte den 6-stelligen Code eingeben.');
+        const { data, error } = await client.auth.verifyOtp({
+            email,
+            token,
+            type: 'email'
+        });
+        if (error) throw error;
+        document.getElementById('supabaseOtpCode').value = '';
+        updateAuthState(data?.user || { email });
+        updateSyncStatus('Eingeloggt per E-Mail-Code.', 'ok');
+        setOtpHint('Code bestaetigt. Du bist jetzt eingeloggt.');
+        await syncPullWarehouses(false);
+        renderCommunityMapCard();
+    } catch (err) {
+        console.error('Supabase OTP verify failed:', err);
+        const message = formatSupabaseOtpError(err);
+        updateSyncStatus(message, 'warn');
+        alert('Code-Bestaetigung fehlgeschlagen: ' + message);
     }
 }
 
 async function supabaseSignOut() {
     try {
+        if (!ensureCloudSyncEnabled('Cloud Logout')) return;
         const client = await getSupabaseClient();
         await client.auth.signOut();
         updateAuthState(null);
         updateSyncStatus('Ausgeloggt. Lokale Daten bleiben auf diesem Gerät erhalten.', 'info');
+        setOtpHint('Code anfordern und danach den 6-stelligen Code eingeben.');
+        renderCommunityMapCard();
     } catch (err) {
         alert('Logout fehlgeschlagen: ' + err.message);
     }
-}
-
-async function supabaseResetPassword() {
-    try {
-        saveSupabaseSettings();
-        const client = await getSupabaseClient();
-        const email = (document.getElementById('supabaseEmail')?.value || '').trim();
-        if (!email) return alert('Bitte E-Mail eintragen.');
-        const redirectTo = window.location.origin && window.location.origin !== 'null'
-            ? `${window.location.origin}${window.location.pathname}`
-            : window.location.href.split('#')[0];
-        const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
-        if (error) throw error;
-        updateSyncStatus('Passwort-Reset-Mail wurde gesendet. Bitte E-Mail öffnen und dem Link folgen.', 'ok');
-    } catch (err) {
-        alert('Passwort-Reset fehlgeschlagen: ' + err.message);
-    }
-}
-
-async function supabaseUpdatePassword() {
-    try {
-        const password = document.getElementById('newSupabasePassword')?.value || '';
-        if (password.length < 6) return alert('Das neue Passwort muss mindestens 6 Zeichen haben.');
-        const client = await getSupabaseClient();
-        const { error } = await client.auth.updateUser({ password });
-        if (error) throw error;
-        document.getElementById('newSupabasePassword').value = '';
-        const box = document.getElementById('passwordRecoveryBox');
-        if (box) box.style.display = 'none';
-        updateSyncStatus('Passwort wurde gespeichert. Du kannst dich jetzt einloggen.', 'ok');
-    } catch (err) {
-        alert('Passwort konnte nicht gespeichert werden: ' + err.message);
-    }
-}
-
-async function detectSupabasePasswordRecovery() {
-    try {
-        const client = await getSupabaseClient();
-        client.auth.onAuthStateChange((event) => {
-            const box = document.getElementById('passwordRecoveryBox');
-            if (event === 'PASSWORD_RECOVERY' && box) {
-                box.style.display = 'block';
-                updateSyncStatus('Passwort-Zurücksetzung erkannt. Bitte neues Passwort speichern.', 'warn');
-            }
-        });
-        if (window.location.hash.includes('type=recovery')) {
-            const box = document.getElementById('passwordRecoveryBox');
-            if (box) box.style.display = 'block';
-        }
-    } catch (err) {}
 }
 
 function decodeJwtPayload(token) {
@@ -920,6 +1150,7 @@ function renderDiagnosticsResult(rows) {
 }
 
 async function runSupabaseDiagnostics() {
+    if (!ensureCloudSyncEnabled('Sync Diagnose')) return;
     const rows = [];
     const add = (label, value, ok = true) => rows.push({ label, value: String(value), ok });
     try {
@@ -1002,6 +1233,16 @@ function canWriteWarehouse(warehouse) {
     return true;
 }
 
+function isWarehouseReadOnlyView(warehouse = getActiveWarehouse()) {
+    return !canWriteWarehouse(warehouse);
+}
+
+function requireWarehouseWriteAccess(actionLabel = 'Diese Aktion') {
+    if (!isWarehouseReadOnlyView()) return true;
+    showToast(`${actionLabel} ist im Nur-Lesen-Lager nicht erlaubt.`, 'warning', 3600);
+    return false;
+}
+
 function queueDeletedWarehouseRemoteId(remoteId) {
     if (!remoteId) return;
     if (!appState.pendingDeletedRemoteIds) appState.pendingDeletedRemoteIds = [];
@@ -1028,6 +1269,7 @@ function isNoWriteAccessError(error) {
 }
 
 async function syncPushAllWarehouses(showAlert = true) {
+    if (!ensureCloudSyncEnabled(showAlert ? 'Daten Upload' : '')) return;
     try {
         const { client, user } = await getSupabaseUser();
         if (!user) {
@@ -1093,7 +1335,28 @@ function getLocalWarehouseByRemoteId(remoteId) {
     return Object.values(appState.warehouses).find(warehouse => warehouse.remoteId === remoteId);
 }
 
+function hasUnsyncedWritableWarehouseChanges() {
+    return Object.values(appState?.warehouses || {}).some(warehouse => {
+        if (!warehouse.remoteId || !canWriteWarehouse(warehouse)) return false;
+        const localTime = new Date(warehouse.localUpdatedAt || warehouse.data?.localUpdatedAt || 0).getTime();
+        const lastSync = new Date(warehouse.lastSyncAt || 0).getTime();
+        return localTime > lastSync;
+    });
+}
+
+function getWarehousePullConflicts(rows = []) {
+    return rows.filter(row => {
+        const local = getLocalWarehouseByRemoteId(row.id);
+        if (!local || !local.remoteId) return false;
+        const cloudTime = new Date(row.updated_at || 0).getTime();
+        const lastSync = new Date(local.lastSyncAt || 0).getTime();
+        const localTime = new Date(local.localUpdatedAt || local.data?.localUpdatedAt || 0).getTime();
+        return cloudTime > lastSync && localTime > lastSync;
+    });
+}
+
 async function syncPullWarehouses(showAlert = true) {
+    if (!ensureCloudSyncEnabled(showAlert ? 'Daten Download' : '')) return;
     try {
         const { client, user } = await getSupabaseUser();
         if (!user) {
@@ -1101,30 +1364,28 @@ async function syncPullWarehouses(showAlert = true) {
             if (showAlert) alert('Bitte zuerst bei Supabase einloggen.');
             return;
         }
-        const hasRemoteLocalChanges = Object.values(appState?.warehouses || {}).some(warehouse => warehouse.remoteId && canWriteWarehouse(warehouse));
+        const hasRemoteLocalChanges = hasUnsyncedWritableWarehouseChanges();
         const hasPendingDeletes = Array.isArray(appState?.pendingDeletedRemoteIds) && appState.pendingDeletedRemoteIds.length > 0;
-        if (showAlert && (hasRemoteLocalChanges || hasPendingDeletes)) {
+        if (hasRemoteLocalChanges || hasPendingDeletes) {
             await syncPushAllWarehouses(false);
         }
         syncIsPulling = true;
         const { data: rows, error } = await client.rpc('list_accessible_warehouses');
         if (error) throw error;
         const sortedRows = (rows || []).slice().sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0));
-        const conflicts = sortedRows.filter(row => {
-            const local = getLocalWarehouseByRemoteId(row.id);
-            if (!local || !local.remoteId) return false;
-            const cloudTime = new Date(row.updated_at || 0).getTime();
-            const lastSync = new Date(local.lastSyncAt || 0).getTime();
-            const localTime = new Date(local.localUpdatedAt || local.data?.localUpdatedAt || 0).getTime();
-            return cloudTime > lastSync && localTime > lastSync;
-        });
-        if (showAlert && conflicts.length > 0) {
+        const conflicts = getWarehousePullConflicts(sortedRows);
+        if (conflicts.length > 0 && showAlert) {
             const names = conflicts.map(row => row.name || 'Lager').join(', ');
             if (!confirm(`Cloud-Konflikt erkannt bei: ${names}\n\nDie Cloud und dieses Gerät wurden seit dem letzten Sync geändert. Daten Download überschreibt den lokalen Stand mit der Cloud-Version. Fortfahren?`)) {
                 updateSyncStatus('Daten Download abgebrochen: Cloud-Konflikt erkannt.', 'warn');
                 return;
             }
             addWarehouseEvent('conflict', `Cloud-Konflikt bestätigt: ${names}`);
+        }
+        const skippedConflictIds = new Set();
+        if (conflicts.length > 0 && !showAlert) {
+            conflicts.forEach(row => skippedConflictIds.add(row.id));
+            updateSyncStatus(`Daten Download teilweise übersprungen: ${conflicts.length} lokale Änderung(en) geschützt.`, 'warn');
         }
         const returnedRemoteIds = new Set(sortedRows.map(row => row.id));
         if (!appState) appState = migrateToWarehouseState(null);
@@ -1144,6 +1405,7 @@ async function syncPullWarehouses(showAlert = true) {
         let firstLoadedLocalId = null;
         sortedRows.forEach(row => {
             const existing = getLocalWarehouseByRemoteId(row.id);
+            if (skippedConflictIds.has(row.id) && existing) return;
             const localId = existing ? existing.id : createWarehouseId();
             const shareRole = row.access_role || (row.owner === user.id ? 'owner' : 'read');
             const isOwner = shareRole === 'owner';
@@ -1192,8 +1454,10 @@ async function syncPullWarehouses(showAlert = true) {
         const lagerTab = document.getElementById('lager');
         if (lagerTab) lagerTab.innerHTML = '';
         renderCurrentWarehouseViews();
+        if (WAREHOUSE_WRITE_TAB_IDS.has(getActiveTabId()) && isWarehouseReadOnlyView()) showTab('lager');
         const sharedText = loadedShared ? ` · ${loadedShared} geteilte Lager` : '';
-        updateSyncStatus(`Daten Download abgeschlossen: ${loaded} Lager geladen.${sharedText}`, 'ok');
+        const conflictText = skippedConflictIds.size ? ` · ${skippedConflictIds.size} Konflikt(e) lokal behalten` : '';
+        updateSyncStatus(`Daten Download abgeschlossen: ${loaded} Lager geladen.${sharedText}${conflictText}`, skippedConflictIds.size ? 'warn' : 'ok');
         addWarehouseEvent('cloud', `Daten Download: ${loaded} Lager geladen${loadedShared ? `, ${loadedShared} geteilt` : ''}`);
         localStorage.setItem(DB_KEY, JSON.stringify(appState));
         if (showAlert) alert(`Daten Download abgeschlossen.\n${loaded} Lager wurden geladen.${loadedShared ? `\n${loadedShared} davon sind mit dir geteilt.` : ''}`);
@@ -1208,6 +1472,21 @@ async function syncPullWarehouses(showAlert = true) {
     }
 }
 
+async function autoSyncWarehousesOnStartup() {
+    if (startupSyncAttempted) return;
+    startupSyncAttempted = true;
+    try {
+        if (!CLOUD_SYNC_ENABLED) return;
+        const settings = getSupabaseSettings();
+        if (!settings.url || !settings.anonKey) return;
+        const { user } = await getSupabaseUser();
+        if (!user) return;
+        await syncPullWarehouses(false);
+    } catch (err) {
+        updateSyncStatus('Automatischer Start-Sync fehlgeschlagen: ' + err.message, 'warn');
+    }
+}
+
 async function ensureActiveWarehouseRemote() {
     const warehouse = getActiveWarehouse();
     if (!warehouse) throw new Error('Kein aktives Lager gefunden.');
@@ -1217,6 +1496,7 @@ async function ensureActiveWarehouseRemote() {
 }
 
 async function addReadOnlyFriend() {
+    if (!ensureCloudSyncEnabled('Freigabe')) return;
     try {
         const email = (document.getElementById('friendEmailInput')?.value || '').trim().toLowerCase();
         const selectedRole = document.getElementById('friendAccessRole')?.value === 'write' ? 'write' : 'read';
@@ -1322,6 +1602,549 @@ async function renderSyncFriendsList() {
     }
 }
 
+function getCommunityMapDraft() {
+    if (!appState) appState = migrateToWarehouseState(db);
+    if (!appState.communityMapProfileDraft || typeof appState.communityMapProfileDraft !== 'object') {
+        appState.communityMapProfileDraft = {};
+    }
+    return appState.communityMapProfileDraft;
+}
+
+function persistCommunityMapDraft(patch = {}) {
+    const draft = getCommunityMapDraft();
+    Object.assign(draft, patch || {});
+    localStorage.setItem(DB_KEY, JSON.stringify(appState));
+}
+
+function normalizeCommunityCoordinate(value, min, max) {
+    const parsed = parseFloat(value);
+    if (!Number.isFinite(parsed)) return null;
+    const clamped = Math.min(max, Math.max(min, parsed));
+    return Math.round(clamped / COMMUNITY_MAP_GRID_STEP) * COMMUNITY_MAP_GRID_STEP;
+}
+
+function getCommunityMapPoint(profile) {
+    if (!profile) return null;
+    const lat = normalizeCommunityCoordinate(profile.approx_lat, -85, 85);
+    const lng = normalizeCommunityCoordinate(profile.approx_lng, -180, 180);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { lat, lng };
+}
+
+function formatCommunityCoordinate(point) {
+    if (!point) return 'kein Punkt gesetzt';
+    return `${point.lat.toFixed(1)}°, ${point.lng.toFixed(1)}°`;
+}
+
+function computeCommunityDistanceKm(a, b) {
+    if (!a || !b) return null;
+    const toRad = value => value * Math.PI / 180;
+    const r = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const hav = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return 2 * r * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
+}
+
+function formatCommunityDistance(distanceKm) {
+    if (!Number.isFinite(distanceKm)) return 'Distanz unbekannt';
+    if (distanceKm < 10) return `${distanceKm.toFixed(1)} km entfernt`;
+    if (distanceKm < 100) return `${distanceKm.toFixed(0)} km entfernt`;
+    return `${Math.round(distanceKm / 5) * 5} km entfernt`;
+}
+
+function buildCommunityMapSvg(profiles, ownUserId = null) {
+    const members = profiles.filter(profile => getCommunityMapPoint(profile));
+    const width = 980;
+    const height = 360;
+    const paddingLeft = 72;
+    const paddingRight = 26;
+    const paddingTop = 26;
+    const paddingBottom = 42;
+    const fallbackBounds = { minLat: 35, maxLat: 61, minLng: -12, maxLng: 28 };
+    const coords = members.map(profile => getCommunityMapPoint(profile));
+    const latValues = coords.map(point => point.lat);
+    const lngValues = coords.map(point => point.lng);
+    const dynamicBounds = coords.length
+        ? {
+            minLat: Math.min(...latValues) - 3,
+            maxLat: Math.max(...latValues) + 3,
+            minLng: Math.min(...lngValues) - 4,
+            maxLng: Math.max(...lngValues) + 4
+        }
+        : fallbackBounds;
+    const minLat = Math.min(dynamicBounds.minLat, fallbackBounds.minLat);
+    const maxLat = Math.max(dynamicBounds.maxLat, fallbackBounds.maxLat);
+    const minLng = Math.min(dynamicBounds.minLng, fallbackBounds.minLng);
+    const maxLng = Math.max(dynamicBounds.maxLng, fallbackBounds.maxLng);
+    const usableWidth = width - paddingLeft - paddingRight;
+    const usableHeight = height - paddingTop - paddingBottom;
+    const project = point => ({
+        x: paddingLeft + ((point.lng - minLng) / (maxLng - minLng || 1)) * usableWidth,
+        y: paddingTop + (1 - ((point.lat - minLat) / (maxLat - minLat || 1))) * usableHeight
+    });
+    const gridRows = 4;
+    const gridCols = 5;
+    const regionLabels = [
+        { text: 'Atlantik', lat: 46, lng: -8 },
+        { text: 'DACH', lat: 49.5, lng: 10.5 },
+        { text: 'Adria', lat: 44, lng: 15.5 },
+        { text: 'Skandinavien', lat: 58, lng: 14 }
+    ];
+    return `
+        <svg class="community-map-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Community Karte mit ungefähren Standorten">
+            <defs>
+                <linearGradient id="communityMapBg" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="rgba(255,255,255,0.08)"></stop>
+                    <stop offset="100%" stop-color="rgba(255,255,255,0.02)"></stop>
+                </linearGradient>
+                <radialGradient id="communityPinGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="rgba(191, 90, 242, 0.45)"></stop>
+                    <stop offset="100%" stop-color="rgba(191, 90, 242, 0)"></stop>
+                </radialGradient>
+            </defs>
+            <rect x="10" y="10" width="${width - 20}" height="${height - 20}" rx="24" fill="url(#communityMapBg)" class="community-map-surface"></rect>
+            ${Array.from({ length: gridRows + 1 }, (_, index) => {
+                const y = paddingTop + (usableHeight / gridRows) * index;
+                return `<line x1="${paddingLeft}" y1="${y}" x2="${width - paddingRight}" y2="${y}" class="community-map-grid"></line>`;
+            }).join('')}
+            ${Array.from({ length: gridCols + 1 }, (_, index) => {
+                const x = paddingLeft + (usableWidth / gridCols) * index;
+                return `<line x1="${x}" y1="${paddingTop}" x2="${x}" y2="${height - paddingBottom}" class="community-map-grid"></line>`;
+            }).join('')}
+            ${regionLabels.map(label => {
+                const p = project(label);
+                return `<text x="${p.x}" y="${p.y}" class="community-map-region">${escapeHtml(label.text)}</text>`;
+            }).join('')}
+            <text x="${paddingLeft}" y="${height - 14}" class="community-map-caption">Punkte sind absichtlich gerundet und zeigen nur ungefähre Regionen.</text>
+            ${members.map(profile => {
+                const point = project(getCommunityMapPoint(profile));
+                const own = profile.user_id === ownUserId;
+                const label = escapeHtml(profile.display_name || profile.region_label || 'Community');
+                return `
+                    <g class="community-map-pin ${own ? 'own' : ''} ${communityUiState.selectedProfileId === profile.user_id ? 'active' : ''}" onclick="focusCommunityProfile('${profile.user_id}')">
+                        <circle cx="${point.x}" cy="${point.y}" r="${own ? 18 : 15}" class="community-map-pin-glow"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="${own ? 8 : 6.5}" class="community-map-pin-core"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="${own ? 11 : 9}" class="community-map-pin-ring"></circle>
+                        <text x="${point.x}" y="${point.y - 16}" class="community-map-pin-label">${label}</text>
+                    </g>
+                `;
+            }).join('')}
+        </svg>
+    `;
+}
+
+function focusCommunityProfile(userId) {
+    communityUiState.selectedProfileId = userId || null;
+    renderCommunityMapCard();
+    setTimeout(() => {
+        document.getElementById('communityMemberList')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 80);
+}
+
+function fillCommunityMapForm(profile = null) {
+    const draft = getCommunityMapDraft();
+    const point = getCommunityMapPoint(profile || draft);
+    const displayName = profile?.display_name || draft.display_name || '';
+    const regionLabel = profile?.region_label || draft.region_label || '';
+    const contactEmail = profile?.contact_email || draft.contact_email || '';
+    const visible = profile ? profile.is_visible === true : draft.is_visible === true;
+    const contactEnabled = profile ? profile.contact_enabled === true : draft.contact_enabled === true;
+    const displayNameEl = document.getElementById('communityDisplayName');
+    const regionEl = document.getElementById('communityRegionLabel');
+    const visibleEl = document.getElementById('communityVisible');
+    const contactEnabledEl = document.getElementById('communityContactEnabled');
+    const contactEmailEl = document.getElementById('communityContactEmail');
+    const latEl = document.getElementById('communityLatitude');
+    const lngEl = document.getElementById('communityLongitude');
+    const summaryEl = document.getElementById('communityLocationSummary');
+    if (displayNameEl) displayNameEl.value = displayName;
+    if (regionEl) regionEl.value = regionLabel;
+    if (visibleEl) visibleEl.checked = visible;
+    if (contactEnabledEl) contactEnabledEl.checked = contactEnabled;
+    if (contactEmailEl) contactEmailEl.value = contactEmail;
+    if (latEl) latEl.value = point ? point.lat.toFixed(1) : '';
+    if (lngEl) lngEl.value = point ? point.lng.toFixed(1) : '';
+    if (summaryEl) summaryEl.innerHTML = point
+        ? `<strong>Gerundeter Punkt:</strong> ${formatCommunityCoordinate(point)}`
+        : '<strong>Noch kein Punkt gesetzt.</strong> Nutze am besten die Geräte-Ortung und speichere nur die grobe Region.';
+}
+
+function syncCommunityMapDraftFromForm() {
+    persistCommunityMapDraft({
+        display_name: document.getElementById('communityDisplayName')?.value || '',
+        region_label: document.getElementById('communityRegionLabel')?.value || '',
+        contact_email: document.getElementById('communityContactEmail')?.value || '',
+        is_visible: document.getElementById('communityVisible')?.checked === true,
+        contact_enabled: document.getElementById('communityContactEnabled')?.checked === true,
+        approx_lat: document.getElementById('communityLatitude')?.value || '',
+        approx_lng: document.getElementById('communityLongitude')?.value || ''
+    });
+}
+
+function updateCommunityLocationSummary() {
+    syncCommunityMapDraftFromForm();
+    fillCommunityMapForm(getCommunityMapDraft());
+}
+
+function isCommunitySchemaMissingError(err) {
+    const message = String(err && err.message ? err.message : err || '');
+    return /community_profiles|community_contact_requests|relation .* does not exist|schema cache/i.test(message);
+}
+
+async function useApproxCommunityLocation() {
+    if (!navigator.geolocation) {
+        alert('Dieses Gerät stellt keine Standort-Funktion bereit.');
+        return;
+    }
+    const status = document.getElementById('communityMapStatus');
+    if (status) status.innerText = 'Standort wird ungefähr übernommen...';
+    navigator.geolocation.getCurrentPosition((position) => {
+        const lat = normalizeCommunityCoordinate(position.coords.latitude, -85, 85);
+        const lng = normalizeCommunityCoordinate(position.coords.longitude, -180, 180);
+        const latEl = document.getElementById('communityLatitude');
+        const lngEl = document.getElementById('communityLongitude');
+        if (latEl) latEl.value = lat.toFixed(1);
+        if (lngEl) lngEl.value = lng.toFixed(1);
+        updateCommunityLocationSummary();
+        if (status) status.innerText = 'Standort übernommen und auf ca. 0,1° gerundet.';
+        showToast('Community Standort grob gesetzt', 'success');
+    }, (error) => {
+        if (status) status.innerText = 'Standort konnte nicht übernommen werden.';
+        alert('Standort konnte nicht gelesen werden: ' + (error.message || 'Unbekannter Fehler'));
+    }, {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 300000
+    });
+}
+
+async function saveCommunityProfile() {
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) return alert('Bitte zuerst im Cloud Login anmelden.');
+        const displayName = (document.getElementById('communityDisplayName')?.value || '').trim();
+        const regionLabel = (document.getElementById('communityRegionLabel')?.value || '').trim();
+        const contactEmail = (document.getElementById('communityContactEmail')?.value || '').trim();
+        const isVisible = document.getElementById('communityVisible')?.checked === true;
+        const contactEnabled = document.getElementById('communityContactEnabled')?.checked === true;
+        const approxLat = normalizeCommunityCoordinate(document.getElementById('communityLatitude')?.value, -85, 85);
+        const approxLng = normalizeCommunityCoordinate(document.getElementById('communityLongitude')?.value, -180, 180);
+        if (!displayName) return alert('Bitte einen Anzeigenamen eintragen.');
+        if (!regionLabel) return alert('Bitte eine grobe Region eintragen, z.B. "Raum Köln".');
+        if (isVisible && (!Number.isFinite(approxLat) || !Number.isFinite(approxLng))) {
+            return alert('Für die sichtbare Community-Karte wird ein grob gerundeter Punkt benötigt.');
+        }
+        const payload = {
+            user_id: user.id,
+            display_name: displayName,
+            region_label: regionLabel,
+            approx_lat: Number.isFinite(approxLat) ? approxLat : null,
+            approx_lng: Number.isFinite(approxLng) ? approxLng : null,
+            is_visible: isVisible,
+            contact_enabled: contactEnabled,
+            contact_email: contactEnabled && contactEmail ? contactEmail : null
+        };
+        const { error } = await client.from('community_profiles').upsert(payload, { onConflict: 'user_id' });
+        if (error) throw error;
+        persistCommunityMapDraft(payload);
+        showToast('Community Profil gespeichert', 'success');
+        await renderCommunityMapCard();
+    } catch (err) {
+        if (isCommunitySchemaMissingError(err)) {
+            alert('Community Map ist noch nicht in Supabase eingerichtet. Bitte die aktualisierte supabase-sync.sql einmal im SQL Editor ausführen.');
+            return;
+        }
+        alert('Community Profil konnte nicht gespeichert werden: ' + err.message);
+    }
+}
+
+async function hideCommunityProfile() {
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) return alert('Bitte zuerst einloggen.');
+        const { error } = await client.from('community_profiles').upsert({
+            user_id: user.id,
+            display_name: document.getElementById('communityDisplayName')?.value || 'Community',
+            region_label: document.getElementById('communityRegionLabel')?.value || 'Privat',
+            is_visible: false,
+            contact_enabled: false,
+            contact_email: null,
+            approx_lat: null,
+            approx_lng: null
+        }, { onConflict: 'user_id' });
+        if (error) throw error;
+        persistCommunityMapDraft({
+            is_visible: false,
+            contact_enabled: false,
+            approx_lat: '',
+            approx_lng: ''
+        });
+        showToast('Community Profil ausgeblendet', 'success');
+        await renderCommunityMapCard();
+    } catch (err) {
+        alert('Community Profil konnte nicht ausgeblendet werden: ' + err.message);
+    }
+}
+
+async function sendCommunityContactRequest() {
+    try {
+        const { client, user } = await getSupabaseUser();
+        if (!user) return alert('Bitte zuerst einloggen.');
+        const recipientUserId = document.getElementById('communityContactTarget')?.value || '';
+        const message = (document.getElementById('communityContactMessage')?.value || '').trim();
+        if (!recipientUserId) return alert('Bitte zuerst eine Person auswählen.');
+        if (!message) return alert('Bitte eine kurze Nachricht eintragen.');
+        const { error } = await client.from('community_contact_requests').insert({
+            recipient_user_id: recipientUserId,
+            message
+        });
+        if (error) throw error;
+        document.getElementById('communityContactMessage').value = '';
+        showToast('Kontaktanfrage gesendet', 'success');
+        await renderCommunityMapCard();
+    } catch (err) {
+        if (isCommunitySchemaMissingError(err)) {
+            alert('Community Map ist noch nicht in Supabase eingerichtet. Bitte die aktualisierte supabase-sync.sql einmal im SQL Editor ausführen.');
+            return;
+        }
+        alert('Kontaktanfrage konnte nicht gesendet werden: ' + err.message);
+    }
+}
+
+async function updateCommunityContactRequestStatus(id, status) {
+    try {
+        const { client } = await getSupabaseUser();
+        const { error } = await client.from('community_contact_requests').update({ status }).eq('id', id);
+        if (error) throw error;
+        await renderCommunityMapCard();
+    } catch (err) {
+        alert('Kontaktanfrage konnte nicht aktualisiert werden: ' + err.message);
+    }
+}
+
+async function renderCommunityMapCard() {
+    const container = document.getElementById('communityMapCard');
+    if (!container) return;
+    if (communityMapLoading) return;
+    communityMapLoading = true;
+    container.innerHTML = '<p class="hint">Community Map wird geladen...</p>';
+    try {
+        if (!CLOUD_SYNC_ENABLED) {
+            container.innerHTML = '<p class="hint">Community Map ist zusammen mit Cloud Login & Share voruebergehend deaktiviert.</p>';
+            return;
+        }
+        const settings = getSupabaseSettings();
+        if (!settings.url || !settings.anonKey) {
+            container.innerHTML = '<p class="hint">Community Map ist an deinen Cloud Login gekoppelt. Bitte zuerst bei "Cloud Login & Share" anmelden.</p>';
+            return;
+        }
+        const { client, user } = await getSupabaseUser();
+        if (!user) {
+            const draft = getCommunityMapDraft();
+            container.innerHTML = `
+                <div class="community-map-card-shell">
+                    <div class="community-map-privacy">
+                        <strong>Community Map mit Datenschutz-Fokus</strong>
+                        <p class="hint">Es werden nur grob gerundete Regionen geteilt. Die Kontaktaufnahme läuft nicht öffentlich über die Karte.</p>
+                    </div>
+                    <div class="community-map-login-hint">
+                        <strong>Cloud Login erforderlich</strong>
+                        <p class="hint">Melde dich an, damit du dein Community-Profil speichern, andere Teilnehmer sehen und Kontaktanfragen verwalten kannst.</p>
+                        <div class="community-map-draft">
+                            <small>Letzter lokaler Entwurf: ${escapeHtml(draft.display_name || 'noch leer')}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const [{ data: ownRows, error: ownError }, { data: visibleRows, error: visibleError }, { data: requestRows, error: requestError }] = await Promise.all([
+            client.from('community_profiles').select('*').eq('user_id', user.id).limit(1),
+            client.from('community_profiles').select('*').eq('is_visible', true).order('updated_at', { ascending: false }),
+            client.from('community_contact_requests').select('*').order('created_at', { ascending: false }).limit(30)
+        ]);
+        if (ownError) throw ownError;
+        if (visibleError) throw visibleError;
+        if (requestError) throw requestError;
+
+        const ownProfile = ownRows && ownRows[0] ? ownRows[0] : null;
+        const ownPoint = getCommunityMapPoint(ownProfile);
+        const mergedProfiles = new Map();
+        (visibleRows || []).forEach(profile => mergedProfiles.set(profile.user_id, profile));
+        if (ownProfile) mergedProfiles.set(ownProfile.user_id, ownProfile);
+        const profiles = Array.from(mergedProfiles.values())
+            .map(profile => {
+                const point = getCommunityMapPoint(profile);
+                const distanceKm = ownPoint && point && profile.user_id !== user.id ? computeCommunityDistanceKm(ownPoint, point) : null;
+                return { ...profile, point, distanceKm };
+            })
+            .sort((a, b) => {
+                if (a.user_id === user.id) return -1;
+                if (b.user_id === user.id) return 1;
+                if (a.distanceKm === null && b.distanceKm === null) return (a.display_name || '').localeCompare(b.display_name || '');
+                if (a.distanceKm === null) return 1;
+                if (b.distanceKm === null) return -1;
+                return a.distanceKm - b.distanceKm;
+            });
+
+        if (!communityUiState.selectedProfileId || !profiles.some(profile => profile.user_id === communityUiState.selectedProfileId)) {
+            communityUiState.selectedProfileId = profiles.find(profile => profile.user_id !== user.id)?.user_id || ownProfile?.user_id || null;
+        }
+        const selectedProfile = profiles.find(profile => profile.user_id === communityUiState.selectedProfileId) || null;
+        const contactTargets = profiles.filter(profile => profile.user_id !== user.id && profile.contact_enabled);
+        const incomingRequests = (requestRows || []).filter(row => row.recipient_user_id === user.id);
+        const outgoingRequests = (requestRows || []).filter(row => row.sender_user_id === user.id);
+        const mapSvg = buildCommunityMapSvg(profiles.filter(profile => profile.is_visible), user.id);
+
+        container.innerHTML = `
+            <div class="community-map-card-shell">
+                <div class="community-map-privacy">
+                    <strong>Community Map Beta</strong>
+                    <p class="hint">Datenschutz zuerst: Die Karte zeigt nur grob gerundete Regionen. Keine öffentliche Mail-Adresse, keine exakten Punkte.</p>
+                </div>
+                <div class="community-map-layout">
+                    <div class="community-map-form">
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Anzeigename:</label>
+                                <input type="text" id="communityDisplayName" placeholder="z.B. Simon / OSCI Köln" oninput="syncCommunityMapDraftFromForm()">
+                            </div>
+                            <div class="input-group">
+                                <label>Grobe Region:</label>
+                                <input type="text" id="communityRegionLabel" placeholder="z.B. Raum Köln" oninput="syncCommunityMapDraftFromForm()">
+                            </div>
+                            <div class="input-group">
+                                <label style="display:flex; align-items:center; gap:8px;">
+                                    <input type="checkbox" id="communityVisible" onchange="syncCommunityMapDraftFromForm()" style="width:18px; height:18px; margin:0;">
+                                    Auf Karte sichtbar
+                                </label>
+                            </div>
+                            <div class="input-group">
+                                <label style="display:flex; align-items:center; gap:8px;">
+                                    <input type="checkbox" id="communityContactEnabled" onchange="syncCommunityMapDraftFromForm()" style="width:18px; height:18px; margin:0;">
+                                    Kontaktanfragen erlauben
+                                </label>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Kontakt-Mail für Antworten:</label>
+                            <input type="email" id="communityContactEmail" placeholder="optional, wenn du Kontaktanfragen beantworten willst" oninput="syncCommunityMapDraftFromForm()">
+                        </div>
+                        <div class="community-map-location-box">
+                            <div id="communityLocationSummary" class="tool-result"></div>
+                            <div class="btn-group" style="flex-wrap:wrap;">
+                                <button type="button" class="btn-secondary btn-animated" onclick="useApproxCommunityLocation()">Standort grob vom Gerät übernehmen</button>
+                                <button type="button" class="btn-primary btn-animated" onclick="saveCommunityProfile()">Profil speichern</button>
+                                <button type="button" class="btn-out btn-animated" onclick="hideCommunityProfile()">Aus Karte entfernen</button>
+                            </div>
+                            <details class="community-map-manual">
+                                <summary>Manuell setzen</summary>
+                                <div class="tool-grid">
+                                    <div class="input-group">
+                                        <label>Breitengrad (gerundet):</label>
+                                        <input type="number" id="communityLatitude" step="0.1" placeholder="z.B. 50.9" oninput="updateCommunityLocationSummary()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Längengrad (gerundet):</label>
+                                        <input type="number" id="communityLongitude" step="0.1" placeholder="z.B. 6.9" oninput="updateCommunityLocationSummary()">
+                                    </div>
+                                </div>
+                            </details>
+                            <div id="communityMapStatus" class="hint">Empfohlen: Standort automatisch grob übernehmen und nur die Region freigeben.</div>
+                        </div>
+                    </div>
+                    <div class="community-map-visual">
+                        ${mapSvg}
+                    </div>
+                </div>
+
+                <div class="community-member-list" id="communityMemberList">
+                    ${profiles.length ? profiles.map(profile => `
+                        <div class="community-member-row ${selectedProfile?.user_id === profile.user_id ? 'active' : ''}">
+                            <button type="button" class="community-member-main" onclick="focusCommunityProfile('${profile.user_id}')">
+                                <strong>${escapeHtml(profile.display_name || 'Community')}</strong>
+                                <small>${escapeHtml(profile.region_label || 'Region offen gelassen')} · ${profile.user_id === user.id ? 'dein Eintrag' : (profile.distanceKm !== null ? formatCommunityDistance(profile.distanceKm) : 'ungefähre Region')}</small>
+                            </button>
+                            <div class="community-member-meta">
+                                <span>${profile.contact_enabled ? 'Kontakt anfragbar' : 'ohne Kontakt'}</span>
+                                ${profile.user_id === user.id ? '<span class="community-own-badge">Du</span>' : ''}
+                            </div>
+                        </div>
+                    `).join('') : '<p class="hint">Noch keine sichtbaren Community-Einträge vorhanden.</p>'}
+                </div>
+
+                <div class="community-map-request-grid">
+                    <div class="community-map-request-card">
+                        <strong>Kontaktanfrage senden</strong>
+                        <div class="input-group">
+                            <label>Person:</label>
+                            <select id="communityContactTarget">
+                                <option value="">Bitte wählen ...</option>
+                                ${contactTargets.map(profile => `<option value="${profile.user_id}" ${selectedProfile?.user_id === profile.user_id ? 'selected' : ''}>${escapeHtml(profile.display_name || profile.region_label || 'Community')} · ${escapeHtml(profile.region_label || '')}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Nachricht:</label>
+                            <textarea id="communityContactMessage" placeholder="Hallo, ich komme aus derselben Region und würde mich gern austauschen."></textarea>
+                        </div>
+                        <button type="button" class="btn-secondary btn-animated" onclick="sendCommunityContactRequest()">Kontaktanfrage senden</button>
+                    </div>
+                    <div class="community-map-request-card">
+                        <strong>Eingehende Anfragen</strong>
+                        <div class="community-request-list">
+                            ${incomingRequests.length ? incomingRequests.map(request => `
+                                <div class="community-request-row">
+                                    <div>
+                                        <strong>${escapeHtml(request.sender_display_name || request.sender_email || 'Kontakt')}</strong>
+                                        <small>${formatWarehouseDate(request.created_at)} · ${escapeHtml(request.sender_email || 'ohne Mail')}</small>
+                                        <p>${escapeHtml(request.message || '')}</p>
+                                    </div>
+                                    <div class="community-request-actions">
+                                        ${request.sender_email ? `<a href="mailto:${escapeHtml(request.sender_email)}?subject=${encodeURIComponent('OSCI Motion Community')}" class="btn-secondary">Mail öffnen</a>` : ''}
+                                        <button type="button" class="btn-out btn-animated" onclick="updateCommunityContactRequestStatus('${request.id}', 'closed')">Erledigt</button>
+                                    </div>
+                                </div>
+                            `).join('') : '<p class="hint">Noch keine eingehenden Kontaktanfragen.</p>'}
+                        </div>
+                    </div>
+                </div>
+
+                <details class="community-map-outbox">
+                    <summary>Gesendete Anfragen (${outgoingRequests.length})</summary>
+                    <div class="community-request-list">
+                        ${outgoingRequests.length ? outgoingRequests.map(request => `
+                            <div class="community-request-row compact">
+                                <div>
+                                    <strong>Status: ${escapeHtml(request.status || 'neu')}</strong>
+                                    <small>${formatWarehouseDate(request.created_at)}</small>
+                                    <p>${escapeHtml(request.message || '')}</p>
+                                </div>
+                            </div>
+                        `).join('') : '<p class="hint">Noch keine ausgehenden Kontaktanfragen.</p>'}
+                    </div>
+                </details>
+            </div>
+        `;
+        fillCommunityMapForm(ownProfile);
+        const select = document.getElementById('communityContactTarget');
+        if (select && selectedProfile && selectedProfile.user_id !== user.id && selectedProfile.contact_enabled) {
+            select.value = selectedProfile.user_id;
+        }
+    } catch (err) {
+        if (isCommunitySchemaMissingError(err)) {
+            container.innerHTML = '<p class="hint">Community Map wartet noch auf die Datenbank-Erweiterung. Bitte die neue <code>supabase-sync.sql</code> im Supabase SQL Editor ausführen.</p>';
+            return;
+        }
+        container.innerHTML = `<p class="hint">Community Map konnte nicht geladen werden: ${escapeHtml(err.message || String(err))}</p>`;
+    } finally {
+        communityMapLoading = false;
+    }
+}
+
 function formatWarehouseDate(value) {
     return value ? new Date(value).toLocaleString('de-DE') : 'noch nie';
 }
@@ -1413,9 +2236,12 @@ function renderCurrentWarehouseViews() {
     renderShopLinkSettings();
     renderNachbestellen();
     renderSupabaseSyncSettings();
+    renderAquariumWorkspacePanels();
     renderLogBook();
+    renderDosingContainers();
     initBulkProductSelect();
     updateNotificationStatus();
+    updateTabAccessState();
     clearCRPdfImport();
 }
 
@@ -1544,6 +2370,7 @@ function openQuickActionMenu() {
 }
 
 function openSmartStockModal(action) {
+    if (!requireWarehouseWriteAccess(action === 'in' ? 'Einlagern' : 'Auslagern')) return;
     const visibleItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
@@ -1575,12 +2402,60 @@ function switchWarehouse(id) {
 
     const current = getActiveWarehouse();
     if (current) current.data = db;
+    syncActiveAquariumDataFromDb(false);
     activeWarehouseId = id;
     appState.activeWarehouseId = id;
     const next = getActiveWarehouse();
     next.data = normalizeWarehouseData(next.data);
     db = next.data;
+    overlayActiveAquariumData();
     applyTheme(db.theme || 'default', false);
+    saveDB(false);
+    renderCurrentWarehouseViews();
+    if (WAREHOUSE_WRITE_TAB_IDS.has(getActiveTabId()) && isWarehouseReadOnlyView()) showTab('lager');
+}
+
+function switchAquarium(id) {
+    if (!appState || !appState.aquariums || !appState.aquariums[id] || id === activeAquariumId) {
+        renderAquariumWorkspacePanels();
+        return;
+    }
+    syncActiveAquariumDataFromDb();
+    activeAquariumId = id;
+    appState.activeAquariumId = id;
+    overlayActiveAquariumData();
+    saveDB(false);
+    renderCurrentWarehouseViews();
+}
+
+function createAquarium() {
+    const name = prompt('Name für das neue Aquarium:', `Aquarium ${Object.keys(appState.aquariums || {}).length + 1}`);
+    if (!name || !name.trim()) return;
+    const record = createAquariumRecord(name.trim(), db);
+    appState.aquariums[record.id] = record;
+    switchAquarium(record.id);
+}
+
+function renameAquarium() {
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    const name = prompt('Neuer Name für dieses Aquarium:', aquarium.name);
+    if (!name || !name.trim()) return;
+    aquarium.name = name.trim();
+    saveDB(false);
+    renderAquariumWorkspacePanels();
+}
+
+function deleteAquarium() {
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    const ids = Object.keys(appState.aquariums || {});
+    if (ids.length <= 1) return alert('Es muss mindestens ein Aquarium vorhanden bleiben.');
+    if (!confirm(`Aquarium "${aquarium.name}" wirklich löschen? Logbuch, Messwerte, ToDos und Tool-Daten dieses Aquariums werden entfernt.`)) return;
+    delete appState.aquariums[aquarium.id];
+    activeAquariumId = Object.keys(appState.aquariums)[0];
+    appState.activeAquariumId = activeAquariumId;
+    overlayActiveAquariumData();
     saveDB(false);
     renderCurrentWarehouseViews();
 }
@@ -1629,6 +2504,50 @@ function jsArg(value) {
     return JSON.stringify(value).replace(/'/g, "\\u0027");
 }
 
+function renderAquariumWorkspacePanels() {
+    const aquarium = getActiveAquarium();
+    const options = Object.values(appState?.aquariums || {}).map(entry => `
+        <option value="${entry.id}" ${entry.id === activeAquariumId ? 'selected' : ''}>${escapeHtml(entry.name)}</option>
+    `).join('');
+    const panelHtml = (selectId) => `
+        <div class="aquarium-workspace-head">
+            <div>
+                <span>Aktives Aquarium</span>
+                <strong>${escapeHtml(aquarium?.name || 'Aquarium')}</strong>
+            </div>
+            <div class="aquarium-workspace-actions">
+                <button type="button" onclick="createAquarium()">Neu</button>
+                <button type="button" onclick="renameAquarium()">Umbenennen</button>
+                <button type="button" onclick="deleteAquarium()">Löschen</button>
+            </div>
+        </div>
+        <div class="aquarium-workspace-select">
+            <select id="${selectId}" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln">${options}</select>
+            <small>Tools, Logbuch, ToDos und Messwerte folgen dem Aquarium und nicht dem Lager.</small>
+        </div>
+    `;
+    const toolsPanel = document.getElementById('toolsAquariumPanel');
+    const logbookPanel = document.getElementById('logbookAquariumPanel');
+    if (toolsPanel) toolsPanel.innerHTML = panelHtml('toolsAquariumSelect');
+    if (logbookPanel) logbookPanel.innerHTML = panelHtml('logbookAquariumSelect');
+}
+
+function updateTabAccessState() {
+    const restricted = isWarehouseReadOnlyView();
+    WAREHOUSE_WRITE_TAB_IDS.forEach(tabId => {
+        const button = document.getElementById('tab-' + tabId);
+        if (button) {
+            button.disabled = restricted;
+            button.classList.toggle('nav-tab-disabled', restricted);
+            button.title = restricted ? 'In diesem geteilten Lager nur mit Schreibzugriff verfügbar' : '';
+        }
+        document.querySelectorAll(`.mobile-bottom-nav button[data-tab="${tabId}"]`).forEach(btn => {
+            btn.disabled = restricted;
+            btn.classList.toggle('nav-tab-disabled', restricted);
+        });
+    });
+}
+
 // --- UI / MENÜ STEUERUNG ---
 function toggleMenu() {
     document.getElementById('main-nav').classList.toggle('open');
@@ -1642,6 +2561,10 @@ function selectTab(tabId) {
 }
 
 function showTab(tabId) {
+    if (WAREHOUSE_WRITE_TAB_IDS.has(tabId) && isWarehouseReadOnlyView()) {
+        showToast('Dieses geteilte Lager ist nur lesbar. Für diesen Bereich brauchst du Schreibzugriff.', 'warning', 3600);
+        tabId = 'lager';
+    }
     applyMenuOrder();
     const targetTab = document.getElementById(tabId);
     const targetBtn = document.getElementById('tab-' + tabId);
@@ -2124,7 +3047,7 @@ function getUsageMetrics(itemName) {
     return {
         outCount: outLogs.length,
         totalConsumed,
-        perDay: totalConsumed > 0 ? totalConsumed / daysSinceStart : 0,
+        perDay: 0,
         confidence: outLogs.length > 0 ? 'low' : 'none'
     };
 }
@@ -2852,6 +3775,7 @@ function renderProductCard(cat, item) {
         let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
         crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
     }
+    const readOnlyView = isWarehouseReadOnlyView();
     return `
         <div class="card ${warningClass}">
             <h4>
@@ -2879,8 +3803,10 @@ function renderProductCard(cat, item) {
                 </div>
             </details>
             <div class="btn-group" style="margin-top: 10px;">
-                <button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
-                <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>
+                ${readOnlyView
+                    ? '<button class="btn-secondary" type="button" disabled>Nur Ansicht</button>'
+                    : `<button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
+                <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>`}
             </div>
         </div>
     `;
@@ -3047,7 +3973,7 @@ function renderTraceExportInputs() {
     
     if (katContainer) {
         katContainer.innerHTML = mixDefinitions.kationen.map(item => {
-            let id = 'mix-kat-' + item.replace(/[^a-zA-Z]/g, '');
+            let id = getTraceInputId('kat', item);
             const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
@@ -3062,7 +3988,7 @@ function renderTraceExportInputs() {
     }
     if (anContainer) {
         anContainer.innerHTML = mixDefinitions.anionen.map(item => {
-            let id = 'mix-an-' + item.replace(/[^a-zA-Z]/g, '');
+            let id = getTraceInputId('an', item);
             const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
@@ -3075,6 +4001,25 @@ function renderTraceExportInputs() {
             </div>
         `}).join('');
     }
+    Object.keys(db.traceDraft || {}).forEach(item => {
+        const typ = mixDefinitions.kationen.includes(item) ? 'kat' : 'an';
+        calcTraceGrams(getTraceInputId(typ, item), item);
+    });
+    [...mixDefinitions.kationen, ...mixDefinitions.anionen].forEach(item => {
+        const prefix = mixDefinitions.kationen.includes(item) ? 'kat' : 'an';
+        const input = document.getElementById(getTraceInputId(prefix, item));
+        if (!input || input.dataset.traceBound === 'true') return;
+        input.dataset.traceBound = 'true';
+        input.addEventListener('input', () => updateTraceDraft(getTraceInputId(prefix, item), item));
+        input.addEventListener('change', () => updateTraceDraft(getTraceInputId(prefix, item), item));
+    });
+}
+
+function getTraceInputId(prefix, itemName) {
+    return `mix-${prefix}-` + String(itemName)
+        .replace(/[^\w]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .toLowerCase();
 }
 
 function calcTraceGrams(inputId, itemName) {
@@ -3097,6 +4042,8 @@ function updateTraceDraft(inputId, itemName) {
     calcTraceGrams(inputId, itemName);
     saveDB(false);
 }
+
+window.updateTraceDraft = updateTraceDraft;
 
 const reefManagerSymbolMap = {
     Co: 'Cobalt (Co)',
@@ -3158,6 +4105,7 @@ function importReefManagerTraceText(text) {
     });
     saveDB(false);
     renderTraceExportInputs();
+    rows.forEach(row => calcTraceGrams(getTraceInputId(row.type === 'kation' ? 'kat' : 'an', row.item), row.item));
     previewReefManagerImport(text);
     showToast(`${rows.length} Reef Manager Wert(e) übernommen`, 'success');
 }
@@ -3187,6 +4135,7 @@ function clearReefManagerImport() {
 }
 
 function initTools() {
+    renderAquariumWorkspacePanels();
     const select = document.getElementById('macroRecipeSelect');
     if (select && select.options.length === 0) {
         select.innerHTML = Object.keys(macroRecipes)
@@ -3208,8 +4157,10 @@ function initTools() {
     renderLightPlanner();
     renderFlowCalculator();
     renderOsmoseTank();
+    renderDosingContainers();
     renderPsuCorrectionSettings();
     renderImplementationLog();
+    renderCommunityMapCard();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
     setupToolTiles();
@@ -3942,6 +4893,162 @@ function checkOsmoseTankReminder(trigger = 'auto') {
     saveDB(false);
 }
 
+function getDosingContainers() {
+    if (!db.dosingContainers) db.dosingContainers = [];
+    return db.dosingContainers;
+}
+
+function getDosingDailyUsage(container) {
+    const usage = Math.max(0, parseFloat(container.usage) || 0);
+    return container.usageUnit === 'hour' ? usage * 24 : usage;
+}
+
+function calculateDosingCurrentFromWeight(weight, tare, density, capacity) {
+    const net = Math.max(0, (parseFloat(weight) || 0) - (parseFloat(tare) || 0));
+    const ml = net / Math.max(0.0001, parseFloat(density) || 1);
+    return Math.min(Math.max(0, ml), Math.max(0, parseFloat(capacity) || ml));
+}
+
+function saveDosingContainer() {
+    const name = (document.getElementById('doseContainerName')?.value || '').trim();
+    const capacity = Math.max(0, parseFloat(document.getElementById('doseContainerCapacity')?.value) || 0);
+    const tare = Math.max(0, parseFloat(document.getElementById('doseContainerTare')?.value) || 0);
+    const density = Math.max(0.0001, parseFloat(document.getElementById('doseContainerDensity')?.value) || 1);
+    const weightRaw = document.getElementById('doseContainerWeight')?.value;
+    const manualCurrent = Math.max(0, parseFloat(document.getElementById('doseContainerCurrent')?.value) || 0);
+    const current = weightRaw ? calculateDosingCurrentFromWeight(weightRaw, tare, density, capacity) : Math.min(manualCurrent, capacity || manualCurrent);
+    const usage = Math.max(0, parseFloat(document.getElementById('doseContainerUsage')?.value) || 0);
+    const usageUnit = document.getElementById('doseContainerUsageUnit')?.value === 'hour' ? 'hour' : 'day';
+    const warnHours = Math.max(0, parseFloat(document.getElementById('doseContainerWarnHours')?.value) || 0);
+    if (!name || !capacity) return alert('Bitte Name und Volumen eintragen.');
+    const containers = getDosingContainers();
+    const existing = containers.find(item => item.name.toLowerCase() === name.toLowerCase());
+    const payload = {
+        id: existing?.id || createWarehouseId(),
+        name,
+        capacityMl: capacity,
+        currentMl: current,
+        tareG: tare,
+        density,
+        usage,
+        usageUnit,
+        warnHours,
+        lastFilledAt: existing?.lastFilledAt || null,
+        lastAlertAt: existing?.lastAlertAt || 0,
+        updatedAt: new Date().toISOString()
+    };
+    if (existing) Object.assign(existing, payload);
+    else containers.unshift(payload);
+    saveDB();
+    renderDosingContainers();
+    showToast('Vorratsbehälter gespeichert', 'success');
+}
+
+function fillDosingContainer(id) {
+    const container = getDosingContainers().find(item => item.id === id);
+    if (!container) return;
+    container.currentMl = parseFloat(container.capacityMl) || 0;
+    container.lastFilledAt = new Date().toISOString();
+    container.lastAlertAt = 0;
+    addWarehouseEvent('dose', `Vorratsbehälter gefüllt: ${container.name}`);
+    saveDB();
+    renderDosingContainers();
+    showToast(`${container.name} aufgefüllt`, 'success');
+}
+
+function fillSelectedDosingContainer() {
+    const first = getDosingContainers()[0];
+    if (!first) return alert('Bitte zuerst einen Vorratsbehälter speichern.');
+    fillDosingContainer(first.id);
+}
+
+function editDosingContainer(id) {
+    const container = getDosingContainers().find(item => item.id === id);
+    if (!container) return;
+    const map = {
+        doseContainerName: container.name,
+        doseContainerCapacity: container.capacityMl,
+        doseContainerTare: container.tareG,
+        doseContainerCurrent: container.currentMl,
+        doseContainerDensity: container.density,
+        doseContainerUsage: container.usage,
+        doseContainerUsageUnit: container.usageUnit || 'day',
+        doseContainerWarnHours: container.warnHours
+    };
+    Object.entries(map).forEach(([idKey, value]) => {
+        const el = document.getElementById(idKey);
+        if (el) el.value = value ?? '';
+    });
+    document.getElementById('doseContainerName')?.focus();
+}
+
+function deleteDosingContainer(id) {
+    if (!confirm('Vorratsbehälter löschen?')) return;
+    db.dosingContainers = getDosingContainers().filter(item => item.id !== id);
+    saveDB();
+    renderDosingContainers();
+}
+
+function renderDosingContainers() {
+    const result = document.getElementById('dosingContainerResult');
+    if (!result) return;
+    const containers = getDosingContainers();
+    if (containers.length === 0) {
+        result.innerHTML = '<p class="hint">Noch keine Vorratsbehälter angelegt.</p>';
+        return;
+    }
+    const now = Date.now();
+    result.innerHTML = `
+        <div class="dosing-container-list">
+            ${containers.map(container => {
+                const capacity = parseFloat(container.capacityMl) || 0;
+                const current = Math.max(0, Math.min(parseFloat(container.currentMl) || 0, capacity || parseFloat(container.currentMl) || 0));
+                const daily = getDosingDailyUsage(container);
+                const hoursLeft = daily > 0 ? current / daily * 24 : null;
+                const percent = capacity > 0 ? Math.max(0, Math.min(100, current / capacity * 100)) : 0;
+                const warn = hoursLeft !== null && hoursLeft <= (parseFloat(container.warnHours) || 0);
+                return `
+                    <div class="dosing-container-row ${warn ? 'warning' : ''}">
+                        <div>
+                            <strong>${escapeHtml(container.name)}</strong>
+                            <small>${current.toFixed(1)} / ${capacity.toFixed(1)} ml · ${daily.toFixed(2)} ml/Tag · leer in ${hoursLeft === null ? 'unbekannt' : formatDuration(hoursLeft * 60)}</small>
+                            <div class="mini-progress"><span style="width:${percent}%"></span></div>
+                            <small>Letzte Füllung: ${container.lastFilledAt ? formatWarehouseDate(container.lastFilledAt) : 'noch nie'}${warn ? ' · Warnbereich erreicht' : ''}</small>
+                        </div>
+                        <div class="logbook-actions">
+                            <button onclick="fillDosingContainer('${container.id}')">Auffüllen</button>
+                            <button onclick="editDosingContainer('${container.id}')">Bearbeiten</button>
+                            <button onclick="deleteDosingContainer('${container.id}')" class="btn-out">Löschen</button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function checkDosingContainerReminders(trigger = 'auto') {
+    if (!db || !db.notifications || !db.notifications.enabled) return;
+    let changed = false;
+    const now = Date.now();
+    getDosingContainers().forEach(container => {
+        const daily = getDosingDailyUsage(container);
+        const current = parseFloat(container.currentMl) || 0;
+        if (daily <= 0) return;
+        const hoursLeft = current / daily * 24;
+        const warnHours = parseFloat(container.warnHours) || 0;
+        if (hoursLeft > warnHours) return;
+        if (trigger !== 'manual' && container.lastAlertAt && now - container.lastAlertAt < 24 * 60 * 60 * 1000) return;
+        const title = 'Vorratsbehälter bald leer';
+        const body = `${container.name}: noch ca. ${current.toFixed(1)} ml, reicht etwa ${formatDuration(hoursLeft * 60)}.`;
+        if (db.notifications.inAppOnly || !supportsNotifications() || Notification.permission !== 'granted') showToast(`${title}: ${body}`, 'warning', 6500);
+        else showLocalNotification(title, body);
+        container.lastAlertAt = now;
+        changed = true;
+    });
+    if (changed) saveDB(false);
+}
+
 function renderNutritionCalculator() {
     const result = document.getElementById('nutritionResult');
     if (!result) return;
@@ -4210,10 +5317,366 @@ function ensureLogBookDefaults() {
     if (!db.aquariumTodos) db.aquariumTodos = [];
 }
 
+function getMeasurementTypes() {
+    if (!db.measurementTypes || !Array.isArray(db.measurementTypes) || db.measurementTypes.length === 0) {
+        db.measurementTypes = [
+            { id: 'KH', label: 'KH', unit: 'dKH' },
+            { id: 'CA', label: 'CA', unit: 'mg/l' },
+            { id: 'MG', label: 'MG', unit: 'mg/l' },
+            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
+            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
+        ];
+    }
+    return db.measurementTypes;
+}
+
+function getMeasurementEntries() {
+    if (!db.measurementEntries || !Array.isArray(db.measurementEntries)) db.measurementEntries = [];
+    return db.measurementEntries;
+}
+
+function normalizeMeasurementTypeId(value) {
+    return String(value || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Z0-9_]/g, '') || `TYPE_${Date.now()}`;
+}
+
+function getMeasurementTypeById(typeId) {
+    return getMeasurementTypes().find(type => type.id === typeId) || getMeasurementTypes()[0];
+}
+
+function getSelectedMeasurementTypeId() {
+    const select = document.getElementById('measurementType');
+    const first = getMeasurementTypes()[0];
+    return select?.value || first?.id || 'KH';
+}
+
+function getMeasurementUnit(typeId) {
+    return getMeasurementTypeById(typeId)?.unit || '';
+}
+
+function saveMeasurementEntry(editId = null) {
+    const targetEditId = editId || measurementUiState.editingEntryId || null;
+    const typeId = getSelectedMeasurementTypeId();
+    const valueRaw = parseFloat(document.getElementById('measurementValue')?.value);
+    const dateValue = document.getElementById('measurementDate')?.value;
+    const note = (document.getElementById('measurementNote')?.value || '').trim();
+    if (!Number.isFinite(valueRaw)) return alert('Bitte einen gültigen Messwert eintragen.');
+    const at = dateValue ? new Date(dateValue).toISOString() : new Date().toISOString();
+    if (targetEditId) {
+        const entry = getMeasurementEntries().find(item => item.id === targetEditId);
+        if (!entry) return;
+        Object.assign(entry, {
+            typeId,
+            value: valueRaw,
+            at,
+            note,
+            updatedAt: new Date().toISOString()
+        });
+    } else {
+        getMeasurementEntries().unshift({
+            id: createWarehouseId(),
+            typeId,
+            value: valueRaw,
+            at,
+            note,
+            createdAt: new Date().toISOString()
+        });
+    }
+    measurementUiState.selectedEntryId = targetEditId || getMeasurementEntries()[0]?.id || null;
+    measurementUiState.editingEntryId = null;
+    saveDB();
+    const valueInput = document.getElementById('measurementValue');
+    const dateInput = document.getElementById('measurementDate');
+    const noteInput = document.getElementById('measurementNote');
+    if (valueInput) valueInput.value = '';
+    if (noteInput) noteInput.value = '';
+    if (dateInput) dateInput.value = formatDateTimeLocal();
+    renderMeasurementTracker();
+}
+
+function addMeasurementType() {
+    const label = (prompt('Name der Messwert-Art:', '') || '').trim();
+    if (!label) return;
+    const unit = (prompt('Einheit für diesen Wert:', 'mg/l') || '').trim();
+    const id = normalizeMeasurementTypeId(label);
+    if (getMeasurementTypes().some(type => type.id === id || type.label.toLowerCase() === label.toLowerCase())) {
+        return alert('Diese Messwert-Art existiert bereits.');
+    }
+    getMeasurementTypes().push({ id, label, unit: unit || 'mg/l' });
+    saveDB();
+    renderMeasurementTracker(id);
+}
+
+function editMeasurementType(typeId) {
+    const type = getMeasurementTypeById(typeId);
+    if (!type) return;
+    const nextLabel = (prompt('Name der Messwert-Art:', type.label) || '').trim();
+    if (!nextLabel) return;
+    const nextUnit = (prompt('Einheit:', type.unit || '') || '').trim();
+    type.label = nextLabel;
+    type.unit = nextUnit;
+    saveDB();
+    renderMeasurementTracker(type.id);
+}
+
+function deleteMeasurementType(typeId) {
+    const type = getMeasurementTypeById(typeId);
+    if (!type) return;
+    const protectedTypes = ['KH', 'CA', 'MG', 'PO4', 'NO3'];
+    if (protectedTypes.includes(type.id)) {
+        return alert('Die Standard-Messwert-Arten bleiben erhalten.');
+    }
+    if (!confirm(`Messwert-Art "${type.label}" inklusive aller Messungen löschen?`)) return;
+    db.measurementTypes = getMeasurementTypes().filter(item => item.id !== typeId);
+    db.measurementEntries = getMeasurementEntries().filter(entry => entry.typeId !== typeId);
+    if (measurementUiState.selectedEntryId && !db.measurementEntries.some(entry => entry.id === measurementUiState.selectedEntryId)) {
+        measurementUiState.selectedEntryId = null;
+    }
+    saveDB();
+    renderMeasurementTracker();
+}
+
+function editMeasurementEntry(entryId) {
+    const entry = getMeasurementEntries().find(item => item.id === entryId);
+    if (!entry) return;
+    const typeSelect = document.getElementById('measurementType');
+    const valueInput = document.getElementById('measurementValue');
+    const dateInput = document.getElementById('measurementDate');
+    const noteInput = document.getElementById('measurementNote');
+    if (typeSelect) typeSelect.value = entry.typeId;
+    if (valueInput) valueInput.value = String(entry.value);
+    if (dateInput) dateInput.value = formatDateTimeLocal(entry.at);
+    if (noteInput) noteInput.value = entry.note || '';
+    measurementUiState.selectedEntryId = entry.id;
+    measurementUiState.editingEntryId = entry.id;
+    renderMeasurementTracker(entry.typeId);
+}
+
+function deleteMeasurementEntry(entryId) {
+    if (!confirm('Messwert löschen?')) return;
+    db.measurementEntries = getMeasurementEntries().filter(entry => entry.id !== entryId);
+    if (measurementUiState.selectedEntryId === entryId) measurementUiState.selectedEntryId = null;
+    if (measurementUiState.editingEntryId === entryId) measurementUiState.editingEntryId = null;
+    saveDB();
+    renderMeasurementTracker();
+}
+
+function selectMeasurementEntry(entryId) {
+    measurementUiState.selectedEntryId = entryId;
+    renderMeasurementTracker();
+}
+
+function renderMeasurementTracker(forceTypeId = null) {
+    const container = document.getElementById('measurementTracker');
+    const typeSelect = document.getElementById('measurementType');
+    const rangeSelect = document.getElementById('measurementRange');
+    const dateInput = document.getElementById('measurementDate');
+    if (!container || !typeSelect || !rangeSelect) return;
+
+    const types = getMeasurementTypes();
+    const currentType = forceTypeId || typeSelect.value || types[0]?.id || 'KH';
+    typeSelect.innerHTML = types.map(type => `<option value="${type.id}">${escapeHtml(type.label)}${type.unit ? ` (${escapeHtml(type.unit)})` : ''}</option>`).join('');
+    typeSelect.value = currentType;
+    if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
+
+    const unit = getMeasurementUnit(currentType);
+    const rangeValue = rangeSelect.value || '30';
+    const allEntries = getMeasurementEntries()
+        .filter(entry => entry.typeId === currentType)
+        .slice()
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+
+    const now = Date.now();
+    const rangeDays = rangeValue === 'all' ? null : parseInt(rangeValue, 10);
+    const visibleEntries = allEntries.filter(entry => {
+        if (!rangeDays) return true;
+        return now - new Date(entry.at).getTime() <= rangeDays * 24 * 60 * 60 * 1000;
+    });
+
+    if (!measurementUiState.selectedEntryId || !visibleEntries.some(entry => entry.id === measurementUiState.selectedEntryId)) {
+        measurementUiState.selectedEntryId = visibleEntries[visibleEntries.length - 1]?.id || allEntries[allEntries.length - 1]?.id || null;
+    }
+
+    const selectedEntry = visibleEntries.find(entry => entry.id === measurementUiState.selectedEntryId)
+        || allEntries.find(entry => entry.id === measurementUiState.selectedEntryId)
+        || visibleEntries[visibleEntries.length - 1]
+        || null;
+
+    const latest = visibleEntries[visibleEntries.length - 1] || null;
+    const first = visibleEntries[0] || null;
+    const valueDelta = latest && first ? latest.value - first.value : 0;
+    const percentDelta = first && Math.abs(first.value) > 0.000001 ? (valueDelta / first.value) * 100 : 0;
+    const spanDays = latest && first ? Math.max(1 / 24, (new Date(latest.at) - new Date(first.at)) / (24 * 60 * 60 * 1000)) : 0;
+    const dailyTrend = spanDays ? valueDelta / spanDays : 0;
+    const forecastDays = 7;
+    const forecastValue = latest ? latest.value + dailyTrend * forecastDays : null;
+    const avg = visibleEntries.length ? visibleEntries.reduce((sum, entry) => sum + entry.value, 0) / visibleEntries.length : 0;
+    const deviationAbs = latest ? latest.value - avg : 0;
+    const deviationPct = avg ? (deviationAbs / avg) * 100 : 0;
+
+    if (visibleEntries.length === 0) {
+        const currentTypeMeta = getMeasurementTypeById(currentType);
+        container.innerHTML = `
+            <div class="measurement-empty">
+                <strong>${escapeHtml(currentTypeMeta?.label || currentType)}</strong>
+                <p class="hint">Noch keine Messwerte gespeichert. Trage den ersten Wert ein, dann erscheint hier automatisch der Verlauf.</p>
+                <div class="measurement-type-actions">
+                    <button class="btn-secondary btn-animated" onclick="editMeasurementType('${currentType}')">Messwert-Art bearbeiten</button>
+                    <button class="btn-out btn-animated" onclick="deleteMeasurementType('${currentType}')">Messwert-Art löschen</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const values = visibleEntries.map(entry => entry.value);
+    const minValue = Math.min(...values);
+    const maxValue = Math.max(...values);
+    const spread = Math.max(0.001, maxValue - minValue);
+    const isCompactMeasurementView = window.innerWidth <= 640;
+    const chartWidth = isCompactMeasurementView ? 420 : 680;
+    const chartHeight = isCompactMeasurementView ? 290 : 250;
+    const paddingLeft = isCompactMeasurementView ? 46 : 64;
+    const paddingRight = isCompactMeasurementView ? 14 : 20;
+    const paddingTop = isCompactMeasurementView ? 16 : 18;
+    const paddingBottom = isCompactMeasurementView ? 42 : 34;
+    const usableWidth = chartWidth - paddingLeft - paddingRight;
+    const usableHeight = chartHeight - paddingTop - paddingBottom;
+    const points = visibleEntries.map((entry, index) => {
+        const x = visibleEntries.length === 1
+            ? chartWidth / 2
+            : paddingLeft + (usableWidth * index) / (visibleEntries.length - 1);
+        const y = paddingTop + usableHeight - (((entry.value - minValue) / spread) * usableHeight);
+        return { ...entry, x, y };
+    });
+    const pathD = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+    const chartFloor = chartHeight - paddingBottom;
+    const areaD = `${pathD} L ${points[points.length - 1].x.toFixed(2)} ${chartFloor.toFixed(2)} L ${points[0].x.toFixed(2)} ${chartFloor.toFixed(2)} Z`;
+    const selectedDetail = selectedEntry || latest;
+    const rangeLabel = rangeValue === 'all' ? 'gesamter Verlauf' : `${rangeValue} Tage`;
+    const typeMeta = getMeasurementTypeById(currentType);
+    const selectedPoint = points.find(point => point.id === selectedDetail?.id) || points[points.length - 1];
+    const xLabelIndexes = isCompactMeasurementView
+        ? new Set([0, points.length - 1])
+        : new Set([0, points.length - 1, Math.round((points.length - 1) / 2)]);
+    const yMarkers = [
+        { value: maxValue, y: paddingTop },
+        { value: minValue + spread / 2, y: paddingTop + usableHeight / 2 },
+        { value: minValue, y: chartFloor }
+    ];
+
+    container.innerHTML = `
+        <div class="measurement-panel">
+            <div class="measurement-stats">
+                <div>
+                    <strong>${latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</strong>
+                    <span>Aktueller Wert</span>
+                </div>
+                <div>
+                    <strong>${dailyTrend >= 0 ? '+' : ''}${dailyTrend.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}/Tag</strong>
+                    <span>Trend in ${escapeHtml(rangeLabel)}</span>
+                </div>
+                <div>
+                    <strong>${forecastValue === null ? '-' : `${forecastValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}`}</strong>
+                    <span>Prognose in 7 Tagen</span>
+                </div>
+                <div>
+                    <strong>${deviationAbs >= 0 ? '+' : ''}${deviationAbs.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)} / ${deviationPct >= 0 ? '+' : ''}${deviationPct.toFixed(1)}%</strong>
+                    <span>Abweichung vom Mittelwert</span>
+                </div>
+            </div>
+            <div class="measurement-chart-card">
+                <div class="measurement-chart-head">
+                    <div>
+                        <strong>${escapeHtml(typeMeta.label)}</strong>
+                        <small>${visibleEntries.length} Messung(en) im gewählten Zeitraum</small>
+                    </div>
+                    <div class="measurement-type-actions">
+                        <button class="btn-secondary btn-animated" onclick="editMeasurementType('${currentType}')">Art bearbeiten</button>
+                        <button class="btn-out btn-animated" onclick="deleteMeasurementType('${currentType}')">Art löschen</button>
+                    </div>
+                </div>
+                <svg class="measurement-chart ${isCompactMeasurementView ? 'compact' : ''}" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Messwert Verlauf">
+                    <defs>
+                        <linearGradient id="measurementFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.32"></stop>
+                            <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.02"></stop>
+                        </linearGradient>
+                        <linearGradient id="measurementLineGlow" x1="0" y1="0" x2="1" y2="0">
+                            <stop offset="0%" stop-color="var(--secondary)" stop-opacity="0.9"></stop>
+                            <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.95"></stop>
+                        </linearGradient>
+                    </defs>
+                    ${yMarkers.map(marker => `
+                        <line x1="${paddingLeft}" y1="${marker.y}" x2="${chartWidth - paddingRight}" y2="${marker.y}" class="measurement-grid-line"></line>
+                        <text x="${paddingLeft - 10}" y="${marker.y + 4}" text-anchor="end" class="measurement-y-label">${marker.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</text>
+                    `).join('')}
+                    <line x1="${paddingLeft}" y1="${chartFloor}" x2="${chartWidth - paddingRight}" y2="${chartFloor}" class="measurement-axis"></line>
+                    <line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${chartFloor}" class="measurement-axis"></line>
+                    <line x1="${selectedPoint.x}" y1="${paddingTop}" x2="${selectedPoint.x}" y2="${chartFloor}" class="measurement-focus-line"></line>
+                    <path d="${areaD}" class="measurement-area"></path>
+                    <path d="${pathD}" class="measurement-line"></path>
+                    ${points.map(point => `
+                        <g class="measurement-point-group ${selectedDetail?.id === point.id ? 'active' : ''}" onclick="selectMeasurementEntry('${point.id}')">
+                            <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 14 : 11}" class="measurement-point-hit"></circle>
+                            <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 15 : 11}" class="measurement-point-halo"></circle>
+                            <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 8.6 : 6.5}" class="measurement-point-ring"></circle>
+                            <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 5.4 : 4.2}" class="measurement-point"></circle>
+                        </g>
+                    `).join('')}
+                    ${points.filter((_, index) => xLabelIndexes.has(index)).map(point => `
+                        <text x="${point.x}" y="${chartHeight - 10}" text-anchor="middle" class="measurement-label">${escapeHtml(new Date(point.at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}</text>
+                    `).join('')}
+                </svg>
+                <div class="measurement-chart-meta">
+                    <span>Min: ${minValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
+                    <span>Mittel: ${avg.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
+                    <span>Max: ${maxValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
+                </div>
+            </div>
+            <div class="measurement-detail-card">
+                <strong>Ausgewählte Messung</strong>
+                <small>${selectedDetail ? formatWarehouseDate(selectedDetail.at) : '-'}</small>
+                <div class="measurement-detail-value">${selectedDetail ? `${selectedDetail.value.toFixed(3).replace(/\.?0+$/, '')} ${unit}` : '-'}</div>
+                <p>${selectedDetail?.note ? escapeHtml(selectedDetail.note) : 'Keine zusätzliche Notiz gespeichert.'}</p>
+                ${selectedDetail ? `
+                    <div class="measurement-detail-actions">
+                        <button onclick="editMeasurementEntry('${selectedDetail.id}')">Eintrag laden</button>
+                        <button onclick="deleteMeasurementEntry('${selectedDetail.id}')" class="btn-out">Löschen</button>
+                    </div>
+                ` : ''}
+            </div>
+            <div class="measurement-list">
+                ${(visibleEntries.slice().reverse().slice(0, 8)).map(entry => `
+                    <div class="measurement-list-row ${selectedDetail?.id === entry.id ? 'active' : ''}">
+                        <button class="measurement-list-button" onclick="selectMeasurementEntry('${entry.id}')">
+                            <strong>${entry.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</strong>
+                            <small>${formatWarehouseDate(entry.at)}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}</small>
+                        </button>
+                        <div class="logbook-actions">
+                            <button onclick="editMeasurementEntry('${entry.id}')">Laden</button>
+                            <button onclick="deleteMeasurementEntry('${entry.id}')" class="btn-out">Löschen</button>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            ${measurementUiState.editingEntryId ? '<p class="hint">Bearbeitungsmodus aktiv: Nach dem Speichern wird der geladene Messwert aktualisiert.</p>' : ''}
+        </div>
+    `;
+}
+
 function renderLogBook() {
+    renderAquariumWorkspacePanels();
     ensureLogBookDefaults();
     const categorySelect = document.getElementById('logBookCategory');
     const todoCategory = document.getElementById('todoCategory');
+    const measurementType = document.getElementById('measurementType');
+    const measurementRange = document.getElementById('measurementRange');
+    const measurementDate = document.getElementById('measurementDate');
+    const filterSelect = document.getElementById('logBookFilterCategory');
     const dateInput = document.getElementById('logBookDate');
     const dueInput = document.getElementById('todoDueAt');
     const entryCount = document.getElementById('logBookEntryCount');
@@ -4222,6 +5685,18 @@ function renderLogBook() {
     const options = db.logBookCategories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
     if (categorySelect) categorySelect.innerHTML = options;
     if (todoCategory) todoCategory.innerHTML = options;
+    if (filterSelect) {
+        const currentFilter = filterSelect.value || 'all';
+        filterSelect.innerHTML = `<option value="all">Alle Kategorien</option>${options}`;
+        filterSelect.value = (currentFilter === 'all' || db.logBookCategories.includes(currentFilter)) ? currentFilter : 'all';
+    }
+    if (measurementType) {
+        const currentType = measurementType.value || getMeasurementTypes()[0]?.id || 'KH';
+        measurementType.innerHTML = getMeasurementTypes().map(type => `<option value="${type.id}">${escapeHtml(type.label)}${type.unit ? ` (${escapeHtml(type.unit)})` : ''}</option>`).join('');
+        measurementType.value = getMeasurementTypes().some(type => type.id === currentType) ? currentType : (getMeasurementTypes()[0]?.id || 'KH');
+    }
+    if (measurementRange && !measurementRange.value) measurementRange.value = '30';
+    if (measurementDate && !measurementDate.value) measurementDate.value = formatDateTimeLocal();
     if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
     if (dueInput && !dueInput.value) dueInput.value = formatDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
     const todos = db.aquariumTodos || [];
@@ -4233,6 +5708,7 @@ function renderLogBook() {
     renderLogBookCategories();
     renderLogBookEntries();
     renderAquariumTodos();
+    renderMeasurementTracker();
 }
 
 function addLogBookCategory() {
@@ -4364,9 +5840,12 @@ function deleteLogBookEntry(id) {
 function renderLogBookEntries() {
     const container = document.getElementById('log-book-list');
     if (!container) return;
-    const entries = (db.logBookEntries || []).slice(0, 80);
+    const filter = document.getElementById('logBookFilterCategory')?.value || 'all';
+    const entries = (db.logBookEntries || [])
+        .filter(entry => filter === 'all' || (entry.category || 'Sonstiges') === filter)
+        .slice(0, 80);
     if (entries.length === 0) {
-        container.innerHTML = '<p class="hint">Noch keine Logbuch-Einträge.</p>';
+        container.innerHTML = `<p class="hint">${filter === 'all' ? 'Noch keine Logbuch-Einträge.' : 'Für diese Kategorie gibt es noch keine Einträge.'}</p>`;
         return;
     }
     container.innerHTML = entries.map(entry => `
@@ -4873,6 +6352,7 @@ function renderLogs() {
 
 // --- MODAL & EINGABELOGIK ---
 function openModal(cat, item, action) {
+    if (!requireWarehouseWriteAccess(action === 'in' ? 'Einlagern' : 'Auslagern')) return;
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
@@ -4952,7 +6432,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
     toggleCustomProductUnitFields();
     initBulkProductSelect();
-    detectSupabasePasswordRecovery();
+    renderOtpCooldownState();
+    setTimeout(() => autoSyncWarehousesOnStartup(), 900);
 });
 
 function closeModal() { document.getElementById('modal').style.display = 'none'; }
@@ -4965,6 +6446,7 @@ function showHelp(topic) {
 }
 
 function executeAction() {
+    if (!requireWarehouseWriteAccess('Diese Lagerbuchung')) return;
     let rawAmount = parseFloat(document.getElementById('amount').value);
     let unit = document.getElementById('unitSelect').value;
     let { cat, item, action } = currentAction;
@@ -5775,6 +7257,7 @@ function auslagernMischung(typ) {
 }
 
 function executeQueueWithConflictHandling(queue, index) {
+    if (!requireWarehouseWriteAccess('Diese Lagerbuchung')) return;
     if (index >= queue.length) {
         saveDB();
         const pasteArea = document.getElementById('cr-paste-area');
@@ -6072,6 +7555,7 @@ function updateBulkTaraPreview() {
 }
 
 function addToBulkCart() {
+    if (!requireWarehouseWriteAccess('Wareneingang')) return;
     const productDataRaw = document.getElementById('bulkProductSelect').value;
     const unit = document.getElementById('bulkUnitSelect').value;
     const amountRaw = parseFloat(document.getElementById('bulkAmount').value);
@@ -6136,6 +7620,7 @@ function renderBulkCart() {
 }
 
 function submitBulkCart() {
+    if (!requireWarehouseWriteAccess('Wareneingang')) return;
     if (bulkCart.length === 0) return;
     
     if (!confirm(`${bulkCart.length} Positionen jetzt final in das Lager einbuchen?`)) return;
@@ -6714,8 +8199,10 @@ setInterval(checkForAppUpdate, 30 * 60 * 1000);
 setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
 setTimeout(checkTodoReminders, 1500);
 setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
+setTimeout(() => checkDosingContainerReminders('startup'), 2300);
 setInterval(checkTodoReminders, 60 * 1000);
 setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
+setInterval(checkDosingContainerReminders, 60 * 60 * 1000);
 
 window.addEventListener('hashchange', () => {
     const hashTab = decodeURIComponent(window.location.hash.slice(1));

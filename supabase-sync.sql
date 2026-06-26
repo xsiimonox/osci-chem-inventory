@@ -263,4 +263,145 @@ grant execute on function public.set_warehouse_owner() to authenticated;
 grant execute on function public.upsert_warehouse_data(uuid, text, jsonb) to authenticated;
 grant execute on function public.list_accessible_warehouses() to authenticated;
 
+create table if not exists public.community_profiles (
+    user_id uuid primary key references auth.users(id) on delete cascade,
+    display_name text not null default 'Community',
+    region_label text not null default 'Privat',
+    approx_lat numeric(5,2),
+    approx_lng numeric(6,2),
+    is_visible boolean not null default false,
+    contact_enabled boolean not null default false,
+    contact_email text,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table if not exists public.community_contact_requests (
+    id uuid primary key default gen_random_uuid(),
+    sender_user_id uuid not null references auth.users(id) on delete cascade,
+    recipient_user_id uuid not null references auth.users(id) on delete cascade,
+    sender_email text,
+    sender_display_name text,
+    message text not null,
+    status text not null default 'new' check (status in ('new', 'closed')),
+    created_at timestamptz not null default now()
+);
+
+alter table public.community_profiles enable row level security;
+alter table public.community_contact_requests enable row level security;
+
+drop policy if exists "public community profiles are visible" on public.community_profiles;
+drop policy if exists "users can insert own community profile" on public.community_profiles;
+drop policy if exists "users can update own community profile" on public.community_profiles;
+drop policy if exists "users can delete own community profile" on public.community_profiles;
+drop policy if exists "community request parties can read" on public.community_contact_requests;
+drop policy if exists "users can create contact requests" on public.community_contact_requests;
+drop policy if exists "recipients can close contact requests" on public.community_contact_requests;
+
+drop trigger if exists set_community_profile_updated_at on public.community_profiles;
+drop trigger if exists set_community_request_sender_before_insert on public.community_contact_requests;
+
+drop function if exists public.touch_community_profile_updated_at();
+drop function if exists public.set_community_request_sender();
+
+create or replace function public.touch_community_profile_updated_at()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    new.updated_at := now();
+    return new;
+end;
+$$;
+
+create or replace function public.set_community_request_sender()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    new.sender_user_id := auth.uid();
+    select
+        coalesce(nullif(cp.contact_email, ''), public.current_user_email()),
+        cp.display_name
+    into new.sender_email, new.sender_display_name
+    from public.community_profiles cp
+    where cp.user_id = auth.uid()
+    limit 1;
+    if new.sender_email is null then
+        new.sender_email := public.current_user_email();
+    end if;
+    return new;
+end;
+$$;
+
+create trigger set_community_profile_updated_at
+before update on public.community_profiles
+for each row
+execute function public.touch_community_profile_updated_at();
+
+create trigger set_community_request_sender_before_insert
+before insert on public.community_contact_requests
+for each row
+execute function public.set_community_request_sender();
+
+create policy "public community profiles are visible"
+on public.community_profiles
+for select
+to authenticated
+using (is_visible = true or user_id = auth.uid());
+
+create policy "users can insert own community profile"
+on public.community_profiles
+for insert
+to authenticated
+with check (user_id = auth.uid());
+
+create policy "users can update own community profile"
+on public.community_profiles
+for update
+to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+create policy "users can delete own community profile"
+on public.community_profiles
+for delete
+to authenticated
+using (user_id = auth.uid());
+
+create policy "community request parties can read"
+on public.community_contact_requests
+for select
+to authenticated
+using (sender_user_id = auth.uid() or recipient_user_id = auth.uid());
+
+create policy "users can create contact requests"
+on public.community_contact_requests
+for insert
+to authenticated
+with check (
+    sender_user_id = auth.uid()
+    and recipient_user_id <> auth.uid()
+    and exists (
+        select 1
+        from public.community_profiles cp
+        where cp.user_id = recipient_user_id
+          and cp.contact_enabled = true
+    )
+);
+
+create policy "recipients can close contact requests"
+on public.community_contact_requests
+for update
+to authenticated
+using (recipient_user_id = auth.uid())
+with check (recipient_user_id = auth.uid());
+
+grant execute on function public.touch_community_profile_updated_at() to authenticated;
+grant execute on function public.set_community_request_sender() to authenticated;
+
 notify pgrst, 'reload schema';

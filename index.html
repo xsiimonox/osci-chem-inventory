@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>OSCI Motion Inventory</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=2.3.3">
+    <link rel="stylesheet" href="style.css?v=2.3.9">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
@@ -15,7 +15,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>OSCI Motion</h1>
-                <span class="version-badge">v2.3.3</span>
+                <span class="version-badge">v2.3.9</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -143,6 +143,7 @@
 
         <div id="tools" class="tab-content">
             <div class="tools-shell">
+                <div class="card aquarium-workspace-panel" id="toolsAquariumPanel"></div>
                 <div class="tools-command-bar">
                     <div class="tools-search-wrap">
                         <span aria-hidden="true">⌕</span>
@@ -565,6 +566,7 @@
                             </div>
                             <div id="osmoseTankResult"></div>
                         </div>
+
                     </div>
                 </details>
 
@@ -588,6 +590,13 @@
                                 </a>
                             </div>
                         </div>
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" id="communityMapCardWrap">
+                            <h3>Community Map <button type="button" class="tool-inline-fav" data-tool-id="community-map">☆ Fav</button></h3>
+                            <p class="hint">Freiwillige Community-Karte mit grob gerundeten Regionen und geschützter Kontaktaufnahme.</p>
+                            <div id="communityMapCard">
+                                <p class="hint">Community Map wird geladen...</p>
+                            </div>
+                        </div>
                     </div>
                 </details>
             </div>
@@ -605,38 +614,91 @@
                     <div><strong id="todoDueCount">0</strong><span>fällig</span></div>
                 </div>
             </div>
+            <div class="card aquarium-workspace-panel aquarium-workspace-panel-logbook" id="logbookAquariumPanel"></div>
 
             <div class="logbook-layout">
-            <div class="card logbook-card logbook-document-card">
-                <div class="logbook-section-title">
-                    <h3>Eintrag dokumentieren</h3>
-                    <span>Log</span>
-                </div>
-                <div class="tool-grid">
-                    <div class="input-group">
-                        <label>Kategorie:</label>
-                        <select id="logBookCategory"></select>
-                    </div>
-                    <div class="input-group">
-                        <label>Titel:</label>
-                        <input type="text" id="logBookTitle" placeholder="z.B. PO4 angepasst, Abschäumer gereinigt">
-                    </div>
-                    <div class="input-group">
-                        <label>Datum/Uhrzeit:</label>
-                        <input type="datetime-local" id="logBookDate">
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label>Notiz:</label>
-                    <textarea id="logBookNote" placeholder="Was wurde gemacht? Welche Werte, Beobachtungen oder nächsten Schritte sind wichtig?"></textarea>
-                </div>
-                <button class="btn-primary btn-animated logbook-primary-action" onclick="saveLogBookEntry()">Log speichern</button>
-                <details class="logbook-list-details">
+            <div class="card logbook-card measurement-card">
+                <details class="logbook-card-details">
                     <summary class="logbook-summary">
-                        <span>Dokumentation anzeigen</span>
+                        <span>Messwerte</span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
-                    <div id="log-book-list"></div>
+                    <div class="logbook-card-body">
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Wert:</label>
+                                <select id="measurementType" onchange="renderMeasurementTracker()"></select>
+                            </div>
+                            <div class="input-group">
+                                <label>Messwert:</label>
+                                <input type="number" id="measurementValue" step="0.001" placeholder="z.B. 7.8">
+                            </div>
+                            <div class="input-group">
+                                <label>Datum/Uhrzeit:</label>
+                                <input type="datetime-local" id="measurementDate">
+                            </div>
+                            <div class="input-group">
+                                <label>Zeitraum:</label>
+                                <select id="measurementRange" onchange="renderMeasurementTracker()">
+                                    <option value="14">14 Tage</option>
+                                    <option value="30" selected>30 Tage</option>
+                                    <option value="90">90 Tage</option>
+                                    <option value="365">1 Jahr</option>
+                                    <option value="all">Alles</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Notiz:</label>
+                            <input type="text" id="measurementNote" placeholder="Optional: Test, ICP, Dosierung, Beobachtung">
+                        </div>
+                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="btn-primary btn-animated" onclick="saveMeasurementEntry()">Messwert speichern</button>
+                            <button class="btn-secondary btn-animated" onclick="addMeasurementType()">Messwert-Art hinzufügen</button>
+                        </div>
+                        <div id="measurementTracker"></div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="card logbook-card logbook-document-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Eintrag dokumentieren</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Kategorie:</label>
+                                <select id="logBookCategory"></select>
+                            </div>
+                            <div class="input-group">
+                                <label>Titel:</label>
+                                <input type="text" id="logBookTitle" placeholder="z.B. PO4 angepasst, Abschäumer gereinigt">
+                            </div>
+                            <div class="input-group">
+                                <label>Datum/Uhrzeit:</label>
+                                <input type="datetime-local" id="logBookDate">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Notiz:</label>
+                            <textarea id="logBookNote" placeholder="Was wurde gemacht? Welche Werte, Beobachtungen oder nächsten Schritte sind wichtig?"></textarea>
+                        </div>
+                        <button class="btn-primary btn-animated logbook-primary-action" onclick="saveLogBookEntry()">Log speichern</button>
+                        <details class="logbook-list-details">
+                            <summary class="logbook-summary">
+                                <span>Dokumentation anzeigen</span>
+                                <span class="settings-accordion-hint" aria-hidden="true"></span>
+                            </summary>
+                            <div class="input-group logbook-filter">
+                                <label>Nach Kategorie filtern:</label>
+                                <select id="logBookFilterCategory" onchange="renderLogBookEntries()"></select>
+                            </div>
+                            <div id="log-book-list"></div>
+                        </details>
+                    </div>
                 </details>
             </div>
 
@@ -656,51 +718,112 @@
             </div>
 
             <div class="card logbook-card logbook-todo-card">
-                <div class="logbook-section-title">
-                    <h3>ToDo &amp; Erinnerungen</h3>
-                    <span>Plan</span>
-                </div>
-                <div class="tool-grid">
-                    <div class="input-group">
-                        <label>Aufgabe:</label>
-                        <input type="text" id="todoTitle" placeholder="z.B. KH messen, Filtervlies prüfen">
-                    </div>
-                    <div class="input-group">
-                        <label>Kategorie:</label>
-                        <select id="todoCategory"></select>
-                    </div>
-                    <div class="input-group">
-                        <label>Fällig am:</label>
-                        <input type="datetime-local" id="todoDueAt">
-                    </div>
-                    <div class="input-group">
-                        <label>Intervall:</label>
-                        <input type="hidden" id="todoInterval" value="7">
-                        <div class="interval-picker" id="todoIntervalPicker">
-                            <button type="button" onclick="setTodoInterval(0)">Einmalig</button>
-                            <button type="button" onclick="setTodoInterval(1)">1 Tag</button>
-                            <button type="button" onclick="setTodoInterval(2)">2 Tage</button>
-                            <button type="button" onclick="setTodoInterval(3)">3 Tage</button>
-                            <button type="button" onclick="setTodoInterval(7)">7 Tage</button>
-                            <button type="button" onclick="setTodoInterval(14)">14 Tage</button>
-                            <button type="button" onclick="setTodoInterval(30)">30 Tage</button>
-                            <button type="button" onclick="setTodoInterval(90)">90 Tage</button>
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>ToDo &amp; Erinnerungen</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Aufgabe:</label>
+                                <input type="text" id="todoTitle" placeholder="z.B. KH messen, Filtervlies prüfen">
+                            </div>
+                            <div class="input-group">
+                                <label>Kategorie:</label>
+                                <select id="todoCategory"></select>
+                            </div>
+                            <div class="input-group">
+                                <label>Fällig am:</label>
+                                <input type="datetime-local" id="todoDueAt">
+                            </div>
+                            <div class="input-group">
+                                <label>Intervall:</label>
+                                <input type="hidden" id="todoInterval" value="7">
+                                <div class="interval-picker" id="todoIntervalPicker">
+                                    <button type="button" onclick="setTodoInterval(0)">Einmalig</button>
+                                    <button type="button" onclick="setTodoInterval(1)">1 Tag</button>
+                                    <button type="button" onclick="setTodoInterval(2)">2 Tage</button>
+                                    <button type="button" onclick="setTodoInterval(3)">3 Tage</button>
+                                    <button type="button" onclick="setTodoInterval(7)">7 Tage</button>
+                                    <button type="button" onclick="setTodoInterval(14)">14 Tage</button>
+                                    <button type="button" onclick="setTodoInterval(30)">30 Tage</button>
+                                    <button type="button" onclick="setTodoInterval(90)">90 Tage</button>
+                                </div>
+                                <input type="number" id="todoIntervalCustom" min="0" step="1" placeholder="Eigene Tage" oninput="setTodoInterval(this.value)">
+                                <div id="todoIntervalLabel" class="tool-result">Alle 7 Tage</div>
+                            </div>
+                            <div class="input-group">
+                                <label style="display:flex; align-items:center; gap:8px;">
+                                    <input type="checkbox" id="todoNotifyEnabled" checked style="width:18px; height:18px; margin:0;">
+                                    Für dieses ToDo erinnern
+                                </label>
+                            </div>
                         </div>
-                        <input type="number" id="todoIntervalCustom" min="0" step="1" placeholder="Eigene Tage" oninput="setTodoInterval(this.value)">
-                        <div id="todoIntervalLabel" class="tool-result">Alle 7 Tage</div>
+                        <div class="btn-group" style="flex-wrap:wrap;">
+                            <button class="btn-secondary btn-animated" onclick="saveAquariumTodo()" style="flex:1;">ToDo speichern</button>
+                            <button class="btn-in btn-animated" onclick="enableStockNotifications()" style="flex:1;">Push aktivieren</button>
+                        </div>
+                        <div id="aquarium-todo-list"></div>
                     </div>
-                    <div class="input-group">
-                        <label style="display:flex; align-items:center; gap:8px;">
-                            <input type="checkbox" id="todoNotifyEnabled" checked style="width:18px; height:18px; margin:0;">
-                            Für dieses ToDo erinnern
-                        </label>
+                </details>
+            </div>
+
+            <div class="card logbook-card logbook-dosing-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Vorratsbehälter</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Name:</label>
+                                <input type="text" id="doseContainerName" placeholder="z.B. KH Tag">
+                            </div>
+                            <div class="input-group">
+                                <label>Volumen (ml):</label>
+                                <input type="number" id="doseContainerCapacity" min="1" step="1" value="1000">
+                            </div>
+                            <div class="input-group">
+                                <label>Leergewicht Tara (g):</label>
+                                <input type="number" id="doseContainerTare" min="0" step="0.1" value="0">
+                            </div>
+                            <div class="input-group">
+                                <label>Aktueller Inhalt (ml):</label>
+                                <input type="number" id="doseContainerCurrent" min="0" step="0.1" value="1000">
+                            </div>
+                            <div class="input-group">
+                                <label>Gewicht voll/aktuell (g):</label>
+                                <input type="number" id="doseContainerWeight" min="0" step="0.1" placeholder="Optional zum Wiegen">
+                            </div>
+                            <div class="input-group">
+                                <label>Dichte (g/ml):</label>
+                                <input type="number" id="doseContainerDensity" min="0.1" step="0.001" value="1.000">
+                            </div>
+                            <div class="input-group">
+                                <label>Verbrauch:</label>
+                                <input type="number" id="doseContainerUsage" min="0" step="0.01" value="10">
+                            </div>
+                            <div class="input-group">
+                                <label>Einheit Verbrauch:</label>
+                                <select id="doseContainerUsageUnit">
+                                    <option value="day">ml pro Tag</option>
+                                    <option value="hour">ml pro Stunde</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Warnung vor leer (Stunden):</label>
+                                <input type="number" id="doseContainerWarnHours" min="0" step="1" value="48">
+                            </div>
+                        </div>
+                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="btn-primary btn-animated" onclick="saveDosingContainer()">Behälter speichern</button>
+                            <button class="btn-in btn-animated" onclick="fillSelectedDosingContainer()">Ausgewählten auffüllen</button>
+                        </div>
+                        <div id="dosingContainerResult"></div>
                     </div>
-                </div>
-                <div class="btn-group" style="flex-wrap:wrap;">
-                    <button class="btn-secondary btn-animated" onclick="saveAquariumTodo()" style="flex:1;">ToDo speichern</button>
-                    <button class="btn-in btn-animated" onclick="enableStockNotifications()" style="flex:1;">Push aktivieren</button>
-                </div>
-                <div id="aquarium-todo-list"></div>
+                </details>
             </div>
             </div>
         </div>
@@ -738,79 +861,14 @@
                 <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
             </div>
 
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+            <div class="card sync-disabled-card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--secondary); margin-bottom: 5px;">Cloud Login &amp; Share</h3>
                 <p class="hint">Synchronisiere deine Lager zwischen Geräten. Freunde werden per E-Mail hinzugefügt und können Nur-Lesen- oder Schreibzugriff bekommen.</p>
-                <div class="sync-privacy-note">
-                    <strong>Account &amp; Datenschutz</strong>
-                    <span>Du registrierst dich über Supabase. Die App speichert dein Passwort nicht. Der Betreiber dieses Supabase-Projekts kann technische Datenbankeinträge administrieren; deine Login-Daten bleiben bei Supabase.</span>
+                <div class="sync-maintenance-banner">
+                    <strong>Voruebergehend deaktiviert</strong>
+                    <span>Cloud Login &amp; Share ist wegen Wartungsarbeiten aktuell abgeschaltet. Der Bereich kann voruebergehend nicht geoeffnet oder genutzt werden.</span>
                 </div>
-                <div class="sync-activation-note">
-                    Nach der Registrierung musst du deinen Account über die Bestätigungs-Mail aktivieren. Schau bitte auch im Spam-Ordner nach.
-                </div>
-                <div id="supabase-sync-status" class="notification-status">Sync-Status wird geladen ...</div>
-                <div id="supabase-auth-state" class="sync-auth-state" data-state="unknown">Loginstatus wird geprüft ...</div>
-
-                <div class="input-group" style="margin-top:14px;">
-                    <label>E-Mail:</label>
-                    <input type="text" id="supabaseEmail" placeholder="deine@email.de">
-                    <label>Passwort:</label>
-                    <div class="password-field">
-                        <input type="password" id="supabasePassword" placeholder="Mindestens 6 Zeichen">
-                        <button type="button" onclick="togglePasswordVisibility('supabasePassword', this)" aria-label="Passwort anzeigen">Anzeigen</button>
-                    </div>
-                </div>
-                <div class="switch-container sync-auto-row" id="syncAutoRow">
-                    <span style="font-weight: 600; font-size: 0.95rem;">Automatisch synchronisieren</span>
-                    <label class="switch">
-                        <input type="checkbox" id="supabaseAutoSync" onchange="toggleSupabaseAutoSync(this.checked)">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-                <div class="btn-group" style="flex-wrap:wrap;">
-                    <button onclick="supabaseSignUp()" class="btn-secondary btn-animated" style="flex:1;">Registrieren</button>
-                    <button onclick="supabaseSignIn()" class="btn-primary btn-animated" style="flex:1;">Einloggen</button>
-                    <button onclick="supabaseSignOut()" class="btn-out btn-animated" style="flex:1;">Ausloggen</button>
-                    <button onclick="supabaseResetPassword()" class="btn-secondary btn-animated" style="flex:1;">Passwort zurücksetzen</button>
-                </div>
-                <div id="passwordRecoveryBox" class="sync-password-recovery" style="display:none;">
-                    <label>Neues Passwort:</label>
-                    <div class="password-field">
-                        <input type="password" id="newSupabasePassword" placeholder="Neues Passwort">
-                        <button type="button" onclick="togglePasswordVisibility('newSupabasePassword', this)" aria-label="Neues Passwort anzeigen">Anzeigen</button>
-                    </div>
-                    <button onclick="supabaseUpdatePassword()" class="btn-primary btn-animated">Neues Passwort speichern</button>
-                </div>
-
-                <div class="btn-group" style="flex-wrap:wrap; margin-top:12px;">
-                    <button onclick="syncPushAllWarehouses(true)" class="btn-primary btn-animated" style="flex:1;">Daten Upload</button>
-                    <button onclick="syncPullWarehouses(true)" class="btn-secondary btn-animated" style="flex:1;">Daten Download</button>
-                    <button onclick="runSupabaseDiagnostics()" class="btn-secondary btn-animated" style="flex:1;">Sync Diagnose</button>
-                </div>
-                <div id="supabase-diagnostics-result" class="sync-diagnostics-result"></div>
-
-                <div class="input-group" style="margin-top:14px;">
-                    <label>Freund für aktuelles Lager hinzufügen:</label>
-                    <div id="shareActiveWarehouseBox" class="share-active-warehouse-box">Aktuelles Lager wird geladen ...</div>
-                    <p class="hint" id="shareActiveWarehouseHint">Freigegeben wird nur das aktuell ausgewählte Lager.</p>
-                    <input type="text" id="friendEmailInput" placeholder="freund@email.de">
-                    <label>Zugriff:</label>
-                    <select id="friendAccessRole">
-                        <option value="read">Nur lesen</option>
-                        <option value="write">Lesen &amp; schreiben</option>
-                    </select>
-                    <button onclick="addReadOnlyFriend()" class="btn-secondary btn-animated">Freund hinzufügen</button>
-                    <p class="hint">Die Sicherheit wird in Supabase per Row Level Security erzwungen. Nur-Lesen-Freunde können nicht speichern, Freunde mit Schreibzugriff dürfen das Lager synchronisieren.</p>
-                </div>
-                <div id="sync-friends-list"></div>
-                <div class="sync-subpanel">
-                    <h4>Cloud-Freigabe Übersicht</h4>
-                    <div id="cloud-share-overview"></div>
-                </div>
-                <div class="sync-subpanel">
-                    <h4>Lagerverlauf</h4>
-                    <div id="warehouse-event-log"></div>
-                </div>
+                <p class="hint" style="margin:0;">Sobald der Cloud-Flow stabil arbeitet, wird dieser Bereich wieder eingeblendet.</p>
             </div>
 
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
@@ -1090,7 +1148,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.3.3"></script>
+    <script src="app.js?v=2.3.9"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')

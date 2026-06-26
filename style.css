@@ -1101,7 +1101,7 @@ textarea {
     margin-bottom: 15px;
     transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
-input[type="number"], input[type="text"], input[type="password"], input[type="search"], input[type="file"], select {
+input[type="number"], input[type="text"], input[type="password"], input[type="search"], input[type="file"], input[type="date"], input[type="time"], input[type="datetime-local"], select {
     width: 100%;
     padding: 12px;
     background: rgba(255,255,255,0.055);
@@ -1117,11 +1117,31 @@ input[type="number"]:focus,
 input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="search"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+input[type="datetime-local"]:focus,
 select:focus {
     outline: none;
     border-color: color-mix(in srgb, var(--primary) 58%, var(--border));
     box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 15%, transparent);
     background: rgba(255,255,255,0.08);
+}
+
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+    appearance: none;
+    -webkit-appearance: none;
+    min-height: 48px;
+    letter-spacing: 0;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+    opacity: 0.78;
+    cursor: pointer;
+    filter: invert(0.92) sepia(0.2) saturate(2) hue-rotate(168deg);
 }
 .input-group label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
 
@@ -1223,6 +1243,77 @@ select:focus {
     border-bottom: 2px solid currentColor;
     transform: rotate(45deg) translate(-1px, -1px);
     transition: transform 0.2s ease;
+}
+
+.aquarium-workspace-panel {
+    margin-bottom: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--secondary) 28%, var(--border));
+    background: linear-gradient(135deg, color-mix(in srgb, var(--secondary) 10%, transparent), color-mix(in srgb, var(--primary) 7%, transparent));
+}
+
+.aquarium-workspace-panel-logbook {
+    margin-top: 0;
+}
+
+.aquarium-workspace-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.aquarium-workspace-head span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.aquarium-workspace-head strong {
+    display: block;
+    margin-top: 3px;
+    font-size: 1.02rem;
+}
+
+.aquarium-workspace-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.aquarium-workspace-actions button {
+    width: auto;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+}
+
+.aquarium-workspace-select small {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.nav-links button.nav-tab-disabled,
+.mobile-bottom-nav button.nav-tab-disabled {
+    opacity: 0.42;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.nav-links button.nav-tab-disabled:hover,
+.mobile-bottom-nav button.nav-tab-disabled:hover {
+    transform: none;
 }
 
 details[open] > summary .settings-accordion-hint {
@@ -1834,6 +1925,34 @@ body.theme-mint.party-mode .card {
     font-weight: 700;
 }
 
+.sync-maintenance-banner {
+    display: grid;
+    gap: 6px;
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid rgba(255, 69, 58, 0.28);
+    border-radius: 12px;
+    background: rgba(255, 69, 58, 0.1);
+    color: #ffd2cc;
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.sync-maintenance-banner strong {
+    color: #fff3f0;
+}
+
+.sync-disabled-fieldset {
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.sync-disabled-card .sync-disabled-fieldset {
+    opacity: 0.56;
+    filter: saturate(0.82);
+}
+
 .share-active-warehouse-box {
     display: flex;
     justify-content: space-between;
@@ -2080,6 +2199,18 @@ body.theme-mint.party-mode .card {
     margin-bottom: 12px;
 }
 
+.logbook-card-details[open] {
+    padding-bottom: 2px;
+}
+
+.logbook-card-details > .logbook-summary {
+    margin: 0;
+}
+
+.logbook-card-body {
+    margin-top: 12px;
+}
+
 .logbook-entry,
 .todo-row {
     display: grid;
@@ -2160,6 +2291,481 @@ body.theme-mint.party-mode .card {
     display: none;
 }
 
+.measurement-panel {
+    display: grid;
+    gap: 12px;
+}
+
+.measurement-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.measurement-stats div,
+.measurement-detail-card,
+.measurement-chart-card,
+.measurement-list-row,
+.measurement-empty,
+.dosing-container-row {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.measurement-stats div {
+    padding: 12px;
+}
+
+.measurement-stats strong {
+    display: block;
+    font-size: 0.98rem;
+    color: var(--secondary);
+}
+
+.measurement-stats span {
+    display: block;
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    line-height: 1.35;
+}
+
+.measurement-chart-card,
+.measurement-detail-card,
+.measurement-empty {
+    padding: 14px;
+}
+
+.measurement-chart-head,
+.measurement-chart-meta,
+.measurement-detail-actions,
+.measurement-type-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.measurement-chart-head strong,
+.measurement-detail-card strong,
+.measurement-empty strong {
+    display: block;
+    font-size: 0.98rem;
+}
+
+.measurement-chart-head small,
+.measurement-chart-meta span,
+.measurement-detail-card small,
+.measurement-empty p,
+.measurement-list-button small {
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.measurement-chart {
+    width: 100%;
+    height: 240px;
+    margin: 10px 0 8px;
+    overflow: visible;
+}
+
+.measurement-chart.compact {
+    margin-inline: auto;
+}
+
+.measurement-axis {
+    stroke: rgba(255,255,255,0.14);
+    stroke-width: 1;
+}
+
+.measurement-grid-line {
+    stroke: rgba(255,255,255,0.08);
+    stroke-width: 1;
+    stroke-dasharray: 4 6;
+}
+
+.measurement-area {
+    fill: url(#measurementFill);
+}
+
+.measurement-focus-line {
+    stroke: color-mix(in srgb, var(--primary) 65%, white);
+    stroke-width: 1.5;
+    stroke-dasharray: 5 7;
+    opacity: 0.7;
+}
+
+.measurement-line {
+    fill: none;
+    stroke: url(#measurementLineGlow);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(0 6px 14px rgba(10, 132, 255, 0.18));
+}
+
+.measurement-point-hit {
+    fill: transparent;
+    cursor: pointer;
+}
+
+.measurement-point-halo {
+    fill: rgba(191, 90, 242, 0.08);
+    opacity: 0;
+    transform-origin: center;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.measurement-point-ring {
+    fill: rgba(255, 255, 255, 0.9);
+    opacity: 0.9;
+    transition: transform 0.24s ease, opacity 0.24s ease, fill 0.24s ease;
+    transform-origin: center;
+}
+
+.measurement-point {
+    fill: var(--secondary);
+    stroke: color-mix(in srgb, var(--card-bg) 70%, white);
+    stroke-width: 2;
+    transition: transform 0.24s ease, fill 0.24s ease, stroke 0.24s ease;
+    transform-origin: center;
+}
+
+.measurement-point-group {
+    cursor: pointer;
+}
+
+.measurement-point-group.active .measurement-point-halo,
+.measurement-point-group:hover .measurement-point-halo {
+    opacity: 1;
+    transform: scale(1.02);
+}
+
+.measurement-point-group.active .measurement-point-ring,
+.measurement-point-group:hover .measurement-point-ring {
+    fill: color-mix(in srgb, var(--primary) 24%, white);
+    transform: scale(1.05);
+}
+
+.measurement-point-group.active .measurement-point,
+.measurement-point-group:hover .measurement-point {
+    fill: var(--primary);
+    stroke: color-mix(in srgb, var(--primary) 38%, white);
+    transform: scale(1.1);
+}
+
+.measurement-label {
+    fill: var(--text-muted);
+    font-size: 12px;
+}
+
+.measurement-y-label {
+    fill: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.measurement-detail-value {
+    margin: 6px 0 8px;
+    font-size: 1.35rem;
+    font-weight: 900;
+    color: var(--text);
+}
+
+.measurement-detail-card p {
+    margin: 0 0 10px;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.measurement-list {
+    display: grid;
+    gap: 8px;
+}
+
+.measurement-list-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+}
+
+.measurement-list-row.active {
+    border-color: color-mix(in srgb, var(--primary) 46%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.community-map-card-shell {
+    display: grid;
+    gap: 14px;
+}
+
+.community-map-privacy,
+.community-map-login-hint,
+.community-map-request-card,
+.community-member-row,
+.community-map-location-box,
+.community-map-visual {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.community-map-privacy,
+.community-map-login-hint,
+.community-map-request-card,
+.community-map-location-box,
+.community-map-visual {
+    padding: 14px;
+}
+
+.community-map-layout,
+.community-map-request-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: 14px;
+}
+
+.community-map-form {
+    display: grid;
+    gap: 12px;
+}
+
+.community-map-surface {
+    stroke: rgba(255,255,255,0.1);
+    stroke-width: 1;
+}
+
+.community-map-svg {
+    width: 100%;
+    min-height: 320px;
+}
+
+.community-map-grid {
+    stroke: rgba(255,255,255,0.08);
+    stroke-width: 1;
+}
+
+.community-map-region,
+.community-map-caption {
+    fill: rgba(255,255,255,0.28);
+    font-size: 14px;
+    font-weight: 600;
+    text-anchor: middle;
+}
+
+.community-map-caption {
+    text-anchor: start;
+    font-size: 13px;
+}
+
+.community-map-pin {
+    cursor: pointer;
+}
+
+.community-map-pin-glow {
+    fill: url(#communityPinGlow);
+    opacity: 0;
+    transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.community-map-pin-ring {
+    fill: rgba(255,255,255,0.1);
+    stroke: rgba(255,255,255,0.42);
+    stroke-width: 1.3;
+    transition: transform 0.24s ease, stroke 0.24s ease, fill 0.24s ease;
+}
+
+.community-map-pin-core {
+    fill: var(--primary);
+    stroke: rgba(255,255,255,0.82);
+    stroke-width: 2;
+    transition: transform 0.24s ease, fill 0.24s ease;
+}
+
+.community-map-pin-label {
+    fill: var(--text);
+    font-size: 13px;
+    font-weight: 700;
+    text-anchor: middle;
+    opacity: 0.78;
+    transition: opacity 0.24s ease;
+}
+
+.community-map-pin.active .community-map-pin-glow,
+.community-map-pin:hover .community-map-pin-glow {
+    opacity: 1;
+}
+
+.community-map-pin.active .community-map-pin-ring,
+.community-map-pin:hover .community-map-pin-ring,
+.community-map-pin.active .community-map-pin-core,
+.community-map-pin:hover .community-map-pin-core {
+    transform: scale(1.06);
+}
+
+.community-map-pin.active .community-map-pin-label,
+.community-map-pin:hover .community-map-pin-label {
+    opacity: 1;
+}
+
+.community-map-pin.own .community-map-pin-core {
+    fill: var(--secondary);
+}
+
+.community-member-list,
+.community-request-list {
+    display: grid;
+    gap: 10px;
+}
+
+.community-member-row,
+.community-request-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+}
+
+.community-member-row.active {
+    border-color: color-mix(in srgb, var(--primary) 52%, var(--border));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+
+.community-member-main {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    color: var(--text);
+}
+
+.community-member-main strong,
+.community-request-row strong {
+    display: block;
+}
+
+.community-member-main small,
+.community-request-row small,
+.community-member-meta span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.community-member-meta {
+    display: grid;
+    justify-items: end;
+    gap: 6px;
+}
+
+.community-own-badge {
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(10, 132, 255, 0.14);
+    color: var(--secondary);
+    font-weight: 700;
+}
+
+.community-request-row p {
+    margin: 6px 0 0;
+    color: var(--text);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.community-request-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.community-map-manual {
+    margin-top: 10px;
+}
+
+.community-map-manual summary,
+.community-map-outbox summary {
+    cursor: pointer;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.community-map-outbox {
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 6px;
+}
+
+.measurement-list-button {
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    color: var(--text);
+    text-align: left;
+}
+
+.measurement-list-button strong {
+    display: block;
+}
+
+.measurement-empty p {
+    margin: 8px 0 0;
+}
+
+.dosing-container-list {
+    display: grid;
+    gap: 10px;
+}
+
+.dosing-container-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+}
+
+.dosing-container-row.warning {
+    border-color: rgba(255, 69, 58, 0.55);
+    background: rgba(255, 69, 58, 0.08);
+}
+
+.dosing-container-row strong {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.dosing-container-row small {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.mini-progress {
+    width: 100%;
+    height: 8px;
+    margin: 10px 0 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+}
+
+.mini-progress span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, var(--secondary), var(--primary));
+}
+
 .interval-picker {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2169,11 +2775,16 @@ body.theme-mint.party-mode .card {
 
 .interval-picker button {
     min-height: 40px;
+    padding: 8px 6px;
     border-radius: 10px;
     border: 1px solid var(--border);
     background: rgba(255, 255, 255, 0.06);
     color: var(--text);
     font-weight: 800;
+    font-size: 0.8rem;
+    line-height: 1.15;
+    white-space: normal;
+    word-break: break-word;
     cursor: pointer;
     transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
@@ -2241,8 +2852,31 @@ body.theme-mint.party-mode .card {
         padding: 14px;
     }
 
+    .community-map-layout,
+    .community-map-request-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .community-map-svg {
+        min-height: 260px;
+    }
+
+    .community-member-row,
+    .community-request-row {
+        grid-template-columns: 1fr;
+        align-items: start;
+    }
+
+    .community-member-meta,
+    .community-request-actions {
+        justify-items: start;
+        justify-content: flex-start;
+    }
+
     .logbook-entry,
-    .todo-row {
+    .todo-row,
+    .measurement-list-row,
+    .dosing-container-row {
         grid-template-columns: 1fr;
         padding: 10px;
     }
@@ -2251,12 +2885,38 @@ body.theme-mint.party-mode .card {
         justify-content: stretch;
     }
 
-    .logbook-actions button {
+    .logbook-actions button,
+    .measurement-type-actions button,
+    .measurement-detail-actions button {
         flex: 1;
     }
 
     .interval-picker {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .interval-picker button {
+        min-height: 46px;
+        font-size: 0.76rem;
+        padding: 8px 5px;
+    }
+
+    .measurement-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .measurement-chart {
+        height: 290px;
+        margin: 12px -6px 10px;
+        width: calc(100% + 12px);
+    }
+
+    .measurement-chart-head,
+    .measurement-chart-meta,
+    .measurement-detail-actions,
+    .measurement-type-actions {
+        flex-direction: column;
+        align-items: stretch;
     }
 
     #naclSolutionResult .tool-row > span:last-child {
@@ -2265,6 +2925,39 @@ body.theme-mint.party-mode .card {
 }
 
 @media (max-width: 600px) {
+    .measurement-chart-card,
+    .measurement-detail-card,
+    .measurement-empty {
+        padding: 12px;
+    }
+
+    .measurement-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .measurement-chart {
+        height: 300px;
+        margin: 12px -8px 10px;
+        width: calc(100% + 16px);
+    }
+
+    .measurement-chart-head strong,
+    .measurement-detail-card strong,
+    .measurement-empty strong {
+        font-size: 0.94rem;
+    }
+
+    .measurement-chart-head small,
+    .measurement-chart-meta span,
+    .measurement-detail-card small,
+    .measurement-empty p,
+    .measurement-list-button small {
+        font-size: 0.74rem;
+    }
+
+    .measurement-detail-value {
+        font-size: 1.25rem;
+    }
 
     .sync-friend-row {
         grid-template-columns: 1fr;
