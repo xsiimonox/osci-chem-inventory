@@ -83,6 +83,72 @@ const seaWaterRecipePer100L = [
     { item: 'KH Tag', amount: 140.0, unit: 'ml' }
 ];
 
+const customCrElementDefinitions = [
+    { key: 'Na', label: 'Na', unit: 'mg/l', target: 10800 },
+    { key: 'Mg', label: 'Mg', unit: 'mg/l', target: 1320 },
+    { key: 'Ca', label: 'Ca', unit: 'mg/l', target: 424 },
+    { key: 'K', label: 'K', unit: 'mg/l', target: 405 },
+    { key: 'Sr', label: 'Sr', unit: 'mg/l', target: 8.2 },
+    { key: 'F', label: 'F', unit: 'mg/l', target: 1.3 },
+    { key: 'Cl', label: 'Cl', unit: 'mg/l', target: 19558 },
+    { key: 'S', label: 'S', unit: 'mg/l', target: 920 },
+    { key: 'Br', label: 'Br', unit: 'mg/l', target: 68.0 },
+    { key: 'B', label: 'B', unit: 'mg/l', target: 4.5 }
+];
+
+const customCrOptimalTargets = customCrElementDefinitions.reduce((acc, entry) => {
+    acc[entry.key] = entry.target;
+    return acc;
+}, {});
+
+const customCrExampleState = {
+    tankLiters: 770,
+    currentPsu: 34.0,
+    targetPsu: 34.5,
+    current: {
+        Na: 10766,
+        Mg: 1343,
+        Ca: 422,
+        K: 412,
+        Sr: 8.3,
+        F: 1.67,
+        Cl: 19328,
+        S: 898,
+        Br: 67.8,
+        B: 4.67
+    },
+    target: {
+        Na: 10800,
+        Mg: 1320,
+        Ca: 425,
+        K: 405,
+        Sr: 8.2,
+        F: 1.59,
+        Cl: 19500,
+        S: 920,
+        Br: 68,
+        B: 4.5
+    }
+};
+
+const customCrProducts = [
+    { item: 'Natriumchlorid (NaCl)', key: 'NaCl', doseMlPer100L: 100, increaseMgL: { Na: 120, Cl: 185 }, psuRisePerMlPer100L: 0.00305, note: '100 ml / 100 L' },
+    { item: 'Magnesiumchlorid (MgCl2)', key: 'MgCl2', doseMlPer100L: 10, increaseMgL: { Mg: 10, Cl: 29.2 }, psuRisePerMlPer100L: 0.00392, note: '10 ml / 100 L' },
+    { item: 'Natriumsulfat (Na2SO4)', key: 'Na2SO4', doseMlPer100L: 50, increaseMgL: { Na: 21.5, S: 15 }, psuRisePerMlPer100L: 0.00073, note: '50 ml / 100 L' },
+    { item: 'Magnesiumsulfat (MgSO4)', key: 'MgSO4', doseMlPer100L: 20, increaseMgL: { Mg: 10, S: 13.2 }, psuRisePerMlPer100L: 0.00116, note: '20 ml / 100 L' },
+    { item: 'Kaliumchlorid (KCl)', key: 'KCl', doseMlPer100L: 10, increaseMgL: { K: 10, Cl: 9.1 }, psuRisePerMlPer100L: 0.00191, note: '10 ml / 100 L' },
+    { item: 'Kaliumsulfat (K2SO4)', key: 'K2SO4', doseMlPer100L: 25, increaseMgL: { K: 10, S: 4.1 }, psuRisePerMlPer100L: 0.00056, note: '25 ml / 100 L' },
+    { item: 'Kaliumbromid (KBr)', key: 'KBr', doseMlPer100L: 1, increaseMgL: { K: 0.5, Br: 1.0 }, psuRisePerMlPer100L: 0.00150, note: '1 ml / 100 L' },
+    { item: 'Strontiumchlorid (SrCl2)', key: 'SrCl2', doseMlPer100L: 1, increaseMgL: { Sr: 1.0, Cl: 0.8 }, psuRisePerMlPer100L: 0.00180, note: '1 ml / 100 L' },
+    { item: 'Calciumchlorid (CaCl2)', key: 'CaCl2', doseMlPer100L: 5, increaseMgL: { Ca: 10, Cl: 17.7 }, psuRisePerMlPer100L: 0.00554, note: '5 ml / 100 L' },
+    { item: 'Natriumfluorid (NaF)', key: 'NaF', doseMlPer100L: 10, increaseMgL: { F: 0.45, Na: 0.55 }, psuRisePerMlPer100L: 0.00010, note: '10 ml / 100 L' },
+    { item: 'Bor (B)', key: 'B', doseMlPer100L: 20, increaseMgL: { B: 0.1 }, psuRisePerMlPer100L: 0.00003, note: '20 ml / 100 L' }
+];
+
+const customCrProxyReferencePsu = 34.5;
+const customCrProxyReferenceSum = customCrElementDefinitions
+    .reduce((sum, entry) => sum + (customCrOptimalTargets[entry.key] || 0), 0);
+
 const nutritionDoseRules = {
     Nitrat: {
         action: 'erhöht',
@@ -314,11 +380,12 @@ const TAB_ICONS = {
 const communityUiState = {
     selectedProfileId: null
 };
+const CUSTOM_CR_UNLOCK_KEY = 'osci-custom-cr-unlocked';
+const CUSTOM_CR_PASSWORD = 'OSCI';
 
 function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
     if (CLOUD_SYNC_ENABLED) return true;
     updateSyncStatus(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warn');
-    showToast(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warning', 3800);
     return false;
 }
 
@@ -4145,6 +4212,11 @@ function initTools() {
     renderNutritionCalculator();
     renderSeaWaterPresetSelect();
     renderSeaWaterMix();
+    syncCustomCRLockUI();
+    if (isCustomCRUnlocked()) {
+        renderCustomCrPlannerMatrix();
+        renderCustomCRPlanner();
+    }
     renderNaclSolutionCalculator();
     syncMajorCorrectionInputsFromSettings(true);
     renderMajorCorrectionCalculator();
@@ -4173,6 +4245,40 @@ function getToolSettings() {
     if (!Array.isArray(db.toolSettings.favorites)) db.toolSettings.favorites = [];
     if (!db.toolSettings.lastSection) db.toolSettings.lastSection = '';
     return db.toolSettings;
+}
+
+function isCustomCRUnlocked() {
+    return localStorage.getItem(CUSTOM_CR_UNLOCK_KEY) === 'true';
+}
+
+function syncCustomCRLockUI() {
+    const lockState = document.getElementById('customCrLockState');
+    const protectedContent = document.getElementById('customCrProtectedContent');
+    const unlocked = isCustomCRUnlocked();
+    if (lockState) lockState.hidden = unlocked;
+    if (protectedContent) protectedContent.hidden = !unlocked;
+}
+
+function unlockCustomCRTool() {
+    const input = document.getElementById('customCrPasswordInput');
+    const value = (input?.value || '').trim();
+    if (value !== CUSTOM_CR_PASSWORD) {
+        showToast('Falsches Passwort', 'warning', 2600);
+        if (input) input.value = '';
+        return;
+    }
+    localStorage.setItem(CUSTOM_CR_UNLOCK_KEY, 'true');
+    if (input) input.value = '';
+    syncCustomCRLockUI();
+    renderCustomCrPlannerMatrix();
+    renderCustomCRPlanner();
+    showToast('C&R Tool entsperrt', 'success', 2200);
+}
+
+function lockCustomCRTool() {
+    localStorage.removeItem(CUSTOM_CR_UNLOCK_KEY);
+    syncCustomCRLockUI();
+    showToast('C&R Tool gesperrt', 'info', 2200);
 }
 
 function slugifyToolTitle(title) {
@@ -5106,6 +5212,551 @@ function bookNutritionDose() {
     executeQueueWithConflictHandling([{ ...resolved, amount: totalMl }], 0);
 }
 
+function getCustomCrPlannerState() {
+    if (!db.customCrPlanner) {
+        db.customCrPlanner = {
+            tankLiters: customCrExampleState.tankLiters,
+            currentPsu: customCrExampleState.currentPsu,
+            targetPsu: customCrExampleState.targetPsu,
+            current: { ...customCrExampleState.current },
+            target: { ...customCrOptimalTargets }
+        };
+    }
+    if (!db.customCrPlanner.current) db.customCrPlanner.current = { ...customCrExampleState.current };
+    if (!db.customCrPlanner.target) db.customCrPlanner.target = { ...customCrOptimalTargets };
+    if (!db.customCrPlanner.tankLiters) db.customCrPlanner.tankLiters = customCrExampleState.tankLiters;
+    if (!db.customCrPlanner.currentPsu) db.customCrPlanner.currentPsu = customCrExampleState.currentPsu;
+    if (!db.customCrPlanner.targetPsu) db.customCrPlanner.targetPsu = customCrProxyReferencePsu;
+    return db.customCrPlanner;
+}
+
+function getCustomCrProxyPsu(values) {
+    const total = customCrElementDefinitions.reduce((sum, entry) => sum + Math.max(0, parseFloat(values?.[entry.key]) || 0), 0);
+    if (!total || !customCrProxyReferenceSum) return 0;
+    return (total / customCrProxyReferenceSum) * customCrProxyReferencePsu;
+}
+
+function getCustomCrIonicSum(values) {
+    return customCrElementDefinitions.reduce((sum, entry) => sum + Math.max(0, parseFloat(values?.[entry.key]) || 0), 0);
+}
+
+function estimateCustomCrFinalPsu(currentValues, finalValues, currentPsu) {
+    const startPsu = Math.max(0, parseFloat(currentPsu) || 0);
+    const currentSum = getCustomCrIonicSum(currentValues);
+    const finalSum = getCustomCrIonicSum(finalValues);
+    if (startPsu > 0 && currentSum > 0 && finalSum > 0) {
+        return startPsu * (finalSum / currentSum);
+    }
+    return getCustomCrProxyPsu(finalValues);
+}
+
+function getCustomCrMassNeed(current, target, tankLiters, removalLiters) {
+    return customCrElementDefinitions.map(entry => {
+        const currentValue = parseFloat(current[entry.key]) || 0;
+        const targetValue = parseFloat(target[entry.key]) || 0;
+        return tankLiters * (targetValue - currentValue) + currentValue * removalLiters;
+    });
+}
+
+function getCustomCrElementContributionPerMl(product, elementKey) {
+    const doseMl = Math.max(0.0001, parseFloat(product?.doseMlPer100L) || 1);
+    const increaseMgL = parseFloat(product?.increaseMgL?.[elementKey]) || 0;
+    return (increaseMgL / doseMl) * 100;
+}
+
+function buildCustomCrCoefficientMatrix() {
+    return customCrElementDefinitions.map(entry =>
+        customCrProducts.map(product => getCustomCrElementContributionPerMl(product, entry.key))
+    );
+}
+
+function getCustomCrAddedIonMassKg(amounts) {
+    let totalMg = 0;
+    customCrProducts.forEach((product, index) => {
+        const amountMl = Math.max(0, parseFloat(amounts[index]) || 0);
+        if (!amountMl) return;
+        Object.keys(product.increaseMgL || {}).forEach(elementKey => {
+            totalMg += getCustomCrElementContributionPerMl(product, elementKey) * amountMl;
+        });
+    });
+    return totalMg / 1e6;
+}
+
+function estimateCustomCrPsuFromProducts(currentPsu, tankLiters, removalLiters, amounts) {
+    const startPsu = Math.max(0, parseFloat(currentPsu) || 0);
+    const tank = Math.max(0, parseFloat(tankLiters) || 0);
+    if (!tank || !startPsu) return 0;
+    const basePsuAfterRemoval = startPsu * Math.max(0, 1 - (Math.max(0, removalLiters) / tank));
+    const additiveRise = customCrProducts.reduce((sum, product, index) => {
+        const amountMl = Math.max(0, parseFloat(amounts[index]) || 0);
+        const risePerMlPer100L = Math.max(0, parseFloat(product.psuRisePerMlPer100L) || 0);
+        return sum + (amountMl * risePerMlPer100L * (100 / tank));
+    }, 0);
+    return basePsuAfterRemoval + additiveRise;
+}
+
+function estimateCustomCrPsuFromSaltMass(currentPsu, tankLiters, removalLiters, amounts) {
+    return estimateCustomCrPsuFromProducts(currentPsu, tankLiters, removalLiters, amounts);
+}
+
+function solveCustomCrNnls(massNeed, warmStart = null) {
+    const rows = customCrElementDefinitions.length;
+    const cols = customCrProducts.length;
+    const matrix = buildCustomCrCoefficientMatrix();
+    const prediction = new Array(rows).fill(0);
+    const amounts = new Array(cols).fill(0);
+    if (Array.isArray(warmStart)) {
+        warmStart.forEach((value, index) => {
+            const next = Math.max(0, parseFloat(value) || 0);
+            amounts[index] = next;
+            for (let row = 0; row < rows; row += 1) prediction[row] += matrix[row][index] * next;
+        });
+    }
+    const columnNorms = customCrProducts.map((_, col) => {
+        let norm = 0;
+        for (let row = 0; row < rows; row += 1) norm += matrix[row][col] * matrix[row][col];
+        return norm || 1;
+    });
+    for (let iteration = 0; iteration < 320; iteration += 1) {
+        let maxChange = 0;
+        for (let col = 0; col < cols; col += 1) {
+            let numerator = 0;
+            for (let row = 0; row < rows; row += 1) {
+                const coeff = matrix[row][col];
+                if (!coeff) continue;
+                numerator += coeff * (massNeed[row] - prediction[row] + coeff * amounts[col]);
+            }
+            const next = Math.max(0, numerator / columnNorms[col]);
+            const delta = next - amounts[col];
+            if (!delta) continue;
+            amounts[col] = next;
+            maxChange = Math.max(maxChange, Math.abs(delta));
+            for (let row = 0; row < rows; row += 1) prediction[row] += matrix[row][col] * delta;
+        }
+        if (maxChange < 0.0001) break;
+    }
+    return { amounts, prediction };
+}
+
+function createCustomCrNeedMap(current, target, tankLiters, removalLiters) {
+    const map = {};
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current[entry.key]) || 0;
+        const targetValue = parseFloat(target[entry.key]) || 0;
+        map[entry.key] = Math.max(0, tankLiters * (targetValue - currentValue) + currentValue * removalLiters);
+    });
+    return map;
+}
+
+function applyCustomCrDoseToNeedMap(needMap, productKey, amountMl) {
+    if (!amountMl || amountMl <= 0) return;
+    const product = customCrProducts.find(entry => entry.key === productKey);
+    if (!product) return;
+    Object.keys(product.increaseMgL || {}).forEach(elementKey => {
+        needMap[elementKey] = Math.max(0, (needMap[elementKey] || 0) - (getCustomCrElementContributionPerMl(product, elementKey) * amountMl));
+    });
+}
+
+function getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, targetPsu) {
+    let removal = 0;
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current[entry.key]) || 0;
+        const targetValue = parseFloat(target[entry.key]) || 0;
+        if (currentValue > targetValue && currentValue > 0) {
+            removal = Math.max(removal, tankLiters * (1 - (targetValue / currentValue)));
+        }
+    });
+    if (currentPsu > 0 && targetPsu > 0 && targetPsu < currentPsu) {
+        removal = Math.max(removal, tankLiters * (1 - (targetPsu / currentPsu)));
+    }
+    return Math.max(0, removal);
+}
+
+function finalizeCustomCrValues(current, tankLiters, removalLiters, additions, extraDilutionLiters = 0) {
+    const finalMass = {};
+    customCrElementDefinitions.forEach(entry => {
+        finalMass[entry.key] = (parseFloat(current[entry.key]) || 0) * Math.max(0, tankLiters - removalLiters);
+    });
+    customCrProducts.forEach((product, index) => {
+        const amountMl = Math.max(0, parseFloat(additions[index]) || 0);
+        if (!amountMl) return;
+        Object.keys(product.increaseMgL || {}).forEach(elementKey => {
+            finalMass[elementKey] += getCustomCrElementContributionPerMl(product, elementKey) * amountMl;
+        });
+    });
+    const dilutionFactor = extraDilutionLiters > 0 ? Math.max(0, 1 - (extraDilutionLiters / tankLiters)) : 1;
+    const finalValues = {};
+    customCrElementDefinitions.forEach(entry => {
+        finalValues[entry.key] = (finalMass[entry.key] / tankLiters) * dilutionFactor;
+    });
+    return finalValues;
+}
+
+function estimateCustomCrPsuAfterAdditionalDilution(basePsu, extraDilutionLiters, tankLiters) {
+    if (!basePsu || !extraDilutionLiters || !tankLiters) return basePsu;
+    return basePsu * Math.max(0, 1 - (extraDilutionLiters / tankLiters));
+}
+
+function scoreCustomCrSolution(solution, targetPsu) {
+    if (!solution) return Number.POSITIVE_INFINITY;
+    const scales = { Na: 50, Mg: 10, Ca: 5, K: 5, Sr: 0.2, F: 0.05, Cl: 60, S: 8, Br: 1, B: 0.1 };
+    let score = 0;
+    customCrElementDefinitions.forEach(entry => {
+        const scale = scales[entry.key] || Math.max(1, (solution.target[entry.key] || 1) * 0.01);
+        const diff = (solution.finalValues[entry.key] || 0) - (solution.target[entry.key] || 0);
+        score += Math.pow(diff / scale, 2);
+    });
+    score += Math.pow(Math.max(0, -solution.roLiters) * 50, 2);
+    score += Math.pow(Math.max(0, solution.totalAdditiveLiters - solution.removalLiters) * 50, 2);
+    score += solution.totalAdditiveLiters * 0.15 + solution.removalLiters * 0.015;
+    if (targetPsu > 0) score += Math.pow((solution.estimatedPsu - targetPsu) * 1.6, 2);
+    return score;
+}
+
+function buildCustomCrSolution(current, target, tankLiters, removalLiters, nnlsResult, currentPsu, targetPsu) {
+    const additions = {};
+    let totalAdditiveMl = 0;
+    customCrProducts.forEach((product, index) => {
+        const amount = Math.max(0, nnlsResult.amounts[index] || 0);
+        additions[product.item] = amount;
+        totalAdditiveMl += amount;
+    });
+    const totalAdditiveLiters = totalAdditiveMl / 1000;
+    const roLiters = removalLiters - totalAdditiveLiters;
+    const finalValues = {};
+    customCrElementDefinitions.forEach((entry, rowIndex) => {
+        const remainingMass = (parseFloat(current[entry.key]) || 0) * Math.max(0, tankLiters - removalLiters);
+        const finalMass = remainingMass + (nnlsResult.prediction[rowIndex] || 0);
+        finalValues[entry.key] = tankLiters > 0 ? finalMass / tankLiters : 0;
+    });
+    return {
+        current,
+        target,
+        removalLiters,
+        roLiters,
+        additions,
+        totalAdditiveLiters,
+        finalValues,
+        estimatedPsu: currentPsu > 0
+            ? estimateCustomCrPsuFromSaltMass(currentPsu, tankLiters, removalLiters, nnlsResult.amounts)
+            : getCustomCrProxyPsu(finalValues),
+        score: 0
+    };
+}
+
+function solveCustomCRAdjustment(current, target, tankLiters, currentPsu, targetPsu) {
+    if (!tankLiters) return null;
+    const removalLiters = getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, targetPsu);
+    const needMap = createCustomCrNeedMap(current, target, tankLiters, removalLiters);
+    const additionsMap = Object.fromEntries(customCrProducts.map(product => [product.item, 0]));
+    const noteParts = [];
+
+    const applyByPrimaryNeed = (productKey, primaryElement) => {
+        const product = customCrProducts.find(entry => entry.key === productKey);
+        if (!product) return 0;
+        const primaryPerMl = getCustomCrElementContributionPerMl(product, primaryElement);
+        if (!primaryPerMl) return 0;
+        const amountMl = Math.max(0, (needMap[primaryElement] || 0) / primaryPerMl);
+        additionsMap[product.item] += amountMl;
+        applyCustomCrDoseToNeedMap(needMap, productKey, amountMl);
+        return amountMl;
+    };
+
+    const primaryProducts = [
+        ['B', 'B'],
+        ['NaF', 'F'],
+        ['SrCl2', 'Sr'],
+        ['CaCl2', 'Ca'],
+        ['KBr', 'Br']
+    ];
+    primaryProducts.forEach(([productKey, primaryElement]) => applyByPrimaryNeed(productKey, primaryElement));
+
+    if ((needMap.Mg || 0) > 0) {
+        const mgso4 = customCrProducts.find(entry => entry.key === 'MgSO4');
+        const mgso4ByMg = (needMap.Mg || 0) / getCustomCrElementContributionPerMl(mgso4, 'Mg');
+        const mgso4ByS = (needMap.S || 0) > 0 ? (needMap.S / getCustomCrElementContributionPerMl(mgso4, 'S')) : mgso4ByMg;
+        const mgso4Amount = Math.max(0, Math.min(mgso4ByMg, mgso4ByS));
+        additionsMap[mgso4.item] += mgso4Amount;
+        applyCustomCrDoseToNeedMap(needMap, 'MgSO4', mgso4Amount);
+        if ((needMap.Mg || 0) > 0) applyByPrimaryNeed('MgCl2', 'Mg');
+    }
+
+    if ((needMap.K || 0) > 0) {
+        const shouldPreferKCl = (needMap.Cl || 0) >= (needMap.S || 0) || (targetPsu > 0 && currentPsu > 0 && targetPsu >= currentPsu);
+        if (!shouldPreferKCl && (needMap.S || 0) > 0) {
+            const k2so4 = customCrProducts.find(entry => entry.key === 'K2SO4');
+            const k2so4ByK = (needMap.K || 0) / getCustomCrElementContributionPerMl(k2so4, 'K');
+            const k2so4ByS = (needMap.S || 0) / getCustomCrElementContributionPerMl(k2so4, 'S');
+            const k2so4Amount = Math.max(0, Math.min(k2so4ByK, k2so4ByS));
+            additionsMap[k2so4.item] += k2so4Amount;
+            applyCustomCrDoseToNeedMap(needMap, 'K2SO4', k2so4Amount);
+        }
+        if ((needMap.K || 0) > 0) applyByPrimaryNeed('KCl', 'K');
+    }
+
+    if ((needMap.S || 0) > 0 && (needMap.Na || 0) > 0) {
+        const na2so4 = customCrProducts.find(entry => entry.key === 'Na2SO4');
+        const na2so4ByS = (needMap.S || 0) / getCustomCrElementContributionPerMl(na2so4, 'S');
+        const na2so4ByNa = (needMap.Na || 0) / getCustomCrElementContributionPerMl(na2so4, 'Na');
+        const na2so4Amount = Math.max(0, Math.min(na2so4ByS, na2so4ByNa));
+        additionsMap[na2so4.item] += na2so4Amount;
+        applyCustomCrDoseToNeedMap(needMap, 'Na2SO4', na2so4Amount);
+    }
+
+    if ((needMap.Na || 0) > 0 || (needMap.Cl || 0) > 0) {
+        const nacl = customCrProducts.find(entry => entry.key === 'NaCl');
+        const naNeedAmount = (needMap.Na || 0) > 0 ? ((needMap.Na || 0) / getCustomCrElementContributionPerMl(nacl, 'Na')) : 0;
+        const clNeedAmount = (needMap.Cl || 0) > 0 ? ((needMap.Cl || 0) / getCustomCrElementContributionPerMl(nacl, 'Cl')) : 0;
+        const naclAmount = Math.max(naNeedAmount, clNeedAmount);
+        additionsMap[nacl.item] += naclAmount;
+        applyCustomCrDoseToNeedMap(needMap, 'NaCl', naclAmount);
+    }
+
+    let additions = customCrProducts.map(product => additionsMap[product.item] || 0);
+    const basePsu = currentPsu > 0 ? estimateCustomCrPsuFromSaltMass(currentPsu, tankLiters, removalLiters, additions) : 0;
+    let extraNaClMl = 0;
+    let extraDilutionLiters = 0;
+
+    if (currentPsu > 0 && targetPsu > 0 && targetPsu > basePsu + 0.01) {
+        let low = 0;
+        let high = 6000;
+        const naclIndex = customCrProducts.findIndex(product => product.key === 'NaCl');
+        for (let i = 0; i < 42; i += 1) {
+            const mid = (low + high) / 2;
+            const test = additions.slice();
+            test[naclIndex] += mid;
+            const psu = estimateCustomCrPsuFromSaltMass(currentPsu, tankLiters, removalLiters, test);
+            if (psu < targetPsu) low = mid;
+            else high = mid;
+        }
+        extraNaClMl = (low + high) / 2;
+        additions[naclIndex] += extraNaClMl;
+        noteParts.push(`PSU-Korrektur ueber NaCl: +${extraNaClMl.toFixed(2)} ml.`);
+    } else if (currentPsu > 0 && targetPsu > 0 && basePsu > targetPsu + 0.01) {
+        let low = 0;
+        let high = tankLiters * 0.2;
+        for (let i = 0; i < 36; i += 1) {
+            const mid = (low + high) / 2;
+            const psu = estimateCustomCrPsuAfterAdditionalDilution(basePsu, mid, tankLiters);
+            if (psu > targetPsu) low = mid;
+            else high = mid;
+        }
+        extraDilutionLiters = (low + high) / 2;
+        noteParts.push(`PSU-Korrektur ueber zusaetzliche RO-Verduennung: ${extraDilutionLiters.toFixed(2)} L.`);
+    }
+
+    const totalAdditiveLiters = additions.reduce((sum, value) => sum + Math.max(0, value || 0), 0) / 1000;
+    const finalValues = finalizeCustomCrValues(current, tankLiters, removalLiters, additions, extraDilutionLiters);
+    const estimatedPsu = currentPsu > 0
+        ? (extraDilutionLiters > 0
+            ? estimateCustomCrPsuAfterAdditionalDilution(basePsu, extraDilutionLiters, tankLiters)
+            : estimateCustomCrPsuFromSaltMass(currentPsu, tankLiters, removalLiters, additions))
+        : getCustomCrProxyPsu(finalValues);
+    const roLiters = Math.max(0, removalLiters - totalAdditiveLiters + extraDilutionLiters);
+    const solution = {
+        current,
+        target,
+        removalLiters: removalLiters + extraDilutionLiters,
+        roLiters,
+        additions: Object.fromEntries(customCrProducts.map((product, index) => [product.item, additions[index] || 0])),
+        totalAdditiveLiters,
+        finalValues,
+        estimatedPsu,
+        score: 0,
+        note: noteParts.join(' '),
+        extraNaClMl,
+        extraDilutionLiters,
+        basePsu
+    };
+    solution.score = scoreCustomCrSolution(solution, targetPsu);
+    return solution;
+}
+
+function renderCustomCrPlannerMatrix() {
+    if (!isCustomCRUnlocked()) return;
+    const planner = getCustomCrPlannerState();
+    const mount = document.getElementById('customCrPlannerMatrix');
+    if (!mount) return;
+    mount.innerHTML = `
+        <div class="custom-cr-matrix">
+            <div class="custom-cr-matrix-header">Element</div>
+            <div class="custom-cr-matrix-header">Vorher</div>
+            <div class="custom-cr-matrix-header">Nachher</div>
+            ${customCrElementDefinitions.map(entry => `
+                <div class="custom-cr-matrix-label">
+                    <strong>${entry.label}</strong>
+                    <small>${entry.unit}</small>
+                </div>
+                <input type="number" id="customCrCurrent-${entry.key}" step="0.01" value="${planner.current[entry.key] ?? ''}" oninput="renderCustomCRPlanner()">
+                <input type="number" id="customCrTarget-${entry.key}" step="0.01" value="${planner.target[entry.key] ?? ''}" oninput="renderCustomCRPlanner()">
+            `).join('')}
+        </div>
+    `;
+}
+
+function syncCustomCrPlannerFromInputs() {
+    const planner = getCustomCrPlannerState();
+    planner.tankLiters = Math.max(0, parseFloat(document.getElementById('customCrTankLiters')?.value) || planner.tankLiters || 0);
+    planner.currentPsu = Math.max(0, parseFloat(document.getElementById('customCrCurrentPsu')?.value) || planner.currentPsu || 0);
+    planner.targetPsu = Math.max(0, parseFloat(document.getElementById('customCrTargetPsu')?.value) || planner.targetPsu || 0);
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(document.getElementById(`customCrCurrent-${entry.key}`)?.value);
+        const targetValue = parseFloat(document.getElementById(`customCrTarget-${entry.key}`)?.value);
+        if (!planner.current) planner.current = {};
+        if (!planner.target) planner.target = {};
+        planner.current[entry.key] = Number.isFinite(currentValue) ? currentValue : 0;
+        planner.target[entry.key] = Number.isFinite(targetValue) ? targetValue : 0;
+    });
+    saveDB(false);
+    return planner;
+}
+
+function renderCustomCRPlanner() {
+    if (!isCustomCRUnlocked()) return;
+    const planner = getCustomCrPlannerState();
+    if (!document.getElementById('customCrPlannerMatrix')?.children.length) renderCustomCrPlannerMatrix();
+    const syncedPlanner = syncCustomCrPlannerFromInputs();
+    const result = document.getElementById('customCrPlannerResult');
+    if (!result) return;
+    const currentDisplayPsu = syncedPlanner.currentPsu > 0 ? syncedPlanner.currentPsu : getCustomCrProxyPsu(syncedPlanner.current);
+    if (!syncedPlanner.tankLiters) {
+        result.innerHTML = '<p class="hint">Bitte zuerst die Aquariumgröße eintragen.</p>';
+        return;
+    }
+    const solution = solveCustomCRAdjustment(syncedPlanner.current, syncedPlanner.target, syncedPlanner.tankLiters, syncedPlanner.currentPsu, syncedPlanner.targetPsu);
+    if (!solution) {
+        result.innerHTML = '<p class="hint">Aus diesen Werten konnte kein sinnvoller Ausgleich berechnet werden.</p>';
+        return;
+    }
+    const productRows = customCrProducts.map(product => {
+        const amount = solution.additions[product.item] || 0;
+        const resolved = resolveRecipeItem({ item: product.item });
+        const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
+        const missing = resolved && stock < amount;
+        const grams = amount * (densityFactors[product.item] || 1);
+        return `
+            <div class="custom-cr-product-chip ${missing ? 'missing' : ''}">
+                <div class="custom-cr-product-head">
+                    <strong>${product.key}</strong>
+                    <span>${amount.toFixed(2)} ml</span>
+                </div>
+                <small>${grams.toFixed(1)} g${resolved ? ` · Bestand ${formatItemAmount(product.item, stock)}` : ''}</small>
+            </div>
+        `;
+    }).join('');
+    const beforeAfterRows = customCrElementDefinitions.map(entry => `
+        <div class="custom-cr-delta-pill">
+            <strong>${entry.label}</strong>
+            <span>${(syncedPlanner.current[entry.key] || 0).toFixed(2)} → ${(solution.finalValues[entry.key] || 0).toFixed(2)}</span>
+            <small>${((solution.finalValues[entry.key] || 0) - (syncedPlanner.current[entry.key] || 0)).toFixed(2)} ${entry.unit}</small>
+        </div>
+    `).join('');
+    result.innerHTML = `
+        <div class="tool-result custom-cr-result-shell">
+            <div class="custom-cr-summary-grid">
+                <div class="custom-cr-metric">
+                    <small>Entnahme</small>
+                    <strong>${solution.removalLiters.toFixed(2)} L</strong>
+                    <span>Wasserwechsel gesamt</span>
+                </div>
+                <div class="custom-cr-metric">
+                    <small>Reinstwasser</small>
+                    <strong>${Math.max(0, solution.roLiters).toFixed(2)} L</strong>
+                    <span>RO-Zugabe gesamt</span>
+                </div>
+                <div class="custom-cr-metric">
+                    <small>C&amp;R Summe</small>
+                    <strong>${solution.totalAdditiveLiters.toFixed(2)} L</strong>
+                    <span>Alle Produkte zusammen</span>
+                </div>
+                <div class="custom-cr-metric">
+                    <small>PSU</small>
+                    <strong>${currentDisplayPsu.toFixed(2)} → ${solution.estimatedPsu.toFixed(2)}</strong>
+                    <span>Ziel ${syncedPlanner.targetPsu.toFixed(2)} PSU</span>
+                </div>
+                ${solution.basePsu ? `
+                    <div class="custom-cr-metric">
+                        <small>Basis-PSU</small>
+                        <strong>${solution.basePsu.toFixed(2)}</strong>
+                        <span>Ohne Zusatzkorrektur</span>
+                    </div>
+                ` : ''}
+            </div>
+
+            <div class="custom-cr-section">
+                <div class="custom-cr-section-head">
+                    <strong>C&amp;R Mengen</strong>
+                    <small>Kompakte Übersicht in ml, g und Lagerbestand</small>
+                </div>
+                <div class="custom-cr-product-grid">
+                    ${productRows}
+                </div>
+            </div>
+
+            <div class="custom-cr-section">
+                <div class="custom-cr-section-head">
+                    <strong>Vorher / Nachher</strong>
+                    <small>Erwartete Entwicklung je Element</small>
+                </div>
+                <div class="custom-cr-delta-grid">
+                    ${beforeAfterRows}
+                </div>
+            </div>
+        </div>
+        <div class="tool-action-row">
+            <button class="btn-danger btn-animated" onclick="bookCustomCRAdjustment()">C&amp;R Produkte auslagern</button>
+        </div>
+        <p class="hint" style="margin-top:10px;">${solution.note ? `${escapeHtml(solution.note)} ` : ''}Hinweis: Wenn die PSU gezielt über NaCl korrigiert wird, steigen vor allem Na und Cl gegenüber dem reinen Elementziel mit an. Genau dafür ist die zusätzliche PSU-Korrektur gedacht.</p>
+    `;
+}
+
+function loadCustomCRExample() {
+    db.customCrPlanner = {
+        tankLiters: customCrExampleState.tankLiters,
+        currentPsu: customCrExampleState.currentPsu,
+        targetPsu: customCrExampleState.targetPsu,
+        current: { ...customCrExampleState.current },
+        target: { ...customCrExampleState.target }
+    };
+    saveDB();
+    const tankEl = document.getElementById('customCrTankLiters');
+    const currentPsuEl = document.getElementById('customCrCurrentPsu');
+    const psuEl = document.getElementById('customCrTargetPsu');
+    if (tankEl) tankEl.value = customCrExampleState.tankLiters;
+    if (currentPsuEl) currentPsuEl.value = customCrExampleState.currentPsu;
+    if (psuEl) psuEl.value = customCrExampleState.targetPsu;
+    renderCustomCrPlannerMatrix();
+    renderCustomCRPlanner();
+}
+
+function loadCustomCROptimalTargets() {
+    const planner = getCustomCrPlannerState();
+    planner.target = { ...customCrOptimalTargets };
+    planner.targetPsu = customCrProxyReferencePsu;
+    saveDB();
+    const psuEl = document.getElementById('customCrTargetPsu');
+    if (psuEl) psuEl.value = customCrProxyReferencePsu;
+    renderCustomCrPlannerMatrix();
+    renderCustomCRPlanner();
+}
+
+function bookCustomCRAdjustment() {
+    const planner = getCustomCrPlannerState();
+    const solution = solveCustomCRAdjustment(planner.current, planner.target, planner.tankLiters, planner.currentPsu, planner.targetPsu);
+    if (!solution) return alert('Kein berechenbarer C&R Ausgleich vorhanden.');
+    const queue = customCrProducts
+        .map(product => {
+            const resolved = resolveRecipeItem({ item: product.item });
+            if (!resolved) return null;
+            const amount = solution.additions[product.item] || 0;
+            return amount > 0 ? { ...resolved, amount } : null;
+        })
+        .filter(Boolean);
+    if (!queue.length) return alert('Dieser Ausgleich enthält keine lagergeführten Mengen.');
+    if (!confirm(`C&R Ausgleich für ${planner.tankLiters.toFixed(0)} L auslagern? Ergebnis bitte vorher prüfen.`)) return;
+    executeQueueWithConflictHandling(queue, 0);
+}
+
 function getSeaWaterScale() {
     return Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0) / 100;
 }
@@ -6027,51 +6678,216 @@ function checkTodoReminders() {
     if (changed) saveDB(false);
 }
 
-function calculateApproxPsu(density, temp) {
-    const densityAt25 = density + (temp - 25) * 0.00030;
-    return 35 + ((densityAt25 - 1.0233) / 0.000742);
-}
-
-function densityFromApproxPsu(psu) {
-    return 1.0233 + ((psu - 35) * 0.000742);
-}
-
 function clampNumber(value, min, max, fallback) {
     const parsed = parseFloat(value);
     if (isNaN(parsed)) return fallback;
     return Math.min(max, Math.max(min, parsed));
 }
 
+function pureWaterDensityKgM3(tempC) {
+    const t = parseFloat(tempC) || 0;
+    return 999.842594
+        + (6.793952e-2 * t)
+        - (9.095290e-3 * Math.pow(t, 2))
+        + (1.001685e-4 * Math.pow(t, 3))
+        - (1.120083e-6 * Math.pow(t, 4))
+        + (6.536332e-9 * Math.pow(t, 5));
+}
+
+function seawaterDensityKgM3(psu, tempC) {
+    const s = Math.max(0, parseFloat(psu) || 0);
+    const t = parseFloat(tempC) || 0;
+    const rhoW = pureWaterDensityKgM3(t);
+    const a = 0.824493
+        - (4.0899e-3 * t)
+        + (7.6438e-5 * Math.pow(t, 2))
+        - (8.2467e-7 * Math.pow(t, 3))
+        + (5.3875e-9 * Math.pow(t, 4));
+    const b = -5.72466e-3
+        + (1.0227e-4 * t)
+        - (1.6546e-6 * Math.pow(t, 2));
+    const c = 4.8314e-4;
+    return rhoW + (a * s) + (b * Math.pow(s, 1.5)) + (c * Math.pow(s, 2));
+}
+
+function densityKgLFromPsuTemp(psu, tempC) {
+    return seawaterDensityKgM3(psu, tempC) / 1000;
+}
+
+function psuFromDensityTemp(densityKgL, tempC) {
+    const density = Math.max(0.9, parseFloat(densityKgL) || 0);
+    let low = 0;
+    let high = 50;
+    for (let i = 0; i < 42; i += 1) {
+        const mid = (low + high) / 2;
+        const candidate = densityKgLFromPsuTemp(mid, tempC);
+        if (candidate < density) low = mid;
+        else high = mid;
+    }
+    return (low + high) / 2;
+}
+
+function psuFromConductivityTemp(conductivity, tempC) {
+    const c = Math.max(0, parseFloat(conductivity) || 0);
+    const t = parseFloat(tempC) || 25;
+    const R = c / 42.914;
+    const rt = 0.6766097
+        + (2.00564e-2 * t)
+        + (1.104259e-4 * Math.pow(t, 2))
+        - (6.9698e-7 * Math.pow(t, 3))
+        + (1.0031e-9 * Math.pow(t, 4));
+    const Rt = R / rt;
+    const rootRt = Math.sqrt(Math.max(Rt, 0));
+    const a = [0.0080, -0.1692, 25.3851, 14.0941, -7.0261, 2.7081];
+    const b = [0.0005, -0.0056, -0.0066, -0.0375, 0.0636, -0.0144];
+    const deltaT = (t - 15) / (1 + 0.0162 * (t - 15));
+    const salinity = a[0]
+        + (a[1] * rootRt)
+        + (a[2] * Rt)
+        + (a[3] * Rt * rootRt)
+        + (a[4] * Math.pow(Rt, 2))
+        + (a[5] * Math.pow(Rt, 2) * rootRt)
+        + deltaT * (
+            b[0]
+            + (b[1] * rootRt)
+            + (b[2] * Rt)
+            + (b[3] * Rt * rootRt)
+            + (b[4] * Math.pow(Rt, 2))
+            + (b[5] * Math.pow(Rt, 2) * rootRt)
+        );
+    return Math.max(0, salinity);
+}
+
+function conductivityFromPsuTemp(psu, tempC) {
+    const target = Math.max(0, parseFloat(psu) || 0);
+    let low = 0;
+    let high = 80;
+    for (let i = 0; i < 40; i += 1) {
+        const mid = (low + high) / 2;
+        const candidate = psuFromConductivityTemp(mid, tempC);
+        if (candidate < target) low = mid;
+        else high = mid;
+    }
+    return (low + high) / 2;
+}
+
+function densityKgLFromSpecificGravity(sg, tempC) {
+    const specificGravity = Math.max(0.9, parseFloat(sg) || 0);
+    return specificGravity * (pureWaterDensityKgM3(tempC) / 1000);
+}
+
+function specificGravityFromDensityKgL(densityKgL, tempC) {
+    const density = Math.max(0.9, parseFloat(densityKgL) || 0);
+    return density / (pureWaterDensityKgM3(tempC) / 1000);
+}
+
+function getSalinityMethodConfig(method) {
+    if (method === 'specificGravity') {
+        return {
+            label: 'Specific Gravity',
+            min: 1.0150,
+            max: 1.0350,
+            step: 0.0001,
+            fallback: 1.0233
+        };
+    }
+    if (method === 'conductivity') {
+        return {
+            label: 'Leitwert (mS/cm)',
+            min: 35,
+            max: 65,
+            step: 0.01,
+            fallback: 53.06
+        };
+    }
+    return {
+        label: 'Dichte abgelesen (kg/l)',
+        min: 1.0150,
+        max: 1.0350,
+        step: 0.0001,
+        fallback: 1.0233
+    };
+}
+
 function updateSalinityCalculator(source = '') {
+    const methodEl = document.getElementById('salinityMethod');
     const densityEl = document.getElementById('salinityDensity');
     const tempEl = document.getElementById('salinityTemp');
     const densityNumberEl = document.getElementById('salinityDensityNumber');
     const tempNumberEl = document.getElementById('salinityTempNumber');
+    const measurementLabelEl = document.getElementById('salinityMeasurementLabel');
     const result = document.getElementById('salinityResult');
     if (!densityEl || !tempEl || !result) return;
 
-    const densityMin = parseFloat(densityEl.min) || 1.0150;
-    const densityMax = parseFloat(densityEl.max) || 1.0350;
+    const method = methodEl?.value || 'density';
+    const methodConfig = getSalinityMethodConfig(method);
+    densityEl.min = String(methodConfig.min);
+    densityEl.max = String(methodConfig.max);
+    densityEl.step = String(methodConfig.step);
+    if (densityNumberEl) {
+        densityNumberEl.min = String(methodConfig.min);
+        densityNumberEl.max = String(methodConfig.max);
+        densityNumberEl.step = String(methodConfig.step);
+    }
+    if (measurementLabelEl) measurementLabelEl.innerText = methodConfig.label;
+
+    const densityMin = parseFloat(densityEl.min) || methodConfig.min;
+    const densityMax = parseFloat(densityEl.max) || methodConfig.max;
     const tempMin = parseFloat(tempEl.min) || 15;
     const tempMax = parseFloat(tempEl.max) || 32;
 
     const densitySource = source === 'densityNumber' && densityNumberEl ? densityNumberEl.value : densityEl.value;
     const tempSource = source === 'tempNumber' && tempNumberEl ? tempNumberEl.value : tempEl.value;
-    const density = clampNumber(densitySource, densityMin, densityMax, 1.0233);
+    const density = clampNumber(densitySource, densityMin, densityMax, methodConfig.fallback);
     const temp = clampNumber(tempSource, tempMin, tempMax, 25);
 
-    densityEl.value = density.toFixed(4);
+    const measurementDecimals = method === 'conductivity' ? 2 : 4;
+    densityEl.value = density.toFixed(measurementDecimals);
     tempEl.value = temp.toFixed(1);
-    if (densityNumberEl && source !== 'densityNumber') densityNumberEl.value = density.toFixed(4);
+    if (densityNumberEl && source !== 'densityNumber') densityNumberEl.value = density.toFixed(measurementDecimals);
     if (tempNumberEl && source !== 'tempNumber') tempNumberEl.value = temp.toFixed(1);
 
     const offset = parseFloat(db.psuCorrectionOffset) || 0;
-    const rawPsu = calculateApproxPsu(density, temp);
+    let rawPsu = 0;
+    let measuredDensity = 0;
+    if (method === 'specificGravity') {
+        measuredDensity = densityKgLFromSpecificGravity(density, temp);
+        rawPsu = psuFromDensityTemp(measuredDensity, temp);
+    } else if (method === 'conductivity') {
+        rawPsu = psuFromConductivityTemp(density, temp);
+        measuredDensity = densityKgLFromPsuTemp(rawPsu, temp);
+    } else {
+        measuredDensity = density;
+        rawPsu = psuFromDensityTemp(density, temp);
+    }
     const psu = rawPsu + offset;
-    const conductivity = 53.06 * (psu / 35);
+    const densityAt25 = densityKgLFromPsuTemp(psu, 25);
+    const densityAtTemp = densityKgLFromPsuTemp(psu, temp);
+    const sgAtTemp = specificGravityFromDensityKgL(densityAtTemp, temp);
+    const conductivity = conductivityFromPsuTemp(psu, temp);
     result.innerHTML = `
         <div class="salinity-value">${psu.toFixed(1)} PSU</div>
-        <small>Rohwert ${rawPsu.toFixed(1)} PSU${offset ? ` · Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)} PSU` : ''}. Leitfähigkeit ca. ${conductivity.toFixed(2)} mS/cm.</small>
+        <div class="tool-row">
+            <span><strong>Rohwert</strong><small>Vor gespeicherter PSU-Korrektur</small></span>
+            <span>${rawPsu.toFixed(2)} PSU</span>
+        </div>
+        <div class="tool-row">
+            <span><strong>Dichte @ ${temp.toFixed(1)} °C</strong><small>Aus der gewählten Messmethode</small></span>
+            <span>${densityAtTemp.toFixed(4)} kg/l</span>
+        </div>
+        <div class="tool-row">
+            <span><strong>Dichte @ 25 °C</strong><small>Temperaturkorrigierte Referenz</small></span>
+            <span>${densityAt25.toFixed(4)} kg/l</span>
+        </div>
+        <div class="tool-row">
+            <span><strong>Specific Gravity</strong><small>Bezugsdichte bei ${temp.toFixed(1)} °C</small></span>
+            <span>${sgAtTemp.toFixed(4)}</span>
+        </div>
+        <div class="tool-row">
+            <span><strong>Leitwert</strong><small>Äquivalenter Leitwert bei ${temp.toFixed(1)} °C</small></span>
+            <span>${conductivity.toFixed(2)} mS/cm</span>
+        </div>
+        <small>${offset ? `Gespeicherte PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)} wurde angewendet.` : 'Keine zusätzliche PSU-Korrektur gespeichert.'}</small>
     `;
     renderPsuCorrectionSettings();
 }
@@ -6080,6 +6896,9 @@ function updateSimpleSalinityConverter(source = 'psu') {
     const psuInput = document.getElementById('simplePsuInput');
     const densityInput = document.getElementById('simpleDensityInput');
     const result = document.getElementById('simpleSalinityResult');
+    const sgInput = document.getElementById('specificGravityInput');
+    const sgTempInput = document.getElementById('specificGravityTempInput');
+    const sgResult = document.getElementById('specificGravityResult');
     if (!psuInput || !densityInput || !result) return;
 
     let psu = parseFloat(psuInput.value);
@@ -6088,21 +6907,47 @@ function updateSimpleSalinityConverter(source = 'psu') {
     const offset = parseFloat(db.psuCorrectionOffset) || 0;
 
     if (source === 'psu' && !isNaN(psu)) {
-        density = densityFromApproxPsu(psu - offset);
+        density = densityKgLFromPsuTemp(Math.max(0, psu - offset), 25);
         densityInput.value = density.toFixed(4);
     } else if (source === 'density' && !isNaN(density)) {
-        psu = calculateApproxPsu(density, 25) + offset;
+        psu = psuFromDensityTemp(density, 25) + offset;
         psuInput.value = psu.toFixed(1);
     }
 
     if (isNaN(psu) && isNaN(density)) {
         result.innerText = '';
-        return;
+    } else {
+        const densityText = isNaN(density) ? '-' : `${density.toFixed(4)} kg/l`;
+        const psuText = isNaN(psu) ? '-' : `${psu.toFixed(1)} PSU`;
+        result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Bei 25 °C Referenz${offset ? ` · PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)}` : ''}.</small>`;
     }
 
-    const densityText = isNaN(density) ? '-' : `${density.toFixed(4)} kg/l`;
-    const psuText = isNaN(psu) ? '-' : `${psu.toFixed(1)} PSU`;
-    result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Bei 25 °C Referenz${offset ? ` · PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)}` : ''}.</small>`;
+    if (sgInput && sgTempInput && sgResult) {
+        const sg = parseFloat(sgInput.value);
+        const sgTemp = clampNumber(sgTempInput.value, 15, 32, 25);
+        if (!isNaN(sg)) {
+            const sgDensity = densityKgLFromSpecificGravity(sg, sgTemp);
+            const sgRawPsu = psuFromDensityTemp(sgDensity, sgTemp);
+            const sgPsu = sgRawPsu + offset;
+            const sgDensity25 = densityKgLFromPsuTemp(sgPsu, 25);
+            sgResult.innerHTML = `
+                <div class="tool-row">
+                    <span><strong>Specific Gravity → PSU</strong><small>Bei ${sgTemp.toFixed(1)} °C gemessen</small></span>
+                    <span>${sgPsu.toFixed(2)} PSU</span>
+                </div>
+                <div class="tool-row">
+                    <span><strong>Dichte @ ${sgTemp.toFixed(1)} °C</strong><small>Aus Specific Gravity abgeleitet</small></span>
+                    <span>${sgDensity.toFixed(4)} kg/l</span>
+                </div>
+                <div class="tool-row">
+                    <span><strong>Dichte @ 25 °C</strong><small>Temperaturkorrigierte Referenz</small></span>
+                    <span>${sgDensity25.toFixed(4)} kg/l</span>
+                </div>
+            `;
+        } else {
+            sgResult.innerText = '';
+        }
+    }
 }
 
 function renderPsuCorrectionSettings() {

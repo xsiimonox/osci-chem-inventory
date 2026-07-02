@@ -312,10 +312,18 @@
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Salzgehalt Rechner <button type="button" class="tool-inline-fav" data-tool-id="salzgehalt-rechner">☆ Fav</button></h3>
-                            <p class="hint">Näherungsrechner für Spindel-Werte. Exakte Korrekturen hängen von Spindel-Kalibrierung und Hersteller-Tabelle ab.</p>
+                            <p class="hint">Temperaturkorrigierter Rechner für Dichte, Specific Gravity und Leitwert. Referenz ist 25 °C, die gespeicherte PSU-Korrektur wird mit berücksichtigt.</p>
+                            <div class="input-group">
+                                <label>Messmethode:</label>
+                                <select id="salinityMethod" onchange="updateSalinityCalculator('method')">
+                                    <option value="density">Spindel / Dichte (kg/l)</option>
+                                    <option value="specificGravity">Refraktometer / Specific Gravity</option>
+                                    <option value="conductivity">Leitwert (mS/cm)</option>
+                                </select>
+                            </div>
                             <div class="input-group salinity-control">
                                 <div class="salinity-control-head">
-                                    <label for="salinityDensity">Dichte abgelesen (kg/l)</label>
+                                    <label for="salinityDensity" id="salinityMeasurementLabel">Dichte abgelesen (kg/l)</label>
                                     <input type="number" id="salinityDensityNumber" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densityNumber')">
                                 </div>
                                 <input type="range" id="salinityDensity" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densitySlider')">
@@ -342,13 +350,28 @@
                                 <button class="btn-secondary btn-animated" onclick="savePsuCorrectionOffset()">PSU-Korrektur speichern</button>
                                 <button class="btn-out btn-animated" onclick="deletePsuCorrectionOffset()">PSU-Korrektur löschen</button>
                             </div>
-                            <div class="input-group" style="margin-top:14px;">
-                                <label>Einfacher Umrechner PSU → Dichte:</label>
-                                <input type="number" id="simplePsuInput" step="0.1" value="35" oninput="updateSimpleSalinityConverter('psu')">
-                                <label>Dichte → PSU:</label>
-                                <input type="number" id="simpleDensityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('density')">
-                                <div id="simpleSalinityResult" class="tool-result"></div>
+                            <div class="tool-grid" style="margin-top:14px;">
+                                <div class="input-group">
+                                    <label>Einfacher Umrechner PSU → Dichte @ 25 °C:</label>
+                                    <input type="number" id="simplePsuInput" step="0.1" value="35" oninput="updateSimpleSalinityConverter('psu')">
+                                </div>
+                                <div class="input-group">
+                                    <label>Dichte → PSU @ 25 °C:</label>
+                                    <input type="number" id="simpleDensityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('density')">
+                                </div>
                             </div>
+                            <div id="simpleSalinityResult" class="tool-result"></div>
+                            <div class="tool-grid" style="margin-top:14px;">
+                                <div class="input-group">
+                                    <label>Specific Gravity:</label>
+                                    <input type="number" id="specificGravityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('specificGravity')">
+                                </div>
+                                <div class="input-group">
+                                    <label>Temperatur für SG (°C):</label>
+                                    <input type="number" id="specificGravityTempInput" step="0.1" min="15" max="32" value="25.0" oninput="updateSimpleSalinityConverter('specificGravity')">
+                                </div>
+                            </div>
+                            <div id="specificGravityResult" class="tool-result" style="margin-top:12px;"></div>
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
@@ -387,6 +410,50 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>C&amp;R Ausgleich erstellen <button type="button" class="tool-inline-fav" data-tool-id="c-und-r-ausgleich-erstellen">☆ Fav</button></h3>
+                            <div class="tool-experimental-banner">
+                                <strong>Ungetestet &amp; experimentell</strong>
+                                <span>Dieses C&amp;R Tool ist noch nicht freigegeben. Jede Berechnung muss manuell geprüft werden.</span>
+                            </div>
+                            <p class="hint">Eigene Ist- und Sollwerte eintragen. Der Rechner schätzt Wasserentnahme, Reinstwasser und passende C&amp;R-Mengen. Ergebnis bitte immer gegenprüfen.</p>
+                            <div id="customCrLockState">
+                                <div class="tool-grid">
+                                    <div class="input-group">
+                                        <label>Passwort zum Entsperren:</label>
+                                        <input type="password" id="customCrPasswordInput" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') unlockCustomCRTool()">
+                                    </div>
+                                </div>
+                                <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                                    <button class="btn-secondary btn-animated" onclick="unlockCustomCRTool()">Tool entsperren</button>
+                                    <button class="btn-out btn-animated" onclick="lockCustomCRTool()">Sperre aktiv lassen</button>
+                                </div>
+                            </div>
+                            <div id="customCrProtectedContent" class="custom-cr-protected-content" hidden>
+                                <div class="tool-grid">
+                                    <div class="input-group">
+                                        <label>Aquariumgröße (L):</label>
+                                        <input type="number" id="customCrTankLiters" min="1" step="1" value="770" oninput="renderCustomCRPlanner()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Vorher-PSU:</label>
+                                        <input type="number" id="customCrCurrentPsu" min="20" step="0.1" value="34.0" oninput="renderCustomCRPlanner()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Ziel-PSU:</label>
+                                        <input type="number" id="customCrTargetPsu" min="20" step="0.1" value="34.5" oninput="renderCustomCRPlanner()">
+                                    </div>
+                                </div>
+                                <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                                    <button class="btn-secondary btn-animated" onclick="loadCustomCRExample()">Beispiel laden</button>
+                                    <button class="btn-secondary btn-animated" onclick="loadCustomCROptimalTargets()">Optimale Zielwerte laden</button>
+                                    <button class="btn-out btn-animated" onclick="lockCustomCRTool()">Wieder sperren</button>
+                                </div>
+                                <div id="customCrPlannerMatrix"></div>
+                                <div id="customCrPlannerResult"></div>
+                            </div>
+                        </div>
+
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Meerwasser aus C&amp;R anmischen <button type="button" class="tool-inline-fav" data-tool-id="meerwasser-aus-c-und-r-anmischen">☆ Fav</button></h3>
                             <p class="hint">Rezept skaliert auf deine gewünschte Meerwassermenge. C&amp;R- und Makro-Produkte können direkt ausgelagert werden.</p>
