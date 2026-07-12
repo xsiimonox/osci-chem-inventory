@@ -204,6 +204,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
+const coralUiState = { editingId: null, pendingPhotoData: '', selectedId: null, lastNfcPayload: null };
 const AQUARIUM_FIELD_KEYS = [
     'implementationLog',
     'logBookCategories',
@@ -219,7 +220,9 @@ const AQUARIUM_FIELD_KEYS = [
     'majorCorrectionSettings',
     'psuCorrectionOffset',
     'toolSettings',
-    'crSeaWaterPresets'
+    'crSeaWaterPresets',
+    'dashboardSettings',
+    'coralCatalog'
 ];
 const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen']);
 
@@ -385,7 +388,7 @@ let googleDriveTokenClient = null;
 let googleDriveAccessToken = '';
 let googleDriveTokenExpiresAt = 0;
 let googleDriveSyncTimer = null;
-const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'korallen', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
 const CLOUD_SYNC_ENABLED = false;
@@ -393,11 +396,13 @@ const CLOUD_SYNC_MAINTENANCE_MESSAGE = 'Cloud Login & Share ist wegen Wartungsar
 const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const TAB_LABELS = {
+    uebersicht: 'Übersicht',
     lager: 'Lager',
     'cr-export': 'C&R',
     'trace-export': 'Trace',
     tools: 'Tools',
     logbuch: 'Logbuch',
+    korallen: 'Korallen',
     statistik: 'Statistik',
     log: 'Protokoll',
     masseneingang: 'Wareneingang',
@@ -405,11 +410,13 @@ const TAB_LABELS = {
     einstellungen: 'Einstellungen'
 };
 const TAB_ICONS = {
+    uebersicht: '⌂',
     lager: '▦',
     'cr-export': 'C',
     'trace-export': 'T',
     tools: '◇',
     logbuch: '✓',
+    korallen: '◉',
     statistik: '◷',
     log: '≡',
     masseneingang: '□',
@@ -1158,7 +1165,13 @@ Object.assign(window, {
 function getMenuOrder() {
     try {
         const parsed = JSON.parse(localStorage.getItem(MENU_ORDER_KEY) || '[]');
-        const valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+        let valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+        if (!valid.includes('uebersicht')) valid = ['uebersicht', ...valid];
+        if (!valid.includes('korallen')) {
+            const logbuchIndex = valid.indexOf('logbuch');
+            if (logbuchIndex >= 0) valid.splice(logbuchIndex + 1, 0, 'korallen');
+            else valid.push('korallen');
+        }
         return [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
     } catch (err) {
         return [...DEFAULT_MENU_ORDER];
@@ -1295,6 +1308,12 @@ function createWarehouseData(source = {}) {
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
         toolSettings: source.toolSettings || { lastSection: '', favorites: [] },
+        dashboardSettings: source.dashboardSettings || {
+            widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
+            range: '30',
+            pinnedMeasurements: ['KH', 'CA', 'PO4']
+        },
+        coralCatalog: source.coralCatalog || [],
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -1331,6 +1350,12 @@ function createAquariumData(source = {}) {
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
         toolSettings: cloneSerializable(source.toolSettings || { lastSection: '', favorites: [] }),
         crSeaWaterPresets: cloneSerializable(source.crSeaWaterPresets || {}),
+        dashboardSettings: cloneSerializable(source.dashboardSettings || {
+            widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
+            range: '30',
+            pinnedMeasurements: ['KH', 'CA', 'PO4']
+        }),
+        coralCatalog: cloneSerializable(source.coralCatalog || []),
         localUpdatedAt: source.localUpdatedAt || null
     };
 }
@@ -1461,6 +1486,11 @@ function normalizeWarehouseData(data) {
     if (db.majorCorrectionSettings.strengths.Ca === undefined) db.majorCorrectionSettings.strengths.Ca = 1;
     if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = 100;
     if (db.psuCorrectionOffset === undefined) db.psuCorrectionOffset = 0;
+    if (!db.dashboardSettings) db.dashboardSettings = { widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true }, range: '30', pinnedMeasurements: ['KH', 'CA', 'PO4'] };
+    if (!db.dashboardSettings.widgets) db.dashboardSettings.widgets = { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true };
+    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements) || db.dashboardSettings.pinnedMeasurements.length === 0) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'PO4'];
+    if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
+    if (!db.coralCatalog) db.coralCatalog = [];
     if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
     if (!db.warehouseEvents) db.warehouseEvents = [];
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
@@ -3073,6 +3103,7 @@ function renderCurrentWarehouseViews() {
     renderSupabaseSyncSettings();
     renderAquariumWorkspacePanels();
     renderLogBook();
+    renderCoralCatalog();
     renderDosingContainers();
     initBulkProductSelect();
     updateNotificationStatus();
@@ -3092,14 +3123,145 @@ function getDashboardNextTodo() {
         }))[0] || null;
 }
 
+function getDashboardSettings() {
+    if (!db.dashboardSettings) {
+        db.dashboardSettings = {
+            widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
+            range: '30',
+            pinnedMeasurements: ['KH', 'CA', 'PO4']
+        };
+    }
+    if (!db.dashboardSettings.widgets) db.dashboardSettings.widgets = { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true };
+    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements)) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'PO4'];
+    if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
+    return db.dashboardSettings;
+}
+
+function toggleDashboardWidget(widgetKey, checked) {
+    const settings = getDashboardSettings();
+    settings.widgets[widgetKey] = checked !== false;
+    saveDB(false);
+    renderDashboard();
+}
+
+function setDashboardRange(value) {
+    const settings = getDashboardSettings();
+    settings.range = value || '30';
+    saveDB(false);
+    renderDashboard();
+}
+
+function toggleDashboardMeasurementPin(typeId, checked) {
+    const settings = getDashboardSettings();
+    const set = new Set(settings.pinnedMeasurements || []);
+    if (checked) set.add(typeId);
+    else set.delete(typeId);
+    settings.pinnedMeasurements = Array.from(set).slice(0, 6);
+    saveDB(false);
+    renderDashboard();
+}
+
+function getMeasurementEntriesForRange(typeId, rangeValue = '30') {
+    const allEntries = getMeasurementEntries()
+        .filter(entry => entry.typeId === typeId)
+        .slice()
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+    if (rangeValue === 'all') return allEntries;
+    const days = parseInt(rangeValue, 10);
+    if (!days) return allEntries;
+    const threshold = Date.now() - days * 24 * 60 * 60 * 1000;
+    return allEntries.filter(entry => new Date(entry.at).getTime() >= threshold);
+}
+
+function getLastMeasurementAt() {
+    const entries = getMeasurementEntries().slice().sort((a, b) => new Date(b.at) - new Date(a.at));
+    return entries[0]?.at || null;
+}
+
+function getRecentLogBookEntry() {
+    return (db.logBookEntries || []).slice().sort((a, b) => new Date(b.at || b.createdAt || 0) - new Date(a.at || a.createdAt || 0))[0] || null;
+}
+
+function getDashboardMeasurementSummary(typeId, rangeValue) {
+    const entries = getMeasurementEntriesForRange(typeId, rangeValue);
+    if (!entries.length) return null;
+    const latest = entries[entries.length - 1];
+    const first = entries[0];
+    const delta = latest.value - first.value;
+    const spanDays = Math.max(1 / 24, (new Date(latest.at) - new Date(first.at)) / (24 * 60 * 60 * 1000));
+    const dailyTrend = entries.length > 1 ? delta / spanDays : 0;
+    return {
+        entries,
+        latest,
+        first,
+        delta,
+        dailyTrend,
+        unit: getMeasurementUnit(typeId),
+        meta: getMeasurementTypeById(typeId)
+    };
+}
+
+function createDashboardMeasurementChart(summary) {
+    if (!summary || !summary.entries.length) return '<div class="dashboard-chart-empty">Noch keine Messwerte</div>';
+    const entries = summary.entries;
+    const values = entries.map(entry => entry.value);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const spread = Math.max(0.001, max - min);
+    const width = 300;
+    const height = 96;
+    const paddingX = 8;
+    const paddingY = 10;
+    const points = entries.map((entry, index) => {
+        const x = entries.length === 1 ? width / 2 : paddingX + ((width - paddingX * 2) * index) / (entries.length - 1);
+        const y = paddingY + (height - paddingY * 2) - (((entry.value - min) / spread) * (height - paddingY * 2));
+        return { x, y };
+    });
+    const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+    const floor = height - paddingY;
+    const area = `${line} L ${points[points.length - 1].x.toFixed(2)} ${floor} L ${points[0].x.toFixed(2)} ${floor} Z`;
+    const latest = points[points.length - 1];
+    return `
+        <svg class="dashboard-trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Messwert Verlauf">
+            <defs>
+                <linearGradient id="dashboardMeasurementFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--secondary)" stop-opacity="0.28"></stop>
+                    <stop offset="100%" stop-color="var(--secondary)" stop-opacity="0.03"></stop>
+                </linearGradient>
+                <linearGradient id="dashboardMeasurementLine" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stop-color="var(--secondary)"></stop>
+                    <stop offset="100%" stop-color="var(--primary)"></stop>
+                </linearGradient>
+            </defs>
+            <path d="${area}" fill="url(#dashboardMeasurementFill)"></path>
+            <path d="${line}" fill="none" stroke="url(#dashboardMeasurementLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="${latest.x}" cy="${latest.y}" r="5.5" fill="var(--primary)"></circle>
+            <circle cx="${latest.x}" cy="${latest.y}" r="11" fill="rgba(191,90,242,0.16)"></circle>
+        </svg>
+    `;
+}
+
 function renderDashboard() {
     const container = document.getElementById('uebersicht');
     if (!container) return;
     const warehouse = getActiveWarehouse();
+    const aquarium = getActiveAquarium();
+    const settings = getDashboardSettings();
     const alerts = getStockAlerts();
     const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
     const nextTodo = getDashboardNextTodo();
     const lastLog = (db.logs || []).slice().reverse()[0];
+    const recentLogBookEntry = getRecentLogBookEntry();
+    const lastMeasurementAt = getLastMeasurementAt();
+    const coralCount = (db.coralCatalog || []).length;
+    const linkedCoralCount = (db.coralCatalog || []).filter(entry => entry.tagId).length;
+    const osmose = db.osmoseTank || { currentLiters: 0, capacityLiters: 0 };
+    const dosingCritical = (db.dosingContainers || []).filter(entry => {
+        const capacity = parseFloat(entry.capacityMl) || 0;
+        const current = parseFloat(entry.currentMl) || 0;
+        return capacity > 0 && current / capacity <= 0.25;
+    });
+    const pinnedMeasurements = (settings.pinnedMeasurements || []).filter(typeId => getMeasurementEntriesForRange(typeId, settings.range).length > 0);
     const lastLogText = lastLog
         ? `${lastLog.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${lastLog.item} · ${formatItemAmount(lastLog.item, lastLog.amount)}`
         : 'Noch keine Buchung';
@@ -3112,11 +3274,34 @@ function renderDashboard() {
             <em>${alert.weeksLeft === null ? 'prüfen' : `${alert.weeksLeft.toFixed(1)} Wochen`}</em>
         </button>
     `).join('');
+    const pinnedMeasurementCards = pinnedMeasurements.map(typeId => {
+        const summary = getDashboardMeasurementSummary(typeId, settings.range);
+        if (!summary) return '';
+        return `
+            <div class="dashboard-measurement-card" onclick="selectTab('logbuch')">
+                <div class="dashboard-measurement-head">
+                    <strong>${escapeHtml(summary.meta?.label || typeId)}</strong>
+                    <small>${summary.latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}</small>
+                </div>
+                ${createDashboardMeasurementChart(summary)}
+                <div class="dashboard-measurement-meta">
+                    <span>${summary.dailyTrend >= 0 ? '+' : ''}${summary.dailyTrend.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}/Tag</span>
+                    <span>${formatWarehouseDate(summary.latest.at)}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+    const measurementChooser = getMeasurementTypes().map(type => `
+        <label class="dashboard-chip-toggle">
+            <input type="checkbox" ${settings.pinnedMeasurements.includes(type.id) ? 'checked' : ''} onchange="toggleDashboardMeasurementPin('${type.id}', this.checked)">
+            <span>${escapeHtml(type.label)}</span>
+        </label>
+    `).join('');
     const onboarding = db.onboardingDone ? '' : `
         <section class="dashboard-onboarding">
             <div>
                 <strong>Ersteinrichtung</strong>
-                <p>Prüfe Lagername, Aquariumgröße, sichtbare Produkte, Warnschwellen und Cloud Login.</p>
+                <p>Prüfe Lagername, Aquariumgröße, sichtbare Produkte, Warnschwellen und sichere deine wichtigsten Bereiche für den Alltag.</p>
             </div>
             <div>
                 <button onclick="selectTab('lager')">Produkte prüfen</button>
@@ -3129,13 +3314,18 @@ function renderDashboard() {
         <section class="dashboard-hero">
             <div>
                 <small>Heute im Blick</small>
-                <h2>${escapeHtml(warehouse?.name || 'Lager')}</h2>
-                <p>${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
+                <h2>${escapeHtml(aquarium?.name || 'Aquarium')}</h2>
+                <p>${escapeHtml(warehouse?.name || 'Lager')} · ${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
             </div>
-            <button type="button" onclick="triggerRefresh()" class="dashboard-refresh">Aktualisieren</button>
+            <div class="dashboard-hero-actions">
+                <button type="button" onclick="triggerRefresh()" class="dashboard-refresh">Aktualisieren</button>
+                <button type="button" onclick="selectTab('korallen')" class="dashboard-refresh">Korallen</button>
+            </div>
         </section>
 
         ${onboarding}
+
+        <div class="card aquarium-workspace-panel dashboard-aquarium-panel" id="dashboardAquariumPanel"></div>
 
         <section class="dashboard-grid">
             <button type="button" class="dashboard-tile ${alerts.length ? 'warn' : 'ok'}" onclick="selectTab('lager')">
@@ -3144,8 +3334,14 @@ function renderDashboard() {
             <button type="button" class="dashboard-tile ${dueTodos.length ? 'warn' : 'ok'}" onclick="selectTab('logbuch')">
                 <span>ToDos</span><strong>${dueTodos.length}</strong><small>${dueTodos.length ? 'fällig' : 'nichts fällig'}</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="selectTab('einstellungen')">
-                <span>Cloud</span><strong>${warehouse?.remoteId ? 'An' : 'Lokal'}</strong><small>${formatWarehouseDate(warehouse?.lastSyncAt)}</small>
+            <button type="button" class="dashboard-tile" onclick="selectTab('logbuch')">
+                <span>Wassertest</span><strong>${lastMeasurementAt ? formatWarehouseDate(lastMeasurementAt) : 'offen'}</strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
+            </button>
+            <button type="button" class="dashboard-tile" onclick="selectTab('korallen')">
+                <span>Korallen</span><strong>${coralCount}</strong><small>${linkedCoralCount} mit NFC</small>
+            </button>
+            <button type="button" class="dashboard-tile" onclick="selectTab('logbuch')">
+                <span>Osmose</span><strong>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} L</strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
             </button>
             <button type="button" class="dashboard-tile" onclick="selectTab('lager')">
                 <span>Produkte</span><strong>${activeProducts}</strong><small>sichtbar</small>
@@ -3157,13 +3353,52 @@ function renderDashboard() {
             <button onclick="openSmartStockModal('in')">Einlagern</button>
             <button onclick="openSmartStockModal('out')">Auslagern</button>
             <button onclick="selectTab('tools')">Tools</button>
+            <button onclick="selectTab('korallen')">Korallen</button>
+        </section>
+
+        <section class="dashboard-config">
+            <details class="dashboard-config-card">
+                <summary>
+                    <span><strong>Dashboard anpassen</strong><small>Widgets ein- oder ausblenden und Messwert-Karten wählen</small></span>
+                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
+                <div class="dashboard-config-body">
+                    <div class="dashboard-widget-grid">
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.stock ? 'checked' : ''} onchange="toggleDashboardWidget('stock', this.checked)"><span>Bestand</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.todos ? 'checked' : ''} onchange="toggleDashboardWidget('todos', this.checked)"><span>ToDos</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.tests ? 'checked' : ''} onchange="toggleDashboardWidget('tests', this.checked)"><span>Wassertests</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.osmose ? 'checked' : ''} onchange="toggleDashboardWidget('osmose', this.checked)"><span>Osmose</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.dosing ? 'checked' : ''} onchange="toggleDashboardWidget('dosing', this.checked)"><span>Vorratsbehälter</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.measurements ? 'checked' : ''} onchange="toggleDashboardWidget('measurements', this.checked)"><span>Diagramme</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.logs ? 'checked' : ''} onchange="toggleDashboardWidget('logs', this.checked)"><span>Letzte Aktionen</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.corals ? 'checked' : ''} onchange="toggleDashboardWidget('corals', this.checked)"><span>Korallen</span></label>
+                    </div>
+                    <div class="tool-grid">
+                        <div class="input-group">
+                            <label>Diagramm-Zeitraum:</label>
+                            <select onchange="setDashboardRange(this.value)">
+                                <option value="14" ${settings.range === '14' ? 'selected' : ''}>14 Tage</option>
+                                <option value="30" ${settings.range === '30' ? 'selected' : ''}>30 Tage</option>
+                                <option value="90" ${settings.range === '90' ? 'selected' : ''}>90 Tage</option>
+                                <option value="365" ${settings.range === '365' ? 'selected' : ''}>1 Jahr</option>
+                                <option value="all" ${settings.range === 'all' ? 'selected' : ''}>Alles</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="dashboard-widget-grid">
+                        ${measurementChooser}
+                    </div>
+                </div>
+            </details>
         </section>
 
         <section class="dashboard-panels">
+            ${settings.widgets.stock ? `
             <div class="dashboard-panel">
                 <h3>Kritische Produkte</h3>
                 ${criticalRows || '<p class="hint">Keine kritischen Lagerwaren im aktuellen Warnzeitraum.</p>'}
-            </div>
+            </div>` : ''}
+            ${settings.widgets.todos ? `
             <div class="dashboard-panel">
                 <h3>Nächste Aufgabe</h3>
                 ${nextTodo ? `
@@ -3173,19 +3408,345 @@ function renderDashboard() {
                         <button onclick="completeAquariumTodo('${nextTodo.id}')">Erledigt</button>
                     </div>
                 ` : '<p class="hint">Keine ToDos geplant.</p>'}
-            </div>
+            </div>` : ''}
+            ${settings.widgets.logs ? `
             <div class="dashboard-panel">
                 <h3>Letzte Buchung</h3>
                 <p class="hint">${escapeHtml(lastLogText)}</p>
-            </div>
+                <div class="dashboard-subtle-list">
+                    <span>Letztes Logbuch:</span>
+                    <strong>${recentLogBookEntry ? escapeHtml(recentLogBookEntry.title || recentLogBookEntry.category) : 'Noch kein Eintrag'}</strong>
+                    <small>${recentLogBookEntry ? formatWarehouseDate(recentLogBookEntry.at || recentLogBookEntry.createdAt) : ''}</small>
+                </div>
+            </div>` : ''}
+            ${settings.widgets.osmose ? `
+            <div class="dashboard-panel">
+                <h3>Osmosevorrat</h3>
+                <p class="hint">${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} Litern verfügbar.</p>
+                <div class="dashboard-progress">
+                    <span style="width:${Math.max(4, Math.min(100, ((parseFloat(osmose.currentLiters) || 0) / Math.max(1, parseFloat(osmose.capacityLiters) || 1)) * 100))}%"></span>
+                </div>
+            </div>` : ''}
+            ${settings.widgets.dosing ? `
+            <div class="dashboard-panel">
+                <h3>Vorratsbehälter</h3>
+                ${dosingCritical.length ? dosingCritical.slice(0, 3).map(entry => `
+                    <div class="dashboard-subtle-list">
+                        <strong>${escapeHtml(entry.name || 'Behälter')}</strong>
+                        <small>${(parseFloat(entry.currentMl) || 0).toFixed(0)} / ${(parseFloat(entry.capacityMl) || 0).toFixed(0)} ml</small>
+                    </div>
+                `).join('') : '<p class="hint">Aktuell kein Behälter im kritischen Bereich.</p>'}
+            </div>` : ''}
+            ${settings.widgets.corals ? `
+            <div class="dashboard-panel">
+                <h3>Korallen im Fokus</h3>
+                <p class="hint">${coralCount ? `${coralCount} Korallen gespeichert, ${linkedCoralCount} mit NFC verknüpft.` : 'Noch keine Korallen angelegt.'}</p>
+                <button onclick="selectTab('korallen')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
+            </div>` : ''}
         </section>
+
+        ${settings.widgets.measurements ? `
+        <section class="dashboard-measurements-grid">
+            ${pinnedMeasurementCards || '<div class="dashboard-panel"><h3>Messwert-Diagramme</h3><p class="hint">Wähle oben mindestens einen Messwert aus oder trage zuerst Messungen im Logbuch ein.</p></div>'}
+        </section>` : ''}
     `;
+    renderAquariumWorkspacePanels();
 }
 
 function finishOnboarding() {
     db.onboardingDone = true;
     saveDB();
     renderDashboard();
+}
+
+function getCoralCatalog() {
+    if (!db.coralCatalog || !Array.isArray(db.coralCatalog)) db.coralCatalog = [];
+    return db.coralCatalog;
+}
+
+function getCoralById(id) {
+    return getCoralCatalog().find(entry => entry.id === id) || null;
+}
+
+function resetCoralForm() {
+    coralUiState.editingId = null;
+    coralUiState.pendingPhotoData = '';
+    ['coralName', 'coralSpecies', 'coralLocation', 'coralTagId', 'coralAddedAt', 'coralNote', 'coralSearch'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && id !== 'coralSearch') el.value = '';
+    });
+    const status = document.getElementById('coralStatus');
+    if (status) status.value = 'beobachten';
+    ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+    });
+    const preview = document.getElementById('coralPhotoPreview');
+    if (preview) preview.innerHTML = '<span>Noch kein Foto gewählt</span>';
+}
+
+function renderCoralPhotoPreview(dataUrl = '') {
+    const preview = document.getElementById('coralPhotoPreview');
+    if (!preview) return;
+    preview.innerHTML = dataUrl
+        ? `<img src="${dataUrl}" alt="Korallenfoto Vorschau">`
+        : '<span>Noch kein Foto gewählt</span>';
+}
+
+function handleCoralPhotoSelection(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+        coralUiState.pendingPhotoData = typeof reader.result === 'string' ? reader.result : '';
+        renderCoralPhotoPreview(coralUiState.pendingPhotoData);
+    };
+    reader.readAsDataURL(file);
+}
+
+function clearCoralPhoto() {
+    coralUiState.pendingPhotoData = '';
+    renderCoralPhotoPreview('');
+    ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = '';
+    });
+}
+
+function saveCoralEntry() {
+    const name = (document.getElementById('coralName')?.value || '').trim();
+    if (!name) return alert('Bitte gib der Koralle mindestens einen Namen.');
+    const species = (document.getElementById('coralSpecies')?.value || '').trim();
+    const location = (document.getElementById('coralLocation')?.value || '').trim();
+    const status = document.getElementById('coralStatus')?.value || 'beobachten';
+    const tagId = (document.getElementById('coralTagId')?.value || '').trim();
+    const addedAt = document.getElementById('coralAddedAt')?.value || '';
+    const note = (document.getElementById('coralNote')?.value || '').trim();
+    const target = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
+    const photo = coralUiState.pendingPhotoData || target?.photoDataUrl || '';
+    if (target) {
+        Object.assign(target, {
+            name, species, location, status, tagId, addedAt, note, photoDataUrl: photo, updatedAt: new Date().toISOString()
+        });
+        showToast('Koralle aktualisiert', 'success', 2200);
+    } else {
+        getCoralCatalog().unshift({
+            id: createWarehouseId(),
+            name,
+            species,
+            location,
+            status,
+            tagId,
+            addedAt,
+            note,
+            photoDataUrl: photo,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            lastSeenAt: null
+        });
+        showToast('Koralle angelegt', 'success', 2200);
+    }
+    saveDB();
+    resetCoralForm();
+    renderCoralCatalog();
+    renderDashboard();
+}
+
+function editCoralEntry(id) {
+    const coral = getCoralById(id);
+    if (!coral) return;
+    coralUiState.editingId = id;
+    coralUiState.pendingPhotoData = coral.photoDataUrl || '';
+    document.getElementById('coralName').value = coral.name || '';
+    document.getElementById('coralSpecies').value = coral.species || '';
+    document.getElementById('coralLocation').value = coral.location || '';
+    document.getElementById('coralStatus').value = coral.status || 'beobachten';
+    document.getElementById('coralTagId').value = coral.tagId || '';
+    document.getElementById('coralAddedAt').value = coral.addedAt || '';
+    document.getElementById('coralNote').value = coral.note || '';
+    renderCoralPhotoPreview(coral.photoDataUrl || '');
+    document.getElementById('coralName')?.focus();
+}
+
+function deleteCoralEntry(id) {
+    const coral = getCoralById(id);
+    if (!coral) return;
+    if (!confirm(`Koralle "${coral.name}" löschen?`)) return;
+    db.coralCatalog = getCoralCatalog().filter(entry => entry.id !== id);
+    if (coralUiState.editingId === id) resetCoralForm();
+    saveDB();
+    renderCoralCatalog();
+    renderDashboard();
+}
+
+function createCoralNfcPayload(coral) {
+    return JSON.stringify({
+        app: 'Reef.Storage&Tools',
+        type: 'coral',
+        id: coral.id,
+        name: coral.name,
+        species: coral.species || '',
+        location: coral.location || '',
+        status: coral.status || '',
+        updatedAt: new Date().toISOString()
+    });
+}
+
+function ensureWebNfcAvailable() {
+    if (!('NDEFReader' in window)) {
+        alert('Web NFC wird auf diesem Gerät oder in diesem Browser nicht unterstützt. Die Korallenverwaltung funktioniert trotzdem ohne NFC.');
+        return false;
+    }
+    if (!window.isSecureContext) {
+        alert('NFC funktioniert nur über HTTPS oder auf localhost.');
+        return false;
+    }
+    return true;
+}
+
+async function writeCurrentCoralToNfc() {
+    if (!ensureWebNfcAvailable()) return;
+    const name = (document.getElementById('coralName')?.value || '').trim();
+    if (!name) return alert('Bitte lege zuerst die Koralle an oder trage mindestens einen Namen ein.');
+    let coral = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
+    if (!coral) {
+        saveCoralEntry();
+        coral = getCoralCatalog()[0] || null;
+    }
+    if (!coral) return;
+    try {
+        const ndef = new NDEFReader();
+        const payload = createCoralNfcPayload(coral);
+        await ndef.write({
+            records: [
+                { recordType: 'text', data: payload },
+                { recordType: 'text', data: `${coral.name}${coral.location ? ' · ' + coral.location : ''}` }
+            ]
+        });
+        coral.tagId = coral.tagId || coral.id;
+        coral.lastSeenAt = new Date().toISOString();
+        coralUiState.lastNfcPayload = { coralId: coral.id, payload };
+        document.getElementById('coralTagId').value = coral.tagId;
+        saveDB();
+        renderCoralCatalog();
+        renderDashboard();
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = `NFC-Tag für ${coral.name} erfolgreich beschrieben.`;
+        showToast('NFC-Tag beschrieben', 'success', 2400);
+    } catch (err) {
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = `Schreiben fehlgeschlagen: ${err.message}`;
+        alert('NFC-Schreiben fehlgeschlagen: ' + err.message);
+    }
+}
+
+function writeCoralEntryToNfc(id) {
+    const coral = getCoralById(id);
+    if (!coral) return;
+    editCoralEntry(id);
+    writeCurrentCoralToNfc();
+}
+
+async function startCoralNfcScan() {
+    if (!ensureWebNfcAvailable()) return;
+    try {
+        const ndef = new NDEFReader();
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = 'NFC-Lesen gestartet. Halte jetzt einen Tag an das Gerät.';
+        await ndef.scan();
+        ndef.onreading = event => {
+            const record = event.message.records[0];
+            if (!record) return;
+            const decoder = new TextDecoder(record.encoding || 'utf-8');
+            const text = decoder.decode(record.data);
+            let parsed = null;
+            try { parsed = JSON.parse(text); } catch (err) {}
+            coralUiState.lastNfcPayload = parsed || { raw: text };
+            let match = null;
+            if (parsed?.id) match = getCoralById(parsed.id);
+            if (!match && parsed?.name) {
+                match = getCoralCatalog().find(entry => entry.name === parsed.name) || null;
+            }
+            if (match) {
+                match.lastSeenAt = new Date().toISOString();
+                if (!match.tagId) match.tagId = parsed?.id || match.id;
+                saveDB();
+                renderCoralCatalog();
+                editCoralEntry(match.id);
+                if (status) status.innerText = `Tag erkannt: ${match.name} wurde geöffnet.`;
+                showToast(`NFC erkannt: ${match.name}`, 'success', 2400);
+            } else {
+                if (parsed?.name) document.getElementById('coralName').value = parsed.name || '';
+                if (parsed?.species) document.getElementById('coralSpecies').value = parsed.species || '';
+                if (parsed?.location) document.getElementById('coralLocation').value = parsed.location || '';
+                if (parsed?.status) document.getElementById('coralStatus').value = parsed.status || 'beobachten';
+                if (parsed?.id) document.getElementById('coralTagId').value = parsed.id;
+                if (status) status.innerText = 'Tag gelesen. Die Daten wurden in das Formular übernommen.';
+                showToast('NFC-Tag gelesen', 'info', 2200);
+            }
+        };
+    } catch (err) {
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = `Lesen fehlgeschlagen: ${err.message}`;
+        alert('NFC-Lesen fehlgeschlagen: ' + err.message);
+    }
+}
+
+function renderCoralCatalog() {
+    renderAquariumWorkspacePanels();
+    const list = document.getElementById('coralCatalogList');
+    const stats = document.getElementById('coralLibraryStats');
+    if (!list) return;
+    const search = (document.getElementById('coralSearch')?.value || '').trim().toLowerCase();
+    const statusFilter = document.getElementById('coralStatusFilter')?.value || 'all';
+    const corals = getCoralCatalog()
+        .filter(entry => statusFilter === 'all' || (entry.status || 'beobachten') === statusFilter)
+        .filter(entry => {
+            if (!search) return true;
+            return [entry.name, entry.species, entry.location, entry.note, entry.tagId].join(' ').toLowerCase().includes(search);
+        })
+        .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
+    const addedAtField = document.getElementById('coralAddedAt');
+    if (addedAtField && !addedAtField.value) addedAtField.value = new Date().toISOString().slice(0, 10);
+    if (!coralUiState.editingId && !coralUiState.pendingPhotoData) renderCoralPhotoPreview('');
+    if (stats) {
+        stats.innerHTML = `
+            <span><strong>${getCoralCatalog().length}</strong><small>gesamt</small></span>
+            <span><strong>${getCoralCatalog().filter(entry => entry.tagId).length}</strong><small>mit NFC</small></span>
+        `;
+    }
+    if (!corals.length) {
+        list.innerHTML = '<div class="dashboard-panel"><h3>Noch keine Korallen</h3><p class="hint">Lege die erste Koralle an oder lies einen vorhandenen NFC-Tag ein.</p></div>';
+        return;
+    }
+    list.innerHTML = corals.map(coral => `
+        <article class="coral-card ${coralUiState.editingId === coral.id ? 'active' : ''}">
+            <div class="coral-card-media">
+                ${coral.photoDataUrl ? `<img src="${coral.photoDataUrl}" alt="${escapeHtml(coral.name)}">` : '<div class="coral-card-placeholder">Kein Foto</div>'}
+            </div>
+            <div class="coral-card-body">
+                <div class="coral-card-head">
+                    <div>
+                        <h4>${escapeHtml(coral.name)}</h4>
+                        <small>${escapeHtml(coral.species || 'Art nicht eingetragen')}</small>
+                    </div>
+                    <span class="coral-status-badge coral-status-${escapeHtml(coral.status || 'beobachten')}">${escapeHtml(coral.status || 'beobachten')}</span>
+                </div>
+                <div class="coral-meta-grid">
+                    <span><strong>Platz</strong><small>${escapeHtml(coral.location || '-')}</small></span>
+                    <span><strong>NFC</strong><small>${escapeHtml(coral.tagId || 'noch nicht verknüpft')}</small></span>
+                    <span><strong>Eingesetzt</strong><small>${coral.addedAt ? escapeHtml(coral.addedAt) : '-'}</small></span>
+                    <span><strong>Zuletzt gesehen</strong><small>${coral.lastSeenAt ? formatWarehouseDate(coral.lastSeenAt) : '-'}</small></span>
+                </div>
+                <p class="hint">${escapeHtml(coral.note || 'Keine zusätzliche Notiz gespeichert.')}</p>
+                <div class="btn-group" style="flex-wrap:wrap;">
+                    <button class="btn-secondary btn-animated" onclick="editCoralEntry('${coral.id}')">Bearbeiten</button>
+                    <button class="btn-secondary btn-animated" onclick="writeCoralEntryToNfc('${coral.id}')">Auf Tag schreiben</button>
+                    <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Löschen</button>
+                </div>
+            </div>
+        </article>
+    `).join('');
 }
 
 function openQuickActionMenu() {
@@ -3363,8 +3924,12 @@ function renderAquariumWorkspacePanels() {
     `;
     const toolsPanel = document.getElementById('toolsAquariumPanel');
     const logbookPanel = document.getElementById('logbookAquariumPanel');
+    const coralPanel = document.getElementById('coralAquariumPanel');
+    const dashboardPanel = document.getElementById('dashboardAquariumPanel');
     if (toolsPanel) toolsPanel.innerHTML = panelHtml('toolsAquariumSelect');
     if (logbookPanel) logbookPanel.innerHTML = panelHtml('logbookAquariumSelect');
+    if (coralPanel) coralPanel.innerHTML = panelHtml('coralAquariumSelect');
+    if (dashboardPanel) dashboardPanel.innerHTML = panelHtml('dashboardAquariumSelect');
 }
 
 function updateTabAccessState() {
@@ -3441,6 +4006,7 @@ function showTab(tabId) {
     if(tabId === 'nachbestellen') renderNachbestellen();
     if(tabId === 'tools') initTools();
     if(tabId === 'logbuch') renderLogBook();
+    if(tabId === 'korallen') renderCoralCatalog();
     if(tabId === 'einstellungen') {
         setupSettingsAccordions();
         updateNotificationStatus();
@@ -10491,7 +11057,7 @@ document.addEventListener('keydown', (e) => {
 async function bootstrapApplication() {
     await initDB();
     renderLegacyDomainBanner();
-    let startupTab = db.lastTab || 'lager';
+    let startupTab = db.lastTab || 'uebersicht';
     try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
     if (window.location.hash) {
         const hashTab = decodeURIComponent(window.location.hash.slice(1));
