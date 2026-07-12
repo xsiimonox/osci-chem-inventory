@@ -1112,6 +1112,14 @@ function renderMobileBottomNav(order = getMenuOrder()) {
     `).join('') + '<button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>';
 }
 
+function renderLegacyDomainBanner() {
+    const banner = document.getElementById('legacy-domain-banner');
+    if (!banner) return;
+    const host = String(window.location.hostname || '').toLowerCase();
+    const isLegacyHost = host === 'xsiimonox.github.io' || host.endsWith('.github.io');
+    banner.hidden = !isLegacyHost;
+}
+
 function renderMenuOrderSettings() {
     const container = document.getElementById('menu-order-settings');
     if (!container) return;
@@ -10302,6 +10310,7 @@ document.addEventListener('keydown', (e) => {
 // APP START
 async function bootstrapApplication() {
     await initDB();
+    renderLegacyDomainBanner();
     let startupTab = db.lastTab || 'lager';
     try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
     if (window.location.hash) {

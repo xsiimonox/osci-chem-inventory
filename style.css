@@ -199,6 +199,71 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 .header-title-container { display: flex; align-items: center; gap: 8px; }
 .version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
 
+.legacy-domain-banner {
+    width: min(1200px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+    margin: 14px auto 8px;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--primary) 48%, var(--border));
+    border-radius: 18px;
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--primary) 22%, transparent), color-mix(in srgb, var(--secondary) 12%, transparent)),
+        color-mix(in srgb, var(--card-bg) 94%, transparent);
+    box-shadow: 0 18px 42px rgba(0,0,0,0.24);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    position: relative;
+    z-index: 100;
+}
+
+.legacy-domain-banner[hidden] {
+    display: none !important;
+}
+
+.legacy-domain-banner-copy strong,
+.legacy-domain-banner-copy span {
+    display: block;
+}
+
+.legacy-domain-banner-copy strong {
+    font-size: 1rem;
+    color: #fff;
+}
+
+.legacy-domain-banner-copy span {
+    margin-top: 4px;
+    color: var(--text);
+    font-size: 0.86rem;
+    line-height: 1.45;
+}
+
+.legacy-domain-banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.legacy-domain-banner-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border-radius: 12px;
+    background: var(--primary);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 800;
+    box-shadow: 0 12px 28px color-mix(in srgb, var(--primary) 36%, transparent);
+}
+
+.legacy-domain-banner-link:hover {
+    filter: brightness(1.06);
+}
+
 .update-banner {
     width: min(1200px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
@@ -4631,6 +4696,23 @@ body.theme-badman .cross-hint { color: #e63946 !important; }
         background: rgba(42, 42, 42, 0.88) !important;
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
+    }
+
+    .legacy-domain-banner {
+        width: min(100vw - 18px, 1200px);
+        margin: 10px auto 6px;
+        padding: 14px;
+        border-radius: 16px;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .legacy-domain-banner-actions {
+        width: 100%;
+    }
+
+    .legacy-domain-banner-link {
+        width: 100%;
     }
 }
 
