@@ -205,6 +205,11 @@ const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
 const coralUiState = { editingId: null, pendingPhotoData: '', selectedId: null, lastNfcPayload: null };
+const CORAL_STATUS_OPTIONS = [
+    { value: 'neuzugang', label: 'Neuzugang' },
+    { value: 'bestand', label: 'Bestandskoralle' },
+    { value: 'ableger', label: 'Ableger' }
+];
 const AQUARIUM_FIELD_KEYS = [
     'implementationLog',
     'logBookCategories',
@@ -222,7 +227,8 @@ const AQUARIUM_FIELD_KEYS = [
     'toolSettings',
     'crSeaWaterPresets',
     'dashboardSettings',
-    'coralCatalog'
+    'coralCatalog',
+    'coralTransfers'
 ];
 const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen']);
 
@@ -395,6 +401,7 @@ const CLOUD_SYNC_ENABLED = false;
 const CLOUD_SYNC_MAINTENANCE_MESSAGE = 'Cloud Login & Share ist wegen Wartungsarbeiten voruebergehend deaktiviert.';
 const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
+const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
     lager: 'Lager',
@@ -1178,6 +1185,62 @@ function getMenuOrder() {
     }
 }
 
+function getDefaultMobileQuickTabs() {
+    return ['uebersicht', 'lager', 'tools', 'logbuch'];
+}
+
+function getMobileQuickTabs() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(MOBILE_QUICK_TABS_KEY) || '[]');
+        const cleaned = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+        const unique = [];
+        cleaned.forEach(id => {
+            if (!unique.includes(id) && unique.length < 4) unique.push(id);
+        });
+        const fallback = getDefaultMobileQuickTabs();
+        fallback.forEach(id => {
+            if (!unique.includes(id) && unique.length < 4) unique.push(id);
+        });
+        return unique.slice(0, 4);
+    } catch (err) {
+        return getDefaultMobileQuickTabs();
+    }
+}
+
+function saveMobileQuickTabs(tabs) {
+    const valid = Array.isArray(tabs) ? tabs.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+    const unique = [];
+    valid.forEach(id => {
+        if (!unique.includes(id) && unique.length < 4) unique.push(id);
+    });
+    const fallback = getDefaultMobileQuickTabs();
+    fallback.forEach(id => {
+        if (!unique.includes(id) && unique.length < 4) unique.push(id);
+    });
+    localStorage.setItem(MOBILE_QUICK_TABS_KEY, JSON.stringify(unique.slice(0, 4)));
+    renderMobileBottomNav();
+    renderMenuOrderSettings();
+}
+
+function updateMobileQuickTab(slotIndex, tabId) {
+    const tabs = getMobileQuickTabs();
+    if (!DEFAULT_MENU_ORDER.includes(tabId)) return;
+    const next = [...tabs];
+    const existingIndex = next.indexOf(tabId);
+    if (existingIndex >= 0 && existingIndex !== slotIndex) {
+        [next[existingIndex], next[slotIndex]] = [next[slotIndex], next[existingIndex]];
+    } else {
+        next[slotIndex] = tabId;
+    }
+    saveMobileQuickTabs(next);
+}
+
+function resetMobileQuickTabs() {
+    localStorage.removeItem(MOBILE_QUICK_TABS_KEY);
+    renderMobileBottomNav();
+    renderMenuOrderSettings();
+}
+
 function saveMenuOrder(order) {
     const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : DEFAULT_MENU_ORDER;
     const normalized = [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
@@ -1222,7 +1285,7 @@ function applyMenuOrder() {
 function renderMobileBottomNav(order = getMenuOrder()) {
     const nav = document.querySelector('.mobile-bottom-nav');
     if (!nav) return;
-    const quickTabs = order.slice(0, 4);
+    const quickTabs = getMobileQuickTabs();
     nav.innerHTML = quickTabs.map(tabId => `
         <button type="button" onclick="selectTab('${tabId}')" data-tab="${tabId}">
             <span>${TAB_ICONS[tabId] || '•'}</span>${TAB_LABELS[tabId] || tabId}
@@ -1242,11 +1305,29 @@ function renderMenuOrderSettings() {
     const container = document.getElementById('menu-order-settings');
     if (!container) return;
     const order = getMenuOrder();
+    const quickTabs = getMobileQuickTabs();
     container.innerHTML = `
+        <div class="mobile-quick-tabs-settings">
+            <div class="mobile-quick-tabs-head">
+                <strong>Mobiler Schnellzugriff</strong>
+                <small>Lege selbst fest, welche 4 Bereiche unten am Handy direkt sichtbar sind.</small>
+            </div>
+            <div class="mobile-quick-tabs-grid">
+                ${quickTabs.map((tabId, index) => `
+                    <label class="mobile-quick-tab-slot">
+                        <span>Slot ${index + 1}</span>
+                        <select onchange="updateMobileQuickTab(${index}, this.value)">
+                            ${DEFAULT_MENU_ORDER.map(optionId => `<option value="${optionId}" ${optionId === tabId ? 'selected' : ''}>${TAB_LABELS[optionId] || optionId}</option>`).join('')}
+                        </select>
+                    </label>
+                `).join('')}
+            </div>
+            <button type="button" class="btn-secondary btn-animated" onclick="resetMobileQuickTabs()">Mobilen Schnellzugriff zurücksetzen</button>
+        </div>
         <div class="menu-order-list">
             ${order.map((tabId, index) => `
                 <div class="menu-order-row">
-                    <span><strong>${index + 1}. ${TAB_LABELS[tabId] || tabId}</strong><small>${index < 4 ? 'Mobile Schnellnavigation' : 'Menü'}</small></span>
+                    <span><strong>${index + 1}. ${TAB_LABELS[tabId] || tabId}</strong><small>Hauptmenü</small></span>
                     <div>
                         <button type="button" onclick="moveMenuItem('${tabId}', -1)" ${index === 0 ? 'disabled' : ''}>↑</button>
                         <button type="button" onclick="moveMenuItem('${tabId}', 1)" ${index === order.length - 1 ? 'disabled' : ''}>↓</button>
@@ -1314,6 +1395,7 @@ function createWarehouseData(source = {}) {
             pinnedMeasurements: ['KH', 'CA', 'PO4']
         },
         coralCatalog: source.coralCatalog || [],
+        coralTransfers: source.coralTransfers || [],
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -1356,6 +1438,7 @@ function createAquariumData(source = {}) {
             pinnedMeasurements: ['KH', 'CA', 'PO4']
         }),
         coralCatalog: cloneSerializable(source.coralCatalog || []),
+        coralTransfers: cloneSerializable(source.coralTransfers || []),
         localUpdatedAt: source.localUpdatedAt || null
     };
 }
@@ -1491,6 +1574,7 @@ function normalizeWarehouseData(data) {
     if (!Array.isArray(db.dashboardSettings.pinnedMeasurements) || db.dashboardSettings.pinnedMeasurements.length === 0) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'PO4'];
     if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
     if (!db.coralCatalog) db.coralCatalog = [];
+    if (!db.coralTransfers) db.coralTransfers = [];
     if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
     if (!db.warehouseEvents) db.warehouseEvents = [];
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
@@ -3464,19 +3548,150 @@ function getCoralCatalog() {
     return db.coralCatalog;
 }
 
+function getCoralTransfers() {
+    if (!db.coralTransfers || !Array.isArray(db.coralTransfers)) db.coralTransfers = [];
+    return db.coralTransfers;
+}
+
 function getCoralById(id) {
     return getCoralCatalog().find(entry => entry.id === id) || null;
+}
+
+function normalizeCoralStatus(status) {
+    const value = (status || '').toLowerCase();
+    if (value === 'frag') return 'ableger';
+    if (value === 'beobachten' || value === 'stabil' || value === 'wachsend') return 'bestand';
+    if (CORAL_STATUS_OPTIONS.some(option => option.value === value)) return value;
+    return 'bestand';
+}
+
+function getCoralStatusLabel(status) {
+    return CORAL_STATUS_OPTIONS.find(option => option.value === status)?.label || 'Bestandskoralle';
+}
+
+function getCoralDisplayName(coral = {}) {
+    return coral.name || coral.tradeName || coral.scientificName || coral.species || 'Koralle';
+}
+
+function getCoralOptionalDisplayName(coral = null) {
+    if (!coral) return '-';
+    return getCoralDisplayName(coral);
+}
+
+function getMotherCoralOptions(currentId = '') {
+    return getCoralCatalog()
+        .filter(entry => entry.id !== currentId)
+        .sort((a, b) => getCoralDisplayName(a).localeCompare(getCoralDisplayName(b), 'de'));
+}
+
+function renderMotherCoralOptions(selectedId = '', currentId = '') {
+    const select = document.getElementById('coralMotherId');
+    if (!select) return;
+    const options = getMotherCoralOptions(currentId);
+    select.innerHTML = [
+        '<option value="">Keine Mutterkoralle zugewiesen</option>',
+        ...options.map(entry => `<option value="${escapeHtml(entry.id)}">${escapeHtml(getCoralDisplayName(entry))}</option>`)
+    ].join('');
+    select.value = selectedId || '';
+}
+
+function updateCoralMotherFieldVisibility() {
+    const wrapper = document.getElementById('coralMotherField');
+    const select = document.getElementById('coralStatus');
+    const status = normalizeCoralStatus(select?.value || '');
+    if (!wrapper) return;
+    wrapper.classList.toggle('is-hidden', status !== 'ableger');
+}
+
+function getCoralFormData() {
+    return {
+        name: (document.getElementById('coralName')?.value || '').trim(),
+        scientificName: (document.getElementById('coralScientificName')?.value || '').trim(),
+        genus: (document.getElementById('coralGenus')?.value || '').trim(),
+        speciesName: (document.getElementById('coralSpeciesName')?.value || '').trim(),
+        species: (document.getElementById('coralSpecies')?.value || '').trim(),
+        coralType: document.getElementById('coralType')?.value || '',
+        tradeName: (document.getElementById('coralTradeName')?.value || '').trim(),
+        origin: document.getElementById('coralOrigin')?.value || '',
+        location: (document.getElementById('coralLocation')?.value || '').trim(),
+        status: normalizeCoralStatus(document.getElementById('coralStatus')?.value || 'bestand'),
+        motherCoralId: document.getElementById('coralMotherId')?.value || '',
+        tagId: (document.getElementById('coralTagId')?.value || '').trim(),
+        addedAt: document.getElementById('coralAddedAt')?.value || '',
+        lightNeed: document.getElementById('coralLightNeed')?.value || '',
+        parRange: (document.getElementById('coralParRange')?.value || '').trim(),
+        flowNeed: document.getElementById('coralFlowNeed')?.value || '',
+        flowType: document.getElementById('coralFlowType')?.value || '',
+        difficulty: document.getElementById('coralDifficulty')?.value || '',
+        placement: document.getElementById('coralPlacement')?.value || '',
+        growthSpeed: document.getElementById('coralGrowthSpeed')?.value || '',
+        growthForm: document.getElementById('coralGrowthForm')?.value || '',
+        aggression: document.getElementById('coralAggression')?.value || '',
+        minDistance: (document.getElementById('coralMinDistance')?.value || '').trim(),
+        note: (document.getElementById('coralNote')?.value || '').trim()
+    };
+}
+
+function applyCoralFormData(data = {}) {
+    const map = {
+        coralName: data.name || '',
+        coralScientificName: data.scientificName || '',
+        coralGenus: data.genus || '',
+        coralSpeciesName: data.speciesName || '',
+        coralSpecies: data.species || '',
+        coralType: data.coralType || '',
+        coralTradeName: data.tradeName || '',
+        coralOrigin: data.origin || '',
+        coralLocation: data.location || '',
+        coralStatus: normalizeCoralStatus(data.status || 'bestand'),
+        coralTagId: data.tagId || '',
+        coralAddedAt: data.addedAt || '',
+        coralLightNeed: data.lightNeed || '',
+        coralParRange: data.parRange || '',
+        coralFlowNeed: data.flowNeed || '',
+        coralFlowType: data.flowType || '',
+        coralDifficulty: data.difficulty || '',
+        coralPlacement: data.placement || '',
+        coralGrowthSpeed: data.growthSpeed || '',
+        coralGrowthForm: data.growthForm || '',
+        coralAggression: data.aggression || '',
+        coralMinDistance: data.minDistance || '',
+        coralNote: data.note || ''
+    };
+    Object.entries(map).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+    renderMotherCoralOptions(data.motherCoralId || '', data.id || coralUiState.editingId || '');
+    updateCoralMotherFieldVisibility();
 }
 
 function resetCoralForm() {
     coralUiState.editingId = null;
     coralUiState.pendingPhotoData = '';
-    ['coralName', 'coralSpecies', 'coralLocation', 'coralTagId', 'coralAddedAt', 'coralNote', 'coralSearch'].forEach(id => {
+    ['coralName', 'coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralSpecies', 'coralTradeName', 'coralLocation', 'coralTagId', 'coralAddedAt', 'coralParRange', 'coralMinDistance', 'coralNote', 'coralSearch'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'coralSearch') el.value = '';
     });
-    const status = document.getElementById('coralStatus');
-    if (status) status.value = 'beobachten';
+    const defaultSelects = {
+        coralStatus: 'bestand',
+        coralType: '',
+        coralOrigin: '',
+        coralLightNeed: '',
+        coralFlowNeed: '',
+        coralFlowType: '',
+        coralDifficulty: '',
+        coralPlacement: '',
+        coralGrowthSpeed: '',
+        coralGrowthForm: '',
+        coralAggression: ''
+    };
+    Object.entries(defaultSelects).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+    renderMotherCoralOptions('', '');
+    updateCoralMotherFieldVisibility();
     ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
@@ -3514,31 +3729,22 @@ function clearCoralPhoto() {
 }
 
 function saveCoralEntry() {
-    const name = (document.getElementById('coralName')?.value || '').trim();
-    if (!name) return alert('Bitte gib der Koralle mindestens einen Namen.');
-    const species = (document.getElementById('coralSpecies')?.value || '').trim();
-    const location = (document.getElementById('coralLocation')?.value || '').trim();
-    const status = document.getElementById('coralStatus')?.value || 'beobachten';
-    const tagId = (document.getElementById('coralTagId')?.value || '').trim();
-    const addedAt = document.getElementById('coralAddedAt')?.value || '';
-    const note = (document.getElementById('coralNote')?.value || '').trim();
+    const form = getCoralFormData();
+    if (!form.name) return alert('Bitte gib der Koralle mindestens einen Namen.');
+    if (form.status !== 'ableger') form.motherCoralId = '';
     const target = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
     const photo = coralUiState.pendingPhotoData || target?.photoDataUrl || '';
     if (target) {
         Object.assign(target, {
-            name, species, location, status, tagId, addedAt, note, photoDataUrl: photo, updatedAt: new Date().toISOString()
+            ...form,
+            photoDataUrl: photo,
+            updatedAt: new Date().toISOString()
         });
         showToast('Koralle aktualisiert', 'success', 2200);
     } else {
         getCoralCatalog().unshift({
             id: createWarehouseId(),
-            name,
-            species,
-            location,
-            status,
-            tagId,
-            addedAt,
-            note,
+            ...form,
             photoDataUrl: photo,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -3557,21 +3763,49 @@ function editCoralEntry(id) {
     if (!coral) return;
     coralUiState.editingId = id;
     coralUiState.pendingPhotoData = coral.photoDataUrl || '';
-    document.getElementById('coralName').value = coral.name || '';
-    document.getElementById('coralSpecies').value = coral.species || '';
-    document.getElementById('coralLocation').value = coral.location || '';
-    document.getElementById('coralStatus').value = coral.status || 'beobachten';
-    document.getElementById('coralTagId').value = coral.tagId || '';
-    document.getElementById('coralAddedAt').value = coral.addedAt || '';
-    document.getElementById('coralNote').value = coral.note || '';
+    applyCoralFormData(coral);
     renderCoralPhotoPreview(coral.photoDataUrl || '');
     document.getElementById('coralName')?.focus();
+}
+
+function archiveCoralTransfer(id) {
+    const coral = getCoralById(id);
+    if (!coral) return;
+    const recipientName = (prompt(`An wen wurde "${getCoralDisplayName(coral)}" abgegeben?`, '') || '').trim();
+    if (!recipientName) return;
+    const recipientContact = (prompt('Kontaktmöglichkeit (optional):', '') || '').trim();
+    const transferNote = (prompt('Notiz zur Abgabe (optional):', '') || '').trim();
+    getCoralTransfers().unshift({
+        id: createWarehouseId(),
+        coralId: coral.id,
+        coralSnapshot: cloneSerializable(coral),
+        recipientName,
+        recipientContact,
+        note: transferNote,
+        transferredAt: new Date().toISOString()
+    });
+    db.coralCatalog = getCoralCatalog().filter(entry => entry.id !== id);
+    if (coralUiState.editingId === id) resetCoralForm();
+    saveDB();
+    renderCoralCatalog();
+    renderDashboard();
+    showToast('Koralle als Abgabe archiviert', 'success', 2400);
 }
 
 function deleteCoralEntry(id) {
     const coral = getCoralById(id);
     if (!coral) return;
-    if (!confirm(`Koralle "${coral.name}" löschen?`)) return;
+    const choice = prompt(
+        `Was möchtest du mit "${getCoralDisplayName(coral)}" machen?\n\n1 = endgültig löschen\n2 = als Abgabe archivieren\n\nNummer eingeben:`,
+        '2'
+    );
+    if (choice === null) return;
+    if (choice.trim() === '2') {
+        archiveCoralTransfer(id);
+        return;
+    }
+    if (choice.trim() !== '1') return;
+    if (!confirm(`Koralle "${getCoralDisplayName(coral)}" endgültig löschen?`)) return;
     db.coralCatalog = getCoralCatalog().filter(entry => entry.id !== id);
     if (coralUiState.editingId === id) resetCoralForm();
     saveDB();
@@ -3585,9 +3819,57 @@ function createCoralNfcPayload(coral) {
         type: 'coral',
         id: coral.id,
         name: coral.name,
+        scientificName: coral.scientificName || '',
+        genus: coral.genus || '',
+        speciesName: coral.speciesName || '',
         species: coral.species || '',
+        coralType: coral.coralType || '',
+        tradeName: coral.tradeName || '',
+        origin: coral.origin || '',
         location: coral.location || '',
-        status: coral.status || '',
+        status: normalizeCoralStatus(coral.status || ''),
+        motherCoralId: coral.motherCoralId || '',
+        lightNeed: coral.lightNeed || '',
+        parRange: coral.parRange || '',
+        flowNeed: coral.flowNeed || '',
+        flowType: coral.flowType || '',
+        difficulty: coral.difficulty || '',
+        placement: coral.placement || '',
+        growthSpeed: coral.growthSpeed || '',
+        growthForm: coral.growthForm || '',
+        aggression: coral.aggression || '',
+        minDistance: coral.minDistance || '',
+        note: coral.note || '',
+        updatedAt: new Date().toISOString()
+    });
+}
+
+function createCoralPresetNfcPayload(form) {
+    return JSON.stringify({
+        app: 'Reef.Storage&Tools',
+        type: 'coral-preset',
+        presetLabel: form.tradeName || form.scientificName || form.name || 'Korallen Preset',
+        data: {
+            scientificName: form.scientificName || '',
+            genus: form.genus || '',
+            speciesName: form.speciesName || '',
+            species: form.species || '',
+            coralType: form.coralType || '',
+            tradeName: form.tradeName || '',
+            origin: form.origin || '',
+            status: normalizeCoralStatus(form.status || ''),
+            lightNeed: form.lightNeed || '',
+            parRange: form.parRange || '',
+            flowNeed: form.flowNeed || '',
+            flowType: form.flowType || '',
+            difficulty: form.difficulty || '',
+            placement: form.placement || '',
+            growthSpeed: form.growthSpeed || '',
+            growthForm: form.growthForm || '',
+            aggression: form.aggression || '',
+            minDistance: form.minDistance || '',
+            note: form.note || ''
+        },
         updatedAt: new Date().toISOString()
     });
 }
@@ -3640,6 +3922,31 @@ async function writeCurrentCoralToNfc() {
     }
 }
 
+async function writeCoralPresetToNfc() {
+    if (!ensureWebNfcAvailable()) return;
+    const form = getCoralFormData();
+    if (!form.scientificName && !form.tradeName && !form.coralType && !form.species) {
+        return alert('Bitte trage erst ein paar Grunddaten ein, damit das Preset sinnvoll vorbelegt ist.');
+    }
+    try {
+        const ndef = new NDEFReader();
+        const payload = createCoralPresetNfcPayload(form);
+        await ndef.write({
+            records: [
+                { recordType: 'text', data: payload },
+                { recordType: 'text', data: `Preset: ${form.tradeName || form.scientificName || form.coralType || 'Koralle'}` }
+            ]
+        });
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = `NFC-Preset erfolgreich geschrieben: ${form.tradeName || form.scientificName || 'Korallen Vorlage'}`;
+        showToast('NFC-Preset geschrieben', 'success', 2400);
+    } catch (err) {
+        const status = document.getElementById('coralNfcStatus');
+        if (status) status.innerText = `Preset-Schreiben fehlgeschlagen: ${err.message}`;
+        alert('NFC-Preset-Schreiben fehlgeschlagen: ' + err.message);
+    }
+}
+
 function writeCoralEntryToNfc(id) {
     const coral = getCoralById(id);
     if (!coral) return;
@@ -3662,6 +3969,15 @@ async function startCoralNfcScan() {
             let parsed = null;
             try { parsed = JSON.parse(text); } catch (err) {}
             coralUiState.lastNfcPayload = parsed || { raw: text };
+            if (parsed?.type === 'coral-preset' && parsed?.data) {
+                applyCoralFormData({
+                    ...parsed.data,
+                    name: document.getElementById('coralName')?.value || ''
+                });
+                if (status) status.innerText = `Preset geladen: ${parsed.presetLabel || 'Korallen Vorlage'}`;
+                showToast(`Preset geladen: ${parsed.presetLabel || 'Korallen Vorlage'}`, 'info', 2400);
+                return;
+            }
             let match = null;
             if (parsed?.id) match = getCoralById(parsed.id);
             if (!match && parsed?.name) {
@@ -3679,8 +3995,9 @@ async function startCoralNfcScan() {
                 if (parsed?.name) document.getElementById('coralName').value = parsed.name || '';
                 if (parsed?.species) document.getElementById('coralSpecies').value = parsed.species || '';
                 if (parsed?.location) document.getElementById('coralLocation').value = parsed.location || '';
-                if (parsed?.status) document.getElementById('coralStatus').value = parsed.status || 'beobachten';
+                if (parsed?.status) document.getElementById('coralStatus').value = normalizeCoralStatus(parsed.status || 'bestand');
                 if (parsed?.id) document.getElementById('coralTagId').value = parsed.id;
+                updateCoralMotherFieldVisibility();
                 if (status) status.innerText = 'Tag gelesen. Die Daten wurden in das Formular übernommen.';
                 showToast('NFC-Tag gelesen', 'info', 2200);
             }
@@ -3696,11 +4013,13 @@ function renderCoralCatalog() {
     renderAquariumWorkspacePanels();
     const list = document.getElementById('coralCatalogList');
     const stats = document.getElementById('coralLibraryStats');
+    const transfersList = document.getElementById('coralTransferList');
     if (!list) return;
     const search = (document.getElementById('coralSearch')?.value || '').trim().toLowerCase();
     const statusFilter = document.getElementById('coralStatusFilter')?.value || 'all';
     const corals = getCoralCatalog()
-        .filter(entry => statusFilter === 'all' || (entry.status || 'beobachten') === statusFilter)
+        .map(entry => ({ ...entry, status: normalizeCoralStatus(entry.status || 'bestand') }))
+        .filter(entry => statusFilter === 'all' || entry.status === statusFilter)
         .filter(entry => {
             if (!search) return true;
             return [entry.name, entry.species, entry.location, entry.note, entry.tagId].join(' ').toLowerCase().includes(search);
@@ -3708,11 +4027,14 @@ function renderCoralCatalog() {
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
     const addedAtField = document.getElementById('coralAddedAt');
     if (addedAtField && !addedAtField.value) addedAtField.value = new Date().toISOString().slice(0, 10);
+    renderMotherCoralOptions(document.getElementById('coralMotherId')?.value || '', coralUiState.editingId || '');
+    updateCoralMotherFieldVisibility();
     if (!coralUiState.editingId && !coralUiState.pendingPhotoData) renderCoralPhotoPreview('');
     if (stats) {
         stats.innerHTML = `
             <span><strong>${getCoralCatalog().length}</strong><small>gesamt</small></span>
             <span><strong>${getCoralCatalog().filter(entry => entry.tagId).length}</strong><small>mit NFC</small></span>
+            <span><strong>${getCoralTransfers().length}</strong><small>abgegeben</small></span>
         `;
     }
     if (!corals.length) {
@@ -3728,25 +4050,48 @@ function renderCoralCatalog() {
                 <div class="coral-card-head">
                     <div>
                         <h4>${escapeHtml(coral.name)}</h4>
-                        <small>${escapeHtml(coral.species || 'Art nicht eingetragen')}</small>
+                        <small>${escapeHtml(coral.tradeName || coral.scientificName || coral.species || 'Art nicht eingetragen')}</small>
                     </div>
-                    <span class="coral-status-badge coral-status-${escapeHtml(coral.status || 'beobachten')}">${escapeHtml(coral.status || 'beobachten')}</span>
+                    <span class="coral-status-badge coral-status-${escapeHtml(coral.status || 'bestand')}">${escapeHtml(getCoralStatusLabel(coral.status || 'bestand'))}</span>
                 </div>
                 <div class="coral-meta-grid">
-                    <span><strong>Platz</strong><small>${escapeHtml(coral.location || '-')}</small></span>
+                    <span><strong>Typ</strong><small>${escapeHtml(coral.coralType || coral.species || '-')}</small></span>
+                    <span><strong>Platz</strong><small>${escapeHtml(coral.location || coral.placement || '-')}</small></span>
                     <span><strong>NFC</strong><small>${escapeHtml(coral.tagId || 'noch nicht verknüpft')}</small></span>
                     <span><strong>Eingesetzt</strong><small>${coral.addedAt ? escapeHtml(coral.addedAt) : '-'}</small></span>
                     <span><strong>Zuletzt gesehen</strong><small>${coral.lastSeenAt ? formatWarehouseDate(coral.lastSeenAt) : '-'}</small></span>
+                    <span><strong>Mutterkoralle</strong><small>${escapeHtml(getCoralOptionalDisplayName(getCoralById(coral.motherCoralId)))}</small></span>
+                    <span><strong>Licht</strong><small>${escapeHtml(coral.lightNeed || coral.parRange || '-')}</small></span>
+                    <span><strong>Strömung</strong><small>${escapeHtml(coral.flowNeed || coral.flowType || '-')}</small></span>
                 </div>
                 <p class="hint">${escapeHtml(coral.note || 'Keine zusätzliche Notiz gespeichert.')}</p>
                 <div class="btn-group" style="flex-wrap:wrap;">
                     <button class="btn-secondary btn-animated" onclick="editCoralEntry('${coral.id}')">Bearbeiten</button>
                     <button class="btn-secondary btn-animated" onclick="writeCoralEntryToNfc('${coral.id}')">Auf Tag schreiben</button>
-                    <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Löschen</button>
+                    <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Abgeben / Löschen</button>
                 </div>
             </div>
         </article>
     `).join('');
+    if (transfersList) {
+        const transfers = getCoralTransfers().slice().sort((a, b) => new Date(b.transferredAt || 0) - new Date(a.transferredAt || 0));
+        transfersList.innerHTML = transfers.length
+            ? transfers.map(entry => `
+                <article class="coral-transfer-card">
+                    <div class="coral-transfer-head">
+                        <strong>${escapeHtml(getCoralDisplayName(entry.coralSnapshot || {}))}</strong>
+                        <small>${formatWarehouseDate(entry.transferredAt)}</small>
+                    </div>
+                    <div class="coral-meta-grid">
+                        <span><strong>An</strong><small>${escapeHtml(entry.recipientName || '-')}</small></span>
+                        <span><strong>Kontakt</strong><small>${escapeHtml(entry.recipientContact || '-')}</small></span>
+                        <span><strong>Typ</strong><small>${escapeHtml(entry.coralSnapshot?.coralType || entry.coralSnapshot?.species || '-')}</small></span>
+                    </div>
+                    <p class="hint">${escapeHtml(entry.note || 'Keine weitere Notiz gespeichert.')}</p>
+                </article>
+            `).join('')
+            : '<div class="dashboard-panel"><h3>Noch keine Abgaben</h3><p class="hint">Wenn du eine Koralle abgibst, kannst du sie hier mit Empfänger und Kontakt wiederfinden.</p></div>';
+    }
 }
 
 function openQuickActionMenu() {

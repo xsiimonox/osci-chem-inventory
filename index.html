@@ -960,8 +960,46 @@
                             <input type="text" id="coralName" placeholder="z.B. Acropora Hellfire">
                         </div>
                         <div class="input-group">
+                            <label>Wissenschaftlicher Name:</label>
+                            <input type="text" id="coralScientificName" placeholder="z.B. Acropora tenuis">
+                        </div>
+                        <div class="input-group">
+                            <label>Gattung:</label>
+                            <input type="text" id="coralGenus" placeholder="z.B. Acropora">
+                        </div>
+                        <div class="input-group">
+                            <label>Art:</label>
+                            <input type="text" id="coralSpeciesName" placeholder="z.B. tenuis">
+                        </div>
+                        <div class="input-group">
                             <label>Art / Typ:</label>
                             <input type="text" id="coralSpecies" placeholder="z.B. Acropora, Euphyllia, Zoanthus">
+                        </div>
+                        <div class="input-group">
+                            <label>Korallentyp:</label>
+                            <select id="coralType">
+                                <option value="">Nicht festgelegt</option>
+                                <option value="SPS">SPS</option>
+                                <option value="LPS">LPS</option>
+                                <option value="Weichkoralle">Weichkoralle</option>
+                                <option value="Gorgonie">Gorgonie</option>
+                                <option value="Zoanthus">Zoanthus</option>
+                                <option value="Anemone">Anemone</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Handelsname / Zuchtname:</label>
+                            <input type="text" id="coralTradeName" placeholder='z.B. Walt Disney'>
+                        </div>
+                        <div class="input-group">
+                            <label>Herkunft:</label>
+                            <select id="coralOrigin">
+                                <option value="">Nicht festgelegt</option>
+                                <option value="Wildfang">Wildfang</option>
+                                <option value="Nachzucht">Nachzucht</option>
+                                <option value="Aquakultur">Aquakultur</option>
+                                <option value="unbekannt">unbekannt</option>
+                            </select>
                         </div>
                         <div class="input-group">
                             <label>Standort im Becken:</label>
@@ -969,11 +1007,16 @@
                         </div>
                         <div class="input-group">
                             <label>Status:</label>
-                            <select id="coralStatus">
-                                <option value="beobachten">Beobachten</option>
-                                <option value="stabil">Stabil</option>
-                                <option value="wachsend">Wachsend</option>
-                                <option value="frag">Ableger</option>
+                            <select id="coralStatus" onchange="updateCoralMotherFieldVisibility()">
+                                <option value="neuzugang">Neuzugang</option>
+                                <option value="bestand">Bestandskoralle</option>
+                                <option value="ableger">Ableger</option>
+                            </select>
+                        </div>
+                        <div class="input-group coral-conditional-field is-hidden" id="coralMotherField">
+                            <label>Mutterkoralle:</label>
+                            <select id="coralMotherId">
+                                <option value="">Keine Mutterkoralle zugewiesen</option>
                             </select>
                         </div>
                         <div class="input-group">
@@ -985,6 +1028,98 @@
                             <input type="date" id="coralAddedAt">
                         </div>
                     </div>
+                    <details class="coral-advanced-details">
+                        <summary>
+                            <span>Haltungsdetails &amp; Preset-Felder</span>
+                            <span class="settings-accordion-hint" aria-hidden="true"></span>
+                        </summary>
+                        <div class="tool-grid coral-advanced-grid">
+                            <div class="input-group">
+                                <label>Lichtbedarf:</label>
+                                <select id="coralLightNeed">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="niedrig">niedrig</option>
+                                    <option value="mittel">mittel</option>
+                                    <option value="hoch">hoch</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>PAR Bereich optional:</label>
+                                <input type="text" id="coralParRange" placeholder="z.B. 200-350">
+                            </div>
+                            <div class="input-group">
+                                <label>Strömungsbedarf:</label>
+                                <select id="coralFlowNeed">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="niedrig">niedrig</option>
+                                    <option value="mittel">mittel</option>
+                                    <option value="stark">stark</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Strömungstyp:</label>
+                                <select id="coralFlowType">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="laminar">laminar</option>
+                                    <option value="turbulent">turbulent</option>
+                                    <option value="wechselnd">wechselnd</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Schwierigkeitsgrad:</label>
+                                <select id="coralDifficulty">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="Anfänger">Anfänger</option>
+                                    <option value="Fortgeschritten">Fortgeschritten</option>
+                                    <option value="Experte">Experte</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Platzierung im Aquarium:</label>
+                                <select id="coralPlacement">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="Boden">Boden</option>
+                                    <option value="unterer Bereich">unterer Bereich</option>
+                                    <option value="Mitte">Mitte</option>
+                                    <option value="oberer Bereich">oberer Bereich</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Wachstumsgeschwindigkeit:</label>
+                                <select id="coralGrowthSpeed">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="langsam">langsam</option>
+                                    <option value="mittel">mittel</option>
+                                    <option value="schnell">schnell</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Wuchsform:</label>
+                                <select id="coralGrowthForm">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="verzweigt">verzweigt</option>
+                                    <option value="plating">plating</option>
+                                    <option value="massiv">massiv</option>
+                                    <option value="encrusting">encrusting</option>
+                                    <option value="tabellarisch">tabellarisch</option>
+                                    <option value="buschig">buschig</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Aggressivität:</label>
+                                <select id="coralAggression">
+                                    <option value="">Nicht festgelegt</option>
+                                    <option value="friedlich">friedlich</option>
+                                    <option value="mäßig aggressiv">mäßig aggressiv</option>
+                                    <option value="aggressiv">aggressiv</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label>Mindestabstand:</label>
+                                <input type="text" id="coralMinDistance" placeholder="z.B. 5 cm">
+                            </div>
+                        </div>
+                    </details>
                     <div class="input-group">
                         <label>Notiz:</label>
                         <textarea id="coralNote" placeholder="Farbe, Herkunft, Beobachtungen, Wachstum, Verhalten..."></textarea>
@@ -1008,6 +1143,7 @@
                     <div class="btn-group" style="flex-wrap:wrap; margin-top:14px;">
                         <button class="btn-primary btn-animated" onclick="saveCoralEntry()">Koralle speichern</button>
                         <button class="btn-secondary btn-animated" onclick="writeCurrentCoralToNfc()">Auf NFC-Tag schreiben</button>
+                        <button class="btn-secondary btn-animated" onclick="writeCoralPresetToNfc()">Preset auf NFC-Tag</button>
                         <button class="btn-secondary btn-animated" onclick="startCoralNfcScan()">NFC-Tag lesen</button>
                     </div>
                     <div id="coralNfcStatus" class="tool-result">Noch kein NFC-Vorgang gestartet.</div>
@@ -1030,14 +1166,20 @@
                             <label>Status:</label>
                             <select id="coralStatusFilter" onchange="renderCoralCatalog()">
                                 <option value="all">Alle</option>
-                                <option value="beobachten">Beobachten</option>
-                                <option value="stabil">Stabil</option>
-                                <option value="wachsend">Wachsend</option>
-                                <option value="frag">Ableger</option>
+                                <option value="neuzugang">Neuzugang</option>
+                                <option value="bestand">Bestandskoralle</option>
+                                <option value="ableger">Ableger</option>
                             </select>
                         </div>
                     </div>
                     <div id="coralCatalogList" class="coral-catalog-list"></div>
+                    <details class="coral-transfer-details">
+                        <summary>
+                            <span>Abgegebene Korallen</span>
+                            <span class="settings-accordion-hint" aria-hidden="true"></span>
+                        </summary>
+                        <div id="coralTransferList" class="coral-transfer-list"></div>
+                    </details>
                 </div>
             </div>
         </div>
