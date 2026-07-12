@@ -4538,9 +4538,14 @@ function renderProductCard(cat, item) {
 function renderLager() {
     const container = document.getElementById('lager');
     if (!container) return;
+    const hasLagerShell = Boolean(
+        container.querySelector('#searchInput') &&
+        container.querySelector('#categoryFilter') &&
+        container.querySelector('#lager-container')
+    );
 
-    // Such- und Filterfeld einbauen, falls nicht vorhanden
-    if (!document.getElementById('searchInput')) {
+    // Such- und Filterfeld gezielt im Lager-Tab aufbauen, falls die Struktur fehlt
+    if (!hasLagerShell) {
         const categoryOptions = Object.keys(catalog)
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
