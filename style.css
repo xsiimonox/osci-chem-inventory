@@ -353,6 +353,7 @@ body.menu-open {
     overflow: hidden !important;
 }
 body.menu-open .mobile-bottom-nav {
+    display: none !important;
     opacity: 0;
     pointer-events: none;
     transform: translateY(120%);
