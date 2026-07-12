@@ -59,6 +59,12 @@ body.theme-badman {
 }
 
 * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+html,
+body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+}
 body {
     margin: 0;
     padding: 0;
@@ -3800,8 +3806,8 @@ body.theme-mint.party-mode .card {
 
     .measurement-chart {
         height: 290px;
-        margin: 12px -6px 10px;
-        width: calc(100% + 12px);
+        margin: 12px 0 10px;
+        width: 100%;
     }
 
     .measurement-chart-head,
@@ -3830,8 +3836,8 @@ body.theme-mint.party-mode .card {
 
     .measurement-chart {
         height: 300px;
-        margin: 12px -8px 10px;
-        width: calc(100% + 16px);
+        margin: 12px 0 10px;
+        width: 100%;
     }
 
     .measurement-chart-head strong,
@@ -6241,6 +6247,28 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
 
 @media (max-width: 767px) {
     body { padding-bottom: 110px; }
+    html,
+    body {
+        overflow-x: hidden;
+    }
+    header,
+    .tab-content,
+    .tab-content > *,
+    .card,
+    .tool-grid,
+    .menu-order-list,
+    .menu-order-row,
+    .backup-project-actions,
+    .backup-project-import,
+    .storage-safety-status-shell,
+    .storage-safety-grid,
+    .mobile-quick-tabs-settings,
+    .coral-layout,
+    .coral-card,
+    .coral-photo-tools {
+        min-width: 0;
+        max-width: 100%;
+    }
     .keyboard-shortcuts-hint { display: none; }
     .tab-content {
         padding: 14px 12px 24px;
@@ -6304,6 +6332,25 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     }
     .mobile-quick-tabs-grid {
         grid-template-columns: 1fr;
+    }
+    .menu-order-row {
+        grid-template-columns: 1fr;
+    }
+    .menu-order-row div {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+    .menu-order-row input[type="checkbox"] {
+        width: 22px;
+        height: 22px;
+    }
+    .backup-project-actions > * {
+        width: 100%;
+        min-width: 0;
+    }
+    .backup-project-import input[type="file"] {
+        width: 100%;
+        max-width: 100%;
     }
     .coral-photo-tools,
     .coral-card {
