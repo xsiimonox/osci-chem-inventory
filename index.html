@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="style.css?v=2.6.0">
+    <link rel="stylesheet" href="style.css?v=2.6.1">
 </head>
 <body>
 
@@ -23,7 +23,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>Reef.Storage&Tools</h1>
-                <span class="version-badge">v2.6.0</span>
+                <span class="version-badge">v2.6.1</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -966,22 +966,37 @@
             </div>
 
             <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
-                <h3 class="google-drive-sync-title">Google Drive Sync</h3>
-                <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Du kannst es später auf demselben oder auf einem anderen Gerät wieder laden.</p>
-                <div id="googleDriveSyncStatus"></div>
-                <div class="google-drive-sync-actions">
-                    <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google Drive verbinden</button>
-                    <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt sichern</button>
-                    <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Backup laden</button>
-                    <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
+                <div id="googleDriveLockState">
+                    <h3 class="google-drive-sync-title">Google Drive Sync</h3>
+                    <p class="hint">Dieser Bereich ist geschützt. Zum Öffnen bitte das Passwort eingeben.</p>
+                    <div class="password-field">
+                        <input type="password" id="googleDrivePasswordInput" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') unlockGoogleDriveSync()">
+                        <button type="button" class="btn-secondary btn-animated" onclick="unlockGoogleDriveSync()">Entsperren</button>
+                    </div>
                 </div>
-                <label class="google-drive-sync-toggle">
-                    <span>
-                        <strong>Automatisch sichern</strong>
-                        <small>Funktioniert nur, solange dein Google-Konto in dieser Sitzung verbunden ist.</small>
-                    </span>
-                    <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
-                </label>
+                <div id="googleDriveProtectedContent" hidden>
+                    <div class="tool-card-lock-header">
+                        <div>
+                            <h3 class="google-drive-sync-title">Google Drive Sync</h3>
+                            <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Du kannst es später auf demselben oder auf einem anderen Gerät wieder laden.</p>
+                        </div>
+                        <button type="button" class="btn-out btn-animated" onclick="lockGoogleDriveSync()">Sperren</button>
+                    </div>
+                    <div id="googleDriveSyncStatus"></div>
+                    <div class="google-drive-sync-actions">
+                        <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google Drive verbinden</button>
+                        <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt sichern</button>
+                        <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Backup laden</button>
+                        <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
+                    </div>
+                    <label class="google-drive-sync-toggle">
+                        <span>
+                            <strong>Automatisch sichern</strong>
+                            <small>Funktioniert nur, solange dein Google-Konto in dieser Sitzung verbunden ist.</small>
+                        </span>
+                        <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
+                    </label>
+                </div>
             </div>
 
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
@@ -1261,7 +1276,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.0"></script>
+    <script src="app.js?v=2.6.1"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js')

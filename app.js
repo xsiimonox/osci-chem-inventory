@@ -227,6 +227,8 @@ const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik
 // This preset is always available and cannot be permanently deleted.
 // It represents the full OSCI Motion product portfolio that maps to shopLinksPreset.
 const OSCI_SHOP_PRESET_NAME = 'OSCI Motion Shop (Standard)';
+const GOOGLE_DRIVE_UNLOCK_KEY = 'osci-google-drive-unlocked';
+const GOOGLE_DRIVE_PASSWORD = 'DRIVE';
 const OSCI_SHOP_PRESET_PRODUCTS = [
     // C&R Produkte
     { name: 'Natriumchlorid (NaCl)',    cat: 'C&R Produkte', sizes: [5000, 10000], sizeUnit: 'ml', sizesOriginal: [5000, 10000], density: 1.192 },
@@ -5006,6 +5008,7 @@ function initTools() {
     renderPsuCorrectionSettings();
     renderImplementationLog();
     renderCommunityMapCard();
+    syncGoogleDriveLockUI();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
     setupToolTiles();
@@ -5023,6 +5026,10 @@ function getToolSettings() {
 
 function isCustomCRUnlocked() {
     return localStorage.getItem(CUSTOM_CR_UNLOCK_KEY) === 'true';
+}
+
+function isGoogleDriveUnlocked() {
+    return localStorage.getItem(GOOGLE_DRIVE_UNLOCK_KEY) === 'true';
 }
 
 function syncCustomCRLockUI() {
@@ -5055,6 +5062,35 @@ function lockCustomCRTool() {
     localStorage.removeItem(CUSTOM_CR_UNLOCK_KEY);
     syncCustomCRLockUI();
     showToast('C&R Tool gesperrt', 'info', 2200);
+}
+
+function syncGoogleDriveLockUI() {
+    const lockState = document.getElementById('googleDriveLockState');
+    const protectedContent = document.getElementById('googleDriveProtectedContent');
+    const unlocked = isGoogleDriveUnlocked();
+    if (lockState) lockState.hidden = unlocked;
+    if (protectedContent) protectedContent.hidden = !unlocked;
+    if (unlocked) renderGoogleDriveSyncCard();
+}
+
+function unlockGoogleDriveSync() {
+    const input = document.getElementById('googleDrivePasswordInput');
+    const value = (input?.value || '').trim();
+    if (value !== GOOGLE_DRIVE_PASSWORD) {
+        showToast('Falsches Passwort', 'warning', 2600);
+        if (input) input.value = '';
+        return;
+    }
+    localStorage.setItem(GOOGLE_DRIVE_UNLOCK_KEY, 'true');
+    if (input) input.value = '';
+    syncGoogleDriveLockUI();
+    showToast('Google Drive Bereich entsperrt', 'success', 2200);
+}
+
+function lockGoogleDriveSync() {
+    localStorage.removeItem(GOOGLE_DRIVE_UNLOCK_KEY);
+    syncGoogleDriveLockUI();
+    showToast('Google Drive Bereich gesperrt', 'info', 2200);
 }
 
 function slugifyToolTitle(title) {
