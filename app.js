@@ -204,7 +204,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
-const coralUiState = { editingId: null, pendingPhotoData: '', selectedId: null, lastNfcPayload: null };
+const coralUiState = { editingId: null, pendingPhotoData: '', selectedId: null };
 const CORAL_STATUS_OPTIONS = [
     { value: 'neuzugang', label: 'Neuzugang' },
     { value: 'bestand', label: 'Bestandskoralle' },
@@ -394,7 +394,7 @@ let googleDriveTokenClient = null;
 let googleDriveAccessToken = '';
 let googleDriveTokenExpiresAt = 0;
 let googleDriveSyncTimer = null;
-const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'korallen', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
 const CLOUD_SYNC_ENABLED = false;
@@ -402,6 +402,7 @@ const CLOUD_SYNC_MAINTENANCE_MESSAGE = 'Cloud Login & Share ist wegen Wartungsar
 const DEFAULT_MENU_ORDER = [...APP_TAB_IDS];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
+const HIDDEN_MENU_TABS_KEY = 'osci_hidden_menu_tabs_v1';
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
     lager: 'Lager',
@@ -430,6 +431,7 @@ const TAB_ICONS = {
     nachbestellen: '!',
     einstellungen: '⚙'
 };
+const ALWAYS_VISIBLE_TABS = new Set(['einstellungen']);
 const communityUiState = {
     selectedProfileId: null
 };
@@ -1175,8 +1177,8 @@ function getMenuOrder() {
         let valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
         if (!valid.includes('uebersicht')) valid = ['uebersicht', ...valid];
         if (!valid.includes('korallen')) {
-            const logbuchIndex = valid.indexOf('logbuch');
-            if (logbuchIndex >= 0) valid.splice(logbuchIndex + 1, 0, 'korallen');
+            const logIndex = valid.indexOf('log');
+            if (logIndex >= 0) valid.splice(logIndex + 1, 0, 'korallen');
             else valid.push('korallen');
         }
         return [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
@@ -1189,33 +1191,74 @@ function getDefaultMobileQuickTabs() {
     return ['uebersicht', 'lager', 'tools', 'logbuch'];
 }
 
+function getHiddenMenuTabs() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(HIDDEN_MENU_TABS_KEY) || '[]');
+        const valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id) && !ALWAYS_VISIBLE_TABS.has(id)) : [];
+        return [...new Set(valid)];
+    } catch (err) {
+        return [];
+    }
+}
+
+function isMenuTabHidden(tabId) {
+    if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
+    return getHiddenMenuTabs().includes(tabId);
+}
+
+function getVisibleMenuOrder() {
+    return getMenuOrder().filter(tabId => !isMenuTabHidden(tabId));
+}
+
+function getFirstVisibleTab() {
+    return getVisibleMenuOrder()[0] || 'einstellungen';
+}
+
+function toggleMenuTabVisibility(tabId, hidden) {
+    if (!DEFAULT_MENU_ORDER.includes(tabId) || ALWAYS_VISIBLE_TABS.has(tabId)) return;
+    const hiddenTabs = getHiddenMenuTabs();
+    const next = hidden
+        ? [...new Set([...hiddenTabs, tabId])]
+        : hiddenTabs.filter(id => id !== tabId);
+    localStorage.setItem(HIDDEN_MENU_TABS_KEY, JSON.stringify(next));
+
+    const quickTabs = getMobileQuickTabs().filter(id => !next.includes(id));
+    saveMobileQuickTabs(quickTabs);
+    applyMenuOrder();
+    renderMenuOrderSettings();
+
+    if (isMenuTabHidden(getActiveTabId())) {
+        showTab(getFirstVisibleTab());
+    }
+}
+
 function getMobileQuickTabs() {
     try {
         const parsed = JSON.parse(localStorage.getItem(MOBILE_QUICK_TABS_KEY) || '[]');
-        const cleaned = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+        const cleaned = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id) && !isMenuTabHidden(id)) : [];
         const unique = [];
         cleaned.forEach(id => {
             if (!unique.includes(id) && unique.length < 4) unique.push(id);
         });
         const fallback = getDefaultMobileQuickTabs();
         fallback.forEach(id => {
-            if (!unique.includes(id) && unique.length < 4) unique.push(id);
+            if (!unique.includes(id) && unique.length < 4 && !isMenuTabHidden(id)) unique.push(id);
         });
         return unique.slice(0, 4);
     } catch (err) {
-        return getDefaultMobileQuickTabs();
+        return getDefaultMobileQuickTabs().filter(id => !isMenuTabHidden(id));
     }
 }
 
 function saveMobileQuickTabs(tabs) {
-    const valid = Array.isArray(tabs) ? tabs.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+    const valid = Array.isArray(tabs) ? tabs.filter(id => DEFAULT_MENU_ORDER.includes(id) && !isMenuTabHidden(id)) : [];
     const unique = [];
     valid.forEach(id => {
         if (!unique.includes(id) && unique.length < 4) unique.push(id);
     });
     const fallback = getDefaultMobileQuickTabs();
     fallback.forEach(id => {
-        if (!unique.includes(id) && unique.length < 4) unique.push(id);
+        if (!unique.includes(id) && unique.length < 4 && !isMenuTabHidden(id)) unique.push(id);
     });
     localStorage.setItem(MOBILE_QUICK_TABS_KEY, JSON.stringify(unique.slice(0, 4)));
     renderMobileBottomNav();
@@ -1224,7 +1267,7 @@ function saveMobileQuickTabs(tabs) {
 
 function updateMobileQuickTab(slotIndex, tabId) {
     const tabs = getMobileQuickTabs();
-    if (!DEFAULT_MENU_ORDER.includes(tabId)) return;
+    if (!DEFAULT_MENU_ORDER.includes(tabId) || isMenuTabHidden(tabId)) return;
     const next = [...tabs];
     const existingIndex = next.indexOf(tabId);
     if (existingIndex >= 0 && existingIndex !== slotIndex) {
@@ -1266,13 +1309,15 @@ function resetMenuOrder() {
 
 function applyMenuOrder() {
     const order = getMenuOrder();
+    const hiddenTabs = getHiddenMenuTabs();
     const nav = document.querySelector('.nav-links');
     if (nav) {
         order.forEach(tabId => {
             const button = document.getElementById('tab-' + tabId);
             if (!button) return;
             button.textContent = TAB_LABELS[tabId] || tabId;
-            nav.appendChild(button);
+            button.hidden = hiddenTabs.includes(tabId);
+            if (!button.hidden) nav.appendChild(button);
         });
     }
     renderMobileBottomNav(order);
@@ -1306,6 +1351,8 @@ function renderMenuOrderSettings() {
     if (!container) return;
     const order = getMenuOrder();
     const quickTabs = getMobileQuickTabs();
+    const hiddenTabs = getHiddenMenuTabs();
+    const selectableTabs = DEFAULT_MENU_ORDER.filter(id => !isMenuTabHidden(id));
     container.innerHTML = `
         <div class="mobile-quick-tabs-settings">
             <div class="mobile-quick-tabs-head">
@@ -1317,12 +1364,22 @@ function renderMenuOrderSettings() {
                     <label class="mobile-quick-tab-slot">
                         <span>Slot ${index + 1}</span>
                         <select onchange="updateMobileQuickTab(${index}, this.value)">
-                            ${DEFAULT_MENU_ORDER.map(optionId => `<option value="${optionId}" ${optionId === tabId ? 'selected' : ''}>${TAB_LABELS[optionId] || optionId}</option>`).join('')}
+                            ${selectableTabs.map(optionId => `<option value="${optionId}" ${optionId === tabId ? 'selected' : ''}>${TAB_LABELS[optionId] || optionId}</option>`).join('')}
                         </select>
                     </label>
                 `).join('')}
             </div>
             <button type="button" class="btn-secondary btn-animated" onclick="resetMobileQuickTabs()">Mobilen Schnellzugriff zurücksetzen</button>
+        </div>
+        <div class="menu-order-list" style="margin-top:14px;">
+            ${DEFAULT_MENU_ORDER.map(tabId => `
+                <label class="menu-order-row">
+                    <span><strong>${TAB_LABELS[tabId] || tabId}</strong><small>${ALWAYS_VISIBLE_TABS.has(tabId) ? 'Immer sichtbar' : (hiddenTabs.includes(tabId) ? 'Ausgeblendet' : 'Sichtbar')}</small></span>
+                    <div>
+                        <input type="checkbox" ${hiddenTabs.includes(tabId) ? '' : 'checked'} ${ALWAYS_VISIBLE_TABS.has(tabId) ? 'disabled' : ''} onchange="toggleMenuTabVisibility('${tabId}', !this.checked)">
+                    </div>
+                </label>
+            `).join('')}
         </div>
         <div class="menu-order-list">
             ${order.map((tabId, index) => `
@@ -3338,7 +3395,6 @@ function renderDashboard() {
     const recentLogBookEntry = getRecentLogBookEntry();
     const lastMeasurementAt = getLastMeasurementAt();
     const coralCount = (db.coralCatalog || []).length;
-    const linkedCoralCount = (db.coralCatalog || []).filter(entry => entry.tagId).length;
     const osmose = db.osmoseTank || { currentLiters: 0, capacityLiters: 0 };
     const dosingCritical = (db.dosingContainers || []).filter(entry => {
         const capacity = parseFloat(entry.capacityMl) || 0;
@@ -3422,7 +3478,7 @@ function renderDashboard() {
                 <span>Wassertest</span><strong>${lastMeasurementAt ? formatWarehouseDate(lastMeasurementAt) : 'offen'}</strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
             </button>
             <button type="button" class="dashboard-tile" onclick="selectTab('korallen')">
-                <span>Korallen</span><strong>${coralCount}</strong><small>${linkedCoralCount} mit NFC</small>
+                <span>Korallen</span><strong>${coralCount}</strong><small>Bestand dokumentiert</small>
             </button>
             <button type="button" class="dashboard-tile" onclick="selectTab('logbuch')">
                 <span>Osmose</span><strong>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} L</strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
@@ -3524,7 +3580,7 @@ function renderDashboard() {
             ${settings.widgets.corals ? `
             <div class="dashboard-panel">
                 <h3>Korallen im Fokus</h3>
-                <p class="hint">${coralCount ? `${coralCount} Korallen gespeichert, ${linkedCoralCount} mit NFC verknüpft.` : 'Noch keine Korallen angelegt.'}</p>
+                <p class="hint">${coralCount ? `${coralCount} Korallen gespeichert und durchsuchbar.` : 'Noch keine Korallen angelegt.'}</p>
                 <button onclick="selectTab('korallen')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
             </div>` : ''}
         </section>
@@ -3616,7 +3672,6 @@ function getCoralFormData() {
         location: (document.getElementById('coralLocation')?.value || '').trim(),
         status: normalizeCoralStatus(document.getElementById('coralStatus')?.value || 'bestand'),
         motherCoralId: document.getElementById('coralMotherId')?.value || '',
-        tagId: (document.getElementById('coralTagId')?.value || '').trim(),
         addedAt: document.getElementById('coralAddedAt')?.value || '',
         lightNeed: document.getElementById('coralLightNeed')?.value || '',
         parRange: (document.getElementById('coralParRange')?.value || '').trim(),
@@ -3644,7 +3699,6 @@ function applyCoralFormData(data = {}) {
         coralOrigin: data.origin || '',
         coralLocation: data.location || '',
         coralStatus: normalizeCoralStatus(data.status || 'bestand'),
-        coralTagId: data.tagId || '',
         coralAddedAt: data.addedAt || '',
         coralLightNeed: data.lightNeed || '',
         coralParRange: data.parRange || '',
@@ -3669,7 +3723,7 @@ function applyCoralFormData(data = {}) {
 function resetCoralForm() {
     coralUiState.editingId = null;
     coralUiState.pendingPhotoData = '';
-    ['coralName', 'coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralSpecies', 'coralTradeName', 'coralLocation', 'coralTagId', 'coralAddedAt', 'coralParRange', 'coralMinDistance', 'coralNote', 'coralSearch'].forEach(id => {
+    ['coralName', 'coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralSpecies', 'coralTradeName', 'coralLocation', 'coralAddedAt', 'coralParRange', 'coralMinDistance', 'coralNote', 'coralSearch'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'coralSearch') el.value = '';
     });
@@ -3813,202 +3867,6 @@ function deleteCoralEntry(id) {
     renderDashboard();
 }
 
-function createCoralNfcPayload(coral) {
-    return JSON.stringify({
-        app: 'Reef.Storage&Tools',
-        type: 'coral',
-        id: coral.id,
-        name: coral.name,
-        scientificName: coral.scientificName || '',
-        genus: coral.genus || '',
-        speciesName: coral.speciesName || '',
-        species: coral.species || '',
-        coralType: coral.coralType || '',
-        tradeName: coral.tradeName || '',
-        origin: coral.origin || '',
-        location: coral.location || '',
-        status: normalizeCoralStatus(coral.status || ''),
-        motherCoralId: coral.motherCoralId || '',
-        lightNeed: coral.lightNeed || '',
-        parRange: coral.parRange || '',
-        flowNeed: coral.flowNeed || '',
-        flowType: coral.flowType || '',
-        difficulty: coral.difficulty || '',
-        placement: coral.placement || '',
-        growthSpeed: coral.growthSpeed || '',
-        growthForm: coral.growthForm || '',
-        aggression: coral.aggression || '',
-        minDistance: coral.minDistance || '',
-        note: coral.note || '',
-        updatedAt: new Date().toISOString()
-    });
-}
-
-function createCoralPresetNfcPayload(form) {
-    return JSON.stringify({
-        app: 'Reef.Storage&Tools',
-        type: 'coral-preset',
-        presetLabel: form.tradeName || form.scientificName || form.name || 'Korallen Preset',
-        data: {
-            scientificName: form.scientificName || '',
-            genus: form.genus || '',
-            speciesName: form.speciesName || '',
-            species: form.species || '',
-            coralType: form.coralType || '',
-            tradeName: form.tradeName || '',
-            origin: form.origin || '',
-            status: normalizeCoralStatus(form.status || ''),
-            lightNeed: form.lightNeed || '',
-            parRange: form.parRange || '',
-            flowNeed: form.flowNeed || '',
-            flowType: form.flowType || '',
-            difficulty: form.difficulty || '',
-            placement: form.placement || '',
-            growthSpeed: form.growthSpeed || '',
-            growthForm: form.growthForm || '',
-            aggression: form.aggression || '',
-            minDistance: form.minDistance || '',
-            note: form.note || ''
-        },
-        updatedAt: new Date().toISOString()
-    });
-}
-
-function ensureWebNfcAvailable() {
-    if (!('NDEFReader' in window)) {
-        alert('Web NFC wird auf diesem Gerät oder in diesem Browser nicht unterstützt. Die Korallenverwaltung funktioniert trotzdem ohne NFC.');
-        return false;
-    }
-    if (!window.isSecureContext) {
-        alert('NFC funktioniert nur über HTTPS oder auf localhost.');
-        return false;
-    }
-    return true;
-}
-
-async function writeCurrentCoralToNfc() {
-    if (!ensureWebNfcAvailable()) return;
-    const name = (document.getElementById('coralName')?.value || '').trim();
-    if (!name) return alert('Bitte lege zuerst die Koralle an oder trage mindestens einen Namen ein.');
-    let coral = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
-    if (!coral) {
-        saveCoralEntry();
-        coral = getCoralCatalog()[0] || null;
-    }
-    if (!coral) return;
-    try {
-        const ndef = new NDEFReader();
-        const payload = createCoralNfcPayload(coral);
-        await ndef.write({
-            records: [
-                { recordType: 'text', data: payload },
-                { recordType: 'text', data: `${coral.name}${coral.location ? ' · ' + coral.location : ''}` }
-            ]
-        });
-        coral.tagId = coral.tagId || coral.id;
-        coral.lastSeenAt = new Date().toISOString();
-        coralUiState.lastNfcPayload = { coralId: coral.id, payload };
-        document.getElementById('coralTagId').value = coral.tagId;
-        saveDB();
-        renderCoralCatalog();
-        renderDashboard();
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = `NFC-Tag für ${coral.name} erfolgreich beschrieben.`;
-        showToast('NFC-Tag beschrieben', 'success', 2400);
-    } catch (err) {
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = `Schreiben fehlgeschlagen: ${err.message}`;
-        alert('NFC-Schreiben fehlgeschlagen: ' + err.message);
-    }
-}
-
-async function writeCoralPresetToNfc() {
-    if (!ensureWebNfcAvailable()) return;
-    const form = getCoralFormData();
-    if (!form.scientificName && !form.tradeName && !form.coralType && !form.species) {
-        return alert('Bitte trage erst ein paar Grunddaten ein, damit das Preset sinnvoll vorbelegt ist.');
-    }
-    try {
-        const ndef = new NDEFReader();
-        const payload = createCoralPresetNfcPayload(form);
-        await ndef.write({
-            records: [
-                { recordType: 'text', data: payload },
-                { recordType: 'text', data: `Preset: ${form.tradeName || form.scientificName || form.coralType || 'Koralle'}` }
-            ]
-        });
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = `NFC-Preset erfolgreich geschrieben: ${form.tradeName || form.scientificName || 'Korallen Vorlage'}`;
-        showToast('NFC-Preset geschrieben', 'success', 2400);
-    } catch (err) {
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = `Preset-Schreiben fehlgeschlagen: ${err.message}`;
-        alert('NFC-Preset-Schreiben fehlgeschlagen: ' + err.message);
-    }
-}
-
-function writeCoralEntryToNfc(id) {
-    const coral = getCoralById(id);
-    if (!coral) return;
-    editCoralEntry(id);
-    writeCurrentCoralToNfc();
-}
-
-async function startCoralNfcScan() {
-    if (!ensureWebNfcAvailable()) return;
-    try {
-        const ndef = new NDEFReader();
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = 'NFC-Lesen gestartet. Halte jetzt einen Tag an das Gerät.';
-        await ndef.scan();
-        ndef.onreading = event => {
-            const record = event.message.records[0];
-            if (!record) return;
-            const decoder = new TextDecoder(record.encoding || 'utf-8');
-            const text = decoder.decode(record.data);
-            let parsed = null;
-            try { parsed = JSON.parse(text); } catch (err) {}
-            coralUiState.lastNfcPayload = parsed || { raw: text };
-            if (parsed?.type === 'coral-preset' && parsed?.data) {
-                applyCoralFormData({
-                    ...parsed.data,
-                    name: document.getElementById('coralName')?.value || ''
-                });
-                if (status) status.innerText = `Preset geladen: ${parsed.presetLabel || 'Korallen Vorlage'}`;
-                showToast(`Preset geladen: ${parsed.presetLabel || 'Korallen Vorlage'}`, 'info', 2400);
-                return;
-            }
-            let match = null;
-            if (parsed?.id) match = getCoralById(parsed.id);
-            if (!match && parsed?.name) {
-                match = getCoralCatalog().find(entry => entry.name === parsed.name) || null;
-            }
-            if (match) {
-                match.lastSeenAt = new Date().toISOString();
-                if (!match.tagId) match.tagId = parsed?.id || match.id;
-                saveDB();
-                renderCoralCatalog();
-                editCoralEntry(match.id);
-                if (status) status.innerText = `Tag erkannt: ${match.name} wurde geöffnet.`;
-                showToast(`NFC erkannt: ${match.name}`, 'success', 2400);
-            } else {
-                if (parsed?.name) document.getElementById('coralName').value = parsed.name || '';
-                if (parsed?.species) document.getElementById('coralSpecies').value = parsed.species || '';
-                if (parsed?.location) document.getElementById('coralLocation').value = parsed.location || '';
-                if (parsed?.status) document.getElementById('coralStatus').value = normalizeCoralStatus(parsed.status || 'bestand');
-                if (parsed?.id) document.getElementById('coralTagId').value = parsed.id;
-                updateCoralMotherFieldVisibility();
-                if (status) status.innerText = 'Tag gelesen. Die Daten wurden in das Formular übernommen.';
-                showToast('NFC-Tag gelesen', 'info', 2200);
-            }
-        };
-    } catch (err) {
-        const status = document.getElementById('coralNfcStatus');
-        if (status) status.innerText = `Lesen fehlgeschlagen: ${err.message}`;
-        alert('NFC-Lesen fehlgeschlagen: ' + err.message);
-    }
-}
-
 function renderCoralCatalog() {
     renderAquariumWorkspacePanels();
     const list = document.getElementById('coralCatalogList');
@@ -4022,7 +3880,7 @@ function renderCoralCatalog() {
         .filter(entry => statusFilter === 'all' || entry.status === statusFilter)
         .filter(entry => {
             if (!search) return true;
-            return [entry.name, entry.species, entry.location, entry.note, entry.tagId].join(' ').toLowerCase().includes(search);
+            return [entry.name, entry.species, entry.location, entry.note, entry.tradeName, entry.scientificName].join(' ').toLowerCase().includes(search);
         })
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
     const addedAtField = document.getElementById('coralAddedAt');
@@ -4033,12 +3891,12 @@ function renderCoralCatalog() {
     if (stats) {
         stats.innerHTML = `
             <span><strong>${getCoralCatalog().length}</strong><small>gesamt</small></span>
-            <span><strong>${getCoralCatalog().filter(entry => entry.tagId).length}</strong><small>mit NFC</small></span>
+            <span><strong>${getCoralCatalog().filter(entry => normalizeCoralStatus(entry.status || 'bestand') === 'ableger').length}</strong><small>Ableger</small></span>
             <span><strong>${getCoralTransfers().length}</strong><small>abgegeben</small></span>
         `;
     }
     if (!corals.length) {
-        list.innerHTML = '<div class="dashboard-panel"><h3>Noch keine Korallen</h3><p class="hint">Lege die erste Koralle an oder lies einen vorhandenen NFC-Tag ein.</p></div>';
+        list.innerHTML = '<div class="dashboard-panel"><h3>Noch keine Korallen</h3><p class="hint">Lege die erste Koralle an und dokumentiere deinen Bestand.</p></div>';
         return;
     }
     list.innerHTML = corals.map(coral => `
@@ -4057,7 +3915,6 @@ function renderCoralCatalog() {
                 <div class="coral-meta-grid">
                     <span><strong>Typ</strong><small>${escapeHtml(coral.coralType || coral.species || '-')}</small></span>
                     <span><strong>Platz</strong><small>${escapeHtml(coral.location || coral.placement || '-')}</small></span>
-                    <span><strong>NFC</strong><small>${escapeHtml(coral.tagId || 'noch nicht verknüpft')}</small></span>
                     <span><strong>Eingesetzt</strong><small>${coral.addedAt ? escapeHtml(coral.addedAt) : '-'}</small></span>
                     <span><strong>Zuletzt gesehen</strong><small>${coral.lastSeenAt ? formatWarehouseDate(coral.lastSeenAt) : '-'}</small></span>
                     <span><strong>Mutterkoralle</strong><small>${escapeHtml(getCoralOptionalDisplayName(getCoralById(coral.motherCoralId)))}</small></span>
@@ -4067,7 +3924,6 @@ function renderCoralCatalog() {
                 <p class="hint">${escapeHtml(coral.note || 'Keine zusätzliche Notiz gespeichert.')}</p>
                 <div class="btn-group" style="flex-wrap:wrap;">
                     <button class="btn-secondary btn-animated" onclick="editCoralEntry('${coral.id}')">Bearbeiten</button>
-                    <button class="btn-secondary btn-animated" onclick="writeCoralEntryToNfc('${coral.id}')">Auf Tag schreiben</button>
                     <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Abgeben / Löschen</button>
                 </div>
             </div>
@@ -4300,12 +4156,18 @@ function toggleMenu() {
 }
 
 function selectTab(tabId) {
+    if (isMenuTabHidden(tabId)) {
+        tabId = getFirstVisibleTab();
+    }
     showTab(tabId);
     document.getElementById('main-nav').classList.remove('open');
     document.getElementById('menu-backdrop').classList.remove('open');
 }
 
 function showTab(tabId) {
+    if (isMenuTabHidden(tabId)) {
+        tabId = getFirstVisibleTab();
+    }
     if (WAREHOUSE_WRITE_TAB_IDS.has(tabId) && isWarehouseReadOnlyView()) {
         showToast('Dieses geteilte Lager ist nur lesbar. Für diesen Bereich brauchst du Schreibzugriff.', 'warning', 3600);
         tabId = 'lager';
@@ -10612,13 +10474,129 @@ function exportData() {
     a.click();
 }
 
+function exportWarehouseInventoryTxt() {
+    const warehouse = getActiveWarehouse();
+    const text = buildWarehouseInventoryShareText();
+    const exportedAtLocal = new Date().toISOString();
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `OSCI_Lagerbestand_${(warehouse?.name || 'Lager').replace(/[^\w.-]+/g, '_')}_${exportedAtLocal.split('T')[0]}.txt`;
+    a.click();
+    showToast('Lagerbestand als TXT exportiert', 'success', 2200);
+}
+
+function normalizeInventoryTextToken(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/\u00a0/g, ' ')
+        .replace(/[()]/g, '')
+        .replace(/ä/g, 'ae')
+        .replace(/ö/g, 'oe')
+        .replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function buildInventoryItemLookup() {
+    const lookup = new Map();
+    const register = (name, cat) => {
+        const token = normalizeInventoryTextToken(name);
+        if (token && !lookup.has(token)) lookup.set(token, { item: name, cat });
+    };
+    for (const cat in catalog) {
+        for (const item in catalog[cat]) {
+            register(item, cat);
+        }
+    }
+    (db.customProducts || []).forEach(product => {
+        const cat = product.category || product.cat || 'Eigene Produkte';
+        register(product.name, cat);
+    });
+    return lookup;
+}
+
+function parseLegacyWarehouseInventoryText(text) {
+    const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const lookup = buildInventoryItemLookup();
+    const entries = [];
+
+    for (const line of lines) {
+        if (/^lagerbestand\s*:/i.test(line) || /^stand\s*:/i.test(line)) continue;
+        if (!line.includes(':')) continue;
+
+        const cleaned = line.replace(/^[\-•*]\s*/, '');
+        const match = cleaned.match(/^(.+?)\s*:\s*([-+]?\d+(?:[.,]\d+)?)\s*(ml|g|stueck|stück|st)?$/i);
+        if (!match) continue;
+
+        const rawName = match[1].trim();
+        const rawAmount = parseFloat(match[2].replace(',', '.'));
+        const rawUnit = (match[3] || '').toLowerCase();
+        if (!rawName || !Number.isFinite(rawAmount) || rawAmount < 0) continue;
+
+        const found = lookup.get(normalizeInventoryTextToken(rawName));
+        if (!found) continue;
+
+        let importUnit = 'ml';
+        if (rawUnit === 'g') importUnit = 'g';
+        else if (rawUnit === 'st' || rawUnit === 'stueck' || rawUnit === 'stück') importUnit = 'st';
+        else if (rawUnit === 'ml') importUnit = 'ml';
+        else importUnit = getItemUnit(found.item);
+
+        const storedAmount = convertInputToStoredAmount(found.item, importUnit, rawAmount, false, null);
+        if (storedAmount === null || !Number.isFinite(storedAmount)) continue;
+
+        entries.push({
+            cat: found.cat,
+            item: found.item,
+            amount: storedAmount
+        });
+    }
+
+    return entries;
+}
+
+function importLegacyWarehouseInventoryText(text, sourceName = 'TXT-Bestand') {
+    const entries = parseLegacyWarehouseInventoryText(text);
+    if (!entries.length) {
+        alert('Keine bekannten Lagerartikel im TXT-Format erkannt.');
+        return false;
+    }
+    const warehouse = getActiveWarehouse();
+    if (!confirm(`TXT-Lagerbestand "${sourceName}" in das aktuell ausgewählte Lager "${warehouse.name}" importieren? Dieses Lager wird dabei überschrieben.`)) {
+        return false;
+    }
+
+    for (const cat in db.inventory) {
+        for (const item in db.inventory[cat]) {
+            db.inventory[cat][item] = 0;
+        }
+    }
+    entries.forEach(entry => {
+        if (!db.inventory[entry.cat]) db.inventory[entry.cat] = {};
+        db.inventory[entry.cat][entry.item] = entry.amount;
+    });
+
+    warehouse.data = db;
+    warehouse.lastImportAt = new Date().toISOString();
+    saveDB();
+    renderCurrentWarehouseViews();
+    renderStorageSecurityStatus();
+    alert(`TXT-Lagerbestand in "${warehouse.name}" geladen!`);
+    selectTab('lager');
+    checkAndNotifyStockAlerts();
+    return true;
+}
+
 function importData() {
     let file = document.getElementById('importFile').files[0];
     if (!file) return alert("Bitte wähle eine Backup-Datei aus.");
     let reader = new FileReader();
     reader.onload = e => {
+        const rawText = typeof e.target.result === 'string' ? e.target.result : '';
         try {
-            let parsed = JSON.parse(e.target.result);
+            let parsed = JSON.parse(rawText);
             const isProjectBackup = parsed && parsed.type === 'osci_project_backup' && parsed.data;
             const importPayload = isProjectBackup ? parsed.data : (parsed && parsed.type === 'osci_warehouse_backup' ? parsed.data : parsed);
             const sourceName = parsed && (parsed.warehouseName || parsed.app) ? (parsed.warehouseName || parsed.app) : 'Backup';
@@ -10656,7 +10634,13 @@ function importData() {
                 checkAndNotifyStockAlerts();
             } 
             else alert("Ungültiges Backup-Format.");
-        } catch(err) { alert("Fehler beim Lesen der Datei."); }
+        } catch(err) {
+            const fileName = file.name || 'TXT-Bestand';
+            if (/\.(txt)$/i.test(fileName) || /lagerbestand\s*:|^\s*-\s*.+:\s*[-+]?\d+/im.test(rawText)) {
+                if (importLegacyWarehouseInventoryText(rawText, fileName)) return;
+            }
+            alert("Fehler beim Lesen der Datei.");
+        }
     };
     reader.readAsText(file);
 }
@@ -11507,6 +11491,7 @@ async function bootstrapApplication() {
         const hashTab = decodeURIComponent(window.location.hash.slice(1));
         if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
     }
+    if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     showTab(startupTab);
     updateNotificationStatus();
     renderStorageSecurityStatus();
@@ -11535,7 +11520,7 @@ bootstrapApplication().catch(err => {
 
 window.addEventListener('hashchange', () => {
     const hashTab = decodeURIComponent(window.location.hash.slice(1));
-    if (APP_TAB_IDS.includes(hashTab)) showTab(hashTab);
+    if (APP_TAB_IDS.includes(hashTab)) showTab(isMenuTabHidden(hashTab) ? getFirstVisibleTab() : hashTab);
 });
 
 window.addEventListener('pagehide', () => {

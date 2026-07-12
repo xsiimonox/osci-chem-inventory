@@ -856,6 +856,12 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
     border-top: 1px solid rgba(255,255,255,0.08);
     padding-top: 14px;
 }
+.coral-bridge-details {
+    border-top: 1px solid rgba(191,90,242,0.18);
+    background: rgba(191,90,242,0.03);
+    border-radius: 18px;
+    padding: 14px;
+}
 .coral-transfer-details summary {
     display: flex;
     align-items: center;
@@ -871,6 +877,12 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
     display: grid;
     gap: 12px;
     margin-top: 14px;
+}
+.coral-bridge-details textarea {
+    min-height: 156px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+    line-height: 1.45;
 }
 .coral-transfer-card {
     border: 1px solid rgba(255,255,255,0.08);

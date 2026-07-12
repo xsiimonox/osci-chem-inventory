@@ -933,14 +933,9 @@
             <div class="card coral-hero-card">
                 <div class="coral-hero-copy">
                     <small>Korallenverwaltung</small>
-                    <h3>Korallen katalogisieren, wiederfinden und per NFC markieren</h3>
-                    <p class="hint">Lege Korallen manuell an, speichere Fotos, verknüpfe NFC-Tags und finde deine Tiere später schnell wieder. NFC funktioniert je nach Gerät und Browser unterschiedlich, die Verwaltung bleibt aber immer nutzbar.</p>
+                    <h3>Korallen katalogisieren, dokumentieren und schnell wiederfinden</h3>
+                    <p class="hint">Lege Korallen manuell an, speichere Fotos, verknüpfe Ableger mit Mutterkorallen und halte deinen Bestand sauber dokumentiert.</p>
                 </div>
-                <a href="https://master-reefer.shop/products/reef-plugs-30mm-13mm-pin?variant=57753737134454" target="_blank" rel="noopener" class="coral-shop-link">
-                    <span>NFC Reef Plugs</span>
-                    <strong>Shop öffnen</strong>
-                    <small>Passende Plugs mit NFC-Tag ansehen</small>
-                </a>
             </div>
 
             <div class="card aquarium-workspace-panel aquarium-workspace-panel-logbook" id="coralAquariumPanel"></div>
@@ -950,7 +945,7 @@
                     <div class="coral-section-head">
                         <div>
                             <h3>Koralle anlegen</h3>
-                            <p class="hint">Auch ohne NFC vollständig nutzbar. Der Tag kann später ergänzt werden.</p>
+                            <p class="hint">Ideal für Bestandsdoku, Ableger-Verwaltung und spätere Suche nach Name, Art oder Standort.</p>
                         </div>
                         <button type="button" class="btn-out btn-animated" onclick="resetCoralForm()">Zurücksetzen</button>
                     </div>
@@ -1018,10 +1013,6 @@
                             <select id="coralMotherId">
                                 <option value="">Keine Mutterkoralle zugewiesen</option>
                             </select>
-                        </div>
-                        <div class="input-group">
-                            <label>NFC / Tag-ID optional:</label>
-                            <input type="text" id="coralTagId" placeholder="Wird automatisch gesetzt oder manuell ergänzt">
                         </div>
                         <div class="input-group">
                             <label>Eingesetzt am:</label>
@@ -1142,11 +1133,7 @@
                     </div>
                     <div class="btn-group" style="flex-wrap:wrap; margin-top:14px;">
                         <button class="btn-primary btn-animated" onclick="saveCoralEntry()">Koralle speichern</button>
-                        <button class="btn-secondary btn-animated" onclick="writeCurrentCoralToNfc()">Auf NFC-Tag schreiben</button>
-                        <button class="btn-secondary btn-animated" onclick="writeCoralPresetToNfc()">Preset auf NFC-Tag</button>
-                        <button class="btn-secondary btn-animated" onclick="startCoralNfcScan()">NFC-Tag lesen</button>
                     </div>
-                    <div id="coralNfcStatus" class="tool-result">Noch kein NFC-Vorgang gestartet.</div>
                 </div>
 
                 <div class="card coral-library-card">
@@ -1440,11 +1427,12 @@
                 <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
                 <div class="backup-project-actions">
                     <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 Projekt-Backup</button>
+                    <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated" style="flex: 1;">📝 TXT Export</button>
                     <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
                     <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">Lagerbestand teilen</button>
                 </div>
                 <div class="backup-project-import">
-                    <label class="hint" style="display:block; margin-bottom:8px;">Backup einlesen</label>
+                    <label class="hint" style="display:block; margin-bottom:8px;">Backup oder alten TXT-Lagerbestand einlesen</label>
                     <input type="file" id="importFile" accept=".json,.txt">
                     <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
                 </div>
