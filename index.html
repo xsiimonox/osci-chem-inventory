@@ -4,6 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Reef.Storage&Tools</title>
+    <script>
+        (function () {
+            var host = String(window.location.hostname || '').toLowerCase();
+            if (host === 'xsiimonox.github.io' || host.endsWith('.github.io')) {
+                window.location.replace('https://reeftools.de/');
+            }
+        })();
+    </script>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css?v=2.5.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
