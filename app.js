@@ -1118,6 +1118,13 @@ function renderLegacyDomainBanner() {
     const host = String(window.location.hostname || '').toLowerCase();
     const isLegacyHost = host === 'xsiimonox.github.io' || host.endsWith('.github.io');
     banner.hidden = !isLegacyHost;
+    if (isLegacyHost) {
+        const path = window.location.pathname || '/';
+        const hash = window.location.hash || '';
+        const search = window.location.search || '';
+        const target = `https://reeftools.de${path}${search}${hash}`;
+        window.location.replace(target);
+    }
 }
 
 function renderMenuOrderSettings() {
