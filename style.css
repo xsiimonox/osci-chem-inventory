@@ -352,6 +352,11 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 body.menu-open {
     overflow: hidden !important;
 }
+body.menu-open .mobile-bottom-nav {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(120%);
+}
 
 .tab-content {
     display: none;
@@ -6400,6 +6405,7 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
         -webkit-backdrop-filter: blur(22px);
         box-shadow: 0 -12px 32px rgba(0,0,0,0.28);
         pointer-events: auto;
+        transition: transform 0.24s ease, opacity 0.2s ease;
     }
     .mobile-bottom-nav button {
         display: flex;
