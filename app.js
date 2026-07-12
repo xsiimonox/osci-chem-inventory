@@ -653,13 +653,15 @@ function getGoogleDriveSyncStatusMessage() {
         return 'Noch nicht eingerichtet: Es fehlt aktuell die Google OAuth Client ID der App.';
     }
     const settings = getGoogleDriveSyncSettings();
-    if (!settings.connectedEmail) return 'Bereit zur Einrichtung. Nutzer verbinden später nur ihr eigenes Google-Konto.';
+    if (!settings.connectedEmail && !hasValidGoogleDriveToken()) return 'Bereit zur Einrichtung. Nutzer verbinden später nur ihr eigenes Google-Konto.';
     if (hasValidGoogleDriveToken()) {
         return settings.autoSync
-            ? `Verbunden mit ${settings.connectedEmail} · Auto-Sync bereit`
-            : `Verbunden mit ${settings.connectedEmail} · Auto-Sync aus`;
+            ? `Google Drive verbunden · Auto-Sync bereit`
+            : `Google Drive verbunden · Auto-Sync aus`;
     }
-    return `Verbunden mit ${settings.connectedEmail} · Bitte Verbindung für diese Sitzung erneuern`;
+    return settings.connectedEmail
+        ? `Verbunden mit ${settings.connectedEmail} · Bitte Verbindung für diese Sitzung erneuern`
+        : 'Verbindung fuer diese Sitzung abgelaufen. Bitte erneut mit Google Drive verbinden.';
 }
 
 function ensureGoogleIdentityScript() {
@@ -891,6 +893,26 @@ function toggleGoogleDriveAutoSync(enabled) {
     if (enabled) scheduleGoogleDriveAutoSync();
 }
 
+async function inspectGoogleDriveSyncNow() {
+    try {
+        if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
+        const fileId = await findGoogleDriveBackupFileId();
+        const settings = getGoogleDriveSyncSettings();
+        let message = 'Google Drive Verbindung geprüft.';
+        if (fileId) {
+            message += ` Backup gefunden.`;
+            storeGoogleDriveSyncSettings({ fileId });
+        } else {
+            message += ' Es wurde noch kein Backup in deinem App-Speicher gefunden.';
+        }
+        renderGoogleDriveSyncCard(message);
+        showToast(fileId ? 'Google Drive Backup gefunden' : 'Noch kein Google Drive Backup vorhanden', fileId ? 'success' : 'info', 2600);
+    } catch (err) {
+        renderGoogleDriveSyncCard(`Prüfung fehlgeschlagen: ${err.message}`);
+        alert('Google Drive Prüfung fehlgeschlagen: ' + err.message);
+    }
+}
+
 async function syncProjectToGoogleDriveNow() {
     try {
         if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
@@ -922,30 +944,64 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     if (!mount) return;
     const settings = getGoogleDriveSyncSettings();
     const configured = isGoogleDriveConfigured();
-    const connected = !!settings.connectedEmail;
+    const sessionConnected = hasValidGoogleDriveToken();
+    const connected = sessionConnected || !!settings.connectedEmail;
+    const accountLabel = settings.connectedEmail || (sessionConnected ? 'aktive Sitzung' : '-');
     const status = statusMessage || getGoogleDriveSyncStatusMessage();
+    const lastSyncLabel = settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch nicht';
+    const lastRestoreLabel = settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch nicht';
+    const backupKnown = !!settings.fileId;
     mount.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row">
-                <span><strong>Einrichtung</strong><small>${configured ? 'Die App ist auf Google Drive vorbereitet.' : 'Die App braucht noch eine einmalig eingetragene Google OAuth Client ID.'}</small></span>
-                <span>${configured ? 'bereit' : 'wartet'}</span>
+        <div class="google-drive-status-shell">
+            <div class="google-drive-status-hero ${connected ? 'is-connected' : 'is-idle'}">
+                <div>
+                    <strong>${connected ? 'Google Drive verbunden' : 'Google Drive noch nicht verbunden'}</strong>
+                    <small>${connected ? 'Dein Projekt kann in deinem privaten App-Speicher gesichert werden.' : 'Verbinde dein Google-Konto, um Backups und Wiederherstellung zu nutzen.'}</small>
+                </div>
+                <span class="google-drive-status-pill">${connected ? 'verbunden' : 'getrennt'}</span>
             </div>
-            <div class="tool-row">
-                <span><strong>Google Konto</strong><small>${connected ? 'Dieses Konto nutzt den versteckten App-Datenspeicher in Google Drive.' : 'Noch nicht verbunden.'}</small></span>
-                <span>${escapeHtml(settings.connectedEmail || '-')}</span>
+            <div class="google-drive-status-grid">
+                <div class="google-drive-status-card">
+                    <small>Konto</small>
+                    <strong>${escapeHtml(accountLabel)}</strong>
+                    <span>${connected ? 'Normales Drive bleibt unberührt' : 'Noch keine aktive Verbindung'}</span>
+                </div>
+                <div class="google-drive-status-card">
+                    <small>Letzte Sicherung</small>
+                    <strong>${escapeHtml(lastSyncLabel)}</strong>
+                    <span>${backupKnown ? 'Backup im App-Speicher bekannt' : 'Noch kein bekanntes Backup'}</span>
+                </div>
+                <div class="google-drive-status-card">
+                    <small>Letztes Laden</small>
+                    <strong>${escapeHtml(lastRestoreLabel)}</strong>
+                    <span>Zuletzt aus Google Drive wiederhergestellt</span>
+                </div>
             </div>
-            <div class="tool-row">
-                <span><strong>Letzter Cloud-Sync</strong><small>Wird nur gesetzt, wenn ein Backup erfolgreich in Google Drive geschrieben wurde.</small></span>
-                <span>${escapeHtml(settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch keiner')}</span>
+            <div class="google-drive-status-note">
+                <strong>Wichtig:</strong> Deine Backups liegen im geschützten App-Speicher von Google Drive und sind im normalen Drive-Dateibereich nicht sichtbar.
             </div>
-            <div class="tool-row">
-                <span><strong>Letzte Cloud-Wiederherstellung</strong><small>Zeigt, wann zuletzt ein Stand aus Google Drive geladen wurde.</small></span>
-                <span>${escapeHtml(settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch keine')}</span>
-            </div>
-            <div class="tool-row">
-                <span><strong>Status</strong><small>Scope ist bewusst minimal: nur der versteckte App-Datenspeicher, keine normalen Drive-Dateien.</small></span>
-                <span>${escapeHtml(status)}</span>
-            </div>
+            <details class="google-drive-diagnostics">
+                <summary>Verbindung & Backup prüfen</summary>
+                <div class="google-drive-diagnostics-body">
+                    <div class="tool-result">
+                        <div class="tool-row">
+                            <span><strong>Status</strong><small>Kurze Zusammenfassung der aktuellen Verbindung.</small></span>
+                            <span>${escapeHtml(status)}</span>
+                        </div>
+                        <div class="tool-row">
+                            <span><strong>Aktive Sitzung</strong><small>Nur für diese Browser-Sitzung gültig.</small></span>
+                            <span>${sessionConnected ? 'ja' : 'nein'}</span>
+                        </div>
+                        <div class="tool-row">
+                            <span><strong>Bekannte Backup-Datei</strong><small>Wird gesetzt, sobald ein Backup gefunden oder hochgeladen wurde.</small></span>
+                            <span>${backupKnown ? 'ja' : 'nein'}</span>
+                        </div>
+                    </div>
+                    <div class="google-drive-diagnostics-actions">
+                        <button onclick="inspectGoogleDriveSyncNow()" class="btn-secondary btn-animated">Verbindung prüfen</button>
+                    </div>
+                </div>
+            </details>
         </div>
     `;
     const autoEl = document.getElementById('googleDriveAutoSync');
@@ -956,6 +1012,7 @@ Object.assign(window, {
     connectGoogleDriveSync,
     disconnectGoogleDriveSync,
     toggleGoogleDriveAutoSync,
+    inspectGoogleDriveSyncNow,
     syncProjectToGoogleDriveNow,
     restoreProjectFromGoogleDriveNow,
     renderGoogleDriveSyncCard

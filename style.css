@@ -327,8 +327,25 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 .menu-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; backdrop-filter: blur(2px); }
 .menu-backdrop.open { display: block; }
 
-.tab-content { display: none; padding: 15px; }
-.tab-content.active { display: block; animation: iosSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+.tab-content {
+    display: none;
+    width: min(1140px, 100%);
+    margin: 0 auto;
+    padding: 18px 16px 30px;
+}
+
+.tab-content.active {
+    display: grid;
+    gap: 14px;
+    animation: iosSlideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.tab-content.active > .card,
+.tab-content.active > details,
+.tab-content.active > .tools-shell,
+.tab-content.active > .warehouse-control-card {
+    margin-bottom: 0;
+}
 
 #app {
     width: min(1220px, 100%);
@@ -656,19 +673,26 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 .category-title { color: var(--text); font-size: 0.85rem; font-weight: 600; margin: 28px 0 12px 2px; text-transform: uppercase; letter-spacing: 1px; transition: color 0.5s ease; opacity: 0.6; }
 .card {
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
-        color-mix(in srgb, var(--card-bg) 96%, transparent);
-    padding: 16px;
+        linear-gradient(180deg, rgba(255,255,255,0.038), rgba(255,255,255,0.012)),
+        color-mix(in srgb, var(--card-bg) 97%, transparent);
+    padding: 18px;
     margin-bottom: 12px;
-    border-radius: 16px;
-    border: 1px solid color-mix(in srgb, var(--border) 76%, rgba(255,255,255,0.12));
-    box-shadow: 0 14px 36px rgba(0,0,0,0.18);
-    transition: transform 0.2s ease, box-shadow 0.35s ease, border-color 0.35s ease, background-color 0.5s ease;
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--border) 82%, rgba(255,255,255,0.08));
+    box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.35s ease;
 }
 
 .card:hover {
-    border-color: color-mix(in srgb, var(--primary) 26%, var(--border));
-    box-shadow: 0 18px 46px rgba(0,0,0,0.24);
+    transform: none;
+    border-color: color-mix(in srgb, var(--primary) 18%, var(--border));
+    box-shadow: 0 14px 32px rgba(0,0,0,0.18);
+}
+
+.card h2,
+.card h3 {
+    margin: 0 0 8px;
+    line-height: 1.2;
 }
 /*.card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }*/
 .card h4 { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
@@ -680,7 +704,7 @@ body.theme-girl .stock { background: rgba(255, 102, 164, 0.15); }
 body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst für Meeres-Badge */
 
 .cross-hint { font-size: 0.75rem; color: #ffd60a; margin-top: 4px; display: block; font-weight: 500; }
-.hint { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px; }
+.hint { font-size: 0.84rem; color: var(--text-muted); margin-bottom: 12px; line-height: 1.45; }
 
 .trace-grid { display: grid; grid-template-columns: 1fr 100px 50px; gap: 5px; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .trace-grid label { font-size: 0.95rem; }
@@ -2109,6 +2133,132 @@ body.theme-mint.party-mode .card {
     margin-top: 14px;
 }
 
+.google-drive-status-shell {
+    display: grid;
+    gap: 12px;
+}
+
+.google-drive-status-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+}
+
+.google-drive-status-hero strong,
+.google-drive-status-hero small {
+    display: block;
+}
+
+.google-drive-status-hero strong {
+    font-size: 1rem;
+    color: var(--text);
+}
+
+.google-drive-status-hero small {
+    margin-top: 4px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.google-drive-status-hero.is-connected {
+    border-color: rgba(48, 209, 88, 0.28);
+    background: linear-gradient(135deg, rgba(48, 209, 88, 0.12), rgba(10, 132, 255, 0.06));
+}
+
+.google-drive-status-pill {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(48, 209, 88, 0.28);
+    background: rgba(48, 209, 88, 0.12);
+    color: var(--success);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.google-drive-status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.google-drive-status-card {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.028);
+}
+
+.google-drive-status-card small,
+.google-drive-status-card strong,
+.google-drive-status-card span {
+    display: block;
+}
+
+.google-drive-status-card small {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.google-drive-status-card strong {
+    margin-top: 6px;
+    color: var(--text);
+    font-size: 0.98rem;
+}
+
+.google-drive-status-card span {
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.google-drive-status-note {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(100, 210, 255, 0.14);
+    background: rgba(100, 210, 255, 0.06);
+    color: var(--text);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.google-drive-diagnostics {
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding-top: 12px;
+}
+
+.google-drive-diagnostics summary {
+    cursor: pointer;
+    color: var(--secondary);
+    font-weight: 700;
+    list-style: none;
+}
+
+.google-drive-diagnostics summary::-webkit-details-marker {
+    display: none;
+}
+
+.google-drive-diagnostics-body {
+    margin-top: 12px;
+    display: grid;
+    gap: 10px;
+}
+
+.google-drive-diagnostics-actions {
+    display: flex;
+    justify-content: flex-start;
+}
+
 .google-drive-sync-toggle {
     display: flex;
     justify-content: space-between;
@@ -2138,6 +2288,17 @@ body.theme-mint.party-mode .card {
     width: 18px;
     height: 18px;
     accent-color: var(--success);
+}
+
+@media (max-width: 767px) {
+    .google-drive-status-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .google-drive-status-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .share-active-warehouse-box {
@@ -5536,7 +5697,10 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
 @media (max-width: 767px) {
     body { padding-bottom: 110px; }
     .keyboard-shortcuts-hint { display: none; }
-    .tab-content { padding: 12px; }
+    .tab-content {
+        padding: 14px 12px 24px;
+        gap: 12px;
+    }
     .warehouse-control-card {
         padding: 14px;
         border-radius: 16px;
