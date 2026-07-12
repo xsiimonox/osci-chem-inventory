@@ -149,6 +149,20 @@ const customCrProxyReferencePsu = 34.5;
 const customCrProxyReferenceSum = customCrElementDefinitions
     .reduce((sum, entry) => sum + (customCrOptimalTargets[entry.key] || 0), 0);
 
+const customCrDefaultStepLimits = {
+    Na: { up: 300, down: 300 },
+    Mg: { up: 100, down: 100 },
+    Ca: { up: 20, down: 20 },
+    K: { up: 20, down: 20 },
+    Sr: { up: 2, down: 2 },
+    F: { up: 0.1, down: 0.1 },
+    Cl: { up: 500, down: 500 },
+    S: { up: 50, down: 50 },
+    Br: { up: 10, down: 10 },
+    B: { up: 1, down: 1 },
+    PSU: { up: 1, down: 1 }
+};
+
 const nutritionDoseRules = {
     Nitrat: {
         action: 'erhöht',
@@ -328,6 +342,18 @@ function buildShopUrl(slug, sizeMl) {
 const DB_KEY = 'osci_db_v5';
 const SYNC_SETTINGS_KEY = 'osci_supabase_sync_v1';
 const LAST_TAB_KEY = 'osci_last_active_tab';
+const GOOGLE_DRIVE_SETTINGS_KEY = 'osci_google_drive_sync_v1';
+const APP_STORAGE_DB_NAME = 'osci_motion_secure_store_v1';
+const APP_STORAGE_DB_VERSION = 1;
+const APP_STORAGE_STATE_STORE = 'state';
+const APP_STORAGE_SNAPSHOT_STORE = 'snapshots';
+const APP_STORAGE_STATE_KEY = 'app_state';
+const APP_STORAGE_META_KEY = 'app_meta';
+const APP_STORAGE_MAX_SNAPSHOTS = 18;
+const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
+const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
+const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
+const GOOGLE_DRIVE_FILE_NAME = 'osci-motion-project-backup.json';
 const DEFAULT_SUPABASE_URL = 'https://ymeszigbnoaoqkwxcbqo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_4LQDgitTmZeu9tO2Mh8Hew_-EseNuP0';
 const COMMUNITY_MAP_DEFAULT_CENTER = { lat: 51.2, lng: 10.45 };
@@ -346,6 +372,17 @@ let startupSyncAttempted = false;
 let communityMapLoading = false;
 let otpCooldownUntil = 0;
 let otpCooldownTimer = null;
+let appStoragePromise = null;
+let pendingPersistTimer = null;
+let persistSequence = Promise.resolve();
+let latestPersistAt = null;
+let latestSnapshotAt = null;
+let appBootstrapComplete = false;
+let googleIdentityScriptPromise = null;
+let googleDriveTokenClient = null;
+let googleDriveAccessToken = '';
+let googleDriveTokenExpiresAt = 0;
+let googleDriveSyncTimer = null;
 const APP_TAB_IDS = ['lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
@@ -388,6 +425,630 @@ function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
     updateSyncStatus(CLOUD_SYNC_MAINTENANCE_MESSAGE, 'warn');
     return false;
 }
+
+function deepClone(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+}
+
+function canUseIndexedDb() {
+    return typeof window !== 'undefined' && 'indexedDB' in window;
+}
+
+function openAppStorage() {
+    if (!canUseIndexedDb()) return Promise.resolve(null);
+    if (!appStoragePromise) {
+        appStoragePromise = new Promise((resolve, reject) => {
+            const request = indexedDB.open(APP_STORAGE_DB_NAME, APP_STORAGE_DB_VERSION);
+            request.onupgradeneeded = () => {
+                const idb = request.result;
+                if (!idb.objectStoreNames.contains(APP_STORAGE_STATE_STORE)) {
+                    idb.createObjectStore(APP_STORAGE_STATE_STORE);
+                }
+                if (!idb.objectStoreNames.contains(APP_STORAGE_SNAPSHOT_STORE)) {
+                    const snapshotStore = idb.createObjectStore(APP_STORAGE_SNAPSHOT_STORE, { keyPath: 'id' });
+                    snapshotStore.createIndex('createdAt', 'createdAt', { unique: false });
+                }
+            };
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error || new Error('IndexedDB konnte nicht geöffnet werden.'));
+        }).catch(err => {
+            console.error('IndexedDB init failed:', err);
+            return null;
+        });
+    }
+    return appStoragePromise;
+}
+
+async function idbGet(storeName, key) {
+    const idb = await openAppStorage();
+    if (!idb) return null;
+    return new Promise((resolve, reject) => {
+        const tx = idb.transaction(storeName, 'readonly');
+        const store = tx.objectStore(storeName);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result ?? null);
+        request.onerror = () => reject(request.error || new Error(`IndexedDB get failed for ${storeName}`));
+    }).catch(err => {
+        console.error(err);
+        return null;
+    });
+}
+
+async function idbPut(storeName, key, value) {
+    const idb = await openAppStorage();
+    if (!idb) return false;
+    return new Promise((resolve, reject) => {
+        const tx = idb.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const request = key === undefined ? store.put(value) : store.put(value, key);
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error || new Error(`IndexedDB put failed for ${storeName}`));
+    }).catch(err => {
+        console.error(err);
+        return false;
+    });
+}
+
+async function idbDelete(storeName, key) {
+    const idb = await openAppStorage();
+    if (!idb) return false;
+    return new Promise((resolve, reject) => {
+        const tx = idb.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const request = store.delete(key);
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error || new Error(`IndexedDB delete failed for ${storeName}`));
+    }).catch(err => {
+        console.error(err);
+        return false;
+    });
+}
+
+async function idbGetAllSnapshots() {
+    const idb = await openAppStorage();
+    if (!idb) return [];
+    return new Promise((resolve, reject) => {
+        const tx = idb.transaction(APP_STORAGE_SNAPSHOT_STORE, 'readonly');
+        const store = tx.objectStore(APP_STORAGE_SNAPSHOT_STORE);
+        const request = store.getAll();
+        request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result : []);
+        request.onerror = () => reject(request.error || new Error('IndexedDB getAll snapshots failed.'));
+    }).catch(err => {
+        console.error(err);
+        return [];
+    });
+}
+
+async function removeLegacyLocalDbCopies() {
+    LEGACY_DB_KEYS.forEach(key => {
+        try { localStorage.removeItem(key); } catch (err) {}
+    });
+}
+
+async function loadPersistedAppState() {
+    const indexedValue = await idbGet(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY);
+    if (indexedValue && typeof indexedValue === 'object') {
+        latestPersistAt = indexedValue.savedAt || indexedValue.updatedAt || null;
+        return indexedValue.payload || null;
+    }
+    let parsed = null;
+    for (const key of LEGACY_DB_KEYS) {
+        try {
+            const saved = localStorage.getItem(key);
+            if (saved) {
+                parsed = JSON.parse(saved);
+                break;
+            }
+        } catch (e) {
+            console.error('Legacy storage load failed:', e);
+        }
+    }
+    return parsed;
+}
+
+async function trimStoredSnapshots() {
+    const snapshots = await idbGetAllSnapshots();
+    if (snapshots.length <= APP_STORAGE_MAX_SNAPSHOTS) return;
+    const sorted = snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const toDelete = sorted.slice(APP_STORAGE_MAX_SNAPSHOTS);
+    for (const entry of toDelete) {
+        await idbDelete(APP_STORAGE_SNAPSHOT_STORE, entry.id);
+    }
+}
+
+async function getAppStorageMeta() {
+    return await idbGet(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY);
+}
+
+async function getLatestStoredSnapshot() {
+    const snapshots = await idbGetAllSnapshots();
+    if (!snapshots.length) return null;
+    return snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
+}
+
+async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
+    if (!appState) return false;
+    const payload = deepClone(appState);
+    const savedAt = new Date().toISOString();
+    latestPersistAt = savedAt;
+    const stateRecord = {
+        key: APP_STORAGE_STATE_KEY,
+        savedAt,
+        reason,
+        payload
+    };
+    const ok = await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY, stateRecord);
+    if (!ok) return false;
+    await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
+        key: APP_STORAGE_META_KEY,
+        lastSavedAt: savedAt,
+        lastSnapshotAt: latestSnapshotAt || null,
+        schema: APP_STORAGE_DB_VERSION
+    });
+    if (createSnapshot) {
+        const snapshot = {
+            id: `snapshot-${savedAt}`,
+            createdAt: savedAt,
+            reason,
+            payload
+        };
+        const snapshotOk = await idbPut(APP_STORAGE_SNAPSHOT_STORE, undefined, snapshot);
+        if (snapshotOk) latestSnapshotAt = savedAt;
+        await trimStoredSnapshots();
+    }
+    renderStorageSecurityStatus();
+    return true;
+}
+
+function queuePersistAppState(reason = 'autosave', createSnapshot = false) {
+    if (!appBootstrapComplete) return;
+    clearTimeout(pendingPersistTimer);
+    pendingPersistTimer = setTimeout(() => {
+        persistSequence = persistSequence.then(() => persistAppStateNow(reason, createSnapshot)).catch(err => {
+            console.error('Persist queue failed:', err);
+        });
+    }, 220);
+}
+
+async function flushPendingPersistence(reason = 'flush', createSnapshot = false) {
+    clearTimeout(pendingPersistTimer);
+    pendingPersistTimer = null;
+    await persistSequence.catch(() => {});
+    await persistAppStateNow(reason, createSnapshot);
+}
+
+function getGoogleDriveSyncSettings() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(GOOGLE_DRIVE_SETTINGS_KEY) || '{}');
+        return {
+            autoSync: parsed.autoSync === true,
+            fileId: parsed.fileId || '',
+            lastSyncAt: parsed.lastSyncAt || null,
+            lastRestoreAt: parsed.lastRestoreAt || null,
+            connectedEmail: parsed.connectedEmail || ''
+        };
+    } catch (err) {
+        return { autoSync: false, fileId: '', lastSyncAt: null, lastRestoreAt: null, connectedEmail: '' };
+    }
+}
+
+function storeGoogleDriveSyncSettings(settings) {
+    const current = getGoogleDriveSyncSettings();
+    localStorage.setItem(GOOGLE_DRIVE_SETTINGS_KEY, JSON.stringify({
+        ...current,
+        ...settings
+    }));
+}
+
+function isGoogleDriveConfigured() {
+    return typeof GOOGLE_DRIVE_CLIENT_ID === 'string' && GOOGLE_DRIVE_CLIENT_ID.trim().length > 0;
+}
+
+function hasValidGoogleDriveToken() {
+    return !!googleDriveAccessToken && googleDriveTokenExpiresAt > Date.now() + 60_000;
+}
+
+function getGoogleDriveSyncStatusMessage() {
+    if (!isGoogleDriveConfigured()) {
+        return 'Noch nicht eingerichtet: Es fehlt aktuell die Google OAuth Client ID der App.';
+    }
+    const settings = getGoogleDriveSyncSettings();
+    if (!settings.connectedEmail) return 'Bereit zur Einrichtung. Nutzer verbinden später nur ihr eigenes Google-Konto.';
+    if (hasValidGoogleDriveToken()) {
+        return settings.autoSync
+            ? `Verbunden mit ${settings.connectedEmail} · Auto-Sync bereit`
+            : `Verbunden mit ${settings.connectedEmail} · Auto-Sync aus`;
+    }
+    return `Verbunden mit ${settings.connectedEmail} · Bitte Verbindung für diese Sitzung erneuern`;
+}
+
+function ensureGoogleIdentityScript() {
+    if (!isGoogleDriveConfigured()) return Promise.resolve(false);
+    if (window.google?.accounts?.oauth2) return Promise.resolve(true);
+    if (!googleIdentityScriptPromise) {
+        googleIdentityScriptPromise = new Promise((resolve, reject) => {
+            const existing = document.querySelector('script[data-google-identity="true"]');
+            if (existing) {
+                existing.addEventListener('load', () => resolve(true), { once: true });
+                existing.addEventListener('error', () => reject(new Error('Google Identity Script konnte nicht geladen werden.')), { once: true });
+                return;
+            }
+            const script = document.createElement('script');
+            script.src = 'https://accounts.google.com/gsi/client';
+            script.async = true;
+            script.defer = true;
+            script.dataset.googleIdentity = 'true';
+            script.onload = () => resolve(true);
+            script.onerror = () => reject(new Error('Google Identity Script konnte nicht geladen werden.'));
+            document.head.appendChild(script);
+        }).catch(err => {
+            console.error(err);
+            return false;
+        });
+    }
+    return googleIdentityScriptPromise;
+}
+
+async function ensureGoogleDriveTokenClient() {
+    if (!isGoogleDriveConfigured()) throw new Error('Google Drive Sync ist noch nicht eingerichtet. Es fehlt die Google OAuth Client ID.');
+    const ready = await ensureGoogleIdentityScript();
+    if (!ready || !window.google?.accounts?.oauth2) throw new Error('Google Identity Services sind nicht verfügbar.');
+    if (!googleDriveTokenClient) {
+        googleDriveTokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: GOOGLE_DRIVE_CLIENT_ID,
+            scope: GOOGLE_DRIVE_SCOPE,
+            callback: () => {}
+        });
+    }
+    return googleDriveTokenClient;
+}
+
+async function fetchGoogleUserEmail(accessToken) {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!response.ok) return '';
+    const profile = await response.json();
+    return profile?.email || '';
+}
+
+async function requestGoogleDriveAccessToken(interactive = true) {
+    if (hasValidGoogleDriveToken()) return googleDriveAccessToken;
+    const client = await ensureGoogleDriveTokenClient();
+    return new Promise((resolve, reject) => {
+        client.callback = async response => {
+            if (!response || response.error) {
+                reject(new Error(response?.error_description || response?.error || 'Google OAuth fehlgeschlagen.'));
+                return;
+            }
+            googleDriveAccessToken = response.access_token || '';
+            googleDriveTokenExpiresAt = Date.now() + ((response.expires_in || 0) * 1000);
+            const email = await fetchGoogleUserEmail(googleDriveAccessToken);
+            if (email) storeGoogleDriveSyncSettings({ connectedEmail: email });
+            renderGoogleDriveSyncCard();
+            resolve(googleDriveAccessToken);
+        };
+        client.error_callback = error => {
+            reject(new Error(error?.message || 'Google OAuth abgebrochen.'));
+        };
+        client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+    });
+}
+
+async function googleDriveFetch(url, options = {}) {
+    const token = hasValidGoogleDriveToken() ? googleDriveAccessToken : await requestGoogleDriveAccessToken(false);
+    const headers = new Headers(options.headers || {});
+    headers.set('Authorization', `Bearer ${token}`);
+    const response = await fetch(url, { ...options, headers });
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Google Drive Fehler ${response.status}: ${text || response.statusText}`);
+    }
+    return response;
+}
+
+function buildProjectBackupPayload() {
+    const exportedAt = new Date().toISOString();
+    const warehouse = getActiveWarehouse();
+    syncActiveAquariumDataFromDb(false);
+    if (warehouse) warehouse.lastExportAt = exportedAt;
+    return {
+        type: 'osci_project_backup',
+        version: 2,
+        app: 'OSCI Motion',
+        schema: APP_STORAGE_DB_VERSION,
+        activeWarehouseId,
+        activeAquariumId,
+        warehouseName: warehouse ? warehouse.name : 'Lager',
+        exportedAt,
+        data: deepClone(appState)
+    };
+}
+
+async function findGoogleDriveBackupFileId() {
+    const settings = getGoogleDriveSyncSettings();
+    if (settings.fileId) return settings.fileId;
+    const query = encodeURIComponent(`name='${GOOGLE_DRIVE_FILE_NAME.replace(/'/g, "\\'")}' and trashed=false`);
+    const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder&fields=files(id,name,modifiedTime)`);
+    const json = await response.json();
+    const fileId = json?.files?.[0]?.id || '';
+    if (fileId) storeGoogleDriveSyncSettings({ fileId });
+    return fileId;
+}
+
+function buildGoogleDriveMultipartBody(metadata, content) {
+    const boundary = `osci-boundary-${Date.now().toString(36)}`;
+    const body = [
+        `--${boundary}`,
+        'Content-Type: application/json; charset=UTF-8',
+        '',
+        JSON.stringify(metadata),
+        `--${boundary}`,
+        'Content-Type: application/json; charset=UTF-8',
+        '',
+        JSON.stringify(content),
+        `--${boundary}--`
+    ].join('\r\n');
+    return { boundary, body };
+}
+
+async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
+    if (!isGoogleDriveConfigured()) throw new Error('Google Drive Sync ist noch nicht eingerichtet.');
+    const payload = buildProjectBackupPayload();
+    const fileId = await findGoogleDriveBackupFileId();
+    const metadata = fileId ? { modifiedTime: new Date().toISOString() } : { name: GOOGLE_DRIVE_FILE_NAME, parents: ['appDataFolder'] };
+    const { boundary, body } = buildGoogleDriveMultipartBody(metadata, payload);
+    const method = fileId ? 'PATCH' : 'POST';
+    const url = fileId
+        ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=multipart`
+        : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+    const response = await googleDriveFetch(url, {
+        method,
+        headers: {
+            'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body
+    });
+    const saved = await response.json();
+    const lastSyncAt = new Date().toISOString();
+    storeGoogleDriveSyncSettings({
+        fileId: saved.id || fileId || '',
+        lastSyncAt
+    });
+    renderGoogleDriveSyncCard();
+    return { saved, lastSyncAt, trigger };
+}
+
+async function restoreProjectBackupFromGoogleDrive() {
+    const fileId = await findGoogleDriveBackupFileId();
+    if (!fileId) throw new Error('In deiner Google Cloud wurde noch kein OSCI Backup gefunden.');
+    const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
+    const parsed = await response.json();
+    if (!parsed || parsed.type !== 'osci_project_backup' || !parsed.data) {
+        throw new Error('Die Google-Backup-Datei hat kein gültiges OSCI Projektformat.');
+    }
+    appState = migrateToWarehouseState(parsed.data);
+    activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
+    activeAquariumId = parsed.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+    appState.activeWarehouseId = activeWarehouseId;
+    appState.activeAquariumId = activeAquariumId;
+    const active = getActiveWarehouse();
+    if (active) db = normalizeWarehouseData(active.data);
+    overlayActiveAquariumData();
+    await persistAppStateNow('google-drive-restore', true);
+    applyTheme(db.theme || 'default', false);
+    renderCurrentWarehouseViews();
+    storeGoogleDriveSyncSettings({ lastRestoreAt: new Date().toISOString(), fileId });
+    renderGoogleDriveSyncCard();
+}
+
+function scheduleGoogleDriveAutoSync() {
+    const settings = getGoogleDriveSyncSettings();
+    if (!settings.autoSync || !hasValidGoogleDriveToken()) return;
+    clearTimeout(googleDriveSyncTimer);
+    googleDriveSyncTimer = setTimeout(() => {
+        uploadProjectBackupToGoogleDrive('autosync')
+            .then(() => showToast('Google Drive Sync aktualisiert', 'success', 1800))
+            .catch(err => {
+                console.error(err);
+                renderGoogleDriveSyncCard(`Auto-Sync pausiert: ${err.message}`);
+            });
+    }, 2600);
+}
+
+async function connectGoogleDriveSync() {
+    try {
+        await requestGoogleDriveAccessToken(true);
+        renderGoogleDriveSyncCard('Google Drive verbunden.');
+        showToast('Google Drive verbunden', 'success', 2200);
+    } catch (err) {
+        renderGoogleDriveSyncCard(`Verbindung fehlgeschlagen: ${err.message}`);
+        alert('Google Drive Verbindung fehlgeschlagen: ' + err.message);
+    }
+}
+
+function disconnectGoogleDriveSync() {
+    const settings = getGoogleDriveSyncSettings();
+    if (googleDriveAccessToken && window.google?.accounts?.oauth2?.revoke) {
+        try { google.accounts.oauth2.revoke(googleDriveAccessToken, () => {}); } catch (err) {}
+    }
+    googleDriveAccessToken = '';
+    googleDriveTokenExpiresAt = 0;
+    clearTimeout(googleDriveSyncTimer);
+    storeGoogleDriveSyncSettings({
+        connectedEmail: '',
+        autoSync: false,
+        fileId: settings.fileId || '',
+        lastSyncAt: settings.lastSyncAt || null,
+        lastRestoreAt: settings.lastRestoreAt || null
+    });
+    renderGoogleDriveSyncCard('Google Drive Verbindung getrennt.');
+}
+
+function toggleGoogleDriveAutoSync(enabled) {
+    storeGoogleDriveSyncSettings({ autoSync: enabled === true });
+    renderGoogleDriveSyncCard(enabled ? 'Auto-Sync aktiviert.' : 'Auto-Sync deaktiviert.');
+    if (enabled) scheduleGoogleDriveAutoSync();
+}
+
+async function syncProjectToGoogleDriveNow() {
+    try {
+        if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
+        await uploadProjectBackupToGoogleDrive('manual');
+        renderGoogleDriveSyncCard('Projekt erfolgreich in Google Drive gesichert.');
+        showToast('Projekt in Google Drive gesichert', 'success', 2400);
+    } catch (err) {
+        renderGoogleDriveSyncCard(`Upload fehlgeschlagen: ${err.message}`);
+        alert('Google Drive Upload fehlgeschlagen: ' + err.message);
+    }
+}
+
+async function restoreProjectFromGoogleDriveNow() {
+    try {
+        if (!confirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?')) return;
+        if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
+        await restoreProjectBackupFromGoogleDrive();
+        renderGoogleDriveSyncCard('Projekt erfolgreich aus Google Drive wiederhergestellt.');
+        showToast('Google Drive Backup geladen', 'success', 2400);
+        selectTab('lager');
+    } catch (err) {
+        renderGoogleDriveSyncCard(`Wiederherstellung fehlgeschlagen: ${err.message}`);
+        alert('Google Drive Wiederherstellung fehlgeschlagen: ' + err.message);
+    }
+}
+
+function renderGoogleDriveSyncCard(statusMessage = '') {
+    const mount = document.getElementById('googleDriveSyncStatus');
+    if (!mount) return;
+    const settings = getGoogleDriveSyncSettings();
+    const configured = isGoogleDriveConfigured();
+    const connected = !!settings.connectedEmail;
+    const status = statusMessage || getGoogleDriveSyncStatusMessage();
+    mount.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Einrichtung</strong><small>${configured ? 'Die App ist auf Google Drive vorbereitet.' : 'Die App braucht noch eine einmalig eingetragene Google OAuth Client ID.'}</small></span>
+                <span>${configured ? 'bereit' : 'wartet'}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Google Konto</strong><small>${connected ? 'Dieses Konto nutzt den versteckten App-Datenspeicher in Google Drive.' : 'Noch nicht verbunden.'}</small></span>
+                <span>${escapeHtml(settings.connectedEmail || '-')}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Letzter Cloud-Sync</strong><small>Wird nur gesetzt, wenn ein Backup erfolgreich in Google Drive geschrieben wurde.</small></span>
+                <span>${escapeHtml(settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch keiner')}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Letzte Cloud-Wiederherstellung</strong><small>Zeigt, wann zuletzt ein Stand aus Google Drive geladen wurde.</small></span>
+                <span>${escapeHtml(settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch keine')}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Status</strong><small>Scope ist bewusst minimal: nur der versteckte App-Datenspeicher, keine normalen Drive-Dateien.</small></span>
+                <span>${escapeHtml(status)}</span>
+            </div>
+        </div>
+    `;
+    const autoEl = document.getElementById('googleDriveAutoSync');
+    if (autoEl) autoEl.checked = settings.autoSync === true;
+}
+
+Object.assign(window, {
+    connectGoogleDriveSync,
+    disconnectGoogleDriveSync,
+    toggleGoogleDriveAutoSync,
+    syncProjectToGoogleDriveNow,
+    restoreProjectFromGoogleDriveNow,
+    renderGoogleDriveSyncCard
+});
+
+async function restoreLatestLocalSnapshot() {
+    const latest = await getLatestStoredSnapshot();
+    if (!latest || !latest.payload) return alert('Es wurde noch kein Wiederherstellungspunkt gefunden.');
+    if (!confirm(`Letzten Wiederherstellungspunkt vom ${formatWarehouseDate(latest.createdAt)} wiederherstellen? Der aktuelle Stand dieses Geräts wird ersetzt.`)) return;
+    appState = migrateToWarehouseState(latest.payload);
+    activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
+    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+    const active = getActiveWarehouse();
+    if (active) db = normalizeWarehouseData(active.data);
+    overlayActiveAquariumData();
+    await persistAppStateNow('restore-snapshot', true);
+    applyTheme(db.theme || 'default', false);
+    renderCurrentWarehouseViews();
+    renderStorageSecurityStatus();
+    showToast('Wiederherstellungspunkt geladen', 'success', 2800);
+}
+
+async function createManualRecoveryPoint() {
+    saveDB(false);
+    await persistAppStateNow('manual-snapshot', true);
+    showToast('Wiederherstellungspunkt gespeichert', 'success', 2200);
+}
+
+async function clearLocalSnapshots() {
+    if (!confirm('Alle lokalen Wiederherstellungspunkte löschen? Der aktuelle Datenstand bleibt erhalten.')) return;
+    const snapshots = await idbGetAllSnapshots();
+    for (const entry of snapshots) {
+        await idbDelete(APP_STORAGE_SNAPSHOT_STORE, entry.id);
+    }
+    latestSnapshotAt = null;
+    await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
+        key: APP_STORAGE_META_KEY,
+        lastSavedAt: latestPersistAt || null,
+        lastSnapshotAt: null,
+        schema: APP_STORAGE_DB_VERSION
+    });
+    renderStorageSecurityStatus();
+    showToast('Wiederherstellungspunkte gelöscht', 'info', 2200);
+}
+
+async function renderStorageSecurityStatus() {
+    const mount = document.getElementById('storageSecurityStatus');
+    if (!mount) return;
+    if (!canUseIndexedDb()) {
+        mount.innerHTML = `
+            <div class="tool-result">
+                <div class="tool-row">
+                    <span><strong>Lokaler Speicher</strong><small>Dieser Browser unterstützt IndexedDB nicht zuverlässig. Bitte einen aktuellen Browser nutzen, damit deine Daten sicher gespeichert werden.</small></span>
+                    <span>nicht verfügbar</span>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    const meta = await getAppStorageMeta();
+    const snapshots = await idbGetAllSnapshots();
+    const latestSnapshot = snapshots.length
+        ? snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
+        : null;
+    const autosaveText = meta?.lastSavedAt ? formatWarehouseDate(meta.lastSavedAt) : (latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'noch nicht');
+    const snapshotText = latestSnapshot?.createdAt ? formatWarehouseDate(latestSnapshot.createdAt) : 'noch keiner';
+    mount.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Hauptspeicher</strong><small>Gesamtes Projekt lokal in IndexedDB gespeichert. Kein dauerhafter Hauptspeicher mehr in Cookies oder localStorage.</small></span>
+                <span>IndexedDB</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Letztes Autosave</strong><small>Wird bei Änderungen automatisch aktualisiert.</small></span>
+                <span>${escapeHtml(autosaveText)}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Wiederherstellungspunkte</strong><small>Lokale Sicherheitsstände gegen Datenverlust.</small></span>
+                <span>${snapshots.length}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Letzter Wiederherstellungspunkt</strong><small>${latestSnapshot?.reason ? `Grund: ${escapeHtml(latestSnapshot.reason)}` : 'Wird bei größeren Änderungen und Imports ergänzt.'}</small></span>
+                <span>${escapeHtml(snapshotText)}</span>
+            </div>
+        </div>
+    `;
+}
+
+Object.assign(window, {
+    restoreLatestLocalSnapshot,
+    createManualRecoveryPoint,
+    clearLocalSnapshots
+});
 
 function getMenuOrder() {
     try {
@@ -721,17 +1382,8 @@ function applyCustomProductsToCatalog() {
     });
 }
 
-function initDB() {
-    let parsed = null;
-    try {
-        let saved = localStorage.getItem(DB_KEY);
-        if (!saved) saved = localStorage.getItem('osci_db_v4');
-        if (!saved) saved = localStorage.getItem('osci_db_v3');
-        if (saved) {
-            parsed = JSON.parse(saved);
-        }
-    } catch (e) { console.error("Fehler beim Laden:", e); }
-
+async function initDB() {
+    let parsed = await loadPersistedAppState();
     appState = migrateToWarehouseState(parsed);
     if (!Array.isArray(appState.pendingDeletedRemoteIds)) appState.pendingDeletedRemoteIds = [];
     if (!appState.communityMapProfileDraft || typeof appState.communityMapProfileDraft !== 'object') appState.communityMapProfileDraft = {};
@@ -778,7 +1430,9 @@ function initDB() {
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
-    saveDB(false);
+    appBootstrapComplete = true;
+    await persistAppStateNow(parsed ? 'init-load' : 'init-empty', true);
+    await removeLegacyLocalDbCopies();
     updateWarehouseUI();
 }
 
@@ -794,8 +1448,9 @@ function saveDB(markDirty = true) {
         }
         appState.activeWarehouseId = activeWarehouseId;
         appState.activeAquariumId = activeAquariumId;
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
         updateWarehouseUI();
+        queuePersistAppState(markDirty ? 'save' : 'save-passive', markDirty);
+        scheduleGoogleDriveAutoSync();
         scheduleSupabaseAutoSync();
     } catch(e) {}
 }
@@ -870,7 +1525,7 @@ function setSharedOwnerHidden(email, hidden) {
             if (active) db = normalizeWarehouseData(active.data);
         }
     }
-    localStorage.setItem(DB_KEY, JSON.stringify(appState));
+    queuePersistAppState('shared-owner-visibility', false);
     updateWarehouseUI();
     renderCurrentWarehouseViews();
     renderSharedOwnerVisibilitySettings();
@@ -1381,13 +2036,13 @@ async function syncPushAllWarehouses(showAlert = true) {
             warehouse.lastSyncAt = payload.updated_at;
             pushed++;
         }
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('cloud-push', false);
         updateWarehouseUI();
         const skipText = skippedReadOnly ? ` · ${skippedReadOnly} Nur-Lesen-Lager übersprungen` : '';
         const deleteText = deleted ? ` · ${deleted} gelöschte Lager entfernt` : '';
         updateSyncStatus(`Daten Upload abgeschlossen: ${pushed} Lager synchronisiert.${deleteText}${skipText}`, 'ok');
         addWarehouseEvent('cloud', `Daten Upload: ${pushed} Lager synchronisiert${deleted ? `, ${deleted} gelöscht` : ''}`);
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('cloud-push', false);
         if (showAlert) alert(`Daten Upload abgeschlossen.\n${pushed} Lager wurden synchronisiert.${deleted ? `\n${deleted} gelöschte Lager wurden auch aus Supabase entfernt.` : ''}${skippedReadOnly ? `\n${skippedReadOnly} Nur-Lesen-Lager wurden übersprungen, weil du dafür keinen Schreibzugriff hast.` : ''}`);
         await renderSyncFriendsList();
     } catch (err) {
@@ -1516,7 +2171,7 @@ async function syncPullWarehouses(showAlert = true) {
         appState.activeWarehouseId = activeWarehouseId;
         const warehouse = getActiveWarehouse();
         if (warehouse) db = normalizeWarehouseData(warehouse.data);
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('cloud-pull', false);
         const lagerTab = document.getElementById('lager');
         if (lagerTab) lagerTab.innerHTML = '';
         renderCurrentWarehouseViews();
@@ -1525,7 +2180,7 @@ async function syncPullWarehouses(showAlert = true) {
         const conflictText = skippedConflictIds.size ? ` · ${skippedConflictIds.size} Konflikt(e) lokal behalten` : '';
         updateSyncStatus(`Daten Download abgeschlossen: ${loaded} Lager geladen.${sharedText}${conflictText}`, skippedConflictIds.size ? 'warn' : 'ok');
         addWarehouseEvent('cloud', `Daten Download: ${loaded} Lager geladen${loadedShared ? `, ${loadedShared} geteilt` : ''}`);
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('cloud-pull', false);
         if (showAlert) alert(`Daten Download abgeschlossen.\n${loaded} Lager wurden geladen.${loadedShared ? `\n${loadedShared} davon sind mit dir geteilt.` : ''}`);
     } catch (err) {
         const message = /list_accessible_warehouses/i.test(String(err.message || ''))
@@ -1580,7 +2235,7 @@ async function addReadOnlyFriend() {
         document.getElementById('friendEmailInput').value = '';
         const roleLabel = selectedRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen';
         addWarehouseEvent('share', `${email} für "${warehouse.name}" freigegeben: ${roleLabel}`);
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('friend-add', false);
         updateSyncStatus(`${email} hat ${roleLabel}-Zugriff auf das Lager "${warehouse.name}".`, 'ok');
         alert(`${email} wurde für "${warehouse.name}" freigegeben.\nZugriff: ${roleLabel}`);
         await renderSyncFriendsList();
@@ -1596,7 +2251,7 @@ async function removeReadOnlyFriend(memberId) {
         const { error } = await client.from('warehouse_members').delete().eq('id', memberId);
         if (error) throw error;
         addWarehouseEvent('share', 'Freigabe entfernt');
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('friend-remove', false);
         await renderSyncFriendsList();
     } catch (err) {
         alert('Freigabe konnte nicht entfernt werden: ' + err.message);
@@ -1613,7 +2268,7 @@ async function updateFriendAccessRole(memberId, role) {
             .eq('id', memberId);
         if (error) throw error;
         addWarehouseEvent('share', `Freigabe geändert: ${nextRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen'}`);
-        localStorage.setItem(DB_KEY, JSON.stringify(appState));
+        queuePersistAppState('friend-role', false);
         updateSyncStatus(`Freigabe aktualisiert: ${nextRole === 'write' ? 'Lesen & schreiben' : 'Nur lesen'}.`, 'ok');
         await renderSyncFriendsList();
     } catch (err) {
@@ -1679,7 +2334,7 @@ function getCommunityMapDraft() {
 function persistCommunityMapDraft(patch = {}) {
     const draft = getCommunityMapDraft();
     Object.assign(draft, patch || {});
-    localStorage.setItem(DB_KEY, JSON.stringify(appState));
+    queuePersistAppState('friend-list', false);
 }
 
 function normalizeCommunityCoordinate(value, min, max) {
@@ -2267,7 +2922,7 @@ function updateWarehouseUI() {
         const sync = active.remoteId ? ` · Sync: ${formatWarehouseDate(active.lastSyncAt)}` : '';
         const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}${sync}${access}`;
         if (meta) meta.innerText = info;
-        if (backupInfo) backupInfo.innerText = `Aktuelles Lager: ${active.name} · ${info}`;
+        if (backupInfo) backupInfo.innerText = `Aktives Lager: ${active.name} · ${info} · Lokales Auto-Save: ${latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'läuft'}`;
         if (accessBadge) {
             accessBadge.innerText = accessLabel;
             accessBadge.dataset.access = !isShared ? 'owner' : (active.readOnly ? 'read' : 'write');
@@ -2285,6 +2940,7 @@ function updateWarehouseUI() {
             shareBox.dataset.access = !isShared ? 'owner' : (active.readOnly ? 'read' : 'write');
         }
     }
+    renderStorageSecurityStatus();
 }
 
 function renderCurrentWarehouseViews() {
@@ -4214,8 +4870,10 @@ function initTools() {
     renderSeaWaterMix();
     syncCustomCRLockUI();
     if (isCustomCRUnlocked()) {
+        renderCustomCrLimitsMatrix();
         renderCustomCrPlannerMatrix();
         renderCustomCRPlanner();
+        renderSavedCustomCrPlans();
     }
     renderNaclSolutionCalculator();
     syncMajorCorrectionInputsFromSettings(true);
@@ -4225,7 +4883,6 @@ function initTools() {
     renderWaterChangeCalculator();
     renderSaltCorrectionCalculator();
     renderFeedNutrientLog();
-    renderLightPlanner();
     renderFlowCalculator();
     renderOsmoseTank();
     renderDosingContainers();
@@ -4270,8 +4927,10 @@ function unlockCustomCRTool() {
     localStorage.setItem(CUSTOM_CR_UNLOCK_KEY, 'true');
     if (input) input.value = '';
     syncCustomCRLockUI();
+    renderCustomCrLimitsMatrix();
     renderCustomCrPlannerMatrix();
     renderCustomCRPlanner();
+    renderSavedCustomCrPlans();
     showToast('C&R Tool entsperrt', 'success', 2200);
 }
 
@@ -4354,6 +5013,12 @@ function setupToolSections() {
         const title = section.querySelector('.tool-section-summary strong')?.textContent?.trim() || `section-${index}`;
         const sectionId = section.dataset.sectionId || slugifyToolTitle(title);
         section.dataset.sectionId = sectionId;
+        const visibleCount = section.querySelectorAll('.tool-compact-card').length;
+        const summaryText = section.querySelector('.tool-section-summary small');
+        if (summaryText) {
+            summaryText.dataset.baseText = summaryText.dataset.baseText || summaryText.textContent.trim();
+            summaryText.textContent = `${summaryText.dataset.baseText} · ${visibleCount} Tools`;
+        }
         if (section.dataset.sectionReady !== 'true') {
             section.dataset.sectionReady = 'true';
             section.addEventListener('toggle', () => {
@@ -4363,7 +5028,7 @@ function setupToolSections() {
                 }
             });
         }
-        section.open = settings.lastSection === sectionId;
+        section.open = settings.lastSection ? settings.lastSection === sectionId : index === 0;
     });
 }
 
@@ -4419,11 +5084,7 @@ function openToolFavorite(toolId) {
     const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
     if (!card) return;
     const section = card.closest('.tool-section');
-    if (section) {
-        section.open = true;
-        getToolSettings().lastSection = section.dataset.sectionId || '';
-        saveDB(false);
-    }
+    if (section) openToolSection(section.dataset.sectionId || '');
     document.querySelectorAll('#tools .tool-card-hidden').forEach(el => el.classList.remove('tool-card-hidden'));
     document.querySelectorAll('#tools .tool-section-hidden').forEach(el => el.classList.remove('tool-section-hidden'));
     const search = document.getElementById('toolSearchInput');
@@ -4432,10 +5093,25 @@ function openToolFavorite(toolId) {
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function openToolSection(sectionId) {
+    if (!sectionId) return;
+    const section = document.querySelector(`#tools .tool-section[data-section-id="${sectionId}"]`);
+    if (!section) return;
+    document.querySelectorAll('#tools .tool-card-hidden').forEach(el => el.classList.remove('tool-card-hidden'));
+    document.querySelectorAll('#tools .tool-section-hidden').forEach(el => el.classList.remove('tool-section-hidden'));
+    const search = document.getElementById('toolSearchInput');
+    if (search) search.value = '';
+    section.open = true;
+    getToolSettings().lastSection = section.dataset.sectionId || '';
+    saveDB(false);
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 Object.assign(window, {
     toggleToolFavoriteFromButton,
     removeToolFavorite,
     openToolFavorite,
+    openToolSection,
     filterTools
 });
 
@@ -4811,40 +5487,11 @@ function deleteFeedNutrientLog(id) {
     renderFeedNutrientLog();
 }
 
-function parseTimeMinutes(value) {
-    const [hours, minutes] = String(value || '00:00').split(':').map(num => parseInt(num, 10) || 0);
-    return hours * 60 + minutes;
-}
-
 function formatDuration(minutes) {
     const safe = Math.max(0, Math.round(minutes));
     const h = Math.floor(safe / 60);
     const m = safe % 60;
     return `${h} h ${String(m).padStart(2, '0')} min`;
-}
-
-function renderLightPlanner() {
-    const result = document.getElementById('lightPlannerResult');
-    if (!result) return;
-    const start = parseTimeMinutes(document.getElementById('lightStart')?.value || '10:00');
-    let end = parseTimeMinutes(document.getElementById('lightEnd')?.value || '21:00');
-    if (end <= start) end += 24 * 60;
-    const rampUp = Math.max(0, parseFloat(document.getElementById('lightRampUp')?.value) || 0);
-    const rampDown = Math.max(0, parseFloat(document.getElementById('lightRampDown')?.value) || 0);
-    const total = end - start;
-    const peak = Math.max(0, total - rampUp - rampDown);
-    result.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row">
-                <span><strong>Gesamte Lichtzeit</strong><small>Von Start bis Ende inklusive Rampen.</small></span>
-                <span>${formatDuration(total)}</span>
-            </div>
-            <div class="tool-row">
-                <span><strong>Volle Beleuchtung</strong><small>Nach Abzug von Ramp-Up und Ramp-Down.</small></span>
-                <span>${formatDuration(peak)}</span>
-            </div>
-        </div>
-    `;
 }
 
 function renderFlowCalculator() {
@@ -5219,15 +5866,280 @@ function getCustomCrPlannerState() {
             currentPsu: customCrExampleState.currentPsu,
             targetPsu: customCrExampleState.targetPsu,
             current: { ...customCrExampleState.current },
-            target: { ...customCrOptimalTargets }
+            target: { ...customCrOptimalTargets },
+            limits: JSON.parse(JSON.stringify(customCrDefaultStepLimits))
         };
     }
     if (!db.customCrPlanner.current) db.customCrPlanner.current = { ...customCrExampleState.current };
     if (!db.customCrPlanner.target) db.customCrPlanner.target = { ...customCrOptimalTargets };
+    if (!db.customCrPlanner.limits || typeof db.customCrPlanner.limits !== 'object') {
+        db.customCrPlanner.limits = JSON.parse(JSON.stringify(customCrDefaultStepLimits));
+    }
+    Object.entries(customCrDefaultStepLimits).forEach(([key, value]) => {
+        if (!db.customCrPlanner.limits[key]) db.customCrPlanner.limits[key] = { ...value };
+        if (!Number.isFinite(parseFloat(db.customCrPlanner.limits[key].up))) db.customCrPlanner.limits[key].up = value.up;
+        if (!Number.isFinite(parseFloat(db.customCrPlanner.limits[key].down))) db.customCrPlanner.limits[key].down = value.down;
+    });
     if (!db.customCrPlanner.tankLiters) db.customCrPlanner.tankLiters = customCrExampleState.tankLiters;
     if (!db.customCrPlanner.currentPsu) db.customCrPlanner.currentPsu = customCrExampleState.currentPsu;
     if (!db.customCrPlanner.targetPsu) db.customCrPlanner.targetPsu = customCrProxyReferencePsu;
     return db.customCrPlanner;
+}
+
+function getCustomCrPlans() {
+    if (!Array.isArray(db.customCrPlans)) db.customCrPlans = [];
+    return db.customCrPlans;
+}
+
+function createCustomCrPlanId() {
+    return `custom-cr-plan-${createRemoteWarehouseId()}`;
+}
+
+function getCustomCrLimitsForSolver(limits) {
+    const source = limits || getCustomCrPlannerState().limits || {};
+    const normalized = {};
+    Object.entries(customCrDefaultStepLimits).forEach(([key, defaults]) => {
+        const current = source[key] || {};
+        normalized[key] = {
+            up: Math.max(0, parseFloat(current.up) || defaults.up),
+            down: Math.max(0, parseFloat(current.down) || defaults.down)
+        };
+    });
+    return normalized;
+}
+
+function getCustomCrElementScale(key) {
+    const entry = customCrElementDefinitions.find(item => item.key === key);
+    return entry?.unit === 'mg/l' ? 'mg/l' : '';
+}
+
+function buildCustomCrStepTarget(current, target, currentPsu, targetPsu, limits) {
+    const nextTarget = {};
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current?.[entry.key]) || 0;
+        const targetValue = parseFloat(target?.[entry.key]) || 0;
+        const delta = targetValue - currentValue;
+        const stepLimit = limits?.[entry.key] || customCrDefaultStepLimits[entry.key];
+        const maxUp = Math.max(0, parseFloat(stepLimit?.up) || 0);
+        const maxDown = Math.max(0, parseFloat(stepLimit?.down) || 0);
+        if (delta > maxUp) nextTarget[entry.key] = currentValue + maxUp;
+        else if (delta < -maxDown) nextTarget[entry.key] = currentValue - maxDown;
+        else nextTarget[entry.key] = targetValue;
+    });
+    const psuLimit = limits?.PSU || customCrDefaultStepLimits.PSU;
+    const psuDelta = (parseFloat(targetPsu) || 0) - (parseFloat(currentPsu) || 0);
+    let nextTargetPsu = parseFloat(targetPsu) || 0;
+    if (psuDelta > 0) nextTargetPsu = (parseFloat(currentPsu) || 0) + Math.min(psuDelta, Math.max(0, parseFloat(psuLimit?.up) || 0));
+    else if (psuDelta < 0) nextTargetPsu = (parseFloat(currentPsu) || 0) - Math.min(Math.abs(psuDelta), Math.max(0, parseFloat(psuLimit?.down) || 0));
+    return { target: nextTarget, targetPsu: nextTargetPsu };
+}
+
+function scaleCustomCrStepTarget(current, target, currentPsu, targetPsu, scale) {
+    const scaled = {};
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current?.[entry.key]) || 0;
+        const targetValue = parseFloat(target?.[entry.key]) || 0;
+        scaled[entry.key] = currentValue + ((targetValue - currentValue) * scale);
+    });
+    const startPsu = parseFloat(currentPsu) || 0;
+    const endPsu = parseFloat(targetPsu) || 0;
+    return {
+        target: scaled,
+        targetPsu: startPsu + ((endPsu - startPsu) * scale)
+    };
+}
+
+function getCustomCrStepViolations(current, target, finalValues, currentPsu, finalPsu, limits) {
+    const normalizedLimits = getCustomCrLimitsForSolver(limits);
+    const violations = [];
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current?.[entry.key]) || 0;
+        const finalValue = parseFloat(finalValues?.[entry.key]) || 0;
+        const targetValue = parseFloat(target?.[entry.key]) || 0;
+        const movingUp = targetValue >= currentValue;
+        const movingDown = targetValue <= currentValue;
+        const delta = finalValue - currentValue;
+        const limit = normalizedLimits[entry.key] || customCrDefaultStepLimits[entry.key];
+        const maxUp = Math.max(0, parseFloat(limit?.up) || 0);
+        const maxDown = Math.max(0, parseFloat(limit?.down) || 0);
+        if (delta > maxUp + 0.0001) violations.push({ key: entry.key, delta, limit: maxUp, direction: 'up' });
+        if (delta < (-maxDown - 0.0001)) violations.push({ key: entry.key, delta, limit: maxDown, direction: 'down' });
+        if (movingUp && finalValue > targetValue + 0.0001) {
+            violations.push({ key: entry.key, delta: finalValue - targetValue, limit: targetValue, direction: 'target-over' });
+        }
+        if (movingDown && finalValue < targetValue - 0.0001) {
+            violations.push({ key: entry.key, delta: targetValue - finalValue, limit: targetValue, direction: 'target-under' });
+        }
+    });
+    const psuDelta = (parseFloat(finalPsu) || 0) - (parseFloat(currentPsu) || 0);
+    const psuLimit = normalizedLimits.PSU || customCrDefaultStepLimits.PSU;
+    if (psuDelta > (parseFloat(psuLimit.up) || 0) + 0.0001) violations.push({ key: 'PSU', delta: psuDelta, limit: psuLimit.up, direction: 'up' });
+    if (psuDelta < (-(parseFloat(psuLimit.down) || 0) - 0.0001)) violations.push({ key: 'PSU', delta: psuDelta, limit: psuLimit.down, direction: 'down' });
+    return violations;
+}
+
+function solveSafeCustomCrStep(current, target, tankLiters, currentPsu, targetPsu, limits) {
+    const baseStage = buildCustomCrStepTarget(current, target, currentPsu, targetPsu, limits);
+    let low = 0;
+    let high = 1;
+    let best = null;
+
+    for (let i = 0; i < 26; i += 1) {
+        const scale = (low + high) / 2;
+        const scaledStage = scaleCustomCrStepTarget(current, baseStage.target, currentPsu, baseStage.targetPsu, scale);
+        const solution = solveCustomCRAdjustment(current, scaledStage.target, tankLiters, currentPsu, scaledStage.targetPsu);
+        if (!solution) {
+            high = scale;
+            continue;
+        }
+        const violations = getCustomCrStepViolations(current, target, solution.finalValues, currentPsu, solution.estimatedPsu, limits);
+        if (violations.length === 0) {
+            best = {
+                scale,
+                stagedTarget: scaledStage.target,
+                stagedTargetPsu: scaledStage.targetPsu,
+                solution,
+                violations
+            };
+            low = scale;
+        } else {
+            high = scale;
+        }
+    }
+
+    if (best) return best;
+    const fallbackScale = 0.01;
+    const fallbackStage = scaleCustomCrStepTarget(current, baseStage.target, currentPsu, baseStage.targetPsu, fallbackScale);
+    const fallbackSolution = solveCustomCRAdjustment(current, fallbackStage.target, tankLiters, currentPsu, fallbackStage.targetPsu);
+    if (!fallbackSolution) return null;
+    return {
+        scale: fallbackScale,
+        stagedTarget: fallbackStage.target,
+        stagedTargetPsu: fallbackStage.targetPsu,
+        solution: fallbackSolution,
+        violations: getCustomCrStepViolations(current, target, fallbackSolution.finalValues, currentPsu, fallbackSolution.estimatedPsu, limits)
+    };
+}
+
+function isCustomCrTargetReached(current, target, currentPsu, targetPsu) {
+    const tolerance = {
+        Na: 3,
+        Mg: 1,
+        Ca: 0.5,
+        K: 0.5,
+        Sr: 0.02,
+        F: 0.01,
+        Cl: 3,
+        S: 0.5,
+        Br: 0.05,
+        B: 0.01,
+        PSU: 0.01
+    };
+    const elementsDone = customCrElementDefinitions.every(entry => {
+        const diff = Math.abs((parseFloat(current?.[entry.key]) || 0) - (parseFloat(target?.[entry.key]) || 0));
+        return diff <= (tolerance[entry.key] || 0.01);
+    });
+    const psuDone = Math.abs((parseFloat(currentPsu) || 0) - (parseFloat(targetPsu) || 0)) <= tolerance.PSU;
+    return elementsDone && psuDone;
+}
+
+function getCustomCrProgressDistance(current, target, currentPsu, targetPsu) {
+    let sum = 0;
+    customCrElementDefinitions.forEach(entry => {
+        sum += Math.abs((parseFloat(current?.[entry.key]) || 0) - (parseFloat(target?.[entry.key]) || 0));
+    });
+    sum += Math.abs((parseFloat(currentPsu) || 0) - (parseFloat(targetPsu) || 0)) * 100;
+    return sum;
+}
+
+function buildCustomCrPlan(current, target, tankLiters, currentPsu, targetPsu, limits) {
+    const normalizedLimits = getCustomCrLimitsForSolver(limits);
+    const steps = [];
+    let stepCurrent = JSON.parse(JSON.stringify(current || {}));
+    let stepCurrentPsu = Math.max(0, parseFloat(currentPsu) || 0);
+
+    for (let index = 0; index < 12; index += 1) {
+        if (isCustomCrTargetReached(stepCurrent, target, stepCurrentPsu, targetPsu)) break;
+        const safeStep = solveSafeCustomCrStep(stepCurrent, target, tankLiters, stepCurrentPsu, targetPsu, normalizedLimits);
+        const solution = safeStep?.solution;
+        if (!solution || !safeStep) break;
+        const stateDelta = getCustomCrProgressDistance(solution.finalValues, stepCurrent, solution.estimatedPsu, stepCurrentPsu);
+        if (stateDelta <= 0.01) break;
+        steps.push({
+            id: `step-${index + 1}`,
+            index: index + 1,
+            current: JSON.parse(JSON.stringify(stepCurrent)),
+            currentPsu: stepCurrentPsu,
+            stagedTarget: JSON.parse(JSON.stringify(safeStep.stagedTarget)),
+            stagedTargetPsu: safeStep.stagedTargetPsu,
+            solution: JSON.parse(JSON.stringify(solution)),
+            expectedAfter: JSON.parse(JSON.stringify(solution.finalValues)),
+            expectedAfterPsu: solution.estimatedPsu,
+            scale: safeStep.scale,
+            violations: JSON.parse(JSON.stringify(safeStep.violations || [])),
+            done: false,
+            doneAt: null
+        });
+        stepCurrent = JSON.parse(JSON.stringify(solution.finalValues));
+        stepCurrentPsu = solution.estimatedPsu;
+    }
+
+    const completed = isCustomCrTargetReached(stepCurrent, target, stepCurrentPsu, targetPsu);
+    return {
+        id: createCustomCrPlanId(),
+        createdAt: new Date().toISOString(),
+        tankLiters,
+        startCurrent: JSON.parse(JSON.stringify(current || {})),
+        startPsu: currentPsu,
+        target: JSON.parse(JSON.stringify(target || {})),
+        targetPsu,
+        limits: JSON.parse(JSON.stringify(normalizedLimits)),
+        steps,
+        projectedFinal: JSON.parse(JSON.stringify(stepCurrent)),
+        projectedFinalPsu: stepCurrentPsu,
+        completed,
+        status: completed ? 'ready' : 'partial'
+    };
+}
+
+function getCustomCrPlanCompletion(plan) {
+    const done = (plan?.steps || []).filter(step => step.done).length;
+    const total = (plan?.steps || []).length;
+    return { done, total };
+}
+
+function renderCustomCrLimitsMatrix() {
+    if (!isCustomCRUnlocked()) return;
+    const mount = document.getElementById('customCrLimitsMatrix');
+    if (!mount) return;
+    const planner = getCustomCrPlannerState();
+    const limitRows = [
+        ...customCrElementDefinitions.map(entry => ({ key: entry.key, label: entry.label, unit: entry.unit })),
+        { key: 'PSU', label: 'PSU', unit: 'PSU' }
+    ];
+    mount.innerHTML = `
+        <details class="custom-cr-limits-shell">
+            <summary class="custom-cr-collapsible-head">
+                <span>
+                    <strong>Schritt-Limits pro C&amp;R Wasserwechsel</strong>
+                    <small>Standardmäßig eingeklappt. Hier steuerst du die maximalen Tagesänderungen.</small>
+                </span>
+            </summary>
+            <div class="custom-cr-limits-grid">
+                <div class="custom-cr-limits-header">Wert</div>
+                <div class="custom-cr-limits-header">Max. hoch</div>
+                <div class="custom-cr-limits-header">Max. runter</div>
+                ${limitRows.map(row => `
+                    <div class="custom-cr-limits-label">
+                        <strong>${row.label}</strong>
+                        <small>${row.unit}</small>
+                    </div>
+                    <input type="number" id="customCrLimitUp-${row.key}" step="0.01" value="${planner.limits?.[row.key]?.up ?? customCrDefaultStepLimits[row.key].up}" oninput="renderCustomCRPlanner()">
+                    <input type="number" id="customCrLimitDown-${row.key}" step="0.01" value="${planner.limits?.[row.key]?.down ?? customCrDefaultStepLimits[row.key].down}" oninput="renderCustomCRPlanner()">
+                `).join('')}
+            </div>
+        </details>
+    `;
 }
 
 function getCustomCrProxyPsu(values) {
@@ -5372,6 +6284,29 @@ function getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, t
     return Math.max(0, removal);
 }
 
+function getCustomCrDirectionalTargetPenalty(current, target, finalValues, finalPsu, targetPsu) {
+    const penaltyScales = { Na: 50, Mg: 10, Ca: 5, K: 5, Sr: 0.2, F: 0.05, Cl: 60, S: 8, Br: 1, B: 0.1, PSU: 0.1 };
+    let penalty = 0;
+    customCrElementDefinitions.forEach(entry => {
+        const currentValue = parseFloat(current?.[entry.key]) || 0;
+        const targetValue = parseFloat(target?.[entry.key]) || 0;
+        const finalValue = parseFloat(finalValues?.[entry.key]) || 0;
+        const scale = penaltyScales[entry.key] || 1;
+        const diff = finalValue - targetValue;
+        penalty += Math.pow(diff / scale, 2);
+        if (targetValue >= currentValue && finalValue > targetValue) {
+            penalty += Math.pow((finalValue - targetValue) / scale, 2) * 400;
+        }
+        if (targetValue <= currentValue && finalValue < targetValue) {
+            penalty += Math.pow((targetValue - finalValue) / scale, 2) * 400;
+        }
+    });
+    const psuScale = penaltyScales.PSU;
+    const psuDiff = (parseFloat(finalPsu) || 0) - (parseFloat(targetPsu) || 0);
+    penalty += Math.pow(psuDiff / psuScale, 2) * 2.2;
+    return penalty;
+}
+
 function finalizeCustomCrValues(current, tankLiters, removalLiters, additions, extraDilutionLiters = 0) {
     const finalMass = {};
     customCrElementDefinitions.forEach(entry => {
@@ -5444,9 +6379,8 @@ function buildCustomCrSolution(current, target, tankLiters, removalLiters, nnlsR
     };
 }
 
-function solveCustomCRAdjustment(current, target, tankLiters, currentPsu, targetPsu) {
+function solveCustomCRAdjustmentWithRemoval(current, target, tankLiters, currentPsu, targetPsu, removalLiters) {
     if (!tankLiters) return null;
-    const removalLiters = getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, targetPsu);
     const needMap = createCustomCrNeedMap(current, target, tankLiters, removalLiters);
     const additionsMap = Object.fromEntries(customCrProducts.map(product => [product.item, 0]));
     const noteParts = [];
@@ -5572,16 +6506,62 @@ function solveCustomCRAdjustment(current, target, tankLiters, currentPsu, target
     return solution;
 }
 
+function solveCustomCRAdjustment(current, target, tankLiters, currentPsu, targetPsu) {
+    if (!tankLiters) return null;
+    const baseRemovalLiters = getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, targetPsu);
+    const candidates = new Set([Math.max(0, baseRemovalLiters)]);
+    const candidateSteps = [0, 0.01, 0.02, 0.035, 0.05, 0.075, 0.1, 0.13, 0.16, 0.2, 0.24, 0.28, 0.33, 0.38];
+    candidateSteps.forEach(stepFraction => {
+        candidates.add(Math.min(tankLiters * 0.55, baseRemovalLiters + (tankLiters * stepFraction)));
+    });
+    if (baseRemovalLiters > 0) {
+        [1.05, 1.1, 1.15, 1.2, 1.3, 1.4, 1.5].forEach(factor => {
+            candidates.add(Math.min(tankLiters * 0.55, baseRemovalLiters * factor));
+        });
+    }
+
+    let best = null;
+    const targetDistanceScale = Math.max(1, tankLiters * 0.0015);
+    [...candidates]
+        .filter(value => Number.isFinite(value) && value >= 0 && value <= tankLiters * 0.55)
+        .sort((a, b) => a - b)
+        .forEach(removalLiters => {
+            const solution = solveCustomCRAdjustmentWithRemoval(current, target, tankLiters, currentPsu, targetPsu, removalLiters);
+            if (!solution) return;
+            const directionalPenalty = getCustomCrDirectionalTargetPenalty(current, target, solution.finalValues, solution.estimatedPsu, targetPsu);
+            const finalScore = directionalPenalty + (solution.removalLiters / targetDistanceScale);
+            solution.optimizerMeta = {
+                baseRemovalLiters,
+                optimizedRemovalLiters: removalLiters,
+                directionalPenalty
+            };
+            if (!best || finalScore < best.finalScore - 0.0001 || (Math.abs(finalScore - best.finalScore) <= 0.0001 && solution.removalLiters < best.solution.removalLiters)) {
+                best = { solution, finalScore };
+            }
+        });
+
+    if (!best) return solveCustomCRAdjustmentWithRemoval(current, target, tankLiters, currentPsu, targetPsu, baseRemovalLiters);
+    if (best.solution.optimizerMeta && best.solution.optimizerMeta.optimizedRemovalLiters > best.solution.optimizerMeta.baseRemovalLiters + 0.25) {
+        const addedRemoval = best.solution.optimizerMeta.optimizedRemovalLiters - best.solution.optimizerMeta.baseRemovalLiters;
+        best.solution.note = `${best.solution.note ? `${best.solution.note} ` : ''}Optimiert fuer weniger Gesamtschritte: +${addedRemoval.toFixed(2)} L extra Wasserwechsel, damit Na, Cl und PSU sauberer ins Ziel laufen.`.trim();
+    }
+    return best.solution;
+}
+
 function renderCustomCrPlannerMatrix() {
     if (!isCustomCRUnlocked()) return;
     const planner = getCustomCrPlannerState();
     const mount = document.getElementById('customCrPlannerMatrix');
     if (!mount) return;
     mount.innerHTML = `
+        <div class="custom-cr-matrix-headline">
+            <strong>Ist- und Zielwerte</strong>
+            <small>Hier trägst du die gemessenen Werte und die gewünschten Zielwerte ein.</small>
+        </div>
         <div class="custom-cr-matrix">
             <div class="custom-cr-matrix-header">Element</div>
-            <div class="custom-cr-matrix-header">Vorher</div>
-            <div class="custom-cr-matrix-header">Nachher</div>
+            <div class="custom-cr-matrix-header">Ist</div>
+            <div class="custom-cr-matrix-header">Ziel</div>
             ${customCrElementDefinitions.map(entry => `
                 <div class="custom-cr-matrix-label">
                     <strong>${entry.label}</strong>
@@ -5607,13 +6587,38 @@ function syncCustomCrPlannerFromInputs() {
         planner.current[entry.key] = Number.isFinite(currentValue) ? currentValue : 0;
         planner.target[entry.key] = Number.isFinite(targetValue) ? targetValue : 0;
     });
+    planner.limits = planner.limits || JSON.parse(JSON.stringify(customCrDefaultStepLimits));
+    Object.keys(customCrDefaultStepLimits).forEach(key => {
+        const upValue = parseFloat(document.getElementById(`customCrLimitUp-${key}`)?.value);
+        const downValue = parseFloat(document.getElementById(`customCrLimitDown-${key}`)?.value);
+        planner.limits[key] = {
+            up: Number.isFinite(upValue) ? Math.max(0, upValue) : customCrDefaultStepLimits[key].up,
+            down: Number.isFinite(downValue) ? Math.max(0, downValue) : customCrDefaultStepLimits[key].down
+        };
+    });
     saveDB(false);
     return planner;
 }
 
+function bindCustomCrRealtimeInputs() {
+    const root = document.getElementById('customCrProtectedContent');
+    if (!root || root.dataset.realtimeBound === 'true') return;
+    const refresh = event => {
+        const target = event.target;
+        if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLSelectElement) && !(target instanceof HTMLTextAreaElement)) return;
+        if (!target.id || !target.id.startsWith('customCr')) return;
+        requestAnimationFrame(() => renderCustomCRPlanner());
+    };
+    root.addEventListener('input', refresh);
+    root.addEventListener('change', refresh);
+    root.dataset.realtimeBound = 'true';
+}
+
 function renderCustomCRPlanner() {
     if (!isCustomCRUnlocked()) return;
+    bindCustomCrRealtimeInputs();
     const planner = getCustomCrPlannerState();
+    if (!document.getElementById('customCrLimitsMatrix')?.children.length) renderCustomCrLimitsMatrix();
     if (!document.getElementById('customCrPlannerMatrix')?.children.length) renderCustomCrPlannerMatrix();
     const syncedPlanner = syncCustomCrPlannerFromInputs();
     const result = document.getElementById('customCrPlannerResult');
@@ -5624,90 +6629,196 @@ function renderCustomCRPlanner() {
         return;
     }
     const solution = solveCustomCRAdjustment(syncedPlanner.current, syncedPlanner.target, syncedPlanner.tankLiters, syncedPlanner.currentPsu, syncedPlanner.targetPsu);
+    const plan = buildCustomCrPlan(syncedPlanner.current, syncedPlanner.target, syncedPlanner.tankLiters, syncedPlanner.currentPsu, syncedPlanner.targetPsu, syncedPlanner.limits);
     if (!solution) {
         result.innerHTML = '<p class="hint">Aus diesen Werten konnte kein sinnvoller Ausgleich berechnet werden.</p>';
         return;
     }
-    const productRows = customCrProducts.map(product => {
-        const amount = solution.additions[product.item] || 0;
-        const resolved = resolveRecipeItem({ item: product.item });
-        const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
-        const missing = resolved && stock < amount;
-        const grams = amount * (densityFactors[product.item] || 1);
-        return `
-            <div class="custom-cr-product-chip ${missing ? 'missing' : ''}">
-                <div class="custom-cr-product-head">
+    const primaryStep = plan.steps[0] || null;
+    const primarySolution = primaryStep?.solution || solution;
+    const primaryAfterValues = primaryStep?.expectedAfter || solution.finalValues;
+    const primaryAfterPsu = primaryStep?.expectedAfterPsu || solution.estimatedPsu;
+    const displayedCurrentPsu = primaryStep?.currentPsu ?? currentDisplayPsu;
+    const activeProductRows = customCrProducts
+        .map(product => {
+            const amount = primarySolution.additions[product.item] || 0;
+            if (amount <= 0.01) return '';
+            const resolved = resolveRecipeItem({ item: product.item });
+            const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
+            const missing = resolved && stock < amount;
+            const grams = amount * (densityFactors[product.item] || 1);
+            return `
+                <div class="custom-cr-product-line ${missing ? 'missing' : ''}">
                     <strong>${product.key}</strong>
                     <span>${amount.toFixed(2)} ml</span>
+                    <small>${grams.toFixed(1)} g${resolved ? ` · Bestand ${formatItemAmount(product.item, stock)}` : ''}</small>
                 </div>
-                <small>${grams.toFixed(1)} g${resolved ? ` · Bestand ${formatItemAmount(product.item, stock)}` : ''}</small>
-            </div>
-        `;
-    }).join('');
+            `;
+        })
+        .filter(Boolean)
+        .join('');
     const beforeAfterRows = customCrElementDefinitions.map(entry => `
         <div class="custom-cr-delta-pill">
             <strong>${entry.label}</strong>
-            <span>${(syncedPlanner.current[entry.key] || 0).toFixed(2)} → ${(solution.finalValues[entry.key] || 0).toFixed(2)}</span>
-            <small>${((solution.finalValues[entry.key] || 0) - (syncedPlanner.current[entry.key] || 0)).toFixed(2)} ${entry.unit}</small>
+            <span>${(syncedPlanner.current[entry.key] || 0).toFixed(2)} → ${(primaryAfterValues[entry.key] || 0).toFixed(2)}</span>
+            <small>${((primaryAfterValues[entry.key] || 0) - (syncedPlanner.current[entry.key] || 0)).toFixed(2)} ${entry.unit} · Ziel ${(syncedPlanner.target[entry.key] || 0).toFixed(2)}</small>
         </div>
     `).join('');
+    const remainingRows = customCrElementDefinitions
+        .map(entry => {
+            const remaining = (syncedPlanner.target[entry.key] || 0) - (primaryAfterValues[entry.key] || 0);
+            return {
+                key: entry.key,
+                label: entry.label,
+                unit: entry.unit,
+                remaining
+            };
+        })
+        .filter(entry => Math.abs(entry.remaining) > 0.01)
+        .sort((a, b) => Math.abs(b.remaining) - Math.abs(a.remaining))
+        .slice(0, 4)
+        .map(entry => `
+            <div class="custom-cr-remaining-chip">
+                <strong>${entry.label}</strong>
+                <span>${entry.remaining > 0 ? '+' : ''}${entry.remaining.toFixed(2)} ${entry.unit}</span>
+            </div>
+        `)
+        .join('');
+    const planSummary = plan.steps.map(step => `
+        <div class="custom-cr-plan-step-card">
+            <div class="custom-cr-plan-chip">
+                <strong>Schritt ${step.index}</strong>
+                <span>${step.solution.removalLiters.toFixed(2)} L WW · ${Math.max(0, step.solution.roLiters).toFixed(2)} L RO</span>
+                <small>PSU ${step.currentPsu.toFixed(2)} → ${step.expectedAfterPsu.toFixed(2)}${step.scale < 0.999 ? ` · Sicherheitsfaktor ${(step.scale * 100).toFixed(0)}%` : ''}</small>
+            </div>
+            <div class="custom-cr-step-values-grid">
+                ${customCrElementDefinitions.map(entry => `
+                    <div class="custom-cr-step-value-pill">
+                        <strong>${entry.label}</strong>
+                        <span>${Number(step.current?.[entry.key] || 0).toFixed(2)} → ${Number(step.expectedAfter?.[entry.key] || 0).toFixed(2)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `).join('');
+    const statusText = !plan.completed && plan.steps.length >= 12
+        ? 'Mehr als 12 Wasserwechsel nötig'
+        : (plan.steps.length > 1 ? `${plan.steps.length} Wasserwechsel empfohlen` : '1 Wasserwechsel reicht aus');
+    const scalingHint = primaryStep?.scale && primaryStep.scale < 0.999
+        ? `Die Grenzwerte erzwingen fuer Schritt 1 aktuell nur ${(primaryStep.scale * 100).toFixed(0)}% der rechnerischen Zielbewegung.`
+        : '';
+    const limitingHint = primaryStep?.violations?.length
+        ? `Begrenzender Faktor: ${primaryStep.violations.map(item => item.key).join(', ')}.`
+        : '';
+    const optimizerHint = primarySolution.optimizerMeta?.optimizedRemovalLiters > primarySolution.optimizerMeta?.baseRemovalLiters + 0.25
+        ? `Der Rechner hat den Wasserwechsel bewusst auf ${primarySolution.optimizerMeta.optimizedRemovalLiters.toFixed(2)} L erhöht, damit weniger Gesamtschritte nötig werden.`
+        : 'Der Rechner sucht automatisch den kleinsten noch sauberen Schritt und vergrößert ihn nur, wenn dadurch weniger Gesamtschritte nötig sind.';
+    const planStatusCopy = plan.steps.length > 1
+        ? `Mit deinen Limits sind aktuell ${plan.steps.length} Schritte der kürzeste saubere Plan.`
+        : 'Mit deinen Limits reicht aktuell ein einziger C&R Wasserwechsel.';
     result.innerHTML = `
         <div class="tool-result custom-cr-result-shell">
+            <div class="custom-cr-topline">
+                <strong>${statusText}</strong>
+                <span>${syncedPlanner.tankLiters.toFixed(0)} L Aquarium · Schritt 1 PSU ${displayedCurrentPsu.toFixed(2)} → ${primaryAfterPsu.toFixed(2)}</span>
+            </div>
+            <div class="custom-cr-overview-card">
+                <div class="custom-cr-section-head">
+                    <strong>Nächster sinnvoller Wasserwechsel</strong>
+                    <small>${planStatusCopy}</small>
+                </div>
+                <div class="custom-cr-summary-grid">
+                    <div class="custom-cr-metric">
+                        <small>Wasser entnehmen</small>
+                        <strong>${primarySolution.removalLiters.toFixed(2)} L</strong>
+                        <span>Gesamt für Schritt 1</span>
+                    </div>
+                    <div class="custom-cr-metric">
+                        <small>RO nachfüllen</small>
+                        <strong>${Math.max(0, primarySolution.roLiters).toFixed(2)} L</strong>
+                        <span>Reinstwasser-Zugabe</span>
+                    </div>
+                    <div class="custom-cr-metric">
+                        <small>C&amp;R zugeben</small>
+                        <strong>${primarySolution.totalAdditiveLiters.toFixed(2)} L</strong>
+                        <span>Produkte zusammen</span>
+                    </div>
+                    <div class="custom-cr-metric">
+                        <small>PSU danach</small>
+                        <strong>${primaryAfterPsu.toFixed(2)}</strong>
+                        <span>Ziel ${syncedPlanner.targetPsu.toFixed(2)} PSU</span>
+                    </div>
+                </div>
+            </div>
             <div class="custom-cr-summary-grid">
                 <div class="custom-cr-metric">
-                    <small>Entnahme</small>
-                    <strong>${solution.removalLiters.toFixed(2)} L</strong>
-                    <span>Wasserwechsel gesamt</span>
+                    <small>Start</small>
+                    <strong>${displayedCurrentPsu.toFixed(2)} PSU</strong>
+                    <span>Vor dem nächsten Schritt</span>
                 </div>
-                <div class="custom-cr-metric">
-                    <small>Reinstwasser</small>
-                    <strong>${Math.max(0, solution.roLiters).toFixed(2)} L</strong>
-                    <span>RO-Zugabe gesamt</span>
-                </div>
-                <div class="custom-cr-metric">
-                    <small>C&amp;R Summe</small>
-                    <strong>${solution.totalAdditiveLiters.toFixed(2)} L</strong>
-                    <span>Alle Produkte zusammen</span>
-                </div>
-                <div class="custom-cr-metric">
-                    <small>PSU</small>
-                    <strong>${currentDisplayPsu.toFixed(2)} → ${solution.estimatedPsu.toFixed(2)}</strong>
-                    <span>Ziel ${syncedPlanner.targetPsu.toFixed(2)} PSU</span>
-                </div>
-                ${solution.basePsu ? `
+                ${primarySolution.basePsu ? `
                     <div class="custom-cr-metric">
                         <small>Basis-PSU</small>
-                        <strong>${solution.basePsu.toFixed(2)}</strong>
-                        <span>Ohne Zusatzkorrektur</span>
+                        <strong>${primarySolution.basePsu.toFixed(2)}</strong>
+                        <span>Vor Feinkorrektur</span>
                     </div>
                 ` : ''}
+                <div class="custom-cr-metric">
+                    <small>Optimierung</small>
+                    <strong>${primarySolution.optimizerMeta?.optimizedRemovalLiters?.toFixed(2) || primarySolution.removalLiters.toFixed(2)} L</strong>
+                    <span>${optimizerHint}</span>
+                </div>
             </div>
 
             <div class="custom-cr-section">
                 <div class="custom-cr-section-head">
-                    <strong>C&amp;R Mengen</strong>
-                    <small>Kompakte Übersicht in ml, g und Lagerbestand</small>
+                    <strong>Produkte für Schritt 1</strong>
+                    <small>Nur Mengen, die in diesem Schritt wirklich gebraucht werden.</small>
                 </div>
                 <div class="custom-cr-product-grid">
-                    ${productRows}
+                    ${activeProductRows || '<p class="hint">Für diesen Schritt werden keine Produkte benötigt.</p>'}
                 </div>
             </div>
 
-            <div class="custom-cr-section">
+            <details class="custom-cr-section" open>
                 <div class="custom-cr-section-head">
-                    <strong>Vorher / Nachher</strong>
-                    <small>Erwartete Entwicklung je Element</small>
+                    <strong>Vorher → Nachher in Schritt 1</strong>
+                    <small>Kein Wert darf über sein Ziel hinausschießen.</small>
                 </div>
                 <div class="custom-cr-delta-grid">
                     ${beforeAfterRows}
                 </div>
-            </div>
+            </details>
+
+            ${remainingRows ? `
+                <div class="custom-cr-section">
+                    <div class="custom-cr-section-head">
+                        <strong>Danach noch offen</strong>
+                        <small>Das sind die größten Restdifferenzen nach Schritt 1.</small>
+                    </div>
+                    <div class="custom-cr-remaining-grid">
+                        ${remainingRows}
+                    </div>
+                </div>
+            ` : ''}
+
+            <details class="custom-cr-section">
+                <div class="custom-cr-section-head">
+                    <strong>Gesamter Plan</strong>
+                    <small>${plan.steps.length > 1 ? `Mit deinen Limits werden ${plan.steps.length} C&R Wasserwechsel empfohlen.` : 'Mit deinen Limits reicht aktuell ein Schritt aus.'}</small>
+                </div>
+                <div class="custom-cr-plan-grid">
+                    ${planSummary || '<p class="hint">Noch kein Schritt ableitbar.</p>'}
+                </div>
+            </details>
         </div>
         <div class="tool-action-row">
             <button class="btn-danger btn-animated" onclick="bookCustomCRAdjustment()">C&amp;R Produkte auslagern</button>
+            <button class="btn-secondary btn-animated" onclick="saveCustomCrPlan()">Plan speichern</button>
         </div>
-        <p class="hint" style="margin-top:10px;">${solution.note ? `${escapeHtml(solution.note)} ` : ''}Hinweis: Wenn die PSU gezielt über NaCl korrigiert wird, steigen vor allem Na und Cl gegenüber dem reinen Elementziel mit an. Genau dafür ist die zusätzliche PSU-Korrektur gedacht.</p>
+        <p class="hint" style="margin-top:10px;">${primarySolution.note ? `${escapeHtml(primarySolution.note)} ` : ''}${scalingHint ? `${escapeHtml(scalingHint)} ` : ''}${limitingHint ? `${escapeHtml(limitingHint)} ` : ''}Hinweis: Wenn die PSU gezielt ueber NaCl korrigiert wird, steigen vor allem Na und Cl gegenueber dem reinen Elementziel mit an. Genau dafuer ist die zusaetzliche PSU-Korrektur gedacht.</p>
     `;
+    renderSavedCustomCrPlans();
 }
 
 function loadCustomCRExample() {
@@ -5716,7 +6827,8 @@ function loadCustomCRExample() {
         currentPsu: customCrExampleState.currentPsu,
         targetPsu: customCrExampleState.targetPsu,
         current: { ...customCrExampleState.current },
-        target: { ...customCrExampleState.target }
+        target: { ...customCrExampleState.target },
+        limits: JSON.parse(JSON.stringify(customCrDefaultStepLimits))
     };
     saveDB();
     const tankEl = document.getElementById('customCrTankLiters');
@@ -5725,6 +6837,7 @@ function loadCustomCRExample() {
     if (tankEl) tankEl.value = customCrExampleState.tankLiters;
     if (currentPsuEl) currentPsuEl.value = customCrExampleState.currentPsu;
     if (psuEl) psuEl.value = customCrExampleState.targetPsu;
+    renderCustomCrLimitsMatrix();
     renderCustomCrPlannerMatrix();
     renderCustomCRPlanner();
 }
@@ -5736,13 +6849,158 @@ function loadCustomCROptimalTargets() {
     saveDB();
     const psuEl = document.getElementById('customCrTargetPsu');
     if (psuEl) psuEl.value = customCrProxyReferencePsu;
+    renderCustomCrLimitsMatrix();
     renderCustomCrPlannerMatrix();
     renderCustomCRPlanner();
 }
 
+function saveCustomCrPlan() {
+    const planner = syncCustomCrPlannerFromInputs();
+    const plan = buildCustomCrPlan(planner.current, planner.target, planner.tankLiters, planner.currentPsu, planner.targetPsu, planner.limits);
+    if (!plan.steps.length) {
+        showToast('Kein speicherbarer C&R Plan gefunden', 'error');
+        return;
+    }
+    const plans = getCustomCrPlans();
+    plans.unshift(plan);
+    db.customCrPlans = plans.slice(0, 12);
+    saveDB();
+    renderSavedCustomCrPlans();
+    showToast(`C&R Plan mit ${plan.steps.length} Schritt(en) gespeichert`, 'success');
+}
+
+function deleteCustomCrPlan(planId) {
+    db.customCrPlans = getCustomCrPlans().filter(plan => plan.id !== planId);
+    saveDB();
+    renderSavedCustomCrPlans();
+}
+
+function getCustomCrPlanById(planId) {
+    return getCustomCrPlans().find(plan => plan.id === planId) || null;
+}
+
+function queueCustomCrPlanStep(planId, stepId) {
+    const plan = getCustomCrPlanById(planId);
+    const step = plan?.steps?.find(entry => entry.id === stepId);
+    if (!plan || !step) return;
+    const queue = customCrProducts
+        .map(product => {
+            const resolved = resolveRecipeItem({ item: product.item });
+            if (!resolved) return null;
+            const amount = step.solution.additions[product.item] || 0;
+            return amount > 0 ? { ...resolved, amount } : null;
+        })
+        .filter(Boolean);
+    if (!queue.length) return alert('Dieser Schritt enthält keine lagergeführten Mengen.');
+    if (!confirm(`Schritt ${step.index} wirklich auslagern? Ergebnis bitte vorher prüfen.`)) return;
+    executeQueueWithConflictHandling(queue, 0);
+}
+
+function toggleCustomCrPlanStepDone(planId, stepId) {
+    const plan = getCustomCrPlanById(planId);
+    const step = plan?.steps?.find(entry => entry.id === stepId);
+    if (!plan || !step) return;
+    step.done = !step.done;
+    step.doneAt = step.done ? new Date().toISOString() : null;
+    saveDB();
+    renderSavedCustomCrPlans();
+}
+
+function renderSavedCustomCrPlans() {
+    if (!isCustomCRUnlocked()) return;
+    const mount = document.getElementById('customCrSavedPlans');
+    if (!mount) return;
+    const plans = getCustomCrPlans();
+    if (!plans.length) {
+        mount.innerHTML = `
+            <div class="custom-cr-section" style="margin-top:14px;">
+                <div class="custom-cr-section-head">
+                    <strong>Gespeicherte C&amp;R Pläne</strong>
+                    <small>Noch nichts gespeichert.</small>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    mount.innerHTML = `
+        <div class="custom-cr-section" style="margin-top:14px;">
+            <div class="custom-cr-section-head">
+                <strong>Gespeicherte C&amp;R Pläne</strong>
+                <small>Mehrstufige Pläne mit Erledigt-Status und Zielvorschau.</small>
+            </div>
+            <div class="custom-cr-saved-plans">
+                ${plans.map(plan => {
+                    const progress = getCustomCrPlanCompletion(plan);
+                    return `
+                        <details class="custom-cr-saved-plan">
+                            <summary>
+                                <span>
+                                    <strong>${progress.total} Schritt(e)</strong>
+                                    <small>${formatWarehouseDate(plan.createdAt)} · ${plan.tankLiters.toFixed(0)} L · ${progress.done}/${progress.total} erledigt</small>
+                                </span>
+                                <span class="custom-cr-plan-target">PSU ${Number(plan.startPsu || 0).toFixed(2)} → ${Number(plan.projectedFinalPsu || 0).toFixed(2)}</span>
+                            </summary>
+                            <div class="custom-cr-saved-plan-body">
+                                <div class="custom-cr-delta-grid">
+                                    ${customCrElementDefinitions.map(entry => `
+                                        <div class="custom-cr-delta-pill">
+                                            <strong>${entry.label}</strong>
+                                            <span>${Number(plan.startCurrent?.[entry.key] || 0).toFixed(2)} → ${Number(plan.projectedFinal?.[entry.key] || 0).toFixed(2)}</span>
+                                            <small>Ziel ${Number(plan.target?.[entry.key] || 0).toFixed(2)} ${entry.unit}</small>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="custom-cr-step-list">
+                                    ${plan.steps.map(step => `
+                                        <div class="custom-cr-step-card ${step.done ? 'done' : ''}">
+                                            <div class="custom-cr-step-head">
+                                                <div>
+                                                    <strong>Schritt ${step.index}</strong>
+                                                    <small>WW ${step.solution.removalLiters.toFixed(2)} L · RO ${Math.max(0, step.solution.roLiters).toFixed(2)} L · PSU ${step.currentPsu.toFixed(2)} → ${step.expectedAfterPsu.toFixed(2)}</small>
+                                                </div>
+                                                <label class="custom-cr-check">
+                                                    <input type="checkbox" ${step.done ? 'checked' : ''} onchange="toggleCustomCrPlanStepDone('${plan.id}','${step.id}')">
+                                                    <span>Erledigt</span>
+                                                </label>
+                                            </div>
+                                            <div class="custom-cr-step-values-grid">
+                                                ${customCrElementDefinitions.map(entry => `
+                                                    <div class="custom-cr-step-value-pill">
+                                                        <strong>${entry.label}</strong>
+                                                        <span>${Number(step.current?.[entry.key] || 0).toFixed(2)} → ${Number(step.expectedAfter?.[entry.key] || 0).toFixed(2)}</span>
+                                                    </div>
+                                                `).join('')}
+                                            </div>
+                                            <div class="custom-cr-step-products">
+                                                ${customCrProducts.map(product => {
+                                                    const amount = step.solution.additions[product.item] || 0;
+                                                    if (amount <= 0) return '';
+                                                    return `<span>${product.key}: ${amount.toFixed(2)} ml</span>`;
+                                                }).join('') || '<span>Keine Produkte</span>'}
+                                            </div>
+                                            <div class="custom-cr-step-actions">
+                                                <button class="btn-secondary btn-animated" onclick="queueCustomCrPlanStep('${plan.id}','${step.id}')">Diesen Schritt auslagern</button>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="tool-action-row">
+                                    <button class="btn-out btn-animated" onclick="deleteCustomCrPlan('${plan.id}')">Plan löschen</button>
+                                </div>
+                            </div>
+                        </details>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+}
+
 function bookCustomCRAdjustment() {
     const planner = getCustomCrPlannerState();
-    const solution = solveCustomCRAdjustment(planner.current, planner.target, planner.tankLiters, planner.currentPsu, planner.targetPsu);
+    const plan = buildCustomCrPlan(planner.current, planner.target, planner.tankLiters, planner.currentPsu, planner.targetPsu, planner.limits);
+    const primaryStep = plan.steps[0];
+    const solution = primaryStep?.solution || solveCustomCRAdjustment(planner.current, planner.target, planner.tankLiters, planner.currentPsu, planner.targetPsu);
     if (!solution) return alert('Kein berechenbarer C&R Ausgleich vorhanden.');
     const queue = customCrProducts
         .map(product => {
@@ -5753,7 +7011,8 @@ function bookCustomCRAdjustment() {
         })
         .filter(Boolean);
     if (!queue.length) return alert('Dieser Ausgleich enthält keine lagergeführten Mengen.');
-    if (!confirm(`C&R Ausgleich für ${planner.tankLiters.toFixed(0)} L auslagern? Ergebnis bitte vorher prüfen.`)) return;
+    const stepLabel = plan.steps.length > 1 ? `Schritt 1 von ${plan.steps.length}` : 'diesen Ausgleich';
+    if (!confirm(`C&R ${stepLabel} für ${planner.tankLiters.toFixed(0)} L auslagern? Ergebnis bitte vorher prüfen.`)) return;
     executeQueueWithConflictHandling(queue, 0);
 }
 
@@ -8140,37 +9399,45 @@ function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; if
 function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLager(); updateNotificationStatus(); alert("Lager ist leer."); } }
 
 function exportData() {
-    const warehouse = getActiveWarehouse();
-    const exportedAt = new Date().toISOString();
-    if (warehouse) {
-        warehouse.data = db;
-        warehouse.lastExportAt = exportedAt;
-    }
-    const payload = {
-        type: 'osci_warehouse_backup',
-        version: 1,
-        warehouseName: warehouse ? warehouse.name : 'Lager',
-        exportedAt,
-        data: db
-    };
+    const payload = buildProjectBackupPayload();
     saveDB();
 
-    let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "text/plain" });
+    let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_${sanitizeFileName(payload.warehouseName)}_${exportedAt.split('T')[0]}.txt`;
+    a.download = `OSCI_Backup_${exportedAt.split('T')[0]}.json`;
     a.click();
 }
 
 function importData() {
     let file = document.getElementById('importFile').files[0];
-    if (!file) return alert("Bitte wähle eine Datei (.txt) aus.");
+    if (!file) return alert("Bitte wähle eine Backup-Datei aus.");
     let reader = new FileReader();
     reader.onload = e => {
         try {
             let parsed = JSON.parse(e.target.result);
-            const importPayload = parsed && parsed.type === 'osci_warehouse_backup' ? parsed.data : parsed;
-            const sourceName = parsed && parsed.warehouseName ? parsed.warehouseName : 'Backup';
+            const isProjectBackup = parsed && parsed.type === 'osci_project_backup' && parsed.data;
+            const importPayload = isProjectBackup ? parsed.data : (parsed && parsed.type === 'osci_warehouse_backup' ? parsed.data : parsed);
+            const sourceName = parsed && (parsed.warehouseName || parsed.app) ? (parsed.warehouseName || parsed.app) : 'Backup';
+            if (isProjectBackup && importPayload && importPayload.warehouses && importPayload.aquariums) {
+                if (!confirm(`Projekt-Backup "${sourceName}" komplett wiederherstellen? Der aktuelle Stand dieses Geräts wird dadurch ersetzt.`)) return;
+                appState = migrateToWarehouseState(importPayload);
+                activeWarehouseId = importPayload.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
+                activeAquariumId = importPayload.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+                appState.activeWarehouseId = activeWarehouseId;
+                appState.activeAquariumId = activeAquariumId;
+                const active = getActiveWarehouse();
+                if (active) db = normalizeWarehouseData(active.data);
+                overlayActiveAquariumData();
+                persistSequence = persistSequence.then(() => persistAppStateNow('import-project', true));
+                applyTheme(db.theme || 'default', false);
+                renderCurrentWarehouseViews();
+                renderStorageSecurityStatus();
+                alert('Projekt-Backup erfolgreich geladen!');
+                selectTab('lager');
+                checkAndNotifyStockAlerts();
+                return;
+            }
             if(importPayload && importPayload.inventory) {
                 const warehouse = getActiveWarehouse();
                 if (!confirm(`Backup "${sourceName}" in das aktuell ausgewählte Lager "${warehouse.name}" importieren? Dieses Lager wird dadurch ersetzt.`)) return;
@@ -8180,6 +9447,7 @@ function importData() {
                 saveDB();
                 applyTheme(db.theme || 'default', false);
                 renderCurrentWarehouseViews();
+                renderStorageSecurityStatus();
                 alert(`Backup in "${warehouse.name}" geladen!`);
                 selectTab('lager');
                 checkAndNotifyStockAlerts();
@@ -9027,30 +10295,51 @@ document.addEventListener('keydown', (e) => {
 });
 
 // APP START
-initDB();
-let startupTab = db.lastTab || 'lager';
-try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
-if (window.location.hash) {
-    const hashTab = decodeURIComponent(window.location.hash.slice(1));
-    if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
+async function bootstrapApplication() {
+    await initDB();
+    let startupTab = db.lastTab || 'lager';
+    try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
+    if (window.location.hash) {
+        const hashTab = decodeURIComponent(window.location.hash.slice(1));
+        if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
+    }
+    showTab(startupTab);
+    updateNotificationStatus();
+    renderStorageSecurityStatus();
+    renderGoogleDriveSyncCard();
+    initCustomCursor();
+    initLiveUpdateChecks();
+    setTimeout(checkForAppUpdate, 2500);
+    setInterval(checkForAppUpdate, 30 * 60 * 1000);
+    setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
+    setTimeout(checkTodoReminders, 1500);
+    setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
+    setTimeout(() => checkDosingContainerReminders('startup'), 2300);
+    setInterval(checkTodoReminders, 60 * 1000);
+    setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
+    setInterval(checkDosingContainerReminders, 60 * 60 * 1000);
 }
-showTab(startupTab);
-updateNotificationStatus();
-initCustomCursor();
-initLiveUpdateChecks();
-setTimeout(checkForAppUpdate, 2500);
-setInterval(checkForAppUpdate, 30 * 60 * 1000);
-setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
-setTimeout(checkTodoReminders, 1500);
-setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
-setTimeout(() => checkDosingContainerReminders('startup'), 2300);
-setInterval(checkTodoReminders, 60 * 1000);
-setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
-setInterval(checkDosingContainerReminders, 60 * 60 * 1000);
+
+bootstrapApplication().catch(err => {
+    console.error('App bootstrap failed:', err);
+    alert('Die App konnte nicht sicher gestartet werden. Bitte die Seite neu laden.');
+});
 
 window.addEventListener('hashchange', () => {
     const hashTab = decodeURIComponent(window.location.hash.slice(1));
     if (APP_TAB_IDS.includes(hashTab)) showTab(hashTab);
+});
+
+window.addEventListener('pagehide', () => {
+    if (!appBootstrapComplete) return;
+    saveDB(false);
+    flushPendingPersistence('pagehide', false);
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'hidden' || !appBootstrapComplete) return;
+    saveDB(false);
+    flushPendingPersistence('visibility-hidden', false);
 });
 
 // Initialize Light Mode if saved
