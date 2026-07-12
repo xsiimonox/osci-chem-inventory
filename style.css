@@ -326,12 +326,16 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 .nav-menu-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; font-weight: 600; font-size: 1.1rem; color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
 .close-menu { background: none; border: none; color: var(--primary); font-size: 1.3rem; cursor: pointer; }
 
-.nav-links { display: flex; flex-direction: column; gap: 8px; }
+.nav-links { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; min-height: 0; padding-bottom: 18px; }
 .nav-links button { width: 100%; text-align: left; padding: 14px 16px; border: none; background: rgba(255,255,255,0.03); color: #fff; font-size: 1rem; font-weight: 500; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
 .nav-links button.active { color: #000; background: var(--primary); font-weight: 600; }
 
 .menu-backdrop { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.4); z-index: 999; backdrop-filter: blur(2px); }
 .menu-backdrop.open { display: block; }
+body.menu-open {
+    overflow: hidden !important;
+    touch-action: none;
+}
 
 .tab-content {
     display: none;

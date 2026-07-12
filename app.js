@@ -4149,10 +4149,41 @@ function updateTabAccessState() {
     });
 }
 
+let menuScrollLockY = 0;
+
+function setMenuOpenState(isOpen) {
+    const nav = document.getElementById('main-nav');
+    const backdrop = document.getElementById('menu-backdrop');
+    if (!nav || !backdrop) return;
+
+    if (isOpen) {
+        menuScrollLockY = window.scrollY || window.pageYOffset || 0;
+        nav.classList.add('open');
+        backdrop.classList.add('open');
+        document.body.classList.add('menu-open');
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${menuScrollLockY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+        return;
+    }
+
+    nav.classList.remove('open');
+    backdrop.classList.remove('open');
+    document.body.classList.remove('menu-open');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, menuScrollLockY || 0);
+}
+
 // --- UI / MENÜ STEUERUNG ---
 function toggleMenu() {
-    document.getElementById('main-nav').classList.toggle('open');
-    document.getElementById('menu-backdrop').classList.toggle('open');
+    const isOpen = document.getElementById('main-nav')?.classList.contains('open');
+    setMenuOpenState(!isOpen);
 }
 
 function selectTab(tabId) {
@@ -4160,8 +4191,7 @@ function selectTab(tabId) {
         tabId = getFirstVisibleTab();
     }
     showTab(tabId);
-    document.getElementById('main-nav').classList.remove('open');
-    document.getElementById('menu-backdrop').classList.remove('open');
+    setMenuOpenState(false);
 }
 
 function showTab(tabId) {
