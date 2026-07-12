@@ -733,7 +733,7 @@ async function requestGoogleDriveAccessToken(interactive = true) {
         client.error_callback = error => {
             reject(new Error(error?.message || 'Google OAuth abgebrochen.'));
         };
-        client.requestAccessToken({ prompt: interactive ? 'consent' : '' });
+        client.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
     });
 }
 
@@ -913,6 +913,19 @@ async function inspectGoogleDriveSyncNow() {
     }
 }
 
+async function tryRestoreGoogleDriveSession() {
+    const settings = getGoogleDriveSyncSettings();
+    if (!isGoogleDriveConfigured() || hasValidGoogleDriveToken() || (!settings.connectedEmail && !settings.autoSync)) return false;
+    try {
+        await requestGoogleDriveAccessToken(false);
+        renderGoogleDriveSyncCard('Google Drive Verbindung für diese Sitzung automatisch erneuert.');
+        return true;
+    } catch (err) {
+        renderGoogleDriveSyncCard('Bitte Google Drive Verbindung für diese Sitzung erneut öffnen.');
+        return false;
+    }
+}
+
 async function syncProjectToGoogleDriveNow() {
     try {
         if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
@@ -946,7 +959,7 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     const configured = isGoogleDriveConfigured();
     const sessionConnected = hasValidGoogleDriveToken();
     const connected = sessionConnected || !!settings.connectedEmail;
-    const accountLabel = settings.connectedEmail || (sessionConnected ? 'aktive Sitzung' : '-');
+    const accountLabel = settings.connectedEmail || (sessionConnected ? 'verbunden' : '-');
     const status = statusMessage || getGoogleDriveSyncStatusMessage();
     const lastSyncLabel = settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch nicht';
     const lastRestoreLabel = settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch nicht';
@@ -964,24 +977,24 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
                 <div class="google-drive-status-card">
                     <small>Konto</small>
                     <strong>${escapeHtml(accountLabel)}</strong>
-                    <span>${connected ? 'Normales Drive bleibt unberührt' : 'Noch keine aktive Verbindung'}</span>
+                    <span>${connected ? 'Dein normales Drive bleibt unberührt' : 'Noch keine aktive Verbindung'}</span>
                 </div>
                 <div class="google-drive-status-card">
                     <small>Letzte Sicherung</small>
                     <strong>${escapeHtml(lastSyncLabel)}</strong>
-                    <span>${backupKnown ? 'Backup im App-Speicher bekannt' : 'Noch kein bekanntes Backup'}</span>
+                    <span>${backupKnown ? 'Ein Backup wurde bereits erkannt' : 'Noch kein Backup vorhanden'}</span>
                 </div>
                 <div class="google-drive-status-card">
                     <small>Letztes Laden</small>
                     <strong>${escapeHtml(lastRestoreLabel)}</strong>
-                    <span>Zuletzt aus Google Drive wiederhergestellt</span>
+                    <span>Zuletzt aus Google Drive auf dieses Gerät geladen</span>
                 </div>
             </div>
             <div class="google-drive-status-note">
                 <strong>Wichtig:</strong> Deine Backups liegen im geschützten App-Speicher von Google Drive und sind im normalen Drive-Dateibereich nicht sichtbar.
             </div>
             <details class="google-drive-diagnostics">
-                <summary>Verbindung & Backup prüfen</summary>
+                <summary>Hilfe bei Problemen</summary>
                 <div class="google-drive-diagnostics-body">
                     <div class="tool-result">
                         <div class="tool-row">
@@ -989,11 +1002,11 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
                             <span>${escapeHtml(status)}</span>
                         </div>
                         <div class="tool-row">
-                            <span><strong>Aktive Sitzung</strong><small>Nur für diese Browser-Sitzung gültig.</small></span>
+                            <span><strong>Aktive Verbindung</strong><small>Gilt nur für diese Browser-Sitzung.</small></span>
                             <span>${sessionConnected ? 'ja' : 'nein'}</span>
                         </div>
                         <div class="tool-row">
-                            <span><strong>Bekannte Backup-Datei</strong><small>Wird gesetzt, sobald ein Backup gefunden oder hochgeladen wurde.</small></span>
+                            <span><strong>Backup gefunden</strong><small>Wird erkannt, sobald ein Backup geladen oder gespeichert wurde.</small></span>
                             <span>${backupKnown ? 'ja' : 'nein'}</span>
                         </div>
                     </div>
@@ -1006,6 +1019,20 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     `;
     const autoEl = document.getElementById('googleDriveAutoSync');
     if (autoEl) autoEl.checked = settings.autoSync === true;
+    const connectBtn = document.getElementById('googleDriveConnectBtn');
+    const syncBtn = document.getElementById('googleDriveSyncBtn');
+    const restoreBtn = document.getElementById('googleDriveRestoreBtn');
+    const disconnectBtn = document.getElementById('googleDriveDisconnectBtn');
+    if (connectBtn) connectBtn.hidden = connected;
+    if (disconnectBtn) disconnectBtn.hidden = !connected;
+    if (syncBtn) {
+        syncBtn.disabled = !connected || !configured;
+        syncBtn.classList.toggle('is-disabled-soft', !connected || !configured);
+    }
+    if (restoreBtn) {
+        restoreBtn.disabled = !connected || !configured;
+        restoreBtn.classList.toggle('is-disabled-soft', !connected || !configured);
+    }
 }
 
 Object.assign(window, {
@@ -1063,10 +1090,20 @@ async function renderStorageSecurityStatus() {
     if (!mount) return;
     if (!canUseIndexedDb()) {
         mount.innerHTML = `
-            <div class="tool-result">
-                <div class="tool-row">
-                    <span><strong>Lokaler Speicher</strong><small>Dieser Browser unterstützt IndexedDB nicht zuverlässig. Bitte einen aktuellen Browser nutzen, damit deine Daten sicher gespeichert werden.</small></span>
-                    <span>nicht verfügbar</span>
+            <div class="storage-safety-status-shell">
+                <div class="storage-safety-hero is-warning">
+                    <div>
+                        <strong>Speicherung nicht vollständig verfügbar</strong>
+                        <small>Dieser Browser unterstützt die sichere lokale Speicherung nicht zuverlässig.</small>
+                    </div>
+                    <span class="storage-safety-pill is-warning">Prüfen</span>
+                </div>
+                <div class="storage-safety-grid">
+                    <div class="storage-safety-status-card">
+                        <small>Automatisches Speichern</small>
+                        <strong>nicht bereit</strong>
+                        <span>Bitte einen aktuellen Browser nutzen.</span>
+                    </div>
                 </div>
             </div>
         `;
@@ -1079,23 +1116,32 @@ async function renderStorageSecurityStatus() {
         : null;
     const autosaveText = meta?.lastSavedAt ? formatWarehouseDate(meta.lastSavedAt) : (latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'noch nicht');
     const snapshotText = latestSnapshot?.createdAt ? formatWarehouseDate(latestSnapshot.createdAt) : 'noch keiner';
+    const autosaveReady = Boolean(meta?.lastSavedAt || latestPersistAt);
     mount.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row">
-                <span><strong>Hauptspeicher</strong><small>Gesamtes Projekt lokal in IndexedDB gespeichert. Kein dauerhafter Hauptspeicher mehr in Cookies oder localStorage.</small></span>
-                <span>IndexedDB</span>
+        <div class="storage-safety-status-shell">
+            <div class="storage-safety-hero ${autosaveReady ? 'is-ready' : ''}">
+                <div>
+                    <strong>${autosaveReady ? 'Deine Daten werden automatisch gespeichert' : 'Die automatische Speicherung wird vorbereitet'}</strong>
+                    <small>${autosaveReady ? 'Änderungen bleiben auf diesem Gerät erhalten.' : 'Sobald du mit der App arbeitest, wird der Speicherstatus hier sichtbar.'}</small>
+                </div>
+                <span class="storage-safety-pill ${autosaveReady ? 'is-ready' : ''}">${autosaveReady ? 'Aktiv' : 'Wartet'}</span>
             </div>
-            <div class="tool-row">
-                <span><strong>Letztes Autosave</strong><small>Wird bei Änderungen automatisch aktualisiert.</small></span>
-                <span>${escapeHtml(autosaveText)}</span>
-            </div>
-            <div class="tool-row">
-                <span><strong>Wiederherstellungspunkte</strong><small>Lokale Sicherheitsstände gegen Datenverlust.</small></span>
-                <span>${snapshots.length}</span>
-            </div>
-            <div class="tool-row">
-                <span><strong>Letzter Wiederherstellungspunkt</strong><small>${latestSnapshot?.reason ? `Grund: ${escapeHtml(latestSnapshot.reason)}` : 'Wird bei größeren Änderungen und Imports ergänzt.'}</small></span>
-                <span>${escapeHtml(snapshotText)}</span>
+            <div class="storage-safety-grid">
+                <div class="storage-safety-status-card">
+                    <small>Speicherort</small>
+                    <strong>Nur dieses Gerät</strong>
+                    <span>Ohne Cloud bleiben deine Daten lokal im Browser.</span>
+                </div>
+                <div class="storage-safety-status-card">
+                    <small>Letzte automatische Speicherung</small>
+                    <strong>${escapeHtml(autosaveText)}</strong>
+                    <span>Wird bei Änderungen selbstständig aktualisiert.</span>
+                </div>
+                <div class="storage-safety-status-card">
+                    <small>Sicherungspunkte</small>
+                    <strong>${snapshots.length}</strong>
+                    <span>Letzter Punkt: ${escapeHtml(snapshotText)}</span>
+                </div>
             </div>
         </div>
     `;
@@ -3459,13 +3505,13 @@ function setupSettingsAccordions() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/supabase|sync|freunde/.test(normalized)) return { group: 'Sync', hint: 'Cloud-Sync, Login, Freunde, Rechte', keywords: 'supabase sync cloud login freunde teilen nur lesen schreibzugriff readonly write sicherheit rls' };
-    if (/system|backup|bug/.test(normalized)) return { group: 'System', hint: 'Updates, Backup, Fehler melden', keywords: 'system update version backup import export bug fehler melden mail' };
-    if (/benachrichtigung/.test(normalized)) return { group: 'Warnungen', hint: 'Warnzeitraum, Push, deaktivierte Warnungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
-    if (/eigene behälter|produkte ein/.test(normalized)) return { group: 'Lager', hint: 'Tara, Behälter, Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte' };
-    if (/eigene produkte|produkt-presets|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Waren, Presets, Shop-Links', keywords: 'produkt eigene waren preset shop link größe dichte stück gramm ml' };
-    if (/design|effekte/.test(normalized)) return { group: 'Darstellung', hint: 'Design, Theme, Animationen', keywords: 'design theme farbe badman light girl mint effekt animation disco' };
-    if (/reset|löschen/.test(normalized)) return { group: 'Gefahrenzone', hint: 'Daten löschen und zurücksetzen', keywords: 'reset löschen statistik protokoll lagerbestand daten' };
+    if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Sicherung', hint: 'Google Drive, Teilen und Wiederherstellen', keywords: 'google drive sync cloud teilen freunde lesen schreiben sicherung backup wiederherstellen' };
+    if (/app|system|update|problem|bug|backup/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates, Ordnung und Hilfe', keywords: 'app system update version backup bug problem mail menü reihenfolge' };
+    if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
+    if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
+    if (/eigene produkte|produktlisten|preset|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen und Links', keywords: 'produkt eigene waren preset produktlisten shop link größe dichte stück gramm ml' };
+    if (/design|effekte|aussehen|farbschema/.test(normalized)) return { group: 'Aussehen', hint: 'Farben, Stil und Animationen', keywords: 'design theme farbe badman light girl mint effekt animation disco aussehen' };
+    if (/reset|löschen/.test(normalized)) return { group: 'Zurücksetzen', hint: 'Daten gezielt löschen', keywords: 'reset löschen statistik protokoll lagerbestand daten' };
     return { group: 'Weitere', hint: 'Weitere Einstellungen', keywords: normalized };
 }
 
@@ -10419,6 +10465,9 @@ async function bootstrapApplication() {
     updateNotificationStatus();
     renderStorageSecurityStatus();
     renderGoogleDriveSyncCard();
+    setTimeout(() => {
+        tryRestoreGoogleDriveSession();
+    }, 500);
     initCustomCursor();
     initLiveUpdateChecks();
     setTimeout(checkForAppUpdate, 2500);

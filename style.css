@@ -1320,6 +1320,7 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     color: var(--text-muted);
     font-size: 0.74rem;
     font-weight: 500;
+    line-height: 1.35;
 }
 
 .settings-accordion-summary::-webkit-details-marker {
@@ -2085,6 +2086,112 @@ body.theme-mint.party-mode .card {
     margin-top: 14px;
 }
 
+.storage-safety-status-shell {
+    display: grid;
+    gap: 12px;
+}
+
+.storage-safety-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+}
+
+.storage-safety-hero strong,
+.storage-safety-hero small {
+    display: block;
+}
+
+.storage-safety-hero strong {
+    color: var(--text);
+    font-size: 1rem;
+}
+
+.storage-safety-hero small {
+    margin-top: 4px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+
+.storage-safety-hero.is-ready {
+    border-color: rgba(48, 209, 88, 0.24);
+    background: linear-gradient(135deg, rgba(48, 209, 88, 0.1), rgba(100, 210, 255, 0.05));
+}
+
+.storage-safety-hero.is-warning {
+    border-color: rgba(255, 214, 10, 0.3);
+    background: linear-gradient(135deg, rgba(255, 214, 10, 0.14), rgba(255,255,255,0.03));
+}
+
+.storage-safety-pill {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(100, 210, 255, 0.26);
+    background: rgba(100, 210, 255, 0.1);
+    color: var(--secondary);
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.storage-safety-pill.is-ready {
+    border-color: rgba(48, 209, 88, 0.28);
+    background: rgba(48, 209, 88, 0.12);
+    color: var(--success);
+}
+
+.storage-safety-pill.is-warning {
+    border-color: rgba(255, 214, 10, 0.3);
+    background: rgba(255, 214, 10, 0.12);
+    color: #ffd60a;
+}
+
+.storage-safety-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.storage-safety-status-card {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.028);
+}
+
+.storage-safety-status-card small,
+.storage-safety-status-card strong,
+.storage-safety-status-card span {
+    display: block;
+}
+
+.storage-safety-status-card small {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.storage-safety-status-card strong {
+    margin-top: 6px;
+    color: var(--text);
+    font-size: 0.98rem;
+}
+
+.storage-safety-status-card span {
+    margin-top: 5px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
 .backup-project-card {
     border: 1px solid rgba(255,255,255,0.08);
     background:
@@ -2232,6 +2339,12 @@ body.theme-mint.party-mode .card {
     line-height: 1.45;
 }
 
+.is-disabled-soft {
+    opacity: 0.48;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 .google-drive-diagnostics {
     border-top: 1px solid rgba(255,255,255,0.07);
     padding-top: 12px;
@@ -2291,6 +2404,15 @@ body.theme-mint.party-mode .card {
 }
 
 @media (max-width: 767px) {
+    .storage-safety-hero {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .storage-safety-grid {
+        grid-template-columns: 1fr;
+    }
+
     .google-drive-status-hero {
         flex-direction: column;
         align-items: flex-start;

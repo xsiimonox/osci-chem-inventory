@@ -929,23 +929,14 @@
         <!-- REITER UMGERANNT AUF EINSTELLUNGEN -->
         <div id="einstellungen" class="tab-content">
             
-            <!-- NEU: SYSTEM & VERSION MIT UPDATE-ZWANG BUTTON -->
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">System &amp; Updates</h3>
-                <p class="hint">Falls eine neue Version bereitgestellt wurde, kannst du sie hier laden. Daten bleiben gespeichert. Ein Backup vorher schadet aber nicht.</p>
-                <button onclick="forceUpdateApp()" class="btn-secondary btn-animated" style="background: rgba(100, 210, 255, 0.15); color: var(--secondary); width: 100%;">
-                    🚀 Neue Version laden 🚀
-                </button>
-            </div>
-
             <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.03); margin-bottom: 20px;">
-                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü-Reihenfolge</h3>
+                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü anpassen</h3>
                 <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
                 <div id="menu-order-settings"></div>
             </div>
 
             <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--danger); margin-bottom: 5px;">Bug melden</h3>
+                <h3 style="color: var(--danger); margin-bottom: 5px;">Problem melden</h3>
                 <p class="hint">Beschreibe kurz, was passiert ist. Die App erstellt daraus automatisch eine Mail an simon@asbach.tech.</p>
                 <div class="input-group">
                     <label>Was ist passiert?</label>
@@ -960,34 +951,34 @@
             </div>
 
             <div class="card sync-disabled-card storage-safety-card">
-                <h3 class="storage-safety-title">Datensicherheit &amp; eigene Cloud</h3>
-                <p class="hint">Cyber-Sicherheit zuerst: Das komplette Projekt wird jetzt lokal in einer geschützten Browser-Datenbank gespeichert und automatisch gegen Datenverlust abgesichert.</p>
+                <h3 class="storage-safety-title">Datenspeicher &amp; Sicherung</h3>
+                <p class="hint">Deine Daten bleiben zuerst auf diesem Gerät. Hier kannst du sehen, ob automatisch gespeichert wird und bei Bedarf einen sicheren Wiederherstellungspunkt anlegen.</p>
                 <div id="storageSecurityStatus"></div>
                 <div class="btn-group storage-safety-actions">
-                    <button onclick="createManualRecoveryPoint()" class="btn-secondary btn-animated">Wiederherstellungspunkt erstellen</button>
-                    <button onclick="restoreLatestLocalSnapshot()" class="btn-secondary btn-animated">Letzten Punkt laden</button>
-                    <button onclick="clearLocalSnapshots()" class="btn-out btn-animated">Punkte löschen</button>
+                    <button onclick="createManualRecoveryPoint()" class="btn-secondary btn-animated">Sicherungspunkt erstellen</button>
+                    <button onclick="restoreLatestLocalSnapshot()" class="btn-secondary btn-animated">Letzten Sicherungspunkt laden</button>
+                    <button onclick="clearLocalSnapshots()" class="btn-out btn-animated">Alte Sicherungspunkte löschen</button>
                 </div>
                 <div class="sync-maintenance-banner storage-safety-note">
-                    <strong>Sicherheitsprinzip</strong>
-                    <span>Cloud-Sync wird nur mit minimalem Google-Drive-Scope vorbereitet. Unsichere Schnelllösungen oder breit freigegebene Drive-Rechte werden bewusst nicht eingebaut.</span>
+                    <strong>Einfach erklärt</strong>
+                    <span>Ohne Cloud bleibt alles nur auf diesem Gerät. Mit Google Drive kannst du später zusätzlich ein eigenes Online-Backup nutzen.</span>
                 </div>
             </div>
 
             <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
                 <h3 class="google-drive-sync-title">Google Drive Sync</h3>
-                <p class="hint">Sichert dein komplettes Projekt im geschützten App-Bereich deines eigenen Google-Kontos. Einfach verbinden und bei Bedarf sichern oder laden.</p>
+                <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Du kannst es später auf demselben oder auf einem anderen Gerät wieder laden.</p>
                 <div id="googleDriveSyncStatus"></div>
                 <div class="google-drive-sync-actions">
-                    <button onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google Drive verbinden</button>
-                    <button onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt in Google Drive sichern</button>
-                    <button onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Aus Google Drive laden</button>
-                    <button onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
+                    <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google Drive verbinden</button>
+                    <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt sichern</button>
+                    <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Backup laden</button>
+                    <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
                 </div>
                 <label class="google-drive-sync-toggle">
                     <span>
-                        <strong>Auto-Sync</strong>
-                        <small>Nur aktiv, solange in dieser Sitzung ein gültiger Google-Token vorhanden ist.</small>
+                        <strong>Automatisch sichern</strong>
+                        <small>Funktioniert nur, solange dein Google-Konto in dieser Sitzung verbunden ist.</small>
                     </span>
                     <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
                 </label>
@@ -1017,7 +1008,7 @@
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Produkte</h3>
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Produkte anlegen</h3>
                 <p class="hint">Lege zusätzliche Lagerartikel an. Behältergrößen bitte mit Komma trennen, zum Beispiel: 250, 500, 1000.</p>
                 <div class="input-group">
                     <label>Produktname:</label>
@@ -1029,7 +1020,7 @@
                 </div>
                 <div class="input-group">
                     <label>Neue Kategorie optional:</label>
-                    <input type="text" id="customProductNewCategory" placeholder="Nur ausfüllen, wenn neue Kategorie gewünscht">
+                    <input type="text" id="customProductNewCategory" placeholder="Nur ausfüllen, wenn du eine neue Kategorie brauchst">
                 </div>
                 <div class="input-group">
                     <label>Einheit für Behältergrößen:</label>
@@ -1052,7 +1043,7 @@
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Behälter</h3>
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Behälter &amp; Tara</h3>
                 <p class="hint">Lege Behälter mit Leergewicht an. Diese stehen danach beim Tara-Abzug zur Auswahl.</p>
                 <div class="input-group">
                     <label>Behältername:</label>
@@ -1067,13 +1058,13 @@
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ein-/ausblenden</h3>
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ausblenden</h3>
                 <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Wareneingang, Nachbestellen und Warnungen.</p>
                 <div id="product-visibility-list"></div>
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Geteilte Lager anzeigen</h3>
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Geteilte Lager</h3>
                 <p class="hint">Wähle pro Person, ob ihre geteilten Lager in deiner Lagerauswahl sichtbar sein sollen. Standard ist sichtbar.</p>
                 <div id="shared-owner-visibility-list"></div>
             </div>
@@ -1082,10 +1073,10 @@
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <details id="product-presets-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="color: var(--secondary); margin:0;">Produkt-Presets</h3>
+                        <h3 style="color: var(--secondary); margin:0;">Produktlisten speichern</h3>
                         <span class="settings-accordion-hint" id="product-presets-toggle-hint" aria-hidden="true"></span>
                     </summary>
-                    <p class="hint" style="margin-top:10px;">Speichere deine aktuellen eigenen Produkte als Preset und lade sie später wieder — z.B. für verschiedene Becken-Konfigurationen. Presets werden im Backup gespeichert.</p>
+                    <p class="hint" style="margin-top:10px;">Speichere deine eigenen Produkte als Liste und lade sie später wieder. Praktisch für verschiedene Becken oder Setups.</p>
                     <div class="input-group" style="margin-top:10px;">
                         <label>Preset-Name:</label>
                         <input type="text" id="presetNameInput" placeholder="z.B. Becken 1, Meerwasser-Setup ...">
@@ -1101,7 +1092,7 @@
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
                 <details id="shop-links-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="color: var(--success); margin:0;">Shop-Links verwalten</h3>
+                        <h3 style="color: var(--success); margin:0;">Shop-Links</h3>
                         <span class="settings-accordion-hint" id="shop-links-toggle-hint" aria-hidden="true"></span>
                     </summary>
                     <p class="hint" style="margin-top:10px;">Trage hier den vollständigen Shop-Link für jedes Produkt und jede Größe ein. Beispiel: <code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">https://osci-motion.de/product/custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter</code></p>
