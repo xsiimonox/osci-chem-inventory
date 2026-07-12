@@ -4484,6 +4484,15 @@ function getCurrentAppVersion() {
     return document.querySelector('.version-badge')?.innerText?.trim() || '';
 }
 
+const appUpdateState = {
+    supported: typeof window !== 'undefined' ? (window.location.protocol !== 'file:') : true,
+    checking: false,
+    available: false,
+    latestVersion: '',
+    lastCheckedAt: null,
+    message: ''
+};
+
 function compareVersionLabels(a, b) {
     const parse = value => String(value || '').replace(/^v/i, '').split('.').map(num => parseInt(num, 10) || 0);
     const left = parse(a);
@@ -4507,14 +4516,33 @@ function showUpdateBanner(latestVersion) {
             : 'Eine neuere App-Version kann geladen werden.';
     }
     banner.hidden = false;
+    appUpdateState.available = true;
+    appUpdateState.latestVersion = latestVersion || appUpdateState.latestVersion || '';
+    appUpdateState.message = latestVersion
+        ? `Neue Version erkannt: ${latestVersion}`
+        : 'Neue Version erkannt.';
+    appUpdateState.lastCheckedAt = new Date().toISOString();
+    renderAppUpdateStatus();
 }
 
 function hideUpdateBanner() {
     const banner = document.getElementById('update-banner');
     if (banner) banner.hidden = true;
+    appUpdateState.available = false;
+    renderAppUpdateStatus();
 }
 
 async function checkForAppUpdate(showIfCurrent = false) {
+    if (!appUpdateState.supported) {
+        appUpdateState.checking = false;
+        appUpdateState.message = 'Datei-Modus erkannt. Automatische Update-Prüfung bitte über localhost oder online nutzen.';
+        renderAppUpdateStatus();
+        if (showIfCurrent) showToast('Update-Prüfung im Datei-Modus eingeschränkt.', 'warning');
+        return;
+    }
+    appUpdateState.checking = true;
+    appUpdateState.message = 'Prüfe auf neue Versionen ...';
+    renderAppUpdateStatus();
     try {
         if ('serviceWorker' in navigator) {
             try {
@@ -4522,20 +4550,28 @@ async function checkForAppUpdate(showIfCurrent = false) {
                 if (registration) await registration.update();
             } catch (err) {}
         }
-        const response = await fetch(`index.html?version-check=${Date.now()}`, { cache: 'no-store' });
+        const response = await fetch(`version.json?check=${Date.now()}`, { cache: 'no-store' });
         if (!response.ok) return;
-        const html = await response.text();
-        const match = html.match(/class=["']version-badge["'][^>]*>\s*(v[0-9.]+)\s*</i);
-        const latest = match ? match[1] : '';
+        const data = await response.json();
+        const latest = data?.version || '';
         const current = getCurrentAppVersion();
+        appUpdateState.lastCheckedAt = new Date().toISOString();
+        appUpdateState.latestVersion = latest || current;
         if (latest && current && compareVersionLabels(latest, current) > 0) {
             showUpdateBanner(latest);
         } else {
             hideUpdateBanner();
+            appUpdateState.message = current
+                ? `Aktuell installiert: ${current}`
+                : 'App ist aktuell.';
             if (showIfCurrent) showToast('Du nutzt bereits die aktuelle Version.', 'success');
         }
     } catch (err) {
+        appUpdateState.message = 'Versionsprüfung gerade nicht möglich.';
         if (showIfCurrent) showToast('Versionsprüfung gerade nicht möglich.', 'warning');
+    } finally {
+        appUpdateState.checking = false;
+        renderAppUpdateStatus();
     }
 }
 
@@ -4587,8 +4623,71 @@ async function forceUpdateApp(ask = true) {
         }
         
         // 3. Einen harten Reload erzwingen
-        window.location.reload();
+        const url = new URL(window.location.href);
+        url.searchParams.set('refresh', String(Date.now()));
+        window.location.replace(url.toString());
     }
+}
+
+function renderAppUpdateStatus() {
+    const mount = document.getElementById('appUpdateStatus');
+    if (!mount) return;
+    const current = getCurrentAppVersion() || 'unbekannt';
+    const checked = appUpdateState.lastCheckedAt ? formatWarehouseDate(appUpdateState.lastCheckedAt) : 'noch nicht';
+    if (!appUpdateState.supported) {
+        mount.innerHTML = `
+            <div class="storage-safety-status-shell">
+                <div class="storage-safety-hero is-warning">
+                    <div>
+                        <strong>Update-Prüfung hier eingeschränkt</strong>
+                        <small>Du hast die App direkt per Datei geöffnet. Bitte nutze localhost oder die Online-Version für zuverlässige Updates.</small>
+                    </div>
+                    <span class="storage-safety-pill is-warning">Datei-Modus</span>
+                </div>
+                <div class="storage-safety-grid">
+                    <div class="storage-safety-status-card">
+                        <small>Installierte Version</small>
+                        <strong>${escapeHtml(current)}</strong>
+                        <span>Lokale Datei ohne sichere Update-Erkennung.</span>
+                    </div>
+                    <div class="storage-safety-status-card">
+                        <small>Letzte Prüfung</small>
+                        <strong>${escapeHtml(checked)}</strong>
+                        <span>Bitte per localhost oder Domain testen.</span>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    const stateLabel = appUpdateState.available ? 'Update verfügbar' : (appUpdateState.checking ? 'Prüfung läuft' : 'Aktuell');
+    const stateClass = appUpdateState.available ? 'is-warning' : (appUpdateState.checking ? '' : 'is-ready');
+    const hint = appUpdateState.message || (appUpdateState.available
+        ? 'Eine neue Version steht bereit.'
+        : 'Die App prüft automatisch weiter im Hintergrund.');
+    mount.innerHTML = `
+        <div class="storage-safety-status-shell">
+            <div class="storage-safety-hero ${stateClass}">
+                <div>
+                    <strong>${escapeHtml(stateLabel)}</strong>
+                    <small>${escapeHtml(hint)}</small>
+                </div>
+                <span class="storage-safety-pill ${stateClass}">${escapeHtml(stateLabel)}</span>
+            </div>
+            <div class="storage-safety-grid">
+                <div class="storage-safety-status-card">
+                    <small>Installierte Version</small>
+                    <strong>${escapeHtml(current)}</strong>
+                    <span>${appUpdateState.latestVersion && appUpdateState.latestVersion !== current ? `Neu erkannt: ${escapeHtml(appUpdateState.latestVersion)}` : 'Kein neuer Stand erkannt.'}</span>
+                </div>
+                <div class="storage-safety-status-card">
+                    <small>Letzte Prüfung</small>
+                    <strong>${escapeHtml(checked)}</strong>
+                    <span>Prüft beim Öffnen, bei Rückkehr und regelmäßig automatisch.</span>
+                </div>
+            </div>
+        </div>
+    `;
 }
 
 function getActiveTabId() {
@@ -11411,6 +11510,7 @@ async function bootstrapApplication() {
     showTab(startupTab);
     updateNotificationStatus();
     renderStorageSecurityStatus();
+    renderAppUpdateStatus();
     renderGoogleDriveSyncCard();
     setTimeout(() => {
         tryRestoreGoogleDriveSession();

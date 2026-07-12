@@ -1,10 +1,11 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v261';
+const CACHE_NAME = 'reef-storage-tools-cache-v262';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
+  './version.json',
   './icon.png',
   './badman.svg',
   './privacy.html',
@@ -28,8 +29,32 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
+
+  const url = new URL(e.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isFreshAsset =
+    e.request.mode === 'navigate' ||
+    ['document', 'script', 'style', 'manifest'].includes(e.request.destination) ||
+    url.pathname.endsWith('/version.json');
+
+  if (isSameOrigin && isFreshAsset) {
+    e.respondWith(
+      fetch(e.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
   e.respondWith(
-    caches.match(e.request).then((res) => res || fetch(e.request))
+    caches.match(e.request).then((cached) => cached || fetch(e.request))
   );
 });
 

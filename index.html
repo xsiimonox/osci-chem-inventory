@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=2.6.1">
+    <link rel="stylesheet" href="style.css?v=2.6.2">
 </head>
 <body>
 
@@ -24,7 +24,7 @@
         <div class="header-main">
             <div class="header-title-container">
                 <h1>Reef.Storage&Tools</h1>
-                <span class="version-badge">v2.6.1</span>
+                <span class="version-badge">v2.6.2</span>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -1223,6 +1223,20 @@
                 </div>
             </div>
 
+            <div class="card sync-disabled-card storage-safety-card" style="margin-bottom: 20px;">
+                <h3 class="storage-safety-title">App-Updates</h3>
+                <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
+                <div id="appUpdateStatus"></div>
+                <div class="btn-group storage-safety-actions">
+                    <button onclick="checkForAppUpdate(true)" class="btn-secondary btn-animated">Jetzt auf Updates prüfen</button>
+                    <button onclick="forceUpdateApp(true)" class="btn-primary btn-animated">Manuelles Update laden</button>
+                </div>
+                <div class="sync-maintenance-banner storage-safety-note">
+                    <strong>Wichtig</strong>
+                    <span>Automatische Update-Erkennung funktioniert zuverlässig über `localhost`, GitHub Pages oder deine Domain. Über `file://` ist das browserbedingt eingeschränkt.</span>
+                </div>
+            </div>
+
             <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
                 <div id="googleDriveLockState">
                     <h3 class="google-drive-sync-title">Google Drive Sync</h3>
@@ -1534,10 +1548,10 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.1"></script>
+    <script src="app.js?v=2.6.2"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js')
+            navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
                 .then(() => console.log('OSCI Motion Service Worker aktiv.'))
                 .catch(err => console.error('PWA Fehler:', err));
         }
