@@ -962,6 +962,27 @@ body.theme-mint .stock { background: rgba(100, 255, 250, 0.15); } /* Angepasst f
     text-align: right;
 }
 
+.cr-unit-preference-group {
+    margin-bottom: 12px;
+}
+
+.cr-unit-preference-group select {
+    width: 100%;
+}
+
+.cr-primary-unit {
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.98rem;
+}
+
+.cr-secondary-unit {
+    color: var(--secondary);
+    font-size: 0.76rem;
+    margin-left: 6px;
+    white-space: nowrap;
+}
+
 @media (max-width: 560px) {
     .cr-adjustment-row {
         grid-template-columns: 1fr;

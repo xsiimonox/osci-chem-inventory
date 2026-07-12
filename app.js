@@ -1118,9 +1118,6 @@ function renderLegacyDomainBanner() {
     const host = String(window.location.hostname || '').toLowerCase();
     const isLegacyHost = host === 'xsiimonox.github.io' || host.endsWith('.github.io');
     banner.hidden = !isLegacyHost;
-    if (isLegacyHost) {
-        window.location.replace('https://reeftools.de/');
-    }
 }
 
 function renderMenuOrderSettings() {
@@ -3332,6 +3329,7 @@ function showTab(tabId) {
     
     if(tabId === 'uebersicht') renderDashboard();
     if(tabId === 'lager') renderLager();
+    if(tabId === 'cr-export') syncCRPreferredUnitUI();
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') renderTraceExportInputs();
     if(tabId === 'log') renderLogs();
@@ -8549,6 +8547,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if(themeSelect && db.theme) themeSelect.value = db.theme;
     const forecastSelect = document.getElementById('forecastWeeks');
     if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
+    syncCRPreferredUnitUI();
     toggleCustomProductUnitFields();
     initBulkProductSelect();
     renderOtpCooldownState();
@@ -8687,6 +8686,45 @@ function undoLog(index, silent = false) {
 }
 
 // --- QUEUE & LISTEN VERARBEITUNG ---
+function getCRPreferredUnit() {
+    const saved = db && db.settings ? db.settings.crPreferredUnit : null;
+    return saved === 'g' ? 'g' : 'ml';
+}
+
+function syncCRPreferredUnitUI() {
+    const select = document.getElementById('crPreferredUnit');
+    if (select) select.value = getCRPreferredUnit();
+}
+
+function updateCRPreferredUnit(value) {
+    if (!db.settings) db.settings = {};
+    db.settings.crPreferredUnit = value === 'g' ? 'g' : 'ml';
+    saveDB(false);
+    syncCRPreferredUnitUI();
+    previewCRPaste();
+    renderCRPdfAdjustments();
+}
+
+function formatCRAmountValue(value, unit) {
+    return `${Number(value || 0).toFixed(2)} ${unit}`;
+}
+
+function formatCRPreferredAmountHtml(itemName, amountMl) {
+    const density = densityFactors[itemName] || 1.0;
+    const amountG = amountMl * density;
+    const preferred = getCRPreferredUnit();
+    const primaryValue = preferred === 'g' ? amountG : amountMl;
+    const primaryUnit = preferred === 'g' ? 'g' : 'ml';
+    const secondaryValue = preferred === 'g' ? amountMl : amountG;
+    const secondaryUnit = preferred === 'g' ? 'ml' : 'g';
+    const primaryText = formatCRAmountValue(primaryValue, primaryUnit);
+    const secondaryText = formatCRAmountValue(secondaryValue, secondaryUnit);
+    return {
+        html: `<strong class="cr-primary-unit">${primaryText}</strong><small class="cr-secondary-unit">(${secondaryText})</small>`,
+        plain: `${primaryText} (${secondaryText})`
+    };
+}
+
 function previewCRPaste() {
     const pasteArea = document.getElementById('cr-paste-area');
     const previewContainer = document.getElementById('cr-preview-container');
@@ -8712,23 +8750,21 @@ function previewCRPaste() {
     for (let i = 0; i < crOrder.length; i++) {
         let amountMl = parseFloat(matches[i].replace(/[^\d.]/g, ''));
         let itemName = crOrder[i].name;
-        let factor = densityFactors[itemName] || 1.0;
-        let amountG = (amountMl * factor).toFixed(2);
         let cat = crOrder[i].cat;
         let currentStock = (db.inventory[cat] && db.inventory[cat][itemName]) || 0;
         
         if (amountMl > 0) {
             let stockWarning = '';
             if (currentStock < amountMl) {
-                let missing = (amountMl - currentStock).toFixed(2);
-                stockWarning = `<span style="color: var(--danger); font-size: 0.8rem; margin-left: 8px;">⚠️ Fehlt: ${missing} ml (Bestand: ${currentStock.toFixed(1)} ml)</span>`;
+                const missingDisplay = formatCRPreferredAmountHtml(itemName, amountMl - currentStock);
+                const stockDisplay = formatCRPreferredAmountHtml(itemName, currentStock);
+                stockWarning = `<span style="color: var(--danger); font-size: 0.8rem; margin-left: 8px;">⚠️ Fehlt: ${missingDisplay.plain} (Bestand: ${stockDisplay.plain})</span>`;
             }
             html += `
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; flex-wrap: wrap; gap: 4px;">
                     <span style="color: #fff;">${itemName}${stockWarning}</span>
                     <span style="text-align: right;">
-                        <strong style="color: #fff;">${amountMl.toFixed(2)} ml</strong> 
-                        <span style="color: var(--secondary); margin-left: 8px;">(${amountG} g)</span>
+                        ${formatCRPreferredAmountHtml(itemName, amountMl).html}
                     </span>
                 </div>
             `;
@@ -9158,16 +9194,18 @@ function renderCRPdfAdjustments() {
             const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
             const isNeeded = entry.amount > 0;
             const isMissing = isNeeded && stock < entry.amount;
-            const amountG = entry.amount * (densityFactors[entry.item] || 1.0);
+            const amountDisplay = formatCRPreferredAmountHtml(entry.item, entry.amount);
+            const stockDisplay = formatCRPreferredAmountHtml(entry.item, stock);
+            const missingDisplay = isMissing ? formatCRPreferredAmountHtml(entry.item, entry.amount - stock) : null;
             return `
                 <div class="cr-adjustment-row ${isMissing ? 'missing' : ''} ${!isNeeded ? 'empty' : ''}">
                     <div>
                         <strong>${escapeHtml(entry.item)}</strong>
-                        <small>Bestand: ${stock.toFixed(1)} ml</small>
+                        <small>Bestand: ${stockDisplay.plain}</small>
                     </div>
                     <div class="cr-adjustment-amount">
-                        <strong>${entry.amount.toFixed(2)} ml</strong>
-                        <small>${amountG.toFixed(2)} g${isMissing ? ` · fehlt ${(entry.amount - stock).toFixed(2)} ml` : ''}</small>
+                        ${amountDisplay.html}
+                        <small>${isMissing ? `Fehlt: ${missingDisplay.plain}` : '&nbsp;'}</small>
                     </div>
                 </div>
             `;

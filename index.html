@@ -4,18 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Reef.Storage&Tools</title>
-    <script>
-        (function () {
-            var host = String(window.location.hostname || '').toLowerCase();
-            if (host === 'xsiimonox.github.io' || host.endsWith('.github.io')) {
-                window.location.replace('https://reeftools.de/');
-            }
-        })();
-    </script>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css?v=2.5.0">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 
@@ -86,6 +76,13 @@
             <div class="card card-accent cr-paste-card">
                 <h3>C&amp;R Liste per Copy &amp; Paste auslagern</h3>
                 <p class="hint">Füge hier die unformatierte Zeile aus C &amp; R Methode 1, 2 oder 3 ein: (von NaCl bis ml Wert unter Bor)</p>
+                <div class="input-group cr-unit-preference-group">
+                    <label>Bevorzugte Anzeige-Einheit:</label>
+                    <select id="crPreferredUnit" onchange="updateCRPreferredUnit(this.value)">
+                        <option value="ml">Milliliter (ml) zuerst</option>
+                        <option value="g">Gramm (g) zuerst</option>
+                    </select>
+                </div>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaCl MgCl2 Na2SO4 MgSO4 KCl K2SO4 KBr SrCl2 CaCl2 NaF Bor (B)  4798.13 ml 25.24 ml 0 ml 714.26 ml 89.89 ml 0 ml 25.24 ml 1.91 ml 76.02 ml 0 ml 0 ml" oninput="previewCRPaste()"></textarea>
                 
                 <div id="cr-preview-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px dashed var(--border);">
