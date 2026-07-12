@@ -1,6 +1,6 @@
 {
-  "name": "OSCI Motion Chemikalien Lagerbestand",
-  "short_name": "OSCI Lager",
+  "name": "Reef.Storage&Tools",
+  "short_name": "Reef.Storage&Tools",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#000000",
