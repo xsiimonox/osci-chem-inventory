@@ -236,8 +236,6 @@ const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik
 // This preset is always available and cannot be permanently deleted.
 // It represents the full OSCI Motion product portfolio that maps to shopLinksPreset.
 const OSCI_SHOP_PRESET_NAME = 'OSCI Motion Shop (Standard)';
-const GOOGLE_DRIVE_UNLOCK_KEY = 'osci-google-drive-unlocked';
-const GOOGLE_DRIVE_PASSWORD = 'DRIVE';
 const OSCI_SHOP_PRESET_PRODUCTS = [
     // C&R Produkte
     { name: 'Natriumchlorid (NaCl)',    cat: 'C&R Produkte', sizes: [5000, 10000], sizeUnit: 'ml', sizesOriginal: [5000, 10000], density: 1.192 },
@@ -394,6 +392,14 @@ let googleDriveTokenClient = null;
 let googleDriveAccessToken = '';
 let googleDriveTokenExpiresAt = 0;
 let googleDriveSyncTimer = null;
+let googleDriveRemoteWatchTimer = null;
+const googleDriveMonitorState = {
+    checking: false,
+    lastCheckedAt: null,
+    remoteModifiedAt: null,
+    newerRemote: false,
+    message: ''
+};
 const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
@@ -682,6 +688,64 @@ function getGoogleDriveSyncStatusMessage() {
         : 'Verbindung fuer diese Sitzung abgelaufen. Bitte erneut mit Google Drive verbinden.';
 }
 
+function getLatestLocalProjectUpdateAt() {
+    const warehouses = Object.values(appState?.warehouses || {});
+    return warehouses.reduce((latest, warehouse) => {
+        const current = new Date(warehouse?.localUpdatedAt || warehouse?.data?.localUpdatedAt || 0).getTime();
+        return Math.max(latest, Number.isFinite(current) ? current : 0);
+    }, 0);
+}
+
+function hasPendingGoogleDriveLocalChanges() {
+    const settings = getGoogleDriveSyncSettings();
+    const lastCloudSync = new Date(settings.lastSyncAt || 0).getTime();
+    return getLatestLocalProjectUpdateAt() > lastCloudSync;
+}
+
+function openGoogleDriveSyncSettings() {
+    selectTab('einstellungen');
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            document.querySelector('.google-drive-sync-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+    });
+}
+
+function renderGoogleDriveHeaderStatus() {
+    const indicator = document.getElementById('googleDriveHeaderStatus');
+    if (!indicator) return;
+    const settings = getGoogleDriveSyncSettings();
+    const connected = hasValidGoogleDriveToken();
+    const knownAccount = settings.connectedEmail || '';
+    const autoSync = settings.autoSync === true;
+    let title = 'Drive offline';
+    let subtitle = knownAccount ? `${knownAccount} · neu verbinden` : 'Nicht verbunden';
+    indicator.classList.remove('is-connected', 'is-warning');
+    if (connected) {
+        title = autoSync ? 'Drive online' : 'Drive verbunden';
+        subtitle = autoSync ? 'Auto-Sync aktiv' : 'Manuell verbunden';
+        indicator.classList.add('is-connected');
+    } else if (knownAccount) {
+        title = 'Drive pausiert';
+        subtitle = `${knownAccount} · Sitzung abgelaufen`;
+        indicator.classList.add('is-warning');
+    }
+    if (googleDriveMonitorState.newerRemote) {
+        title = 'Cloud neuer';
+        subtitle = hasPendingGoogleDriveLocalChanges()
+            ? 'Neuerer Cloud-Stand erkannt'
+            : 'Neuen Stand zum Laden bereit';
+        indicator.classList.add('is-warning');
+    }
+    indicator.innerHTML = `
+        <span class="header-sync-dot" aria-hidden="true"></span>
+        <span class="header-sync-copy">
+            <strong>${escapeHtml(title)}</strong>
+            <small>${escapeHtml(subtitle)}</small>
+        </span>
+    `;
+}
+
 function ensureGoogleIdentityScript() {
     if (!isGoogleDriveConfigured()) return Promise.resolve(false);
     if (window.google?.accounts?.oauth2) return Promise.resolve(true);
@@ -786,14 +850,25 @@ function buildProjectBackupPayload() {
 }
 
 async function findGoogleDriveBackupFileId() {
+    const metadata = await fetchGoogleDriveBackupMetadata();
+    return metadata?.id || '';
+}
+
+async function fetchGoogleDriveBackupMetadata() {
     const settings = getGoogleDriveSyncSettings();
-    if (settings.fileId) return settings.fileId;
+    if (settings.fileId) {
+        try {
+            const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(settings.fileId)}?fields=id,name,modifiedTime`);
+            const json = await response.json();
+            if (json?.id) return json;
+        } catch (err) {}
+    }
     const query = encodeURIComponent(`name='${GOOGLE_DRIVE_FILE_NAME.replace(/'/g, "\\'")}' and trashed=false`);
     const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder&fields=files(id,name,modifiedTime)`);
     const json = await response.json();
-    const fileId = json?.files?.[0]?.id || '';
-    if (fileId) storeGoogleDriveSyncSettings({ fileId });
-    return fileId;
+    const file = json?.files?.[0] || null;
+    if (file?.id) storeGoogleDriveSyncSettings({ fileId: file.id });
+    return file;
 }
 
 function buildGoogleDriveMultipartBody(metadata, content) {
@@ -835,6 +910,12 @@ async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
         fileId: saved.id || fileId || '',
         lastSyncAt
     });
+    googleDriveMonitorState.remoteModifiedAt = lastSyncAt;
+    googleDriveMonitorState.newerRemote = false;
+    googleDriveMonitorState.lastCheckedAt = lastSyncAt;
+    googleDriveMonitorState.message = trigger === 'autosync'
+        ? 'Automatisch in Google Drive aktualisiert.'
+        : 'Cloud-Stand erfolgreich aktualisiert.';
     renderGoogleDriveSyncCard();
     return { saved, lastSyncAt, trigger };
 }
@@ -858,7 +939,12 @@ async function restoreProjectBackupFromGoogleDrive() {
     await persistAppStateNow('google-drive-restore', true);
     applyTheme(db.theme || 'default', false);
     renderCurrentWarehouseViews();
-    storeGoogleDriveSyncSettings({ lastRestoreAt: new Date().toISOString(), fileId });
+    const restoredAt = new Date().toISOString();
+    storeGoogleDriveSyncSettings({ lastRestoreAt: restoredAt, fileId, lastSyncAt: parsed.exportedAt || restoredAt });
+    googleDriveMonitorState.remoteModifiedAt = parsed.exportedAt || restoredAt;
+    googleDriveMonitorState.newerRemote = false;
+    googleDriveMonitorState.lastCheckedAt = restoredAt;
+    googleDriveMonitorState.message = 'Cloud-Stand auf dieses Geraet geladen.';
     renderGoogleDriveSyncCard();
 }
 
@@ -876,10 +962,79 @@ function scheduleGoogleDriveAutoSync() {
     }, 2600);
 }
 
+function scheduleGoogleDriveRemoteWatch(delay = 6000) {
+    clearTimeout(googleDriveRemoteWatchTimer);
+    const settings = getGoogleDriveSyncSettings();
+    if (!settings.autoSync || (!hasValidGoogleDriveToken() && !settings.connectedEmail)) return;
+    googleDriveRemoteWatchTimer = setTimeout(() => {
+        checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }).catch(() => {});
+    }, Math.max(1500, delay));
+}
+
+async function checkGoogleDriveRemoteChanges({ silent = false, autoRestore = false } = {}) {
+    const settings = getGoogleDriveSyncSettings();
+    if (!isGoogleDriveConfigured() || (!settings.connectedEmail && !hasValidGoogleDriveToken())) return false;
+    googleDriveMonitorState.checking = true;
+    googleDriveMonitorState.message = 'Pruefe Google Drive auf neueren Stand ...';
+    renderGoogleDriveSyncCard();
+    try {
+        if (!hasValidGoogleDriveToken()) {
+            const restored = await tryRestoreGoogleDriveSession();
+            if (!restored) throw new Error('Google Sitzung muss fuer diese Sitzung erneut verbunden werden.');
+        }
+        const metadata = await fetchGoogleDriveBackupMetadata();
+        googleDriveMonitorState.lastCheckedAt = new Date().toISOString();
+        if (!metadata?.id) {
+            googleDriveMonitorState.remoteModifiedAt = null;
+            googleDriveMonitorState.newerRemote = false;
+            googleDriveMonitorState.message = 'Noch kein Cloud-Backup gefunden.';
+            renderGoogleDriveSyncCard();
+            scheduleGoogleDriveRemoteWatch(5 * 60 * 1000);
+            return false;
+        }
+        const remoteModifiedAt = metadata.modifiedTime || null;
+        const remoteTime = new Date(remoteModifiedAt || 0).getTime();
+        const localReference = Math.max(
+            new Date(settings.lastRestoreAt || 0).getTime(),
+            new Date(settings.lastSyncAt || 0).getTime()
+        );
+        const newerRemote = remoteTime > localReference + 1000;
+        googleDriveMonitorState.remoteModifiedAt = remoteModifiedAt;
+        googleDriveMonitorState.newerRemote = newerRemote;
+        if (newerRemote) {
+            if (autoRestore && !hasPendingGoogleDriveLocalChanges()) {
+                await restoreProjectBackupFromGoogleDrive();
+                showToast('Neuerer Cloud-Stand automatisch geladen', 'success', 2600);
+                googleDriveMonitorState.message = 'Neuerer Cloud-Stand automatisch geladen.';
+            } else {
+                googleDriveMonitorState.message = hasPendingGoogleDriveLocalChanges()
+                    ? 'In der Cloud liegt ein neuerer Stand. Erst lokale Aenderungen sichern oder manuell laden.'
+                    : 'In der Cloud liegt ein neuerer Stand zum Laden bereit.';
+                if (!silent) showToast('Neuerer Cloud-Stand erkannt', 'info', 2600);
+            }
+        } else {
+            googleDriveMonitorState.message = 'Cloud und dieses Geraet sind auf demselben Stand.';
+        }
+        renderGoogleDriveSyncCard();
+        scheduleGoogleDriveRemoteWatch(5 * 60 * 1000);
+        return newerRemote;
+    } catch (err) {
+        googleDriveMonitorState.message = `Cloud-Pruefung pausiert: ${err.message}`;
+        renderGoogleDriveSyncCard();
+        scheduleGoogleDriveRemoteWatch(8 * 60 * 1000);
+        if (!silent) alert('Google Drive Pruefung fehlgeschlagen: ' + err.message);
+        return false;
+    } finally {
+        googleDriveMonitorState.checking = false;
+        renderGoogleDriveSyncCard();
+    }
+}
+
 async function connectGoogleDriveSync() {
     try {
         await requestGoogleDriveAccessToken(true);
         renderGoogleDriveSyncCard('Google Drive verbunden.');
+        scheduleGoogleDriveRemoteWatch(4000);
         showToast('Google Drive verbunden', 'success', 2200);
     } catch (err) {
         renderGoogleDriveSyncCard(`Verbindung fehlgeschlagen: ${err.message}`);
@@ -895,6 +1050,10 @@ function disconnectGoogleDriveSync() {
     googleDriveAccessToken = '';
     googleDriveTokenExpiresAt = 0;
     clearTimeout(googleDriveSyncTimer);
+    clearTimeout(googleDriveRemoteWatchTimer);
+    googleDriveMonitorState.checking = false;
+    googleDriveMonitorState.newerRemote = false;
+    googleDriveMonitorState.message = 'Google Drive ist getrennt.';
     storeGoogleDriveSyncSettings({
         connectedEmail: '',
         autoSync: false,
@@ -908,18 +1067,25 @@ function disconnectGoogleDriveSync() {
 function toggleGoogleDriveAutoSync(enabled) {
     storeGoogleDriveSyncSettings({ autoSync: enabled === true });
     renderGoogleDriveSyncCard(enabled ? 'Auto-Sync aktiviert.' : 'Auto-Sync deaktiviert.');
-    if (enabled) scheduleGoogleDriveAutoSync();
+    if (enabled) {
+        scheduleGoogleDriveAutoSync();
+        scheduleGoogleDriveRemoteWatch(4000);
+    } else {
+        clearTimeout(googleDriveRemoteWatchTimer);
+    }
 }
 
 async function inspectGoogleDriveSyncNow() {
     try {
         if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
-        const fileId = await findGoogleDriveBackupFileId();
+        const metadata = await fetchGoogleDriveBackupMetadata();
+        const fileId = metadata?.id || '';
         const settings = getGoogleDriveSyncSettings();
         let message = 'Google Drive Verbindung geprüft.';
         if (fileId) {
             message += ` Backup gefunden.`;
             storeGoogleDriveSyncSettings({ fileId });
+            googleDriveMonitorState.remoteModifiedAt = metadata?.modifiedTime || googleDriveMonitorState.remoteModifiedAt;
         } else {
             message += ' Es wurde noch kein Backup in deinem App-Speicher gefunden.';
         }
@@ -937,6 +1103,7 @@ async function tryRestoreGoogleDriveSession() {
     try {
         await requestGoogleDriveAccessToken(false);
         renderGoogleDriveSyncCard('Google Drive Verbindung für diese Sitzung automatisch erneuert.');
+        scheduleGoogleDriveRemoteWatch(3000);
         return true;
     } catch (err) {
         renderGoogleDriveSyncCard('Bitte Google Drive Verbindung für diese Sitzung erneut öffnen.');
@@ -972,7 +1139,6 @@ async function restoreProjectFromGoogleDriveNow() {
 
 function renderGoogleDriveSyncCard(statusMessage = '') {
     const mount = document.getElementById('googleDriveSyncStatus');
-    if (!mount) return;
     const settings = getGoogleDriveSyncSettings();
     const configured = isGoogleDriveConfigured();
     const sessionConnected = hasValidGoogleDriveToken();
@@ -982,7 +1148,8 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     const lastSyncLabel = settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch nicht';
     const lastRestoreLabel = settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch nicht';
     const backupKnown = !!settings.fileId;
-    mount.innerHTML = `
+    const remoteModifiedLabel = googleDriveMonitorState.remoteModifiedAt ? formatWarehouseDate(googleDriveMonitorState.remoteModifiedAt) : 'noch nicht';
+    if (mount) mount.innerHTML = `
         <div class="google-drive-status-shell">
             <div class="google-drive-status-hero ${connected ? 'is-connected' : 'is-idle'}">
                 <div>
@@ -1007,6 +1174,11 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
                     <strong>${escapeHtml(lastRestoreLabel)}</strong>
                     <span>Zuletzt aus Google Drive auf dieses Gerät geladen</span>
                 </div>
+                <div class="google-drive-status-card">
+                    <small>Cloud-Stand</small>
+                    <strong>${escapeHtml(remoteModifiedLabel)}</strong>
+                    <span>${googleDriveMonitorState.newerRemote ? 'In der Cloud liegt ein neuerer Stand' : 'Zuletzt erkannter Stand in Google Drive'}</span>
+                </div>
             </div>
             <div class="google-drive-status-note">
                 <strong>Wichtig:</strong> Deine Backups liegen im geschützten App-Speicher von Google Drive und sind im normalen Drive-Dateibereich nicht sichtbar.
@@ -1027,9 +1199,14 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
                             <span><strong>Backup gefunden</strong><small>Wird erkannt, sobald ein Backup geladen oder gespeichert wurde.</small></span>
                             <span>${backupKnown ? 'ja' : 'nein'}</span>
                         </div>
+                        <div class="tool-row">
+                            <span><strong>Cloud-Prüfung</strong><small>Automatisch im Hintergrund, solange Auto-Sync aktiv ist.</small></span>
+                            <span>${escapeHtml(googleDriveMonitorState.message || 'Noch keine Cloud-Prüfung erfolgt.')}</span>
+                        </div>
                     </div>
                     <div class="google-drive-diagnostics-actions">
                         <button onclick="inspectGoogleDriveSyncNow()" class="btn-secondary btn-animated">Verbindung prüfen</button>
+                        <button onclick="checkGoogleDriveRemoteChanges({ silent: false, autoRestore: false })" class="btn-secondary btn-animated">Cloud-Stand prüfen</button>
                     </div>
                 </div>
             </details>
@@ -1051,6 +1228,7 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
         restoreBtn.disabled = !connected || !configured;
         restoreBtn.classList.toggle('is-disabled-soft', !connected || !configured);
     }
+    renderGoogleDriveHeaderStatus();
 }
 
 Object.assign(window, {
@@ -1060,7 +1238,9 @@ Object.assign(window, {
     inspectGoogleDriveSyncNow,
     syncProjectToGoogleDriveNow,
     restoreProjectFromGoogleDriveNow,
-    renderGoogleDriveSyncCard
+    renderGoogleDriveSyncCard,
+    openGoogleDriveSyncSettings,
+    checkGoogleDriveRemoteChanges
 });
 
 async function restoreLatestLocalSnapshot() {
@@ -3342,6 +3522,94 @@ function getDashboardMeasurementSummary(typeId, rangeValue) {
     };
 }
 
+function openDetailsAncestors(element) {
+    let current = element?.closest ? element.closest('details') : null;
+    while (current) {
+        current.open = true;
+        current = current.parentElement?.closest ? current.parentElement.closest('details') : null;
+    }
+}
+
+function focusDashboardTarget(target, { selector = '', focus = true, delay = 140 } = {}) {
+    setTimeout(() => {
+        const element = selector ? document.querySelector(selector) : null;
+        if (!element) return;
+        openDetailsAncestors(element);
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (focus && typeof element.focus === 'function') element.focus();
+    }, delay);
+}
+
+function openDashboardDestination(target, payload = '') {
+    switch (target) {
+        case 'stock':
+        case 'products':
+            selectTab('lager');
+            break;
+        case 'todos':
+            selectTab('logbuch');
+            focusDashboardTarget(target, { selector: '#todoTitle' });
+            break;
+        case 'measurement':
+            selectTab('logbuch');
+            setTimeout(() => {
+                if (payload) {
+                    const typeSelect = document.getElementById('measurementType');
+                    if (typeSelect) {
+                        typeSelect.value = payload;
+                        renderMeasurementTracker();
+                    }
+                }
+            }, 110);
+            focusDashboardTarget(target, { selector: '#measurementValue' });
+            break;
+        case 'measurement-list':
+            selectTab('logbuch');
+            setTimeout(() => {
+                if (payload) {
+                    const typeSelect = document.getElementById('measurementType');
+                    if (typeSelect) {
+                        typeSelect.value = payload;
+                        renderMeasurementTracker();
+                    }
+                }
+            }, 110);
+            focusDashboardTarget(target, { selector: '#measurementTracker', focus: false });
+            break;
+        case 'logbook-entry':
+            selectTab('logbuch');
+            setTimeout(() => {
+                const documentDetails = document.querySelector('.logbook-document-card .logbook-card-details');
+                const listDetails = document.querySelector('.logbook-document-card .logbook-list-details');
+                if (documentDetails) documentDetails.open = true;
+                if (listDetails) listDetails.open = true;
+                const list = document.getElementById('log-book-list');
+                if (list) {
+                    list.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 140);
+            break;
+        case 'protocol':
+            selectTab('log');
+            break;
+        case 'osmose':
+            selectTab('tools');
+            setTimeout(() => openToolFavorite('osmosetank-verwaltung'), 90);
+            focusDashboardTarget(target, { selector: '#osmoseTankCurrent' });
+            break;
+        case 'dosing':
+            selectTab('logbuch');
+            focusDashboardTarget(target, { selector: '#doseContainerName' });
+            break;
+        case 'corals':
+            selectTab('korallen');
+            break;
+        default:
+            selectTab('uebersicht');
+            break;
+    }
+}
+
 function createDashboardMeasurementChart(summary) {
     if (!summary || !summary.entries.length) return '<div class="dashboard-chart-empty">Noch keine Messwerte</div>';
     const entries = summary.entries;
@@ -3409,7 +3677,7 @@ function renderDashboard() {
         return sum + Object.keys(catalog[cat]).filter(item => !isProductHidden(item)).length;
     }, 0);
     const criticalRows = alerts.slice(0, 4).map(alert => `
-        <button type="button" class="dashboard-list-row" onclick="selectTab('lager'); setTimeout(() => focusProductInLager(${jsArg(alert.item)}), 80)">
+        <button type="button" class="dashboard-list-row" onclick="openDashboardDestination('stock'); setTimeout(() => focusProductInLager(${jsArg(alert.item)}), 80)">
             <span><strong>${escapeHtml(alert.item)}</strong><small>${escapeHtml(alert.cat)} · ${formatItemAmount(alert.item, alert.stock)}</small></span>
             <em>${alert.weeksLeft === null ? 'prüfen' : `${alert.weeksLeft.toFixed(1)} Wochen`}</em>
         </button>
@@ -3418,7 +3686,7 @@ function renderDashboard() {
         const summary = getDashboardMeasurementSummary(typeId, settings.range);
         if (!summary) return '';
         return `
-            <div class="dashboard-measurement-card" onclick="selectTab('logbuch')">
+            <div class="dashboard-measurement-card" onclick="openDashboardDestination('measurement-list', '${typeId}')">
                 <div class="dashboard-measurement-head">
                     <strong>${escapeHtml(summary.meta?.label || typeId)}</strong>
                     <small>${summary.latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}</small>
@@ -3468,22 +3736,22 @@ function renderDashboard() {
         <div class="card aquarium-workspace-panel dashboard-aquarium-panel" id="dashboardAquariumPanel"></div>
 
         <section class="dashboard-grid">
-            <button type="button" class="dashboard-tile ${alerts.length ? 'warn' : 'ok'}" onclick="selectTab('lager')">
+            <button type="button" class="dashboard-tile ${alerts.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('stock')">
                 <span>Bestand</span><strong>${alerts.length}</strong><small>${alerts.length ? 'Warnung(en)' : 'alles ruhig'}</small>
             </button>
-            <button type="button" class="dashboard-tile ${dueTodos.length ? 'warn' : 'ok'}" onclick="selectTab('logbuch')">
+            <button type="button" class="dashboard-tile ${dueTodos.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('todos')">
                 <span>ToDos</span><strong>${dueTodos.length}</strong><small>${dueTodos.length ? 'fällig' : 'nichts fällig'}</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="selectTab('logbuch')">
+            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('measurement')">
                 <span>Wassertest</span><strong>${lastMeasurementAt ? formatWarehouseDate(lastMeasurementAt) : 'offen'}</strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="selectTab('korallen')">
+            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('corals')">
                 <span>Korallen</span><strong>${coralCount}</strong><small>Bestand dokumentiert</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="selectTab('logbuch')">
+            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('osmose')">
                 <span>Osmose</span><strong>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} L</strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="selectTab('lager')">
+            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('products')">
                 <span>Produkte</span><strong>${activeProducts}</strong><small>sichtbar</small>
             </button>
         </section>
@@ -3539,18 +3807,18 @@ function renderDashboard() {
                 ${criticalRows || '<p class="hint">Keine kritischen Lagerwaren im aktuellen Warnzeitraum.</p>'}
             </div>` : ''}
             ${settings.widgets.todos ? `
-            <div class="dashboard-panel">
+            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('todos')">
                 <h3>Nächste Aufgabe</h3>
                 ${nextTodo ? `
                     <div class="dashboard-next">
                         <strong>${escapeHtml(nextTodo.title)}</strong>
                         <small>${escapeHtml(nextTodo.category || 'Wartung')} · ${formatWarehouseDate(nextTodo.dueAt)}</small>
-                        <button onclick="completeAquariumTodo('${nextTodo.id}')">Erledigt</button>
+                        <button onclick="event.stopPropagation(); completeAquariumTodo('${nextTodo.id}')">Erledigt</button>
                     </div>
                 ` : '<p class="hint">Keine ToDos geplant.</p>'}
             </div>` : ''}
             ${settings.widgets.logs ? `
-            <div class="dashboard-panel">
+            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('protocol')">
                 <h3>Letzte Buchung</h3>
                 <p class="hint">${escapeHtml(lastLogText)}</p>
                 <div class="dashboard-subtle-list">
@@ -3558,9 +3826,10 @@ function renderDashboard() {
                     <strong>${recentLogBookEntry ? escapeHtml(recentLogBookEntry.title || recentLogBookEntry.category) : 'Noch kein Eintrag'}</strong>
                     <small>${recentLogBookEntry ? formatWarehouseDate(recentLogBookEntry.at || recentLogBookEntry.createdAt) : ''}</small>
                 </div>
+                <button onclick="event.stopPropagation(); openDashboardDestination('logbook-entry')">Zum Logbuch</button>
             </div>` : ''}
             ${settings.widgets.osmose ? `
-            <div class="dashboard-panel">
+            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('osmose')">
                 <h3>Osmosevorrat</h3>
                 <p class="hint">${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} Litern verfügbar.</p>
                 <div class="dashboard-progress">
@@ -3568,7 +3837,7 @@ function renderDashboard() {
                 </div>
             </div>` : ''}
             ${settings.widgets.dosing ? `
-            <div class="dashboard-panel">
+            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('dosing')">
                 <h3>Vorratsbehälter</h3>
                 ${dosingCritical.length ? dosingCritical.slice(0, 3).map(entry => `
                     <div class="dashboard-subtle-list">
@@ -3578,10 +3847,10 @@ function renderDashboard() {
                 `).join('') : '<p class="hint">Aktuell kein Behälter im kritischen Bereich.</p>'}
             </div>` : ''}
             ${settings.widgets.corals ? `
-            <div class="dashboard-panel">
+            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('corals')">
                 <h3>Korallen im Fokus</h3>
                 <p class="hint">${coralCount ? `${coralCount} Korallen gespeichert und durchsuchbar.` : 'Noch keine Korallen angelegt.'}</p>
-                <button onclick="selectTab('korallen')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
+                <button onclick="event.stopPropagation(); openDashboardDestination('corals')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
             </div>` : ''}
         </section>
 
@@ -5910,7 +6179,6 @@ function initTools() {
     renderPsuCorrectionSettings();
     renderImplementationLog();
     renderCommunityMapCard();
-    syncGoogleDriveLockUI();
     updateSalinityCalculator();
     updateSimpleSalinityConverter();
     setupToolTiles();
@@ -5928,10 +6196,6 @@ function getToolSettings() {
 
 function isCustomCRUnlocked() {
     return localStorage.getItem(CUSTOM_CR_UNLOCK_KEY) === 'true';
-}
-
-function isGoogleDriveUnlocked() {
-    return localStorage.getItem(GOOGLE_DRIVE_UNLOCK_KEY) === 'true';
 }
 
 function syncCustomCRLockUI() {
@@ -5964,35 +6228,6 @@ function lockCustomCRTool() {
     localStorage.removeItem(CUSTOM_CR_UNLOCK_KEY);
     syncCustomCRLockUI();
     showToast('C&R Tool gesperrt', 'info', 2200);
-}
-
-function syncGoogleDriveLockUI() {
-    const lockState = document.getElementById('googleDriveLockState');
-    const protectedContent = document.getElementById('googleDriveProtectedContent');
-    const unlocked = isGoogleDriveUnlocked();
-    if (lockState) lockState.hidden = unlocked;
-    if (protectedContent) protectedContent.hidden = !unlocked;
-    if (unlocked) renderGoogleDriveSyncCard();
-}
-
-function unlockGoogleDriveSync() {
-    const input = document.getElementById('googleDrivePasswordInput');
-    const value = (input?.value || '').trim();
-    if (value !== GOOGLE_DRIVE_PASSWORD) {
-        showToast('Falsches Passwort', 'warning', 2600);
-        if (input) input.value = '';
-        return;
-    }
-    localStorage.setItem(GOOGLE_DRIVE_UNLOCK_KEY, 'true');
-    if (input) input.value = '';
-    syncGoogleDriveLockUI();
-    showToast('Google Drive Bereich entsperrt', 'success', 2200);
-}
-
-function lockGoogleDriveSync() {
-    localStorage.removeItem(GOOGLE_DRIVE_UNLOCK_KEY);
-    syncGoogleDriveLockUI();
-    showToast('Google Drive Bereich gesperrt', 'info', 2200);
 }
 
 function slugifyToolTitle(title) {
@@ -11527,13 +11762,16 @@ async function bootstrapApplication() {
     renderStorageSecurityStatus();
     renderAppUpdateStatus();
     renderGoogleDriveSyncCard();
+    renderGoogleDriveHeaderStatus();
     setTimeout(() => {
         tryRestoreGoogleDriveSession();
     }, 500);
     initCustomCursor();
     initLiveUpdateChecks();
     setTimeout(checkForAppUpdate, 2500);
+    setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
     setInterval(checkForAppUpdate, 30 * 60 * 1000);
+    setInterval(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 5 * 60 * 1000);
     setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
     setTimeout(checkTodoReminders, 1500);
     setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
