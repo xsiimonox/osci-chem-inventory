@@ -27,13 +27,26 @@
                     <h1>Reef.Storage&Tools</h1>
                     <span class="version-badge">v2.6.5</span>
                 </div>
-                <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Google Drive Sync Status öffnen">
-                    <span class="header-sync-dot" aria-hidden="true"></span>
-                    <span class="header-sync-copy">
-                        <strong>Drive offline</strong>
-                        <small>Nicht verbunden</small>
-                    </span>
-                </button>
+                <div class="header-cloud-bar">
+                    <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
+                        <span class="header-sync-dot" aria-hidden="true"></span>
+                        <span class="header-sync-copy">
+                            <strong>Cloud Status</strong>
+                            <small>offline</small>
+                        </span>
+                    </button>
+                    <div class="header-sync-actions-wrap">
+                        <button type="button" id="cloudQuickSyncButton" class="header-quick-sync-button" onclick="toggleCloudQuickSyncMenu()" aria-label="Schnell Sync öffnen" aria-expanded="false">
+                            Sync
+                        </button>
+                        <div id="cloudQuickSyncMenu" class="header-quick-sync-menu" hidden>
+                            <button type="button" onclick="runCloudQuickAction('upload')">Hochladen</button>
+                            <button type="button" onclick="runCloudQuickAction('download')">Herunterladen</button>
+                            <button type="button" onclick="runCloudQuickAction('check')">Prüfen</button>
+                            <button type="button" onclick="runCloudQuickAction('settings')">Einstellungen</button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
                 <div class="bar"></div>
@@ -1256,6 +1269,13 @@
                             <small>Speichert Aenderungen nach kurzer Zeit in dein Google Drive und prueft regelmaessig, ob in deiner Cloud ein neuerer Stand liegt.</small>
                         </span>
                         <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
+                    </label>
+                    <label class="google-drive-sync-toggle">
+                        <span>
+                            <strong>Automatisch an Cloud-Login erinnern</strong>
+                            <small>Wenn die Cloud offline ist, erinnert dich die App ans erneute Einloggen. Das kannst du hier oder direkt in der Meldung abschalten.</small>
+                        </span>
+                        <input type="checkbox" id="googleDriveReconnectReminder" onchange="toggleGoogleDriveReconnectReminder(this.checked)">
                     </label>
                 </div>
             </div>

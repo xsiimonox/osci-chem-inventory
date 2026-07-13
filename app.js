@@ -590,6 +590,36 @@ async function getLatestStoredSnapshot() {
     return snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
 }
 
+function getSnapshotReasonLabel(reason = '') {
+    const value = String(reason || '').toLowerCase();
+    if (value === 'manual-snapshot') return 'Manuell erstellt';
+    if (value === 'restore-snapshot') return 'Nach Wiederherstellung';
+    if (value === 'google-drive-restore') return 'Cloud geladen';
+    if (value === 'import-project') return 'Projekt importiert';
+    if (value === 'init-load') return 'Beim Laden gespeichert';
+    if (value.startsWith('save')) return 'Automatische Sicherung';
+    if (value === 'init-empty') return 'Erststart';
+    return reason ? reason : 'Sicherungspunkt';
+}
+
+function getSnapshotRelativeLabel(createdAt) {
+    if (!createdAt) return '';
+    const diffMs = Date.now() - new Date(createdAt).getTime();
+    const diffHours = diffMs / (60 * 60 * 1000);
+    if (diffHours < 24) return 'Heute';
+    if (diffHours < 48) return 'Gestern';
+    if (diffHours < (24 * 7)) return 'Diese Woche';
+    if (diffHours < (24 * 14)) return 'Letzte Woche';
+    return 'Älter';
+}
+
+function getSnapshotWarehouseLabel(snapshot) {
+    const payload = snapshot?.payload;
+    const activeId = payload?.activeWarehouseId || '';
+    const warehouse = activeId && payload?.warehouses ? payload.warehouses[activeId] : null;
+    return warehouse?.name || payload?.warehouseName || 'Projektstand';
+}
+
 async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     if (!appState) return false;
     const payload = deepClone(appState);
@@ -649,10 +679,12 @@ function getGoogleDriveSyncSettings() {
             fileId: parsed.fileId || '',
             lastSyncAt: parsed.lastSyncAt || null,
             lastRestoreAt: parsed.lastRestoreAt || null,
-            connectedEmail: parsed.connectedEmail || ''
+            connectedEmail: parsed.connectedEmail || '',
+            remindReconnect: parsed.remindReconnect !== false,
+            lastPromptAt: parsed.lastPromptAt || null
         };
     } catch (err) {
-        return { autoSync: false, fileId: '', lastSyncAt: null, lastRestoreAt: null, connectedEmail: '' };
+        return { autoSync: false, fileId: '', lastSyncAt: null, lastRestoreAt: null, connectedEmail: '', remindReconnect: true, lastPromptAt: null };
     }
 }
 
@@ -703,6 +735,7 @@ function hasPendingGoogleDriveLocalChanges() {
 }
 
 function openGoogleDriveSyncSettings() {
+    closeCloudQuickSyncMenu();
     selectTab('einstellungen');
     requestAnimationFrame(() => {
         setTimeout(() => {
@@ -718,32 +751,166 @@ function renderGoogleDriveHeaderStatus() {
     const connected = hasValidGoogleDriveToken();
     const knownAccount = settings.connectedEmail || '';
     const autoSync = settings.autoSync === true;
-    let title = 'Drive offline';
-    let subtitle = knownAccount ? `${knownAccount} · neu verbinden` : 'Nicht verbunden';
+    let subtitle = knownAccount ? `offline · ${knownAccount}` : 'offline';
     indicator.classList.remove('is-connected', 'is-warning');
     if (connected) {
-        title = autoSync ? 'Drive online' : 'Drive verbunden';
-        subtitle = autoSync ? 'Auto-Sync aktiv' : 'Manuell verbunden';
+        subtitle = autoSync ? 'online · Auto-Sync aktiv' : 'online · manuell';
         indicator.classList.add('is-connected');
     } else if (knownAccount) {
-        title = 'Drive pausiert';
-        subtitle = `${knownAccount} · Sitzung abgelaufen`;
+        subtitle = `offline · ${knownAccount}`;
         indicator.classList.add('is-warning');
     }
     if (googleDriveMonitorState.newerRemote) {
-        title = 'Cloud neuer';
         subtitle = hasPendingGoogleDriveLocalChanges()
-            ? 'Neuerer Cloud-Stand erkannt'
-            : 'Neuen Stand zum Laden bereit';
+            ? 'online · neuerer Cloud-Stand'
+            : 'online · Cloud-Update bereit';
         indicator.classList.add('is-warning');
     }
     indicator.innerHTML = `
         <span class="header-sync-dot" aria-hidden="true"></span>
         <span class="header-sync-copy">
-            <strong>${escapeHtml(title)}</strong>
+            <strong>Cloud Status</strong>
             <small>${escapeHtml(subtitle)}</small>
         </span>
     `;
+}
+
+function shouldPromptGoogleDriveReconnect() {
+    const settings = getGoogleDriveSyncSettings();
+    if (settings.remindReconnect === false) return false;
+    const lastPromptAt = new Date(settings.lastPromptAt || 0).getTime();
+    return !lastPromptAt || (Date.now() - lastPromptAt) > (15 * 60 * 1000);
+}
+
+function setGoogleDriveReconnectReminder(enabled) {
+    storeGoogleDriveSyncSettings({
+        remindReconnect: enabled !== false,
+        lastPromptAt: enabled === false ? new Date().toISOString() : null
+    });
+    renderGoogleDriveSyncCard(enabled === false ? 'Automatische Login-Erinnerung deaktiviert.' : 'Automatische Login-Erinnerung aktiviert.');
+}
+
+function showGoogleDriveReconnectPrompt(reason = '') {
+    if (!shouldPromptGoogleDriveReconnect()) return;
+    const modal = document.getElementById('modal');
+    const title = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    if (!modal || !title || !body) return;
+    storeGoogleDriveSyncSettings({ lastPromptAt: new Date().toISOString() });
+    title.innerText = 'Cloud Login nötig';
+    body.innerHTML = `
+        <div class="cloud-login-prompt">
+            <p>${escapeHtml(reason || 'Die Cloud ist gerade offline. Bitte verbinde dein Google-Konto erneut, damit Synchronisierung und Cloud-Backup wieder funktionieren.')}</p>
+            <div class="btn-group" style="flex-wrap:wrap; margin-top:12px;">
+                <button class="btn-primary btn-animated" onclick="reconnectGoogleDriveFromPrompt()">Jetzt einloggen</button>
+                <button class="btn-secondary btn-animated" onclick="closeModal()">Später</button>
+                <button class="btn-out btn-animated" onclick="disableGoogleDriveReconnectPrompt()">Nie wieder erinnern</button>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'flex';
+}
+
+async function reconnectGoogleDriveFromPrompt() {
+    closeModal();
+    await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Cloud Status' });
+}
+
+function disableGoogleDriveReconnectPrompt() {
+    setGoogleDriveReconnectReminder(false);
+    closeModal();
+    showToast('Automatische Cloud-Login-Erinnerung deaktiviert', 'info', 2600);
+}
+
+async function ensureGoogleDriveOnline({ interactive = false, showPrompt = false, reason = '' } = {}) {
+    const settings = getGoogleDriveSyncSettings();
+    if (hasValidGoogleDriveToken()) return true;
+    if (!isGoogleDriveConfigured()) return false;
+    if (settings.connectedEmail || settings.autoSync) {
+        const restored = await tryRestoreGoogleDriveSession();
+        if (restored || hasValidGoogleDriveToken()) return true;
+    }
+    if (interactive) {
+        try {
+            await requestGoogleDriveAccessToken(true);
+            renderGoogleDriveSyncCard('Google Drive Verbindung wiederhergestellt.');
+            scheduleGoogleDriveRemoteWatch(2500);
+            return true;
+        } catch (err) {
+            renderGoogleDriveSyncCard(`Verbindung fehlgeschlagen: ${err.message}`);
+        }
+    }
+    if (showPrompt) {
+        showGoogleDriveReconnectPrompt(reason || 'Cloud-Sync ist momentan offline. Bitte melde dich erneut an.');
+    }
+    return false;
+}
+
+async function refreshGoogleDrivePresence(showPrompt = false) {
+    const settings = getGoogleDriveSyncSettings();
+    if (!isGoogleDriveConfigured() || (!settings.connectedEmail && !settings.autoSync)) return false;
+    if (hasValidGoogleDriveToken()) return true;
+    return ensureGoogleDriveOnline({
+        interactive: false,
+        showPrompt,
+        reason: 'Die Cloud ist aktuell offline. Bitte melde dich erneut an, damit Synchronisierung und Wiederherstellung wieder funktionieren.'
+    });
+}
+
+async function toggleCloudQuickSyncMenu(forceOpen = null) {
+    const menu = document.getElementById('cloudQuickSyncMenu');
+    const button = document.getElementById('cloudQuickSyncButton');
+    if (!menu || !button) return;
+    const willOpen = forceOpen === null ? menu.hidden : !!forceOpen;
+    if (willOpen && !hasValidGoogleDriveToken()) {
+        const online = await ensureGoogleDriveOnline({
+            interactive: true,
+            showPrompt: true,
+            reason: 'Für den Schnell-Sync ist eine aktive Cloud-Verbindung nötig.'
+        });
+        if (!online) {
+            menu.hidden = true;
+            button.classList.remove('is-active');
+            button.setAttribute('aria-expanded', 'false');
+            return;
+        }
+    }
+    menu.hidden = !willOpen;
+    button.classList.toggle('is-active', willOpen);
+    button.setAttribute('aria-expanded', String(willOpen));
+}
+
+function closeCloudQuickSyncMenu() {
+    const menu = document.getElementById('cloudQuickSyncMenu');
+    const button = document.getElementById('cloudQuickSyncButton');
+    if (menu) menu.hidden = true;
+    if (button) {
+        button.classList.remove('is-active');
+        button.setAttribute('aria-expanded', 'false');
+    }
+}
+
+async function runCloudQuickAction(action) {
+    closeCloudQuickSyncMenu();
+    switch (action) {
+        case 'upload':
+            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Hochladen braucht die App eine aktive Cloud-Verbindung.' })) return;
+            await syncProjectToGoogleDriveNow();
+            break;
+        case 'download':
+            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Herunterladen braucht die App eine aktive Cloud-Verbindung.' })) return;
+            await restoreProjectFromGoogleDriveNow();
+            break;
+        case 'check':
+            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Für die Cloud-Prüfung braucht die App eine aktive Verbindung.' })) return;
+            await checkGoogleDriveRemoteChanges({ silent: false, autoRestore: false });
+            break;
+        case 'settings':
+            openGoogleDriveSyncSettings();
+            break;
+        default:
+            break;
+    }
 }
 
 function ensureGoogleIdentityScript() {
@@ -1032,7 +1199,8 @@ async function checkGoogleDriveRemoteChanges({ silent = false, autoRestore = fal
 
 async function connectGoogleDriveSync() {
     try {
-        await requestGoogleDriveAccessToken(true);
+        const connected = await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Bitte mit Google verbinden, damit dein Cloud-Backup wieder online ist.' });
+        if (!connected) return;
         renderGoogleDriveSyncCard('Google Drive verbunden.');
         scheduleGoogleDriveRemoteWatch(4000);
         showToast('Google Drive verbunden', 'success', 2200);
@@ -1075,6 +1243,15 @@ function toggleGoogleDriveAutoSync(enabled) {
     }
 }
 
+function toggleGoogleDriveReconnectReminder(enabled) {
+    setGoogleDriveReconnectReminder(enabled === true);
+    if (enabled) {
+        showToast('Cloud-Login-Erinnerung aktiviert', 'success', 2200);
+    } else {
+        showToast('Cloud-Login-Erinnerung deaktiviert', 'info', 2200);
+    }
+}
+
 async function inspectGoogleDriveSyncNow() {
     try {
         if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
@@ -1113,7 +1290,7 @@ async function tryRestoreGoogleDriveSession() {
 
 async function syncProjectToGoogleDriveNow() {
     try {
-        if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
+        if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Hochladen muss die Cloud-Verbindung aktiv sein.' })) return;
         await uploadProjectBackupToGoogleDrive('manual');
         renderGoogleDriveSyncCard('Projekt erfolgreich in Google Drive gesichert.');
         showToast('Projekt in Google Drive gesichert', 'success', 2400);
@@ -1126,7 +1303,7 @@ async function syncProjectToGoogleDriveNow() {
 async function restoreProjectFromGoogleDriveNow() {
     try {
         if (!confirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?')) return;
-        if (!hasValidGoogleDriveToken()) await requestGoogleDriveAccessToken(true);
+        if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Herunterladen muss die Cloud-Verbindung aktiv sein.' })) return;
         await restoreProjectBackupFromGoogleDrive();
         renderGoogleDriveSyncCard('Projekt erfolgreich aus Google Drive wiederhergestellt.');
         showToast('Google Drive Backup geladen', 'success', 2400);
@@ -1214,6 +1391,8 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     `;
     const autoEl = document.getElementById('googleDriveAutoSync');
     if (autoEl) autoEl.checked = settings.autoSync === true;
+    const reminderEl = document.getElementById('googleDriveReconnectReminder');
+    if (reminderEl) reminderEl.checked = settings.remindReconnect !== false;
     const connectBtn = document.getElementById('googleDriveConnectBtn');
     const syncBtn = document.getElementById('googleDriveSyncBtn');
     const restoreBtn = document.getElementById('googleDriveRestoreBtn');
@@ -1240,14 +1419,22 @@ Object.assign(window, {
     restoreProjectFromGoogleDriveNow,
     renderGoogleDriveSyncCard,
     openGoogleDriveSyncSettings,
-    checkGoogleDriveRemoteChanges
+    checkGoogleDriveRemoteChanges,
+    toggleGoogleDriveReconnectReminder,
+    toggleCloudQuickSyncMenu,
+    closeCloudQuickSyncMenu,
+    runCloudQuickAction,
+    reconnectGoogleDriveFromPrompt,
+    disableGoogleDriveReconnectPrompt
 });
 
-async function restoreLatestLocalSnapshot() {
-    const latest = await getLatestStoredSnapshot();
-    if (!latest || !latest.payload) return alert('Es wurde noch kein Wiederherstellungspunkt gefunden.');
-    if (!confirm(`Letzten Wiederherstellungspunkt vom ${formatWarehouseDate(latest.createdAt)} wiederherstellen? Der aktuelle Stand dieses Geräts wird ersetzt.`)) return;
-    appState = migrateToWarehouseState(latest.payload);
+async function restoreLocalSnapshot(snapshotId, ask = true) {
+    const snapshots = await idbGetAllSnapshots();
+    const snapshot = snapshots.find(entry => entry.id === snapshotId) || null;
+    if (!snapshot || !snapshot.payload) return alert('Dieser Wiederherstellungspunkt wurde nicht gefunden.');
+    const summary = `${formatWarehouseDate(snapshot.createdAt)} · ${getSnapshotReasonLabel(snapshot.reason)} · ${getSnapshotWarehouseLabel(snapshot)}`;
+    if (ask && !confirm(`Diesen Wiederherstellungspunkt wiederherstellen?\n\n${summary}\n\nDer aktuelle Stand dieses Geräts wird ersetzt.`)) return;
+    appState = migrateToWarehouseState(snapshot.payload);
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
     activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
     const active = getActiveWarehouse();
@@ -1260,10 +1447,34 @@ async function restoreLatestLocalSnapshot() {
     showToast('Wiederherstellungspunkt geladen', 'success', 2800);
 }
 
+async function restoreLatestLocalSnapshot() {
+    const latest = await getLatestStoredSnapshot();
+    if (!latest || !latest.payload) return alert('Es wurde noch kein Wiederherstellungspunkt gefunden.');
+    await restoreLocalSnapshot(latest.id, true);
+}
+
 async function createManualRecoveryPoint() {
     saveDB(false);
     await persistAppStateNow('manual-snapshot', true);
     showToast('Wiederherstellungspunkt gespeichert', 'success', 2200);
+}
+
+async function deleteLocalSnapshot(snapshotId) {
+    const snapshots = await idbGetAllSnapshots();
+    const snapshot = snapshots.find(entry => entry.id === snapshotId) || null;
+    if (!snapshot) return;
+    if (!confirm(`Diesen Sicherungspunkt löschen?\n\n${formatWarehouseDate(snapshot.createdAt)} · ${getSnapshotReasonLabel(snapshot.reason)}`)) return;
+    await idbDelete(APP_STORAGE_SNAPSHOT_STORE, snapshotId);
+    const latest = await getLatestStoredSnapshot();
+    latestSnapshotAt = latest?.createdAt || null;
+    await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
+        key: APP_STORAGE_META_KEY,
+        lastSavedAt: latestPersistAt || null,
+        lastSnapshotAt: latestSnapshotAt,
+        schema: APP_STORAGE_DB_VERSION
+    });
+    renderStorageSecurityStatus();
+    showToast('Sicherungspunkt gelöscht', 'info', 2200);
 }
 
 async function clearLocalSnapshots() {
@@ -1312,9 +1523,39 @@ async function renderStorageSecurityStatus() {
     const latestSnapshot = snapshots.length
         ? snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0]
         : null;
+    const sortedSnapshots = snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     const autosaveText = meta?.lastSavedAt ? formatWarehouseDate(meta.lastSavedAt) : (latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'noch nicht');
     const snapshotText = latestSnapshot?.createdAt ? formatWarehouseDate(latestSnapshot.createdAt) : 'noch keiner';
     const autosaveReady = Boolean(meta?.lastSavedAt || latestPersistAt);
+    const snapshotTimeline = sortedSnapshots.length
+        ? `
+            <details class="storage-snapshot-details">
+                <summary>Wiederherstellungspunkte anzeigen (${sortedSnapshots.length})</summary>
+                <div class="storage-snapshot-list">
+                    ${sortedSnapshots.map(snapshot => `
+                        <div class="storage-snapshot-item">
+                            <div class="storage-snapshot-copy">
+                                <div class="storage-snapshot-head">
+                                    <strong>${escapeHtml(formatWarehouseDate(snapshot.createdAt))}</strong>
+                                    <span>${escapeHtml(getSnapshotRelativeLabel(snapshot.createdAt))}</span>
+                                </div>
+                                <small>${escapeHtml(getSnapshotReasonLabel(snapshot.reason))} · ${escapeHtml(getSnapshotWarehouseLabel(snapshot))}</small>
+                            </div>
+                            <div class="storage-snapshot-actions">
+                                <button class="btn-secondary btn-animated" onclick="restoreLocalSnapshot('${snapshot.id}')">Wiederherstellen</button>
+                                <button class="btn-out btn-animated" onclick="deleteLocalSnapshot('${snapshot.id}')">Löschen</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </details>
+        `
+        : `
+            <div class="storage-snapshot-empty">
+                <strong>Noch keine Wiederherstellungspunkte</strong>
+                <span>Erstelle einen manuellen Sicherungspunkt oder arbeite weiter, damit automatische Punkte entstehen.</span>
+            </div>
+        `;
     mount.innerHTML = `
         <div class="storage-safety-status-shell">
             <div class="storage-safety-hero ${autosaveReady ? 'is-ready' : ''}">
@@ -1341,12 +1582,15 @@ async function renderStorageSecurityStatus() {
                     <span>Letzter Punkt: ${escapeHtml(snapshotText)}</span>
                 </div>
             </div>
+            ${snapshotTimeline}
         </div>
     `;
 }
 
 Object.assign(window, {
     restoreLatestLocalSnapshot,
+    restoreLocalSnapshot,
+    deleteLocalSnapshot,
     createManualRecoveryPoint,
     clearLocalSnapshots
 });
@@ -4738,10 +4982,16 @@ async function checkForAppUpdate(showIfCurrent = false) {
 
 function initLiveUpdateChecks() {
     const runCheck = () => checkForAppUpdate(false);
+    const runCloudRefresh = (showPrompt = false) => refreshGoogleDrivePresence(showPrompt).catch(() => {});
     window.addEventListener('focus', runCheck);
+    window.addEventListener('focus', () => runCloudRefresh(true));
     window.addEventListener('online', runCheck);
+    window.addEventListener('online', () => runCloudRefresh(true));
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) runCheck();
+        if (!document.hidden) {
+            runCheck();
+            runCloudRefresh(true);
+        }
     });
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(registration => {
@@ -6440,6 +6690,11 @@ document.addEventListener('click', event => {
     if (!card) return;
     event.preventDefault();
     toggleToolTile(card);
+});
+
+document.addEventListener('click', event => {
+    const insideQuickSync = event.target.closest?.('.header-sync-actions-wrap');
+    if (!insideQuickSync) closeCloudQuickSyncMenu();
 });
 
 const majorCorrectionDefaultSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
@@ -11769,8 +12024,10 @@ async function bootstrapApplication() {
     initCustomCursor();
     initLiveUpdateChecks();
     setTimeout(checkForAppUpdate, 2500);
+    setTimeout(() => refreshGoogleDrivePresence(false), 3200);
     setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
     setInterval(checkForAppUpdate, 30 * 60 * 1000);
+    setInterval(() => refreshGoogleDrivePresence(false), 10 * 60 * 1000);
     setInterval(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 5 * 60 * 1000);
     setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
     setTimeout(checkTodoReminders, 1500);
