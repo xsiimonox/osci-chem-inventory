@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=2.6.5">
+    <link rel="stylesheet" href="style.css?v=2.6.6">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v2.6.5</span>
+                    <span class="version-badge">v2.6.6</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1242,10 +1242,6 @@
                     <button onclick="checkForAppUpdate(true)" class="btn-secondary btn-animated">Jetzt auf Updates prüfen</button>
                     <button onclick="forceUpdateApp(true)" class="btn-primary btn-animated">Manuelles Update laden</button>
                 </div>
-                <div class="sync-maintenance-banner storage-safety-note">
-                    <strong>Wichtig</strong>
-                    <span>Automatische Update-Erkennung funktioniert zuverlässig über `localhost`, GitHub Pages oder deine Domain. Über `file://` ist das browserbedingt eingeschränkt.</span>
-                </div>
             </div>
 
             <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
@@ -1558,7 +1554,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.5"></script>
+    <script src="app.js?v=2.6.6"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

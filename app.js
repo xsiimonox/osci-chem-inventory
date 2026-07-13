@@ -4895,7 +4895,8 @@ const appUpdateState = {
     available: false,
     latestVersion: '',
     lastCheckedAt: null,
-    message: ''
+    message: '',
+    autoUpdateTimer: null
 };
 
 function compareVersionLabels(a, b) {
@@ -4928,12 +4929,23 @@ function showUpdateBanner(latestVersion) {
         : 'Neue Version erkannt.';
     appUpdateState.lastCheckedAt = new Date().toISOString();
     renderAppUpdateStatus();
+    if (!appUpdateState.autoUpdateTimer) {
+        showToast('Neue Version erkannt. Die App aktualisiert sich gleich automatisch.', 'info', 3200);
+        appUpdateState.autoUpdateTimer = setTimeout(() => {
+            appUpdateState.autoUpdateTimer = null;
+            forceUpdateApp(false);
+        }, 3500);
+    }
 }
 
 function hideUpdateBanner() {
     const banner = document.getElementById('update-banner');
     if (banner) banner.hidden = true;
     appUpdateState.available = false;
+    if (appUpdateState.autoUpdateTimer) {
+        clearTimeout(appUpdateState.autoUpdateTimer);
+        appUpdateState.autoUpdateTimer = null;
+    }
     renderAppUpdateStatus();
 }
 

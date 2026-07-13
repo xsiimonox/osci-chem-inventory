@@ -117,8 +117,8 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     box-shadow: 0 10px 30px rgba(0,0,0,0.14);
 }
 .header-sync-actions-wrap {
-    position: relative;
-    display: inline-flex;
+    display: grid;
+    gap: 8px;
 }
 .header-quick-sync-button {
     width: auto;
@@ -139,29 +139,27 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     background: linear-gradient(135deg, rgba(191,90,242,0.24), rgba(100,210,255,0.2));
 }
 .header-quick-sync-menu {
-    position: absolute;
-    top: calc(100% + 10px);
-    right: 0;
-    z-index: 2200;
-    min-width: 190px;
+    min-width: 220px;
     padding: 8px;
     display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     border-radius: 16px;
     border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(28,28,30,0.96);
-    box-shadow: 0 24px 40px rgba(0,0,0,0.28);
-    backdrop-filter: blur(22px);
-    -webkit-backdrop-filter: blur(22px);
+    background: rgba(255,255,255,0.045);
+    box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
 }
 .header-quick-sync-menu button {
     width: 100%;
     padding: 10px 12px;
-    text-align: left;
+    text-align: center;
     background: rgba(255,255,255,0.05);
     color: var(--text);
     border: 1px solid rgba(255,255,255,0.06);
     box-shadow: none;
+    min-height: 44px;
 }
 .header-quick-sync-menu button:hover {
     background: rgba(255,255,255,0.08);
@@ -3093,18 +3091,18 @@ body.theme-mint.party-mode .card {
     }
 
     .header-sync-actions-wrap {
-        flex: 0 0 auto;
+        flex: 1 1 100%;
     }
 
     .header-quick-sync-button {
+        width: 100%;
         min-width: 68px;
         padding: 8px 12px;
     }
 
     .header-quick-sync-menu {
-        right: 0;
-        left: auto;
-        min-width: 172px;
+        min-width: 0;
+        width: 100%;
     }
 
     .header-sync-copy strong {
