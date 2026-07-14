@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=2.6.7">
+    <link rel="stylesheet" href="style.css?v=2.6.8">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v2.6.7</span>
+                    <span class="version-badge">v2.6.8</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -119,21 +119,6 @@
                 <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
             </div>
 
-            <div class="card card-accent cr-pdf-card">
-                <h3>PDF-Ausgleich importieren</h3>
-                <p class="hint">Dieses Feature ist aktuell nicht verfügbar.</p>
-                <div class="cr-maintenance-warning">
-                    Der PDF-Ausgleich-Import wurde wegen Wartungsarbeiten vorübergehend deaktiviert. Bitte nutze bis zur Freigabe die manuelle C&amp;R Eingabe per Copy &amp; Paste.
-                </div>
-                <input type="file" id="cr-pdf-file" accept="application/pdf,.pdf" disabled>
-                <textarea id="cr-pdf-text" placeholder="PDF-Import wegen Wartungsarbeiten deaktiviert." disabled></textarea>
-                <div class="btn-group" style="margin-bottom: 12px;">
-                    <button class="btn-secondary btn-animated" disabled>Text auswerten</button>
-                    <button class="btn-secondary btn-animated" onclick="clearCRPdfImport()">Zurücksetzen</button>
-                </div>
-                <div id="cr-pdf-status" class="hint">PDF-Import wegen Wartungsarbeiten deaktiviert.</div>
-                <div id="cr-pdf-results"></div>
-            </div>
         </div>
 
         <div id="trace-export" class="tab-content">
@@ -1320,7 +1305,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.7"></script>
+    <script src="app.js?v=2.6.8"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

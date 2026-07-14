@@ -4630,6 +4630,43 @@ function updateTabAccessState() {
 }
 
 let menuScrollLockY = 0;
+const activeScrollLocks = new Set();
+
+function syncBodyScrollLock() {
+    const shouldLock = activeScrollLocks.size > 0;
+    if (shouldLock) {
+        if (!document.body.classList.contains('scroll-locked')) {
+            menuScrollLockY = window.scrollY || window.pageYOffset || 0;
+            document.body.classList.add('scroll-locked');
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${menuScrollLockY}px`;
+            document.body.style.left = '0';
+            document.body.style.right = '0';
+            document.body.style.width = '100%';
+        }
+        return;
+    }
+    if (!document.body.classList.contains('scroll-locked')) return;
+    document.body.classList.remove('scroll-locked');
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    window.scrollTo(0, menuScrollLockY || 0);
+}
+
+function acquireBodyScrollLock(lockId) {
+    if (!lockId) return;
+    activeScrollLocks.add(lockId);
+    syncBodyScrollLock();
+}
+
+function releaseBodyScrollLock(lockId) {
+    if (!lockId) return;
+    activeScrollLocks.delete(lockId);
+    syncBodyScrollLock();
+}
 
 function setMenuOpenState(isOpen) {
     const nav = document.getElementById('main-nav');
@@ -4637,27 +4674,17 @@ function setMenuOpenState(isOpen) {
     if (!nav || !backdrop) return;
 
     if (isOpen) {
-        menuScrollLockY = window.scrollY || window.pageYOffset || 0;
         nav.classList.add('open');
         backdrop.classList.add('open');
         document.body.classList.add('menu-open');
-        document.body.style.position = 'fixed';
-        document.body.style.top = `-${menuScrollLockY}px`;
-        document.body.style.left = '0';
-        document.body.style.right = '0';
-        document.body.style.width = '100%';
+        acquireBodyScrollLock('menu');
         return;
     }
 
     nav.classList.remove('open');
     backdrop.classList.remove('open');
     document.body.classList.remove('menu-open');
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    window.scrollTo(0, menuScrollLockY || 0);
+    releaseBodyScrollLock('menu');
 }
 
 // --- UI / MENÜ STEUERUNG ---
@@ -5209,6 +5236,13 @@ function convertInputToStoredAmount(itemName, inputUnit, amount, useTara = false
     return value;
 }
 
+function convertInputToStoredAmountAllowZero(itemName, inputUnit, amount, useTara = false, containerValue = null) {
+    const numericAmount = parseFloat(amount);
+    if (Number.isNaN(numericAmount)) return null;
+    if (numericAmount === 0) return 0;
+    return convertInputToStoredAmount(itemName, inputUnit, numericAmount, useTara, containerValue);
+}
+
 function formatConvertedInputPreview(itemName, inputUnit, amount, useTara = false, containerValue = null) {
     const converted = convertInputToStoredAmount(itemName, inputUnit, amount, useTara, containerValue);
     if (converted === null) return '';
@@ -5225,6 +5259,10 @@ function formatBidirectionalMassVolumePreview(itemName, inputUnit, amount, useTa
     if (inputUnit === 'ml') return `≈ ${(value * factor).toFixed(2)} g`;
     if (inputUnit === 'g') return `≈ ${(value / factor).toFixed(2)} ml`;
     return '';
+}
+
+function formatInventoryDeltaPreview(itemName, currentAmount, nextAmount) {
+    return `${formatItemAmount(itemName, currentAmount)} -> ${formatItemAmount(itemName, nextAmount)}`;
 }
 
 function getAllContainers() {
@@ -10007,6 +10045,7 @@ function openModal(cat, item, action) {
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
+    const currentStock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
     const unitOptions = itemUsesPieces(item)
         ? '<option value="st">Stück</option>'
         : (getItemUnit(item) === 'g'
@@ -10038,9 +10077,29 @@ function openModal(cat, item, action) {
             <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" oninput="updateLiveConversion()" style="width:100%; padding:12px;">
             <div id="liveConversion" style="margin-top: 8px; font-size: 0.9rem; color: var(--secondary); font-weight: 600; text-align: center; height: 1.2rem;"></div>
         </div>
-        <button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction()">Buchung ausführen</button>
+        ${action === 'out' ? `
+            <div class="input-group" style="margin-top:15px;">
+                <label>Neuer Lagerbestand (optional):</label>
+                <input type="number" step="0.01" id="targetAmount" placeholder="z.B. 80" oninput="updateLiveConversion()" style="width:100%; padding:12px;">
+                <div id="targetStockPreview" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted); text-align: center; min-height: 1.2rem;"></div>
+            </div>
+        ` : ''}
+        <div class="tool-result" style="margin-top:12px;">
+            <strong>Aktueller Bestand</strong><br>
+            <span id="currentStockText">${formatItemAmount(item, currentStock)}</span>
+        </div>
+        ${action === 'out'
+            ? `<div class="btn-group" style="margin-top:10px; flex-wrap:wrap;">
+                    <button class="btn-primary btn-animated" onclick="executeAction('log')">Auslagerung buchen</button>
+                    <button class="btn-secondary btn-animated" onclick="executeAction('correct')">Nur Bestand korrigieren</button>
+               </div>
+               <p class="hint" style="margin-top:8px;">Wenn du den neuen Lagerbestand einträgst, kannst du wählen, ob nur korrigiert oder die Differenz als Auslagerung protokolliert werden soll.</p>`
+            : `<button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction('log')">Buchung ausführen</button>`
+        }
     `;
     modal.style.display = 'flex';
+    acquireBodyScrollLock('modal');
+    updateLiveConversion();
 }
 
 function toggleContainerOptions() {
@@ -10053,24 +10112,37 @@ function toggleContainerOptions() {
 function updateLiveConversion() {
     const amountInput = document.getElementById('amount');
     const liveDiv = document.getElementById('liveConversion');
-    if (!amountInput || !liveDiv) return;
+    if (!amountInput || !liveDiv || !currentAction) return;
 
     let rawAmount = parseFloat(amountInput.value);
-    if (isNaN(rawAmount) || rawAmount <= 0) {
-        liveDiv.innerText = '';
-        return;
-    }
-
     let unit = document.getElementById('unitSelect').value;
     const useTara = unit === 'g' && document.getElementById('useContainer') && document.getElementById('useContainer').checked;
     const containerValue = document.getElementById('containerSelect') ? document.getElementById('containerSelect').value : null;
-    const preview = formatBidirectionalMassVolumePreview(currentAction.item, unit, rawAmount, useTara, containerValue);
-
-    if (!preview) {
+    const targetPreview = document.getElementById('targetStockPreview');
+    if (isNaN(rawAmount) || rawAmount <= 0) {
         liveDiv.innerText = '';
     } else {
+        const preview = formatBidirectionalMassVolumePreview(currentAction.item, unit, rawAmount, useTara, containerValue);
         liveDiv.innerText = preview;
         liveDiv.style.color = preview.includes('Tara') ? 'var(--danger)' : 'var(--secondary)';
+    }
+
+    if (targetPreview && currentAction.action === 'out') {
+        const targetRaw = document.getElementById('targetAmount')?.value;
+        const currentStock = (db.inventory[currentAction.cat] && db.inventory[currentAction.cat][currentAction.item]) || 0;
+        if (targetRaw === '' || targetRaw === null || targetRaw === undefined) {
+            targetPreview.innerText = '';
+        } else {
+            const targetStored = convertInputToStoredAmountAllowZero(currentAction.item, unit, targetRaw, useTara, containerValue);
+            if (targetStored === null || targetStored < 0) {
+                targetPreview.innerText = 'Neuer Lagerstand ungueltig';
+                targetPreview.style.color = 'var(--danger)';
+            } else {
+                const delta = currentStock - targetStored;
+                targetPreview.innerText = `${formatInventoryDeltaPreview(currentAction.item, currentStock, targetStored)}${delta !== 0 ? ` · Delta ${delta > 0 ? '-' : '+'}${formatItemAmount(currentAction.item, Math.abs(delta))}` : ''}`;
+                targetPreview.style.color = delta < 0 ? 'var(--warning)' : 'var(--text-muted)';
+            }
+        }
     }
 }
 
@@ -10088,7 +10160,10 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => autoSyncWarehousesOnStartup(), 900);
 });
 
-function closeModal() { document.getElementById('modal').style.display = 'none'; }
+function closeModal() {
+    document.getElementById('modal').style.display = 'none';
+    releaseBodyScrollLock('modal');
+}
 
 function showHelp(topic) {
     const texts = {
@@ -10097,21 +10172,19 @@ function showHelp(topic) {
     alert(texts[topic] || 'Für dieses Feld gibt es noch keinen Hilfetext.');
 }
 
-function executeAction() {
+function executeAction(mode = 'log') {
     if (!requireWarehouseWriteAccess('Diese Lagerbuchung')) return;
     let rawAmount = parseFloat(document.getElementById('amount').value);
     let unit = document.getElementById('unitSelect').value;
     let { cat, item, action } = currentAction;
-    
-    if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
-    
+
     const useTara = unit === 'g' && document.getElementById('useContainer') && document.getElementById('useContainer').checked;
     const containerValue = document.getElementById('containerSelect') ? document.getElementById('containerSelect').value : null;
-    let finalMl = convertInputToStoredAmount(item, unit, rawAmount, useTara, containerValue);
-
-    if (finalMl === null || finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
 
     if (action === 'in') {
+                if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
+                let finalMl = convertInputToStoredAmount(item, unit, rawAmount, useTara, containerValue);
+                if (finalMl === null || finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
                 db.inventory[cat][item] += finalMl;
                 const log = addLog(cat, item, 'in', finalMl);
                 saveDB();
@@ -10122,6 +10195,40 @@ function executeAction() {
             } 
     else {
         let stock = db.inventory[cat][item] || 0;
+        const targetAmountValue = document.getElementById('targetAmount')?.value;
+        const hasTargetAmount = targetAmountValue !== undefined && targetAmountValue !== null && String(targetAmountValue).trim() !== '';
+
+        if (hasTargetAmount) {
+            const targetStored = convertInputToStoredAmountAllowZero(item, unit, targetAmountValue, useTara, containerValue);
+            if (targetStored === null || targetStored < 0) return alert("Bitte einen gültigen neuen Lagerbestand eingeben.");
+            if (mode === 'correct') {
+                db.inventory[cat][item] = targetStored;
+                saveDB();
+                closeModal();
+                renderLager();
+                showToast(`${item}: Lagerbestand auf ${formatItemAmount(item, targetStored)} korrigiert`, 'success');
+                checkAndNotifyStockAlerts();
+                return;
+            }
+            if (targetStored > stock) {
+                return alert("Der neue Lagerbestand liegt über dem aktuellen Bestand. Bitte dafür 'Nur Bestand korrigieren' nutzen.");
+            }
+            rawAmount = stock - targetStored;
+            if (rawAmount === 0) {
+                closeModal();
+                showToast('Kein Unterschied zwischen altem und neuem Lagerbestand', 'info');
+                return;
+            }
+        } else {
+            if (mode === 'correct') {
+                return alert("Für eine reine Korrektur bitte zuerst den neuen Lagerbestand eintragen.");
+            }
+            if (isNaN(rawAmount) || rawAmount <= 0) return alert("Bitte eine gültige Menge eingeben.");
+        }
+
+        let finalMl = convertInputToStoredAmount(item, unit, rawAmount, useTara, containerValue);
+        if (finalMl === null || finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
+
         if (stock - finalMl < 0) {
             if (item === "Fluor (F)") {
                 let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
@@ -10176,6 +10283,7 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
     `;
     document.getElementById('proceed-conflict-btn').onclick = proceedCallback;
     document.getElementById('modal').style.display = 'flex';
+    acquireBodyScrollLock('modal');
 }
 
 function addLog(cat, item, action, amount) {
@@ -10289,6 +10397,8 @@ function previewCRPaste() {
         
         if (amountMl > 0) {
             let stockWarning = '';
+            const newStock = Math.max(0, currentStock - amountMl);
+            const newStockDisplay = formatCRPreferredAmountHtml(itemName, newStock);
             if (currentStock < amountMl) {
                 const missingDisplay = formatCRPreferredAmountHtml(itemName, amountMl - currentStock);
                 const stockDisplay = formatCRPreferredAmountHtml(itemName, currentStock);
@@ -10299,6 +10409,7 @@ function previewCRPaste() {
                     <span style="color: #fff;">${itemName}${stockWarning}</span>
                     <span style="text-align: right;">
                         ${formatCRPreferredAmountHtml(itemName, amountMl).html}
+                        <small style="display:block; color: var(--text-muted); margin-top: 2px;">Neu: ${newStockDisplay.plain}</small>
                     </span>
                 </div>
             `;
@@ -10728,14 +10839,16 @@ function renderCRPdfAdjustments() {
             const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
             const isNeeded = entry.amount > 0;
             const isMissing = isNeeded && stock < entry.amount;
+            const newStock = Math.max(0, stock - entry.amount);
             const amountDisplay = formatCRPreferredAmountHtml(entry.item, entry.amount);
             const stockDisplay = formatCRPreferredAmountHtml(entry.item, stock);
+            const newStockDisplay = formatCRPreferredAmountHtml(entry.item, newStock);
             const missingDisplay = isMissing ? formatCRPreferredAmountHtml(entry.item, entry.amount - stock) : null;
             return `
                 <div class="cr-adjustment-row ${isMissing ? 'missing' : ''} ${!isNeeded ? 'empty' : ''}">
                     <div>
                         <strong>${escapeHtml(entry.item)}</strong>
-                        <small>Bestand: ${stockDisplay.plain}</small>
+                        <small>Bestand: ${stockDisplay.plain} · Neu: ${newStockDisplay.plain}</small>
                     </div>
                     <div class="cr-adjustment-amount">
                         ${amountDisplay.html}
@@ -12377,6 +12490,7 @@ function showQuickPreview(item, category) {
     
     document.body.appendChild(backdrop);
     document.body.appendChild(preview);
+    acquireBodyScrollLock('quick-preview');
     setTimeout(() => {
         backdrop.classList.add('active');
         preview.classList.add('active');
@@ -12389,6 +12503,7 @@ function closeQuickPreview() {
     const preview = document.querySelector('.quick-preview');
     if (backdrop) backdrop.classList.remove('active');
     if (preview) preview.classList.remove('active');
+    releaseBodyScrollLock('quick-preview');
     setTimeout(() => {
         if (backdrop) backdrop.remove();
         if (preview) preview.remove();
