@@ -40,9 +40,8 @@
                             Sync
                         </button>
                         <div id="cloudQuickSyncMenu" class="header-quick-sync-menu" hidden>
-                            <button type="button" onclick="runCloudQuickAction('upload')">Hochladen</button>
-                            <button type="button" onclick="runCloudQuickAction('download')">Herunterladen</button>
-                            <button type="button" onclick="runCloudQuickAction('check')">Prüfen</button>
+                            <button type="button" onclick="runCloudQuickAction('download')">Download</button>
+                            <button type="button" onclick="runCloudQuickAction('upload')">Upload</button>
                             <button type="button" onclick="runCloudQuickAction('settings')">Einstellungen</button>
                         </div>
                     </div>
@@ -189,8 +188,8 @@
                 <div class="card tools-hub-card">
                     <div class="tools-hub-head">
                         <div>
-                            <h3>Tool Hub</h3>
-                            <p class="hint">Erst Thema wählen, dann das passende Tool öffnen. So bleibt auch bei vielen Rechnern alles schnell auffindbar.</p>
+                            <h3>Tools</h3>
+                            <p class="hint">Suche direkt nach einem Rechner oder öffne den passenden Arbeitsbereich darunter.</p>
                         </div>
                     </div>
                     <div class="tools-command-bar">
@@ -206,33 +205,11 @@
                             <div class="tool-favorites-list" id="toolFavoritesList"></div>
                         </div>
                     </div>
-                    <div class="tools-section-jump-grid">
-                        <button type="button" class="tools-section-jump" onclick="openToolSection('dosieren-und-messwerte')">
-                            <strong>Dosieren &amp; Messwerte</strong>
-                            <span>Korrektur, Verbrauch und Nährstoffe</span>
-                        </button>
-                        <button type="button" class="tools-section-jump" onclick="openToolSection('salinitaet-und-wasserwechsel')">
-                            <strong>Salinität &amp; Wasserwechsel</strong>
-                            <span>PSU, Dichte und Wasserwechsel</span>
-                        </button>
-                        <button type="button" class="tools-section-jump" onclick="openToolSection('c-und-r-und-mischen')">
-                            <strong>C&amp;R &amp; Mischen</strong>
-                            <span>Ausgleich, Meerwasser und Makros</span>
-                        </button>
-                        <button type="button" class="tools-section-jump" onclick="openToolSection('alltag-und-versorgung')">
-                            <strong>Alltag &amp; Versorgung</strong>
-                            <span>Futter, Osmose und Strömung</span>
-                        </button>
-                        <button type="button" class="tools-section-jump" onclick="openToolSection('community-und-hilfe')">
-                            <strong>Community &amp; Hilfe</strong>
-                            <span>OSCI Links und Community Map</span>
-                        </button>
-                    </div>
                 </div>
 
                 <details class="tool-section" data-section-id="dosieren-und-messwerte">
                     <summary class="tool-section-summary">
-                        <span><strong>Dosieren &amp; Messwerte</strong><small>Werte korrigieren, Verbrauch abschätzen und Heimtests sauber einordnen</small></span>
+                        <span><strong>Dosierung &amp; Analyse</strong><small>Korrektur, Verbrauch, Testabgleich und gezielte Nährstoffzugabe</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -371,7 +348,7 @@
 
                 <details class="tool-section" data-section-id="salinitaet-und-wasserwechsel">
                     <summary class="tool-section-summary">
-                        <span><strong>Salinität &amp; Wasserwechsel</strong><small>PSU, Dichte, Wasserwechsel-Effekt und Salzkorrektur</small></span>
+                        <span><strong>Salinität &amp; Wasserwechsel</strong><small>PSU, Dichte, Salzkorrektur und rechnerischer Wechsel-Effekt</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -440,7 +417,7 @@
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>Salz Korrektur <button type="button" class="tool-inline-fav" data-tool-id="salz-korrektur">☆ Fav</button></h3>
+                            <h3>Salzgehalt Korrigieren <button type="button" class="tool-inline-fav" data-tool-id="salz-korrektur">☆ Fav</button></h3>
                             <p class="hint">Näherung für PSU-Korrektur. Langsam angleichen und Messung kontrollieren.</p>
                             <div class="tool-grid">
                                 <div class="input-group">
@@ -487,56 +464,10 @@
 
                 <details class="tool-section" data-section-id="c-und-r-und-mischen">
                     <summary class="tool-section-summary">
-                        <span><strong>C&amp;R &amp; Mischen</strong><small>Ausgleich, Meerwasser, Makros und C&amp;R Natriumchlorid</small></span>
+                        <span><strong>C&amp;R &amp; Mischrezepte</strong><small>Ausgleich planen, Meerwasser ansetzen und Lösungen mischen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>C&amp;R Ausgleich erstellen <button type="button" class="tool-inline-fav" data-tool-id="c-und-r-ausgleich-erstellen">☆ Fav</button></h3>
-                            <div class="tool-experimental-banner">
-                                <strong>Ungetestet &amp; experimentell</strong>
-                                <span>Dieses C&amp;R Tool ist noch nicht freigegeben. Jede Berechnung muss manuell geprüft werden.</span>
-                            </div>
-                            <p class="hint">Eigene Ist- und Sollwerte eintragen. Der Rechner schätzt Wasserentnahme, Reinstwasser und passende C&amp;R-Mengen. Ergebnis bitte immer gegenprüfen.</p>
-                            <div id="customCrLockState">
-                                <div class="tool-grid">
-                                    <div class="input-group">
-                                        <label>Passwort zum Entsperren:</label>
-                                        <input type="password" id="customCrPasswordInput" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') unlockCustomCRTool()">
-                                    </div>
-                                </div>
-                                <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
-                                    <button class="btn-secondary btn-animated" onclick="unlockCustomCRTool()">Tool entsperren</button>
-                                    <button class="btn-out btn-animated" onclick="lockCustomCRTool()">Sperre aktiv lassen</button>
-                                </div>
-                            </div>
-                            <div id="customCrProtectedContent" class="custom-cr-protected-content" hidden>
-                                <div class="tool-grid">
-                                    <div class="input-group">
-                                        <label>Aquariumgröße (L):</label>
-                                        <input type="number" id="customCrTankLiters" min="1" step="1" value="770" oninput="renderCustomCRPlanner()">
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Vorher-PSU:</label>
-                                        <input type="number" id="customCrCurrentPsu" min="20" step="0.1" value="34.0" oninput="renderCustomCRPlanner()">
-                                    </div>
-                                    <div class="input-group">
-                                        <label>Ziel-PSU:</label>
-                                        <input type="number" id="customCrTargetPsu" min="20" step="0.1" value="34.5" oninput="renderCustomCRPlanner()">
-                                    </div>
-                                </div>
-                                <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
-                                    <button class="btn-secondary btn-animated" onclick="loadCustomCRExample()">Beispiel laden</button>
-                                    <button class="btn-secondary btn-animated" onclick="loadCustomCROptimalTargets()">Optimale Zielwerte laden</button>
-                                    <button class="btn-out btn-animated" onclick="lockCustomCRTool()">Wieder sperren</button>
-                                </div>
-                                <div id="customCrLimitsMatrix"></div>
-                                <div id="customCrPlannerMatrix"></div>
-                                <div id="customCrPlannerResult"></div>
-                                <div id="customCrSavedPlans"></div>
-                            </div>
-                        </div>
-
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Meerwasser aus C&amp;R anmischen <button type="button" class="tool-inline-fav" data-tool-id="meerwasser-aus-c-und-r-anmischen">☆ Fav</button></h3>
                             <p class="hint">Rezept skaliert auf deine gewünschte Meerwassermenge. C&amp;R- und Makro-Produkte können direkt ausgelagert werden.</p>
@@ -597,107 +528,9 @@
                     </div>
                 </details>
 
-                <details class="tool-section" data-section-id="alltag-und-versorgung">
-                    <summary class="tool-section-summary">
-                        <span><strong>Alltag &amp; Versorgung</strong><small>Praktische Helfer für Fütterung, Osmose und Technik</small></span>
-                        <span class="settings-accordion-hint" aria-hidden="true"></span>
-                    </summary>
-                    <div class="tool-card-grid">
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>Futter &amp; Nährstoffnotizen <button type="button" class="tool-inline-fav" data-tool-id="futter-und-naehrstoffnotizen">☆ Fav</button></h3>
-                            <p class="hint">Fütterung zusammen mit NO3/PO4 dokumentieren, um Muster besser zu erkennen.</p>
-                            <div class="tool-grid">
-                                <div class="input-group">
-                                    <label>Datum:</label>
-                                    <input type="datetime-local" id="feedLogDate">
-                                </div>
-                                <div class="input-group">
-                                    <label>Futter / Ereignis:</label>
-                                    <input type="text" id="feedLogFood" placeholder="z.B. Frostfutter, Pellets, Korallenfutter">
-                                </div>
-                                <div class="input-group">
-                                    <label>Menge:</label>
-                                    <input type="text" id="feedLogAmount" placeholder="z.B. 1 Würfel, 2 Prisen">
-                                </div>
-                                <div class="input-group">
-                                    <label>NO3 (mg/l):</label>
-                                    <input type="number" id="feedLogNo3" step="0.01">
-                                </div>
-                                <div class="input-group">
-                                    <label>PO4 (mg/l):</label>
-                                    <input type="number" id="feedLogPo4" step="0.01">
-                                </div>
-                            </div>
-                            <div class="input-group">
-                                <label>Notiz:</label>
-                                <textarea id="feedLogNote" placeholder="Beobachtungen, Reaktion der Tiere, Besonderheiten"></textarea>
-                            </div>
-                            <button class="btn-secondary btn-animated" onclick="saveFeedNutrientLog()">Eintrag speichern</button>
-                            <div id="feedNutrientLogResult"></div>
-                        </div>
-
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>Osmosetank Verwaltung <button type="button" class="tool-inline-fav" data-tool-id="osmosetank-verwaltung">☆ Fav</button></h3>
-                            <p class="hint">Tankgröße und Füllstand pflegen, Verbrauch dokumentieren und rechtzeitig vor leerem Tank warnen lassen.</p>
-                            <div class="tool-grid">
-                                <div class="input-group">
-                                    <label>Tankgröße (L):</label>
-                                    <input type="number" id="osmoseTankCapacity" min="1" step="1" value="50" oninput="updateOsmoseTankSettings()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Aktueller Füllstand (L):</label>
-                                    <input type="number" id="osmoseTankCurrent" min="0" step="0.1" value="50" oninput="updateOsmoseTankSettings()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Warnung vor leer (Tage):</label>
-                                    <input type="number" id="osmoseTankWarnDays" min="0" step="1" value="2" oninput="updateOsmoseTankSettings()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Verbrauch dokumentieren (L):</label>
-                                    <input type="number" id="osmoseTankUsageLiters" min="0" step="0.1" placeholder="z.B. 5">
-                                </div>
-                            </div>
-                            <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
-                                <button class="btn-secondary btn-animated" onclick="addOsmoseTankUsage()">Verbrauch speichern</button>
-                                <button class="btn-in btn-animated" onclick="fillOsmoseTank()">Tank gefüllt</button>
-                                <button class="btn-secondary btn-animated" onclick="enableStockNotifications()">Push aktivieren</button>
-                            </div>
-                            <div id="osmoseTankResult"></div>
-                        </div>
-
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>Pumpen &amp; Strömung <button type="button" class="tool-inline-fav" data-tool-id="stroemungsumsatz">☆ Fav</button></h3>
-                            <p class="hint">Pumpenleistung addieren und sehen, wie oft das Becken rechnerisch pro Stunde umgewälzt wird.</p>
-                            <div class="tool-grid">
-                                <div class="input-group">
-                                    <label>Beckenvolumen (L):</label>
-                                    <input type="number" id="flowTankLiters" min="1" step="1" value="100" oninput="renderFlowCalculator()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Pumpe 1 (L/h):</label>
-                                    <input type="number" id="flowPump1" min="0" step="100" value="3000" oninput="renderFlowCalculator()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Pumpe 2 (L/h):</label>
-                                    <input type="number" id="flowPump2" min="0" step="100" value="3000" oninput="renderFlowCalculator()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Pumpe 3 (L/h):</label>
-                                    <input type="number" id="flowPump3" min="0" step="100" value="0" oninput="renderFlowCalculator()">
-                                </div>
-                                <div class="input-group">
-                                    <label>Pumpe 4 (L/h):</label>
-                                    <input type="number" id="flowPump4" min="0" step="100" value="0" oninput="renderFlowCalculator()">
-                                </div>
-                            </div>
-                            <div id="flowCalculatorResult"></div>
-                        </div>
-                    </div>
-                </details>
-
                 <details class="tool-section" data-section-id="community-und-hilfe">
                     <summary class="tool-section-summary">
-                        <span><strong>Community &amp; Hilfe</strong><small>Offizielle OSCI Links und die freiwillige Community Map</small></span>
+                        <span><strong>Ressourcen &amp; Community</strong><small>Offizielle OSCI Links und die freiwillige Community Map</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -947,6 +780,42 @@
                             <button class="btn-in btn-animated" onclick="fillSelectedDosingContainer()">Ausgewählten auffüllen</button>
                         </div>
                         <div id="dosingContainerResult"></div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="card logbook-card logbook-osmose-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Osmosetank</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <p class="hint">Tankgröße und Füllstand pflegen, Verbrauch dokumentieren und rechtzeitig vor leerem Tank warnen lassen.</p>
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label>Tankgröße (L):</label>
+                                <input type="number" id="osmoseTankCapacity" min="1" step="1" value="50" oninput="updateOsmoseTankSettings()">
+                            </div>
+                            <div class="input-group">
+                                <label>Aktueller Füllstand (L):</label>
+                                <input type="number" id="osmoseTankCurrent" min="0" step="0.1" value="50" oninput="updateOsmoseTankSettings()">
+                            </div>
+                            <div class="input-group">
+                                <label>Warnung vor leer (Tage):</label>
+                                <input type="number" id="osmoseTankWarnDays" min="0" step="1" value="2" oninput="updateOsmoseTankSettings()">
+                            </div>
+                            <div class="input-group">
+                                <label>Verbrauch dokumentieren (L):</label>
+                                <input type="number" id="osmoseTankUsageLiters" min="0" step="0.1" placeholder="z.B. 5">
+                            </div>
+                        </div>
+                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <button class="btn-secondary btn-animated" onclick="addOsmoseTankUsage()">Verbrauch speichern</button>
+                            <button class="btn-in btn-animated" onclick="fillOsmoseTank()">Tank gefüllt</button>
+                            <button class="btn-secondary btn-animated" onclick="enableStockNotifications()">Push aktivieren</button>
+                        </div>
+                        <div id="osmoseTankResult"></div>
                     </div>
                 </details>
             </div>

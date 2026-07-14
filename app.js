@@ -893,17 +893,13 @@ function closeCloudQuickSyncMenu() {
 async function runCloudQuickAction(action) {
     closeCloudQuickSyncMenu();
     switch (action) {
-        case 'upload':
-            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Hochladen braucht die App eine aktive Cloud-Verbindung.' })) return;
-            await syncProjectToGoogleDriveNow();
-            break;
         case 'download':
-            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Herunterladen braucht die App eine aktive Cloud-Verbindung.' })) return;
+            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Download braucht die App eine aktive Cloud-Verbindung.' })) return;
             await restoreProjectFromGoogleDriveNow();
             break;
-        case 'check':
-            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Für die Cloud-Prüfung braucht die App eine aktive Verbindung.' })) return;
-            await checkGoogleDriveRemoteChanges({ silent: false, autoRestore: false });
+        case 'upload':
+            if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Upload braucht die App eine aktive Cloud-Verbindung.' })) return;
+            await syncProjectToGoogleDriveNow();
             break;
         case 'settings':
             openGoogleDriveSyncSettings();
