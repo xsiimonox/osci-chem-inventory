@@ -204,7 +204,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
-const coralUiState = { editingId: null, pendingPhotoData: '', selectedId: null };
+const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null };
 const CORAL_STATUS_OPTIONS = [
     { value: 'neuzugang', label: 'Neuzugang' },
     { value: 'bestand', label: 'Bestandskoralle' },
@@ -4143,6 +4143,13 @@ function getCoralOptionalDisplayName(coral = null) {
     return getCoralDisplayName(coral);
 }
 
+function getCoralPhotoList(coral = null) {
+    if (!coral) return [];
+    if (Array.isArray(coral.photoGallery) && coral.photoGallery.length) return coral.photoGallery.filter(Boolean);
+    if (coral.photoDataUrl) return [coral.photoDataUrl];
+    return [];
+}
+
 function getMotherCoralOptions(currentId = '') {
     return getCoralCatalog()
         .filter(entry => entry.id !== currentId)
@@ -4169,92 +4176,56 @@ function updateCoralMotherFieldVisibility() {
 }
 
 function getCoralFormData() {
+    const scientificName = (document.getElementById('coralScientificName')?.value || '').trim();
+    const tradeName = (document.getElementById('coralTradeName')?.value || '').trim();
     return {
-        name: (document.getElementById('coralName')?.value || '').trim(),
-        scientificName: (document.getElementById('coralScientificName')?.value || '').trim(),
+        name: tradeName || scientificName || 'Koralle',
+        scientificName,
         genus: (document.getElementById('coralGenus')?.value || '').trim(),
         speciesName: (document.getElementById('coralSpeciesName')?.value || '').trim(),
-        species: (document.getElementById('coralSpecies')?.value || '').trim(),
+        species: scientificName,
         coralType: document.getElementById('coralType')?.value || '',
-        tradeName: (document.getElementById('coralTradeName')?.value || '').trim(),
-        origin: document.getElementById('coralOrigin')?.value || '',
-        location: (document.getElementById('coralLocation')?.value || '').trim(),
-        status: normalizeCoralStatus(document.getElementById('coralStatus')?.value || 'bestand'),
-        motherCoralId: document.getElementById('coralMotherId')?.value || '',
-        addedAt: document.getElementById('coralAddedAt')?.value || '',
-        lightNeed: document.getElementById('coralLightNeed')?.value || '',
-        parRange: (document.getElementById('coralParRange')?.value || '').trim(),
-        flowNeed: document.getElementById('coralFlowNeed')?.value || '',
-        flowType: document.getElementById('coralFlowType')?.value || '',
-        difficulty: document.getElementById('coralDifficulty')?.value || '',
-        placement: document.getElementById('coralPlacement')?.value || '',
-        growthSpeed: document.getElementById('coralGrowthSpeed')?.value || '',
+        tradeName,
+        status: normalizeCoralStatus('bestand'),
+        motherCoralId: '',
+        addedAt: '',
         growthForm: document.getElementById('coralGrowthForm')?.value || '',
-        aggression: document.getElementById('coralAggression')?.value || '',
-        minDistance: (document.getElementById('coralMinDistance')?.value || '').trim(),
-        note: (document.getElementById('coralNote')?.value || '').trim()
+        color: (document.getElementById('coralColor')?.value || '').trim(),
+        note: ''
     };
 }
 
 function applyCoralFormData(data = {}) {
     const map = {
-        coralName: data.name || '',
         coralScientificName: data.scientificName || '',
         coralGenus: data.genus || '',
         coralSpeciesName: data.speciesName || '',
-        coralSpecies: data.species || '',
         coralType: data.coralType || '',
         coralTradeName: data.tradeName || '',
-        coralOrigin: data.origin || '',
-        coralLocation: data.location || '',
-        coralStatus: normalizeCoralStatus(data.status || 'bestand'),
-        coralAddedAt: data.addedAt || '',
-        coralLightNeed: data.lightNeed || '',
-        coralParRange: data.parRange || '',
-        coralFlowNeed: data.flowNeed || '',
-        coralFlowType: data.flowType || '',
-        coralDifficulty: data.difficulty || '',
-        coralPlacement: data.placement || '',
-        coralGrowthSpeed: data.growthSpeed || '',
         coralGrowthForm: data.growthForm || '',
-        coralAggression: data.aggression || '',
-        coralMinDistance: data.minDistance || '',
-        coralNote: data.note || ''
+        coralColor: data.color || ''
     };
     Object.entries(map).forEach(([id, value]) => {
         const el = document.getElementById(id);
         if (el) el.value = value;
     });
-    renderMotherCoralOptions(data.motherCoralId || '', data.id || coralUiState.editingId || '');
-    updateCoralMotherFieldVisibility();
 }
 
 function resetCoralForm() {
     coralUiState.editingId = null;
-    coralUiState.pendingPhotoData = '';
-    ['coralName', 'coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralSpecies', 'coralTradeName', 'coralLocation', 'coralAddedAt', 'coralParRange', 'coralMinDistance', 'coralNote', 'coralSearch'].forEach(id => {
+    coralUiState.pendingPhotos = [];
+    ['coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralTradeName', 'coralColor', 'coralSearch'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'coralSearch') el.value = '';
     });
     const defaultSelects = {
-        coralStatus: 'bestand',
         coralType: '',
-        coralOrigin: '',
-        coralLightNeed: '',
-        coralFlowNeed: '',
-        coralFlowType: '',
-        coralDifficulty: '',
-        coralPlacement: '',
-        coralGrowthSpeed: '',
-        coralGrowthForm: '',
-        coralAggression: ''
+        coralGrowthForm: ''
     };
     Object.entries(defaultSelects).forEach(([id, value]) => {
         const el = document.getElementById(id);
         if (el) el.value = value;
     });
-    renderMotherCoralOptions('', '');
-    updateCoralMotherFieldVisibility();
     ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
@@ -4266,25 +4237,30 @@ function resetCoralForm() {
 function renderCoralPhotoPreview(dataUrl = '') {
     const preview = document.getElementById('coralPhotoPreview');
     if (!preview) return;
-    preview.innerHTML = dataUrl
-        ? `<img src="${dataUrl}" alt="Korallenfoto Vorschau">`
+    const photos = Array.isArray(dataUrl) ? dataUrl : (dataUrl ? [dataUrl] : []);
+    preview.innerHTML = photos.length
+        ? photos.map((url, index) => `<img src="${url}" alt="Korallenfoto ${index + 1}">`).join('')
         : '<span>Noch kein Foto gewählt</span>';
 }
 
 function handleCoralPhotoSelection(event) {
-    const file = event?.target?.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-        coralUiState.pendingPhotoData = typeof reader.result === 'string' ? reader.result : '';
-        renderCoralPhotoPreview(coralUiState.pendingPhotoData);
-    };
-    reader.readAsDataURL(file);
+    const files = Array.from(event?.target?.files || []).filter(Boolean);
+    if (!files.length) return;
+    Promise.all(files.map(file => new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+    }))).then(results => {
+        const newPhotos = results.filter(Boolean);
+        coralUiState.pendingPhotos = [...coralUiState.pendingPhotos, ...newPhotos];
+        renderCoralPhotoPreview(coralUiState.pendingPhotos);
+    });
 }
 
 function clearCoralPhoto() {
-    coralUiState.pendingPhotoData = '';
-    renderCoralPhotoPreview('');
+    coralUiState.pendingPhotos = [];
+    renderCoralPhotoPreview([]);
     ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
         const input = document.getElementById(id);
         if (input) input.value = '';
@@ -4293,13 +4269,14 @@ function clearCoralPhoto() {
 
 function saveCoralEntry() {
     const form = getCoralFormData();
-    if (!form.name) return alert('Bitte gib der Koralle mindestens einen Namen.');
-    if (form.status !== 'ableger') form.motherCoralId = '';
+    if (!form.scientificName && !form.tradeName) return alert('Bitte gib mindestens einen wissenschaftlichen Namen oder einen Handelsnamen ein.');
     const target = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
-    const photo = coralUiState.pendingPhotoData || target?.photoDataUrl || '';
+    const photoGallery = coralUiState.pendingPhotos.length ? [...coralUiState.pendingPhotos] : getCoralPhotoList(target);
+    const photo = photoGallery[0] || '';
     if (target) {
         Object.assign(target, {
             ...form,
+            photoGallery,
             photoDataUrl: photo,
             updatedAt: new Date().toISOString()
         });
@@ -4308,6 +4285,7 @@ function saveCoralEntry() {
         getCoralCatalog().unshift({
             id: createWarehouseId(),
             ...form,
+            photoGallery,
             photoDataUrl: photo,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -4325,10 +4303,10 @@ function editCoralEntry(id) {
     const coral = getCoralById(id);
     if (!coral) return;
     coralUiState.editingId = id;
-    coralUiState.pendingPhotoData = coral.photoDataUrl || '';
+    coralUiState.pendingPhotos = getCoralPhotoList(coral);
     applyCoralFormData(coral);
-    renderCoralPhotoPreview(coral.photoDataUrl || '');
-    document.getElementById('coralName')?.focus();
+    renderCoralPhotoPreview(coralUiState.pendingPhotos);
+    document.getElementById('coralScientificName')?.focus();
 }
 
 function archiveCoralTransfer(id) {
@@ -4389,14 +4367,10 @@ function renderCoralCatalog() {
         .filter(entry => statusFilter === 'all' || entry.status === statusFilter)
         .filter(entry => {
             if (!search) return true;
-            return [entry.name, entry.species, entry.location, entry.note, entry.tradeName, entry.scientificName].join(' ').toLowerCase().includes(search);
+            return [entry.name, entry.species, entry.color, entry.tradeName, entry.scientificName, entry.genus, entry.speciesName].join(' ').toLowerCase().includes(search);
         })
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
-    const addedAtField = document.getElementById('coralAddedAt');
-    if (addedAtField && !addedAtField.value) addedAtField.value = new Date().toISOString().slice(0, 10);
-    renderMotherCoralOptions(document.getElementById('coralMotherId')?.value || '', coralUiState.editingId || '');
-    updateCoralMotherFieldVisibility();
-    if (!coralUiState.editingId && !coralUiState.pendingPhotoData) renderCoralPhotoPreview('');
+    if (!coralUiState.editingId && !coralUiState.pendingPhotos.length) renderCoralPhotoPreview([]);
     if (stats) {
         stats.innerHTML = `
             <span><strong>${getCoralCatalog().length}</strong><small>gesamt</small></span>
@@ -4411,26 +4385,24 @@ function renderCoralCatalog() {
     list.innerHTML = corals.map(coral => `
         <article class="coral-card ${coralUiState.editingId === coral.id ? 'active' : ''}">
             <div class="coral-card-media">
-                ${coral.photoDataUrl ? `<img src="${coral.photoDataUrl}" alt="${escapeHtml(coral.name)}">` : '<div class="coral-card-placeholder">Kein Foto</div>'}
+                ${getCoralPhotoList(coral)[0] ? `<img src="${getCoralPhotoList(coral)[0]}" alt="${escapeHtml(coral.name)}">` : '<div class="coral-card-placeholder">Kein Foto</div>'}
             </div>
             <div class="coral-card-body">
                 <div class="coral-card-head">
                     <div>
                         <h4>${escapeHtml(coral.name)}</h4>
-                        <small>${escapeHtml(coral.tradeName || coral.scientificName || coral.species || 'Art nicht eingetragen')}</small>
+                        <small>${escapeHtml(coral.scientificName || coral.tradeName || 'Art nicht eingetragen')}</small>
                     </div>
                     <span class="coral-status-badge coral-status-${escapeHtml(coral.status || 'bestand')}">${escapeHtml(getCoralStatusLabel(coral.status || 'bestand'))}</span>
                 </div>
                 <div class="coral-meta-grid">
-                    <span><strong>Typ</strong><small>${escapeHtml(coral.coralType || coral.species || '-')}</small></span>
-                    <span><strong>Platz</strong><small>${escapeHtml(coral.location || coral.placement || '-')}</small></span>
-                    <span><strong>Eingesetzt</strong><small>${coral.addedAt ? escapeHtml(coral.addedAt) : '-'}</small></span>
-                    <span><strong>Zuletzt gesehen</strong><small>${coral.lastSeenAt ? formatWarehouseDate(coral.lastSeenAt) : '-'}</small></span>
-                    <span><strong>Mutterkoralle</strong><small>${escapeHtml(getCoralOptionalDisplayName(getCoralById(coral.motherCoralId)))}</small></span>
-                    <span><strong>Licht</strong><small>${escapeHtml(coral.lightNeed || coral.parRange || '-')}</small></span>
-                    <span><strong>Strömung</strong><small>${escapeHtml(coral.flowNeed || coral.flowType || '-')}</small></span>
+                    <span><strong>Gattung</strong><small>${escapeHtml(coral.genus || '-')}</small></span>
+                    <span><strong>Art</strong><small>${escapeHtml(coral.speciesName || '-')}</small></span>
+                    <span><strong>Typ</strong><small>${escapeHtml(coral.coralType || '-')}</small></span>
+                    <span><strong>Wuchsform</strong><small>${escapeHtml(coral.growthForm || '-')}</small></span>
+                    <span><strong>Farbe</strong><small>${escapeHtml(coral.color || '-')}</small></span>
+                    <span><strong>Fotos</strong><small>${getCoralPhotoList(coral).length || 0}</small></span>
                 </div>
-                <p class="hint">${escapeHtml(coral.note || 'Keine zusätzliche Notiz gespeichert.')}</p>
                 <div class="btn-group" style="flex-wrap:wrap;">
                     <button class="btn-secondary btn-animated" onclick="editCoralEntry('${coral.id}')">Bearbeiten</button>
                     <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Abgeben / Löschen</button>
