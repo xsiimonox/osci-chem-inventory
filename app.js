@@ -4440,7 +4440,6 @@ function openQuickActionMenu() {
         { label: 'Tool öffnen', run: () => selectTab('tools') }
     ];
     if (activeTab === 'logbuch') actions.unshift({ label: 'Neue ToDo', run: () => { selectTab('logbuch'); document.getElementById('todoTitle')?.focus(); } });
-    if (activeTab === 'tools') actions.unshift({ label: 'Tool suchen', run: () => { selectTab('tools'); document.getElementById('toolSearchInput')?.focus(); } });
     const choice = prompt(`Schnellaktion:\n${actions.map((action, index) => `${index + 1}. ${action.label}`).join('\n')}\n\nNummer eingeben:`, '1');
     if (choice === null) return;
     const selected = actions[(parseInt(choice, 10) || 1) - 1];
@@ -6414,7 +6413,6 @@ function initTools() {
     setupToolTiles();
     setupToolSections();
     renderToolFavorites();
-    filterTools(document.getElementById('toolSearchInput')?.value || '');
 }
 
 function getToolSettings() {
@@ -6476,6 +6474,23 @@ function getToolCardTitle(card) {
     return card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim() || card?.querySelector('h3')?.textContent?.trim() || '';
 }
 
+function getToolTileVisual(toolId, title = '') {
+    const map = {
+        'kh-ca-korrektur': { icon: 'KH', subtitle: 'Zielwerte anpassen' },
+        'verbrauch-pro-tag': { icon: '24', subtitle: 'Tagesverbrauch rechnen' },
+        'test-korrekturfaktor': { icon: 'IC', subtitle: 'Tests abgleichen' },
+        'nutrition-rechner': { icon: 'N', subtitle: 'Naehrstoffe dosieren' },
+        'salzgehalt-rechner': { icon: 'PS', subtitle: 'PSU und Dichte pruefen' },
+        'salz-korrektur': { icon: 'SG', subtitle: 'Salz angleichen' },
+        'wasserwechsel-effekt': { icon: 'WW', subtitle: 'Wasserwechsel planen' },
+        'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
+        'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
+        'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
+        'hilfreiche-quellen': { icon: 'Q', subtitle: 'Links und Wissen' }
+    };
+    return map[toolId] || { icon: (title || 'T').slice(0, 2).toUpperCase(), subtitle: 'Tool oeffnen' };
+}
+
 function setupToolTiles() {
     const settings = getToolSettings();
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
@@ -6483,8 +6498,17 @@ function setupToolTiles() {
         if (!title) return;
         const toolTitle = getToolCardTitle(card);
         const toolId = card.dataset.toolId || slugifyToolTitle(toolTitle);
+        const visual = getToolTileVisual(toolId, toolTitle);
         card.dataset.toolId = toolId;
+        card.dataset.toolIcon = visual.icon;
         card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''}`.toLowerCase();
+        const hint = card.querySelector('.hint');
+        if (hint && !hint.dataset.originalText) {
+            hint.dataset.originalText = hint.textContent.trim();
+        }
+        if (hint) {
+            hint.dataset.tileSubtitle = visual.subtitle;
+        }
         if (card.dataset.tileReady !== 'true') {
             card.dataset.tileReady = 'true';
             card.classList.add('tool-tile-card');
@@ -6528,8 +6552,7 @@ function applyToolReviewBadge(card, title) {
 }
 
 function setupToolSections() {
-    const settings = getToolSettings();
-    document.querySelectorAll('#tools .tool-section').forEach((section, index) => {
+    document.querySelectorAll('#tools .tool-section').forEach(section => {
         const title = section.querySelector('.tool-section-summary strong')?.textContent?.trim() || `section-${index}`;
         const sectionId = section.dataset.sectionId || slugifyToolTitle(title);
         section.dataset.sectionId = sectionId;
@@ -6548,7 +6571,7 @@ function setupToolSections() {
                 }
             });
         }
-        section.open = settings.lastSection ? settings.lastSection === sectionId : index === 0;
+        section.open = false;
     });
 }
 
