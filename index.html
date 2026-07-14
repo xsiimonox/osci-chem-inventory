@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=2.6.6">
+    <link rel="stylesheet" href="style.css?v=2.6.7">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v2.6.6</span>
+                    <span class="version-badge">v2.6.7</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -530,13 +530,13 @@
 
                 <details class="tool-section" data-section-id="community-und-hilfe">
                     <summary class="tool-section-summary">
-                        <span><strong>Ressourcen &amp; Community</strong><small>Offizielle OSCI Links und die freiwillige Community Map</small></span>
+                        <span><strong>Ressourcen</strong><small>Offizielle OSCI Links und weitere hilfreiche Quellen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>OSCI Motion Ressourcen <button type="button" class="tool-inline-fav" data-tool-id="osci-motion-ressourcen">☆ Fav</button></h3>
-                            <p class="hint">Direkte Links zu offiziellen OSCI Motion Anleitungen und weiteren Rechnern.</p>
+                            <h3>Hilfreiche Quellen <button type="button" class="tool-inline-fav" data-tool-id="osci-motion-ressourcen">☆ Fav</button></h3>
+                            <p class="hint">Hilfreiche Quellen, Nachschlagewerke und Buchtipps rund um Meerwasser, Versorgung und Aquarienchemie.</p>
                             <div class="resource-link-grid">
                                 <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Anleitungen</strong>
@@ -547,12 +547,27 @@
                                     <span>Weitere offizielle Rechner und Plausibilitäts-Tools</span>
                                 </a>
                             </div>
-                        </div>
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" id="communityMapCardWrap">
-                            <h3>Community Map <button type="button" class="tool-inline-fav" data-tool-id="community-map">☆ Fav</button></h3>
-                            <p class="hint">Freiwillige Community-Karte mit grob gerundeten Regionen und geschützter Kontaktaufnahme.</p>
-                            <div id="communityMapCard">
-                                <p class="hint">Community Map wird geladen...</p>
+                            <p class="hint" style="margin:14px 0 8px;"><strong>Weitere hilfreiche Quellen</strong></p>
+                            <div class="resource-link-grid">
+                                <a href="https://www.meerwasser-lexikon.de" target="_blank" rel="noopener" class="resource-link-card">
+                                    <strong>Meerwasser Lexikon</strong>
+                                    <span>Großes Nachschlagewerk für Tiere, Korallen, Algen und allgemeine Meerwasser-Themen</span>
+                                </a>
+                                <a href="http://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
+                                    <strong>Sangokai A-Z</strong>
+                                    <span>PDF mit kompakten Empfehlungen und Hintergründen für Meerwasseraquaristik</span>
+                                </a>
+                            </div>
+                            <p class="hint" style="margin:14px 0 8px;"><strong>Buchtipps</strong></p>
+                            <div class="resource-link-grid">
+                                <a href="https://www.daehne-aquaristik.de/products/algen?srsltid=AfmBOoqKmGgUCKXVBe3oyi8OLUVeRnyhifAH7BVkkYqbc3VFovAVXY6D" target="_blank" rel="noopener" class="resource-link-card">
+                                    <strong>Buchtipp: Algen</strong>
+                                    <span>Praxisnaher Buchtipp zur Bestimmung, Einordnung und zum Umgang mit Algen im Aquarium</span>
+                                </a>
+                                <a href="https://www.amazon.de/Ratgeber-Meerwasserchemie-Theorie-Praxis-Aquarianer/dp/3981057023" target="_blank" rel="noopener" class="resource-link-card">
+                                    <strong>Buchtipp: Ratgeber Meerwasserchemie</strong>
+                                    <span>Theorie und Praxis der Meerwasserchemie für Aquarianer kompakt erklärt</span>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -1423,7 +1438,7 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.6"></script>
+    <script src="app.js?v=2.6.7"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

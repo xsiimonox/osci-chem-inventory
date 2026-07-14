@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v266';
+const CACHE_NAME = 'reef-storage-tools-cache-v267';
 const ASSETS = [
   './',
   './index.html',
@@ -9,7 +9,8 @@ const ASSETS = [
   './icon.png',
   './badman.svg',
   './privacy.html',
-  './impressum.html'
+  './impressum.html',
+  './docs/SANGOKAI_Empfehlungen_A_Z.pdf'
 ];
 
 self.addEventListener('install', (e) => {
