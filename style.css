@@ -7970,34 +7970,6 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     body.theme-light .nav-links button.active { background: rgba(0, 122, 255, 0.1) !important; color: #007aff !important; border-bottom: 3px solid #007aff !important; }
 }
 
-/* ==========================================================================
-   ⌨️ KEYBOARD SHORTCUTS HINT
-   ========================================================================== */
-.keyboard-shortcuts-hint {
-    position: fixed;
-    bottom: 24px;
-    left: 20px;
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    opacity: 0.6;
-    transition: opacity 0.2s;
-    z-index: 100;
-}
-.keyboard-shortcuts-hint:hover {
-    opacity: 1;
-}
-.keyboard-shortcuts-hint kbd {
-    background: rgba(255,255,255,0.1);
-    padding: 2px 5px;
-    border-radius: 3px;
-    font-family: monospace;
-    font-size: 0.7rem;
-}
-
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
     width: 8px;
@@ -8131,7 +8103,6 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
         min-width: 0;
         max-width: 100%;
     }
-    .keyboard-shortcuts-hint { display: none; }
     .tab-content {
         padding: 14px 12px 24px;
         gap: 12px;
