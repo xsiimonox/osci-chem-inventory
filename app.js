@@ -437,6 +437,21 @@ const TAB_ICONS = {
     nachbestellen: '!',
     einstellungen: '⚙'
 };
+
+function normalizeMenuOrder(order) {
+    const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
+    const normalized = [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
+    const korallenIndex = normalized.indexOf('korallen');
+    const overviewIndex = normalized.indexOf('uebersicht');
+    const logIndex = normalized.indexOf('log');
+    if (korallenIndex >= 0 && logIndex >= 0 && korallenIndex === overviewIndex + 1) {
+        normalized.splice(korallenIndex, 1);
+        const nextLogIndex = normalized.indexOf('log');
+        normalized.splice(nextLogIndex + 1, 0, 'korallen');
+    }
+    return normalized;
+}
+
 const ALWAYS_VISIBLE_TABS = new Set(['einstellungen']);
 const communityUiState = {
     selectedProfileId: null
@@ -1601,9 +1616,9 @@ function getMenuOrder() {
             if (logIndex >= 0) valid.splice(logIndex + 1, 0, 'korallen');
             else valid.push('korallen');
         }
-        return [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
+        return normalizeMenuOrder(valid);
     } catch (err) {
-        return [...DEFAULT_MENU_ORDER];
+        return normalizeMenuOrder(DEFAULT_MENU_ORDER);
     }
 }
 
@@ -1706,7 +1721,7 @@ function resetMobileQuickTabs() {
 
 function saveMenuOrder(order) {
     const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : DEFAULT_MENU_ORDER;
-    const normalized = [...valid, ...DEFAULT_MENU_ORDER.filter(id => !valid.includes(id))];
+    const normalized = normalizeMenuOrder(valid);
     localStorage.setItem(MENU_ORDER_KEY, JSON.stringify(normalized));
     applyMenuOrder();
     renderMenuOrderSettings();
@@ -11120,6 +11135,106 @@ function exportWarehouseInventoryTxt() {
     a.download = `OSCI_Lagerbestand_${(warehouse?.name || 'Lager').replace(/[^\w.-]+/g, '_')}_${exportedAtLocal.split('T')[0]}.txt`;
     a.click();
     showToast('Lagerbestand als TXT exportiert', 'success', 2200);
+}
+
+function buildWarehouseInventoryRows() {
+    const rows = [];
+    for (const cat in catalog) {
+        for (const item in catalog[cat]) {
+            if (isProductHidden(item)) continue;
+            const stock = db.inventory[cat] && db.inventory[cat][item] ? db.inventory[cat][item] : 0;
+            if (stock <= 0) continue;
+            const threshold = (db.thresholds && db.thresholds[item]) || 0;
+            const low = threshold > 0 && stock <= threshold;
+            rows.push({
+                cat,
+                item,
+                stock,
+                threshold,
+                low
+            });
+        }
+    }
+    return rows.sort((a, b) => a.cat.localeCompare(b.cat, 'de') || a.item.localeCompare(b.item, 'de'));
+}
+
+function buildWarehouseInventoryPdfDocument() {
+    const warehouse = getActiveWarehouse();
+    const rows = buildWarehouseInventoryRows();
+    const totalItems = rows.length;
+    const lowCount = rows.filter(row => row.low).length;
+    const htmlRows = rows.length
+        ? rows.map(row => `
+            <tr>
+                <td>${escapeHtml(row.cat)}</td>
+                <td>${escapeHtml(row.item)}</td>
+                <td>${escapeHtml(formatItemAmount(row.item, row.stock))}</td>
+                <td>${row.threshold > 0 ? escapeHtml(formatItemAmount(row.item, row.threshold)) : '-'}</td>
+                <td class="${row.low ? 'danger' : 'ok'}">${row.low ? 'Niedrig' : 'OK'}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" style="text-align:center;color:#666;">Keine Artikel mit Bestand vorhanden.</td></tr>';
+
+    return `
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>Lagerbestand ${escapeHtml(warehouse ? warehouse.name : 'Lager')}</title>
+            <style>
+                body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:28px;color:#111;background:#fff}
+                h1{margin:0 0 4px;font-size:24px}
+                .meta{color:#666;margin-bottom:10px}
+                .summary{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0 22px}
+                .pill{border:1px solid #d9dee6;border-radius:14px;padding:10px 12px;min-width:140px;background:#f8fafc}
+                .pill strong{display:block;font-size:18px;color:#111}
+                .pill span{display:block;font-size:12px;color:#666;margin-top:2px}
+                table{width:100%;border-collapse:collapse;font-size:12px}
+                th,td{text-align:left;border-bottom:1px solid #ddd;padding:8px;vertical-align:middle}
+                th{background:#f3f5f7}
+                .danger{color:#b91c1c;font-weight:700}
+                .ok{color:#166534;font-weight:700}
+                .actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+                button{padding:10px 14px;border-radius:10px;border:1px solid #d1d5db;background:#111;color:#fff;font:inherit;cursor:pointer}
+                button.secondary{background:#fff;color:#111}
+                @media print{button{display:none}.actions{display:none}body{margin:18px}}
+            </style>
+        </head>
+        <body>
+            <div class="actions">
+                <button onclick="window.print()">Als PDF sichern / drucken</button>
+            </div>
+            <h1>Lagerbestand</h1>
+            <div class="meta">${escapeHtml(warehouse ? warehouse.name : 'Lager')} · ${new Date().toLocaleString('de-DE')}</div>
+            <div class="summary">
+                <div class="pill"><strong>${totalItems}</strong><span>Artikel mit Bestand</span></div>
+                <div class="pill"><strong>${lowCount}</strong><span>Unter Warnschwelle</span></div>
+            </div>
+            <table>
+                <thead><tr><th>Kategorie</th><th>Produkt</th><th>Bestand</th><th>Warnschwelle</th><th>Status</th></tr></thead>
+                <tbody>${htmlRows}</tbody>
+            </table>
+        </body>
+        </html>
+    `;
+}
+
+function exportWarehouseInventoryPdf() {
+    const report = window.open('', '_blank');
+    if (!report) return alert('Popup wurde blockiert. Bitte Popups für diese App erlauben.');
+    report.document.write(buildWarehouseInventoryPdfDocument());
+    report.document.close();
+}
+
+function emailWarehouseInventory() {
+    const settings = getGoogleDriveSyncSettings ? getGoogleDriveSyncSettings() : { connectedEmail: '' };
+    const suggested = settings?.connectedEmail || '';
+    const target = (prompt('An welche E-Mail-Adresse soll der Lagerstand gesendet werden?', suggested) || '').trim();
+    if (!target) return;
+    const warehouse = getActiveWarehouse();
+    const subject = encodeURIComponent(`Lagerbestand ${warehouse ? warehouse.name : ''}`.trim());
+    const body = encodeURIComponent(`${buildWarehouseInventoryShareText()}\n\nHinweis: Für ein PDF bitte zusätzlich den PDF-Export in der App nutzen.`);
+    window.location.href = `mailto:${encodeURIComponent(target)}?subject=${subject}&body=${body}`;
 }
 
 function normalizeInventoryTextToken(value) {

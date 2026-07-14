@@ -948,28 +948,6 @@
 
         <!-- REITER UMGERANNT AUF EINSTELLUNGEN -->
         <div id="einstellungen" class="tab-content">
-            
-            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.03); margin-bottom: 20px;">
-                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü anpassen</h3>
-                <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
-                <div id="menu-order-settings"></div>
-            </div>
-
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--danger); margin-bottom: 5px;">Problem melden</h3>
-                <p class="hint">Beschreibe kurz, was passiert ist. Die App erstellt daraus automatisch eine Mail an simon@asbach.tech.</p>
-                <div class="input-group">
-                    <label>Was ist passiert?</label>
-                    <textarea id="bugReportDescription" class="bug-report-textarea" placeholder="z.B. PDF-Analyse erkennt den 3. Ausgleich falsch ..."></textarea>
-                </div>
-                <div class="input-group">
-                    <label>Wie kann man den Fehler auslösen? optional</label>
-                    <textarea id="bugReportSteps" class="bug-report-textarea bug-report-textarea-small" placeholder="1. C&amp;R öffnen&#10;2. PDF importieren&#10;3. Ergebnis prüfen"></textarea>
-                </div>
-                <button onclick="sendBugReport()" class="btn-danger btn-animated">Fehler per Mail melden</button>
-                <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
-            </div>
-
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">Datenspeicher &amp; Sicherung</h3>
                 <p class="hint">Deine Daten bleiben zuerst auf diesem Gerät. Hier kannst du sehen, ob automatisch gespeichert wird und bei Bedarf einen sicheren Wiederherstellungspunkt anlegen.</p>
@@ -985,6 +963,51 @@
                 </div>
             </div>
 
+            <div class="card backup-project-card" style="margin-top: 20px;">
+                <h3>Backup &amp; Export</h3>
+                <p class="hint">Exportiere oder importiere das komplette Projekt mit allen Lagern, Aquarien, Messwerten, Logs, Todos, Statistiken und Einstellungen.</p>
+                <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
+                <div class="backup-project-actions">
+                    <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 Projekt-Backup</button>
+                    <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated" style="flex: 1;">📝 TXT Export</button>
+                    <button onclick="exportWarehouseInventoryPdf()" class="btn-secondary btn-animated" style="flex: 1;">📄 PDF Export</button>
+                    <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
+                    <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">Lagerbestand teilen</button>
+                    <button onclick="emailWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">✉️ Per Mail senden</button>
+                </div>
+                <div class="backup-project-import">
+                    <label class="hint" style="display:block; margin-bottom:8px;">Backup oder alten TXT-Lagerbestand einlesen</label>
+                    <input type="file" id="importFile" accept=".json,.txt">
+                    <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
+                </div>
+            </div>
+
+            <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
+                <h3 class="google-drive-sync-title">Google Drive Sync</h3>
+                <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Aenderungen koennen automatisch hochgeladen werden. Wenn auf einem anderen Geraet ein neuerer Stand liegt, wird das hier erkannt.</p>
+                <div id="googleDriveSyncStatus"></div>
+                <div class="google-drive-sync-actions">
+                    <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google verbinden</button>
+                    <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt hochladen</button>
+                    <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Cloud-Stand laden</button>
+                    <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
+                </div>
+                <label class="google-drive-sync-toggle">
+                    <span>
+                        <strong>Automatisch synchronisieren</strong>
+                        <small>Speichert Aenderungen nach kurzer Zeit in dein Google Drive und prueft regelmaessig, ob in deiner Cloud ein neuerer Stand liegt.</small>
+                    </span>
+                    <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
+                </label>
+                <label class="google-drive-sync-toggle">
+                    <span>
+                        <strong>Automatisch an Cloud-Login erinnern</strong>
+                        <small>Wenn die Cloud offline ist, erinnert dich die App ans erneute Einloggen. Das kannst du hier oder direkt in der Meldung abschalten.</small>
+                    </span>
+                    <input type="checkbox" id="googleDriveReconnectReminder" onchange="toggleGoogleDriveReconnectReminder(this.checked)">
+                </label>
+            </div>
+
             <div class="card sync-disabled-card storage-safety-card" style="margin-bottom: 20px;">
                 <h3 class="storage-safety-title">App-Updates</h3>
                 <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
@@ -992,38 +1015,6 @@
                 <div class="btn-group storage-safety-actions">
                     <button onclick="checkForAppUpdate(true)" class="btn-secondary btn-animated">Jetzt auf Updates prüfen</button>
                     <button onclick="forceUpdateApp(true)" class="btn-primary btn-animated">Manuelles Update laden</button>
-                </div>
-            </div>
-
-            <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
-                <div>
-                    <div class="tool-card-lock-header">
-                        <div>
-                            <h3 class="google-drive-sync-title">Google Drive Sync</h3>
-                            <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Aenderungen koennen automatisch hochgeladen werden. Wenn auf einem anderen Geraet ein neuerer Stand liegt, wird das hier erkannt.</p>
-                        </div>
-                    </div>
-                    <div id="googleDriveSyncStatus"></div>
-                    <div class="google-drive-sync-actions">
-                        <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google verbinden</button>
-                        <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt hochladen</button>
-                        <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Cloud-Stand laden</button>
-                        <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
-                    </div>
-                    <label class="google-drive-sync-toggle">
-                        <span>
-                            <strong>Automatisch synchronisieren</strong>
-                            <small>Speichert Aenderungen nach kurzer Zeit in dein Google Drive und prueft regelmaessig, ob in deiner Cloud ein neuerer Stand liegt.</small>
-                        </span>
-                        <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
-                    </label>
-                    <label class="google-drive-sync-toggle">
-                        <span>
-                            <strong>Automatisch an Cloud-Login erinnern</strong>
-                            <small>Wenn die Cloud offline ist, erinnert dich die App ans erneute Einloggen. Das kannst du hier oder direkt in der Meldung abschalten.</small>
-                        </span>
-                        <input type="checkbox" id="googleDriveReconnectReminder" onchange="toggleGoogleDriveReconnectReminder(this.checked)">
-                    </label>
                 </div>
             </div>
 
@@ -1048,6 +1039,12 @@
                     <button onclick="enableStockNotifications()" class="btn-in btn-animated">Aktivieren</button>
                     <button onclick="sendTestNotification()" class="btn-secondary btn-animated">Test</button>
                 </div>
+            </div>
+
+            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.03); margin-bottom: 20px;">
+                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü anpassen</h3>
+                <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
+                <div id="menu-order-settings"></div>
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
@@ -1101,19 +1098,6 @@
             </div>
 
             <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ausblenden</h3>
-                <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Wareneingang, Nachbestellen und Warnungen.</p>
-                <div id="product-visibility-list"></div>
-            </div>
-
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Geteilte Lager</h3>
-                <p class="hint">Wähle pro Person, ob ihre geteilten Lager in deiner Lagerauswahl sichtbar sein sollen. Standard ist sichtbar.</p>
-                <div id="shared-owner-visibility-list"></div>
-            </div>
-
-            <!-- PRODUKT-PRESETS -->
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
                 <details id="product-presets-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
                         <h3 style="color: var(--secondary); margin:0;">Produktlisten speichern</h3>
@@ -1131,7 +1115,12 @@
                 </details>
             </div>
 
-            <!-- SHOP-LINKS VERWALTEN -->
+            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ausblenden</h3>
+                <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Wareneingang, Nachbestellen und Warnungen.</p>
+                <div id="product-visibility-list"></div>
+            </div>
+
             <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
                 <details id="shop-links-details">
                     <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
@@ -1147,7 +1136,6 @@
                 </details>
             </div>
 
-            <!-- ANPASSUNG: STYLING & DESIGNS (GIRL EDITION) -->
             <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.02); margin-bottom: 20px;">
                 <h3 style="color: var(--primary);">Design &amp; Effekte</h3>
                 
@@ -1171,6 +1159,21 @@
                 </div>
             </div>
 
+            <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
+                <h3 style="color: var(--danger); margin-bottom: 5px;">Problem melden</h3>
+                <p class="hint">Beschreibe kurz, was passiert ist. Die App erstellt daraus automatisch eine Mail an simon@asbach.tech.</p>
+                <div class="input-group">
+                    <label>Was ist passiert?</label>
+                    <textarea id="bugReportDescription" class="bug-report-textarea" placeholder="z.B. PDF-Analyse erkennt den 3. Ausgleich falsch ..."></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Wie kann man den Fehler auslösen? optional</label>
+                    <textarea id="bugReportSteps" class="bug-report-textarea bug-report-textarea-small" placeholder="1. C&amp;R öffnen&#10;2. PDF importieren&#10;3. Ergebnis prüfen"></textarea>
+                </div>
+                <button onclick="sendBugReport()" class="btn-danger btn-animated">Fehler per Mail melden</button>
+                <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
+            </div>
+
             <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
                 <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
                 <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
@@ -1187,23 +1190,6 @@
                 </div>
                 <div>
                     <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand löschen</button>
-                </div>
-            </div>
-
-            <div class="card backup-project-card" style="margin-top: 20px;">
-                <h3>Backup</h3>
-                <p class="hint">Exportiere oder importiere das komplette Projekt mit allen Lagern, Aquarien, Messwerten, Logs, Todos, Statistiken und Einstellungen.</p>
-                <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
-                <div class="backup-project-actions">
-                    <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 Projekt-Backup</button>
-                    <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated" style="flex: 1;">📝 TXT Export</button>
-                    <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
-                    <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">Lagerbestand teilen</button>
-                </div>
-                <div class="backup-project-import">
-                    <label class="hint" style="display:block; margin-bottom:8px;">Backup oder alten TXT-Lagerbestand einlesen</label>
-                    <input type="file" id="importFile" accept=".json,.txt">
-                    <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
                 </div>
             </div>
         </div>
