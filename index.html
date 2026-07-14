@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=2.6.8">
+    <link rel="stylesheet" href="style.css?v=2.6.9-sangokai">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v2.6.8</span>
+                    <span class="version-badge">v2.6.9</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -47,13 +47,13 @@
                     </div>
                 </div>
             </div>
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen">
+            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen" aria-controls="main-nav" aria-expanded="false">
                 <div class="bar"></div>
                 <div class="bar"></div>
                 <div class="bar"></div>
             </button>
         </div>
-        <div class="subtitle">Meerwasser Lager, Rechner &amp; Logbuch</div>
+        <div class="subtitle"><span>Aktiver Bereich</span><strong id="activePageTitle">Lager</strong></div>
     </header>
 
     <div id="update-banner" class="update-banner" hidden>
@@ -68,10 +68,10 @@
         <span>↻</span>
     </div>
 
-    <nav class="nav-menu" id="main-nav">
+    <nav class="nav-menu" id="main-nav" aria-label="Hauptnavigation">
         <div class="nav-menu-header">
             <span>Navigation</span>
-            <button class="close-menu" onclick="toggleMenu()">✕</button>
+            <button class="close-menu" onclick="toggleMenu()" aria-label="Navigation schließen">✕</button>
         </div>
         <div class="nav-links">
             <button onclick="selectTab('uebersicht')" id="tab-uebersicht">Übersicht</button>
@@ -98,9 +98,20 @@
         <div id="uebersicht" class="tab-content"></div>
         <div id="lager" class="tab-content active"></div>
 
-        <div id="cr-export" class="tab-content">
-            <div class="card card-accent cr-paste-card">
-                <h3>C&amp;R Liste per Copy &amp; Paste auslagern</h3>
+        <div id="cr-export" class="tab-content workflow-page workflow-page--cr">
+            <div class="workflow-page-head">
+                <div>
+                    <span class="workflow-eyebrow">C&amp;R Auslagerung</span>
+                    <h2>C&amp;R Liste übernehmen</h2>
+                    <p>Werte einfügen, Bestand prüfen und anschließend verbindlich auslagern.</p>
+                </div>
+                <div class="workflow-context" aria-label="Aktives Lager">
+                    <span>Aktives Lager</span>
+                    <strong id="crActiveWarehouseName">Lager</strong>
+                </div>
+            </div>
+            <div class="card card-accent cr-paste-card workflow-card">
+                <h3>1. Daten und Anzeige</h3>
                 <p class="hint">Füge hier die unformatierte Zeile aus C &amp; R Methode 1, 2 oder 3 ein: (von NaCl bis ml Wert unter Bor)</p>
                 <div class="input-group cr-unit-preference-group">
                     <label>Bevorzugte Anzeige-Einheit:</label>
@@ -109,35 +120,55 @@
                         <option value="g">Gramm (g) zuerst</option>
                     </select>
                 </div>
+                <label for="cr-paste-area" class="field-label">C&amp;R Daten:</label>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaCl MgCl2 Na2SO4 MgSO4 KCl K2SO4 KBr SrCl2 CaCl2 NaF Bor (B)  4798.13 ml 25.24 ml 0 ml 714.26 ml 89.89 ml 0 ml 25.24 ml 1.91 ml 76.02 ml 0 ml 0 ml" oninput="previewCRPaste()"></textarea>
                 
-                <div id="cr-preview-container" style="display: none; margin-bottom: 15px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px dashed var(--border);">
-                    <h4 style="margin: 0 0 10px 0; color: var(--secondary); font-size: 0.95rem;">Live Vorschau (Mengen):</h4>
+                <div id="cr-preview-container" class="workflow-preview" hidden>
+                    <h4>2. Vorschau und Bestandsprüfung</h4>
                     <div id="cr-preview-list"></div>
                 </div>
 
-                <button class="btn-primary btn-animated" onclick="processCRPaste()">Automatisches Auslagern</button>
+                <div class="workflow-actions">
+                    <button class="btn-primary btn-animated booking-action" onclick="processCRPaste()">Automatisch auslagern</button>
+                </div>
             </div>
 
         </div>
 
-        <div id="trace-export" class="tab-content">
-            <div class="card">
+        <div id="trace-export" class="tab-content workflow-page workflow-page--trace">
+            <div class="workflow-page-head">
+                <div>
+                    <span class="workflow-eyebrow">Trace Mischungen</span>
+                    <h2>Einzelmengen vorbereiten</h2>
+                    <p>Mengen je Element erfassen, Grammwerte prüfen und vollständig auslagern.</p>
+                </div>
+                <div class="workflow-context" aria-label="Aktives Lager">
+                    <span>Aktives Lager</span>
+                    <strong id="traceActiveWarehouseName">Lager</strong>
+                </div>
+            </div>
+            <div class="trace-mixture-grid">
+            <div class="card workflow-card trace-mixture-card">
                 <h3>Kationen Mischung</h3>
                 <div id="kationen-inputs-container"></div>
-                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('kationen')">Kationen Mischung abziehen</button>
+                <div class="workflow-actions">
+                    <button class="btn-primary btn-animated booking-action" onclick="auslagernMischung('kationen')">Kationen auslagern</button>
+                </div>
             </div>
-            <div class="card" style="margin-top: 20px;">
+            <div class="card workflow-card trace-mixture-card">
                 <h3>Anionen Mischung</h3>
                 <div id="anionen-inputs-container"></div>
-                <button class="btn-danger btn-animated" style="margin-top: 15px;" onclick="auslagernMischung('anionen')">Anionen Mischung abziehen</button>
+                <div class="workflow-actions">
+                    <button class="btn-primary btn-animated booking-action" onclick="auslagernMischung('anionen')">Anionen auslagern</button>
+                </div>
+            </div>
             </div>
             <details class="reef-manager-import-compact">
                 <summary>
                     <span>Reef Manager Import</span>
                     <span class="settings-accordion-hint" aria-hidden="true"></span>
                 </summary>
-                <div class="btn-group" style="margin-bottom: 10px;">
+                <div class="btn-group calculator-actions">
                     <button class="btn-secondary btn-animated" onclick="importReefManagerTraceFromClipboard()">Aus Zwischenablage importieren</button>
                     <button class="btn-out btn-animated" onclick="clearReefManagerImport()">Import zurücksetzen</button>
                 </div>
@@ -146,12 +177,15 @@
         </div>
 
         <div id="statistik" class="tab-content">
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <h3>Verbrauchsstatistik &amp; Prognose</h3>
-                    <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;">
-                        <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; max-width: 170px;" onclick="exportConsumptionPdf()">PDF-Bericht</button>
-                        <button class="btn-out" style="padding: 6px 12px; font-size: 0.8rem; max-width: 100px;" onclick="resetStatsSingle()">Reset</button>
+            <div class="card statistics-shell">
+                <div class="section-page-head">
+                    <div>
+                        <span class="section-eyebrow">Lagerverbrauch</span>
+                        <h3>Verbrauchsstatistik &amp; Prognose</h3>
+                    </div>
+                    <div class="section-head-actions">
+                        <button class="btn-secondary" onclick="exportConsumptionPdf()">PDF-Bericht</button>
+                        <button class="btn-out" onclick="resetStatsSingle()">Reset</button>
                     </div>
                 </div>
                 <p class="hint" id="stats-start-date">Statistik aufgezeichnet seit: --</p>
@@ -160,9 +194,30 @@
         </div>
 
         <div id="log" class="tab-content">
-            <div class="card">
-                <h3>Aktionsprotokoll</h3>
-                <p class="hint">Hier siehst du alle vergangenen Buchungen und kannst sie bei Bedarf rückgängig machen:</p>
+            <div class="card protocol-shell">
+                <div class="section-page-head">
+                    <div>
+                        <span class="section-eyebrow">Lageraktivität</span>
+                        <h3>Aktionsprotokoll</h3>
+                        <p class="hint">Vergangene Ein- und Auslagerungen chronologisch nachvollziehen.</p>
+                    </div>
+                </div>
+                <div class="protocol-filter-toolbar" role="search" aria-label="Aktionsprotokoll filtern">
+                    <div class="input-group">
+                        <label for="protocolSearch">Protokoll durchsuchen:</label>
+                        <input type="search" id="protocolSearch" placeholder="Produkt oder Kategorie" oninput="renderLogs()">
+                    </div>
+                    <div class="input-group">
+                        <label for="protocolActionFilter">Aktion:</label>
+                        <select id="protocolActionFilter" onchange="renderLogs()">
+                            <option value="all">Alle Aktionen</option>
+                            <option value="in">Eingelagert</option>
+                            <option value="out">Ausgelagert</option>
+                        </select>
+                    </div>
+                    <button type="button" class="btn-secondary" onclick="resetProtocolFilters()">Filter zurücksetzen</button>
+                </div>
+                <div class="protocol-filter-status" id="protocolFilterStatus" aria-live="polite"></div>
                 <div id="log-container"></div>
             </div>
         </div>
@@ -226,7 +281,7 @@
                                     <input type="number" id="majorCorrectionDays" min="1" step="1" value="3" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                             </div>
-                            <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="saveMajorCorrectionDefaults()">Voreinstellungen speichern</button>
                                 <button class="btn-out btn-animated" onclick="resetMajorCorrectionDefaults()">Voreinstellungen zurücksetzen</button>
                             </div>
@@ -290,11 +345,52 @@
                                     <input type="number" id="testCorrectionMeasured" step="0.01" value="7.5" oninput="renderTestCorrectionTool()">
                                 </div>
                             </div>
-                            <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="saveTestCorrectionFactor()">Faktor speichern</button>
                                 <button class="btn-out btn-animated" onclick="deleteTestCorrectionFactor()">Faktor löschen</button>
                             </div>
                             <div id="testCorrectionResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>Hanna Phosphor zu Phosphat <button type="button" class="tool-inline-fav" data-tool-id="hanna-phosphor-zu-phosphat">☆ Fav</button></h3>
+                            <p class="hint">Rechnet den Hanna Phosphor Checker Wert in Phosphat um.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label>Phosphor P (ppb):</label>
+                                    <input type="number" id="hannaPhosphorusInput" min="0" step="1" value="16" oninput="renderHannaPhosphorusConverter()">
+                                </div>
+                            </div>
+                            <div id="hannaPhosphorusResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>Salifert Umrechner <button type="button" class="tool-inline-fav" data-tool-id="salifert-umrechner">☆ Fav</button></h3>
+                            <p class="hint">Rechnet Salifert Calcium- und KH-Spritzenwerte aus einem auswählbaren Restinhalt um.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label>Test:</label>
+                                    <div class="salifert-select" data-salifert-select="type">
+                                        <button type="button" id="salifertConverterTypeButton" class="salifert-select-button" onclick="toggleSalifertDropdown(event, 'type')" aria-haspopup="listbox" aria-expanded="false">
+                                            <span id="salifertConverterTypeLabel">Calcium</span>
+                                        </button>
+                                        <div id="salifertConverterTypeMenu" class="salifert-select-menu" role="listbox" hidden>
+                                            <button type="button" role="option" data-value="calcium" aria-selected="true" onclick="selectSalifertOption(event, 'type', 'calcium', 'Calcium')">Calcium</button>
+                                            <button type="button" role="option" data-value="kh" aria-selected="false" onclick="selectSalifertOption(event, 'type', 'kh', 'KH / Alkalinität')">KH / Alkalinität</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="input-group">
+                                    <label>Restinhalt Spritze (ml):</label>
+                                    <div class="salifert-select" data-salifert-select="syringe">
+                                        <button type="button" id="salifertSyringeValueButton" class="salifert-select-button" onclick="toggleSalifertDropdown(event, 'syringe')" aria-haspopup="listbox" aria-expanded="false">
+                                            <span id="salifertSyringeValueLabel">0,20 ml</span>
+                                        </button>
+                                        <div id="salifertSyringeValueMenu" class="salifert-select-menu salifert-select-menu-scroll" role="listbox" hidden></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="salifertConverterResult"></div>
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
@@ -346,17 +442,17 @@
                             </div>
                             <div class="input-group salinity-control">
                                 <div class="salinity-control-head">
-                                    <label for="salinityDensity" id="salinityMeasurementLabel">Dichte abgelesen (kg/l)</label>
+                                    <label for="salinityDensityNumber" id="salinityMeasurementLabel">Dichte abgelesen (kg/l)</label>
                                     <input type="number" id="salinityDensityNumber" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densityNumber')">
                                 </div>
-                                <input type="range" id="salinityDensity" min="1.0150" max="1.0350" step="0.0001" value="1.0233" oninput="updateSalinityCalculator('densitySlider')">
+                                <input type="range" id="salinityDensity" min="1.0150" max="1.0350" step="0.0001" value="1.0233" aria-label="Dichte mit Schieberegler einstellen" oninput="updateSalinityCalculator('densitySlider')">
                             </div>
                             <div class="input-group salinity-control">
                                 <div class="salinity-control-head">
-                                    <label for="salinityTemp">Temperatur (°C)</label>
+                                    <label for="salinityTempNumber">Temperatur (°C)</label>
                                     <input type="number" id="salinityTempNumber" min="15" max="32" step="0.1" value="25.0" oninput="updateSalinityCalculator('tempNumber')">
                                 </div>
-                                <input type="range" id="salinityTemp" min="15" max="32" step="0.1" value="25" oninput="updateSalinityCalculator('tempSlider')">
+                                <input type="range" id="salinityTemp" min="15" max="32" step="0.1" value="25" aria-label="Temperatur mit Schieberegler einstellen" oninput="updateSalinityCalculator('tempSlider')">
                             </div>
                             <div id="salinityResult" class="tool-result"></div>
                             <div class="tool-grid">
@@ -369,11 +465,11 @@
                                     <input type="text" id="psuCorrectionExample" value="Keine Korrektur" readonly>
                                 </div>
                             </div>
-                            <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="savePsuCorrectionOffset()">PSU-Korrektur speichern</button>
                                 <button class="btn-out btn-animated" onclick="deletePsuCorrectionOffset()">PSU-Korrektur löschen</button>
                             </div>
-                            <div class="tool-grid" style="margin-top:14px;">
+                            <div class="tool-grid calculator-subsection">
                                 <div class="input-group">
                                     <label>Einfacher Umrechner PSU → Dichte @ 25 °C:</label>
                                     <input type="number" id="simplePsuInput" step="0.1" value="35" oninput="updateSimpleSalinityConverter('psu')">
@@ -384,7 +480,7 @@
                                 </div>
                             </div>
                             <div id="simpleSalinityResult" class="tool-result"></div>
-                            <div class="tool-grid" style="margin-top:14px;">
+                            <div class="tool-grid calculator-subsection">
                                 <div class="input-group">
                                     <label>Specific Gravity:</label>
                                     <input type="number" id="specificGravityInput" step="0.0001" value="1.0233" oninput="updateSimpleSalinityConverter('specificGravity')">
@@ -394,7 +490,7 @@
                                     <input type="number" id="specificGravityTempInput" step="0.1" min="15" max="32" value="25.0" oninput="updateSimpleSalinityConverter('specificGravity')">
                                 </div>
                             </div>
-                            <div id="specificGravityResult" class="tool-result" style="margin-top:12px;"></div>
+                            <div id="specificGravityResult" class="tool-result"></div>
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
@@ -462,7 +558,7 @@
                                     <select id="seaWaterPresetSelect" onchange="loadSeaWaterPreset(this.value)"></select>
                                 </div>
                             </div>
-                            <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                            <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="saveSeaWaterPreset()">Preset speichern</button>
                                 <button class="btn-secondary btn-animated" onclick="deleteSeaWaterPreset()">Preset löschen</button>
                             </div>
@@ -515,9 +611,23 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
-                            <h3>Hilfreiche Quellen <button type="button" class="tool-inline-fav" data-tool-id="osci-motion-ressourcen">☆ Fav</button></h3>
-                            <p class="hint">Hilfreiche Quellen, Nachschlagewerke und Buchtipps rund um Meerwasser, Versorgung und Aquarienchemie.</p>
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="sangokai-a-z-assistent">
+                            <h3>Sangokai A-Z Assistent <button type="button" class="tool-inline-fav" data-tool-id="sangokai-a-z-assistent">☆ Fav</button></h3>
+                            <p class="hint">Durchsuche das Sangokai A-Z PDF lokal und nutze die Quellenlinks als Ergänzung.</p>
+                            <div class="sangokai-search-card" role="search" aria-label="Sangokai A-Z durchsuchen">
+                                <div class="sangokai-search-head">
+                                    <div>
+                                        <strong>Sangokai A-Z Assistent</strong>
+                                        <span>Antwortet nur mit Wissen aus dem lokal eingebauten PDF.</span>
+                                    </div>
+                                    <small id="sangokaiSourceLabel">Quelle: Sangokai Empfehlungen A-Z</small>
+                                </div>
+                                <div class="sangokai-search-controls">
+                                    <input type="search" id="sangokaiSearchInput" placeholder="Frage oder Stichwort, z.B. Dinoflagellaten, Blauphase, Aktivkohle" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
+                                    <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
+                                </div>
+                                <div id="sangokaiSearchResult" class="sangokai-search-result" aria-live="polite"></div>
+                            </div>
                             <div class="resource-link-grid">
                                 <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Anleitungen</strong>
@@ -528,18 +638,18 @@
                                     <span>Weitere offizielle Rechner und Plausibilitäts-Tools</span>
                                 </a>
                             </div>
-                            <p class="hint" style="margin:14px 0 8px;"><strong>Weitere hilfreiche Quellen</strong></p>
+                            <p class="hint resource-subheading"><strong>Weitere hilfreiche Quellen</strong></p>
                             <div class="resource-link-grid">
                                 <a href="https://www.meerwasser-lexikon.de" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Meerwasser Lexikon</strong>
                                     <span>Großes Nachschlagewerk für Tiere, Korallen, Algen und allgemeine Meerwasser-Themen</span>
                                 </a>
-                                <a href="http://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
+                                <a href="https://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Sangokai A-Z</strong>
                                     <span>PDF mit kompakten Empfehlungen und Hintergründen für Meerwasseraquaristik</span>
                                 </a>
                             </div>
-                            <p class="hint" style="margin:14px 0 8px;"><strong>Buchtipps</strong></p>
+                            <p class="hint resource-subheading"><strong>Buchtipps</strong></p>
                             <div class="resource-link-grid">
                                 <a href="https://www.daehne-aquaristik.de/products/algen?srsltid=AfmBOoqKmGgUCKXVBe3oyi8OLUVeRnyhifAH7BVkkYqbc3VFovAVXY6D" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Buchtipp: Algen</strong>
@@ -557,11 +667,13 @@
         </div>
 
         <div id="logbuch" class="tab-content">
-            <div class="card logbook-hero">
+            <div class="card logbook-hero logbook-page-header">
                 <div>
+                    <span class="section-eyebrow">Aquarium-Verlauf</span>
                     <h3>Logbuch</h3>
                     <p class="hint">Pflege, Messungen, Besatz, Technik und Aufgaben am Aquarium sauber nachvollziehen.</p>
                 </div>
+                <button type="button" class="btn-primary btn-animated logbook-new-entry" onclick="openLogBookEntryForm()">Neuer Eintrag</button>
                 <div class="logbook-metrics">
                     <div><strong id="logBookEntryCount">0</strong><span>Logs</span></div>
                     <div><strong id="todoOpenCount">0</strong><span>offen</span></div>
@@ -572,7 +684,7 @@
 
             <div class="logbook-layout">
             <div class="card logbook-card measurement-card">
-                <details class="logbook-card-details">
+                <details class="logbook-card-details" id="measurementDetails">
                     <summary class="logbook-summary">
                         <span>Messwerte</span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
@@ -580,19 +692,19 @@
                     <div class="logbook-card-body">
                         <div class="tool-grid">
                             <div class="input-group">
-                                <label>Wert:</label>
+                                <label for="measurementType">Messwert-Art:</label>
                                 <select id="measurementType" onchange="renderMeasurementTracker()"></select>
                             </div>
                             <div class="input-group">
-                                <label>Messwert:</label>
+                                <label for="measurementValue">Messwert:</label>
                                 <input type="number" id="measurementValue" step="0.001" placeholder="z.B. 7.8">
                             </div>
                             <div class="input-group">
-                                <label>Datum/Uhrzeit:</label>
+                                <label for="measurementDate">Datum/Uhrzeit:</label>
                                 <input type="datetime-local" id="measurementDate">
                             </div>
                             <div class="input-group">
-                                <label>Zeitraum:</label>
+                                <label for="measurementRange">Zeitraum:</label>
                                 <select id="measurementRange" onchange="renderMeasurementTracker()">
                                     <option value="14">14 Tage</option>
                                     <option value="30" selected>30 Tage</option>
@@ -603,11 +715,12 @@
                             </div>
                         </div>
                         <div class="input-group">
-                            <label>Notiz:</label>
+                            <label for="measurementNote">Notiz:</label>
                             <input type="text" id="measurementNote" placeholder="Optional: Test, ICP, Dosierung, Beobachtung">
                         </div>
-                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
-                            <button class="btn-primary btn-animated" onclick="saveMeasurementEntry()">Messwert speichern</button>
+                        <div class="btn-group logbook-form-actions">
+                            <button class="btn-primary btn-animated" id="measurementSaveButton" onclick="saveMeasurementEntry()">Messwert speichern</button>
+                            <button class="btn-secondary btn-animated is-hidden" id="measurementCancelButton" onclick="cancelMeasurementEdit()">Bearbeiten abbrechen</button>
                             <button class="btn-secondary btn-animated" onclick="addMeasurementType()">Messwert-Art hinzufügen</button>
                         </div>
                         <div id="measurementTracker"></div>
@@ -616,7 +729,7 @@
             </div>
 
             <div class="card logbook-card logbook-document-card">
-                <details class="logbook-card-details">
+                <details class="logbook-card-details" id="logBookEntryDetails">
                     <summary class="logbook-summary">
                         <span>Eintrag dokumentieren</span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
@@ -624,32 +737,43 @@
                     <div class="logbook-card-body">
                         <div class="tool-grid">
                             <div class="input-group">
-                                <label>Kategorie:</label>
+                                <label for="logBookCategory">Kategorie:</label>
                                 <select id="logBookCategory"></select>
                             </div>
                             <div class="input-group">
-                                <label>Titel:</label>
+                                <label for="logBookTitle">Titel:</label>
                                 <input type="text" id="logBookTitle" placeholder="z.B. PO4 angepasst, Abschäumer gereinigt">
                             </div>
                             <div class="input-group">
-                                <label>Datum/Uhrzeit:</label>
+                                <label for="logBookDate">Datum/Uhrzeit:</label>
                                 <input type="datetime-local" id="logBookDate">
                             </div>
                         </div>
                         <div class="input-group">
-                            <label>Notiz:</label>
+                            <label for="logBookNote">Notiz:</label>
                             <textarea id="logBookNote" placeholder="Was wurde gemacht? Welche Werte, Beobachtungen oder nächsten Schritte sind wichtig?"></textarea>
                         </div>
-                        <button class="btn-primary btn-animated logbook-primary-action" onclick="saveLogBookEntry()">Log speichern</button>
+                        <div class="logbook-form-actions logbook-primary-action">
+                            <button class="btn-primary btn-animated" id="logBookSaveButton" onclick="saveLogBookEntry()">Log speichern</button>
+                            <button class="btn-secondary btn-animated is-hidden" id="logBookCancelButton" onclick="cancelLogBookEdit()">Bearbeiten abbrechen</button>
+                        </div>
                         <details class="logbook-list-details">
                             <summary class="logbook-summary">
                                 <span>Dokumentation anzeigen</span>
                                 <span class="settings-accordion-hint" aria-hidden="true"></span>
                             </summary>
-                            <div class="input-group logbook-filter">
-                                <label>Nach Kategorie filtern:</label>
-                                <select id="logBookFilterCategory" onchange="renderLogBookEntries()"></select>
+                            <div class="logbook-filter-toolbar" role="search" aria-label="Logbuch durchsuchen und filtern">
+                                <div class="input-group logbook-filter">
+                                    <label for="logBookSearch">Logbuch durchsuchen:</label>
+                                    <input type="search" id="logBookSearch" placeholder="Titel, Notiz oder Kategorie" oninput="renderLogBookEntries()">
+                                </div>
+                                <div class="input-group logbook-filter">
+                                    <label for="logBookFilterCategory">Kategorie:</label>
+                                    <select id="logBookFilterCategory" onchange="renderLogBookEntries()"></select>
+                                </div>
+                                <button type="button" class="btn-secondary logbook-filter-reset" onclick="resetLogBookFilters()">Filter zurücksetzen</button>
                             </div>
+                            <div class="logbook-filter-status" id="logBookFilterStatus" aria-live="polite"></div>
                             <div id="log-book-list"></div>
                         </details>
                     </div>
@@ -704,19 +828,20 @@
                                     <button type="button" onclick="setTodoInterval(30)">30 Tage</button>
                                     <button type="button" onclick="setTodoInterval(90)">90 Tage</button>
                                 </div>
+                                <label for="todoIntervalCustom" class="field-label">Eigenes Intervall in Tagen:</label>
                                 <input type="number" id="todoIntervalCustom" min="0" step="1" placeholder="Eigene Tage" oninput="setTodoInterval(this.value)">
                                 <div id="todoIntervalLabel" class="tool-result">Alle 7 Tage</div>
                             </div>
                             <div class="input-group">
-                                <label style="display:flex; align-items:center; gap:8px;">
-                                    <input type="checkbox" id="todoNotifyEnabled" checked style="width:18px; height:18px; margin:0;">
+                                <label class="logbook-checkbox" for="todoNotifyEnabled">
+                                    <input type="checkbox" id="todoNotifyEnabled" checked>
                                     Für dieses ToDo erinnern
                                 </label>
                             </div>
                         </div>
-                        <div class="btn-group" style="flex-wrap:wrap;">
-                            <button class="btn-secondary btn-animated" onclick="saveAquariumTodo()" style="flex:1;">ToDo speichern</button>
-                            <button class="btn-in btn-animated" onclick="enableStockNotifications()" style="flex:1;">Push aktivieren</button>
+                        <div class="btn-group logbook-form-actions">
+                            <button class="btn-secondary btn-animated" onclick="saveAquariumTodo()">ToDo speichern</button>
+                            <button class="btn-in btn-animated" onclick="enableStockNotifications()">Push aktivieren</button>
                         </div>
                         <div id="aquarium-todo-list"></div>
                     </div>
@@ -771,7 +896,7 @@
                                 <input type="number" id="doseContainerWarnHours" min="0" step="1" value="48">
                             </div>
                         </div>
-                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                        <div class="btn-group logbook-form-actions">
                             <button class="btn-primary btn-animated" onclick="saveDosingContainer()">Behälter speichern</button>
                             <button class="btn-in btn-animated" onclick="fillSelectedDosingContainer()">Ausgewählten auffüllen</button>
                         </div>
@@ -806,7 +931,7 @@
                                 <input type="number" id="osmoseTankUsageLiters" min="0" step="0.1" placeholder="z.B. 5">
                             </div>
                         </div>
-                        <div class="btn-group" style="flex-wrap:wrap; margin-bottom:12px;">
+                        <div class="btn-group logbook-form-actions">
                             <button class="btn-secondary btn-animated" onclick="addOsmoseTankUsage()">Verbrauch speichern</button>
                             <button class="btn-in btn-animated" onclick="fillOsmoseTank()">Tank gefüllt</button>
                             <button class="btn-secondary btn-animated" onclick="enableStockNotifications()">Push aktivieren</button>
@@ -819,10 +944,10 @@
         </div>
 
         <div id="korallen" class="tab-content">
-            <div class="card coral-hero-card">
+            <div class="card coral-hero-card coral-page-header">
                 <div class="coral-hero-copy">
                     <small>Korallenverwaltung</small>
-                    <h3>Korallen katalogisieren, dokumentieren und schnell wiederfinden</h3>
+                    <h3>Korallenkatalog</h3>
                     <p class="hint">Lege Korallen manuell an, speichere Fotos, verknüpfe Ableger mit Mutterkorallen und halte deinen Bestand sauber dokumentiert.</p>
                 </div>
             </div>
@@ -833,26 +958,26 @@
                 <div class="card coral-form-card">
                     <div class="coral-section-head">
                         <div>
-                            <h3>Koralle anlegen</h3>
+                            <h3 id="coralFormTitle">Koralle anlegen</h3>
                             <p class="hint">Schlank, eindeutig und schnell pflegbar. Nur die Felder, die für die Korallen-Dokumentation wirklich sinnvoll sind.</p>
                         </div>
                         <button type="button" class="btn-out btn-animated" onclick="resetCoralForm()">Zurücksetzen</button>
                     </div>
                     <div class="tool-grid">
                         <div class="input-group">
-                            <label>Wissenschaftlicher Name:</label>
+                            <label for="coralScientificName">Wissenschaftlicher Name:</label>
                             <input type="text" id="coralScientificName" placeholder="z.B. Acropora tenuis">
                         </div>
                         <div class="input-group">
-                            <label>Gattung:</label>
+                            <label for="coralGenus">Gattung:</label>
                             <input type="text" id="coralGenus" placeholder="z.B. Acropora">
                         </div>
                         <div class="input-group">
-                            <label>Art:</label>
+                            <label for="coralSpeciesName">Art:</label>
                             <input type="text" id="coralSpeciesName" placeholder="z.B. tenuis">
                         </div>
                         <div class="input-group">
-                            <label>Korallentyp:</label>
+                            <label for="coralType">Korallentyp:</label>
                             <select id="coralType">
                                 <option value="">Nicht festgelegt</option>
                                 <option value="SPS">SPS</option>
@@ -866,11 +991,11 @@
                             </select>
                         </div>
                         <div class="input-group">
-                            <label>Handelsname:</label>
+                            <label for="coralTradeName">Handelsname:</label>
                             <input type="text" id="coralTradeName" placeholder='z.B. Walt Disney Acropora'>
                         </div>
                         <div class="input-group">
-                            <label>Wuchsform:</label>
+                            <label for="coralGrowthForm">Wuchsform:</label>
                             <select id="coralGrowthForm">
                                 <option value="">Nicht festgelegt</option>
                                 <option value="verzweigt">verzweigt</option>
@@ -882,12 +1007,12 @@
                             </select>
                         </div>
                         <div class="input-group">
-                            <label>Farbe:</label>
+                            <label for="coralColor">Farbe:</label>
                             <input type="text" id="coralColor" placeholder="z.B. blau mit grünen Polypen">
                         </div>
                     </div>
                     <div class="input-group">
-                        <label>Foto:</label>
+                        <label>Fotos:</label>
                         <p class="hint">Mehrere Bilder sind möglich. Das erste Bild wird als Hauptfoto im Bestand verwendet.</p>
                     </div>
                     <div class="coral-photo-tools">
@@ -906,8 +1031,9 @@
                             <button type="button" class="btn-out btn-animated" onclick="clearCoralPhoto()">Bilder entfernen</button>
                         </div>
                     </div>
-                    <div class="btn-group" style="flex-wrap:wrap; margin-top:14px;">
-                        <button class="btn-primary btn-animated" onclick="saveCoralEntry()">Koralle speichern</button>
+                    <div class="coral-form-status" id="coralFormStatus" aria-live="polite"></div>
+                    <div class="btn-group coral-form-actions">
+                        <button class="btn-primary btn-animated" id="coralSaveButton" onclick="saveCoralEntry()">Koralle speichern</button>
                     </div>
                 </div>
 
@@ -921,11 +1047,11 @@
                     </div>
                     <div class="tool-grid coral-filter-grid">
                         <div class="input-group">
-                            <label>Suche:</label>
+                            <label for="coralSearch">Suche:</label>
                             <input type="search" id="coralSearch" placeholder="Name, Art, Standort..." oninput="renderCoralCatalog()">
                         </div>
                         <div class="input-group">
-                            <label>Status:</label>
+                            <label for="coralStatusFilter">Status:</label>
                             <select id="coralStatusFilter" onchange="renderCoralCatalog()">
                                 <option value="all">Alle</option>
                                 <option value="neuzugang">Neuzugang</option>
@@ -934,6 +1060,7 @@
                             </select>
                         </div>
                     </div>
+                    <div class="coral-filter-status" id="coralFilterStatus" aria-live="polite"></div>
                     <div id="coralCatalogList" class="coral-catalog-list"></div>
                     <details class="coral-transfer-details">
                         <summary>
@@ -948,6 +1075,16 @@
 
         <!-- REITER UMGERANNT AUF EINSTELLUNGEN -->
         <div id="einstellungen" class="tab-content">
+            <section class="settings-page-head" aria-labelledby="settingsPageTitle">
+                <div>
+                    <span class="section-eyebrow">App konfigurieren</span>
+                    <h2 id="settingsPageTitle">Einstellungen</h2>
+                    <p>Alle Bereiche bleiben standardmäßig geschlossen. Wähle eine Gruppe und öffne nur die Einstellung, die du gerade brauchst.</p>
+                </div>
+                <span class="status-badge status-neutral" id="settingsGroupStatus">Alle Bereiche</span>
+            </section>
+            <nav class="settings-group-nav" id="settingsGroupNav" aria-label="Einstellungsgruppen"></nav>
+
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">Datenspeicher &amp; Sicherung</h3>
                 <p class="hint">Deine Daten bleiben zuerst auf diesem Gerät. Hier kannst du sehen, ob automatisch gespeichert wird und bei Bedarf einen sicheren Wiederherstellungspunkt anlegen.</p>
@@ -963,26 +1100,26 @@
                 </div>
             </div>
 
-            <div class="card backup-project-card" style="margin-top: 20px;">
+            <div class="card backup-project-card">
                 <h3>Backup &amp; Export</h3>
                 <p class="hint">Exportiere oder importiere das komplette Projekt mit allen Lagern, Aquarien, Messwerten, Logs, Todos, Statistiken und Einstellungen.</p>
                 <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
                 <div class="backup-project-actions">
-                    <button onclick="exportData()" class="btn-primary btn-animated" style="flex: 1;">💾 Projekt-Backup</button>
-                    <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated" style="flex: 1;">📝 TXT Export</button>
-                    <button onclick="exportWarehouseInventoryPdf()" class="btn-secondary btn-animated" style="flex: 1;">📄 PDF Export</button>
-                    <button onclick="exportToCSV()" class="btn-secondary btn-animated" style="flex: 1;">📊 CSV Export</button>
-                    <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">Lagerbestand teilen</button>
-                    <button onclick="emailWarehouseInventory()" class="btn-secondary btn-animated" style="flex: 1;">✉️ Per Mail senden</button>
+                    <button onclick="exportData()" class="btn-primary btn-animated">Projekt-Backup</button>
+                    <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated">TXT exportieren</button>
+                    <button onclick="exportWarehouseInventoryPdf()" class="btn-secondary btn-animated">PDF exportieren</button>
+                    <button onclick="exportToCSV()" class="btn-secondary btn-animated">CSV exportieren</button>
+                    <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated">Lagerbestand teilen</button>
+                    <button onclick="emailWarehouseInventory()" class="btn-secondary btn-animated">Per Mail senden</button>
                 </div>
                 <div class="backup-project-import">
-                    <label class="hint" style="display:block; margin-bottom:8px;">Backup oder alten TXT-Lagerbestand einlesen</label>
+                    <label class="hint" for="importFile">Backup oder alten TXT-Lagerbestand einlesen</label>
                     <input type="file" id="importFile" accept=".json,.txt">
                     <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
                 </div>
             </div>
 
-            <div class="card google-drive-sync-card" style="margin-bottom: 20px;">
+            <div class="card google-drive-sync-card">
                 <h3 class="google-drive-sync-title">Google Drive Sync</h3>
                 <p class="hint">Dein komplettes Projekt wird in deinem eigenen Google-Konto gesichert. Aenderungen koennen automatisch hochgeladen werden. Wenn auf einem anderen Geraet ein neuerer Stand liegt, wird das hier erkannt.</p>
                 <div id="googleDriveSyncStatus"></div>
@@ -1008,7 +1145,7 @@
                 </label>
             </div>
 
-            <div class="card sync-disabled-card storage-safety-card" style="margin-bottom: 20px;">
+            <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">App-Updates</h3>
                 <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
                 <div id="appUpdateStatus"></div>
@@ -1018,14 +1155,14 @@
                 </div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--success); margin-bottom: 5px;">Benachrichtigungen</h3>
+            <div class="card settings-card settings-card-notifications">
+                <h3>Benachrichtigungen</h3>
                 <p class="hint">Die App kann dich beim Öffnen und nach Buchungen informieren, wenn Artikel den Warnzeitraum unterschreiten.</p>
                 
-                <div class="input-group" style="margin-top: 12px; margin-bottom: 15px;">
-                    <label style="font-weight: 600;">Warnzeitraum (Verbrauchsprognose):</label>
-                    <p class="hint" style="margin-top: 4px; margin-bottom: 8px; font-size: 0.8rem;">Wie viele Wochen im Voraus soll die App dich warnen, bevor ein Bestand voraussichtlich leer geht — basierend auf der berechneten Verbrauchsprognose.</p>
-                    <select id="forecastWeeks" onchange="updateForecastWindow(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
+                <div class="input-group settings-field-with-help">
+                    <label for="forecastWeeks">Warnzeitraum (Verbrauchsprognose):</label>
+                    <p class="hint">Wie viele Wochen im Voraus soll die App dich warnen, bevor ein Bestand voraussichtlich leer geht?</p>
+                    <select id="forecastWeeks" onchange="updateForecastWindow(this.value)">
                         <option value="2">2 Wochen Vorwarnzeit</option>
                         <option value="4">4 Wochen Vorwarnzeit</option>
                         <option value="8">8 Wochen Vorwarnzeit</option>
@@ -1035,100 +1172,100 @@
                 
                 <div id="notification-status" class="notification-status">Status wird geladen...</div>
                 <div id="disabled-alert-products" class="disabled-alert-products"></div>
-                <div class="btn-group" style="margin-top: 12px;">
+                <div class="btn-group settings-actions">
                     <button onclick="enableStockNotifications()" class="btn-in btn-animated">Aktivieren</button>
                     <button onclick="sendTestNotification()" class="btn-secondary btn-animated">Test</button>
                 </div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.03); margin-bottom: 20px;">
-                <h3 style="color: var(--primary); margin-bottom: 5px;">Menü anpassen</h3>
+            <div class="card settings-card settings-card-navigation">
+                <h3>Menü anpassen</h3>
                 <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
                 <div id="menu-order-settings"></div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Eigene Produkte anlegen</h3>
+            <div class="card settings-card settings-card-products">
+                <h3>Eigene Produkte anlegen</h3>
                 <p class="hint">Lege zusätzliche Lagerartikel an. Behältergrößen bitte mit Komma trennen, zum Beispiel: 250, 500, 1000.</p>
                 <div class="input-group">
-                    <label>Produktname:</label>
+                    <label for="customProductName">Produktname:</label>
                     <input type="text" id="customProductName" placeholder="z.B. Testlösung A">
                 </div>
                 <div class="input-group">
-                    <label>Kategorie:</label>
+                    <label for="customProductCategory">Kategorie:</label>
                     <select id="customProductCategory"></select>
                 </div>
                 <div class="input-group">
-                    <label>Neue Kategorie optional:</label>
+                    <label for="customProductNewCategory">Neue Kategorie optional:</label>
                     <input type="text" id="customProductNewCategory" placeholder="Nur ausfüllen, wenn du eine neue Kategorie brauchst">
                 </div>
                 <div class="input-group">
-                    <label>Einheit für Behältergrößen:</label>
-                    <select id="customProductSizeUnit" onchange="toggleCustomProductUnitFields()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+                    <label for="customProductSizeUnit">Einheit für Behältergrößen:</label>
+                    <select id="customProductSizeUnit" onchange="toggleCustomProductUnitFields()">
                         <option value="ml">Milliliter (ml)</option>
                         <option value="g">Gramm (g)</option>
                         <option value="st">Stück (st)</option>
                     </select>
                 </div>
                 <div class="input-group" id="customProductSizesGroup">
-                    <label>Behältergrößen:</label>
+                    <label for="customProductSizes">Behältergrößen:</label>
                     <input type="text" id="customProductSizes" placeholder="30, 100, 1000">
                 </div>
                 <div class="input-group" id="customProductDensityGroup">
-                    <label>Dichte optional:</label>
+                    <label for="customProductDensity">Dichte optional:</label>
                     <input type="number" step="0.001" min="0" id="customProductDensity" placeholder="1.000">
                 </div>
                 <button onclick="addCustomProduct()" class="btn-primary btn-animated">Produkt anlegen</button>
                 <div id="custom-products-list" class="custom-products-list"></div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Behälter &amp; Tara</h3>
+            <div class="card settings-card settings-card-products">
+                <h3>Behälter &amp; Tara</h3>
                 <p class="hint">Lege Behälter mit Leergewicht an. Diese stehen danach beim Tara-Abzug zur Auswahl.</p>
                 <div class="input-group">
-                    <label>Behältername:</label>
+                    <label for="customContainerName">Behältername:</label>
                     <input type="text" id="customContainerName" placeholder="z.B. Eimer 25 kg">
                 </div>
                 <div class="input-group">
-                    <label>Leergewicht in g:</label>
+                    <label for="customContainerWeight">Leergewicht in g:</label>
                     <input type="number" step="0.1" min="0" id="customContainerWeight" placeholder="z.B. 840">
                 </div>
                 <button onclick="addCustomContainer()" class="btn-primary btn-animated">Behälter anlegen</button>
                 <div id="custom-containers-list" class="custom-products-list"></div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
+            <div class="card settings-card settings-card-products">
                 <details id="product-presets-details">
-                    <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="color: var(--secondary); margin:0;">Produktlisten speichern</h3>
+                    <summary class="settings-native-summary">
+                        <h3>Produktlisten speichern</h3>
                         <span class="settings-accordion-hint" id="product-presets-toggle-hint" aria-hidden="true"></span>
                     </summary>
-                    <p class="hint" style="margin-top:10px;">Speichere deine eigenen Produkte als Liste und lade sie später wieder. Praktisch für verschiedene Becken oder Setups.</p>
-                    <div class="input-group" style="margin-top:10px;">
-                        <label>Preset-Name:</label>
+                    <p class="hint settings-detail-intro">Speichere deine eigenen Produkte als Liste und lade sie später wieder. Praktisch für verschiedene Becken oder Setups.</p>
+                    <div class="input-group">
+                        <label for="presetNameInput">Preset-Name:</label>
                         <input type="text" id="presetNameInput" placeholder="z.B. Becken 1, Meerwasser-Setup ...">
                     </div>
-                    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:15px;">
+                    <div class="settings-actions">
                         <button onclick="saveProductPreset()" class="btn-in btn-animated">Aktuell als Preset speichern</button>
                     </div>
                     <div id="product-presets-list"></div>
                 </details>
             </div>
 
-            <div class="card" style="border: 1px solid var(--secondary); background: rgba(100, 210, 255, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--secondary); margin-bottom: 5px;">Produkte ausblenden</h3>
+            <div class="card settings-card settings-card-products">
+                <h3>Produkte ausblenden</h3>
                 <p class="hint">Ausgeblendete Produkte verschwinden aus Lagerlisten, Wareneingang, Nachbestellen und Warnungen.</p>
                 <div id="product-visibility-list"></div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--success); background: rgba(48, 209, 88, 0.02); margin-bottom: 20px;">
+            <div class="card settings-card settings-card-products">
                 <details id="shop-links-details">
-                    <summary style="cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;">
-                        <h3 style="color: var(--success); margin:0;">Shop-Links</h3>
+                    <summary class="settings-native-summary">
+                        <h3>Shop-Links</h3>
                         <span class="settings-accordion-hint" id="shop-links-toggle-hint" aria-hidden="true"></span>
                     </summary>
-                    <p class="hint" style="margin-top:10px;">Trage hier den vollständigen Shop-Link für jedes Produkt und jede Größe ein. Beispiel: <code style="background:rgba(255,255,255,0.08); padding:2px 6px; border-radius:4px;">https://osci-motion.de/product/custom-repair-elements-kaliumbromid/?attribute_volumen=5+Liter</code></p>
-                    <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                    <p class="hint settings-detail-intro">Trage hier den vollständigen Shop-Link für jedes Produkt und jede Größe ein.</p>
+                    <div class="settings-actions">
                         <button onclick="saveShopLinks()" class="btn-in btn-animated">Speichern</button>
                         <button onclick="resetShopLinksToPreset()" class="btn-secondary btn-animated">Preset zurücksetzen</button>
                     </div>
@@ -1136,20 +1273,20 @@
                 </details>
             </div>
 
-            <div class="card" style="border: 1px solid var(--primary); background: rgba(191, 90, 242, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--primary);">Design &amp; Effekte</h3>
+            <div class="card settings-card settings-card-appearance">
+                <h3>Design &amp; Effekte</h3>
                 
                 <div class="switch-container">
-                    <span style="font-weight: 600; font-size: 0.95rem;">Disko- &amp; Animationsmodus</span>
-                    <label class="switch">
+                    <span class="settings-toggle-title">Disko- &amp; Animationsmodus</span>
+                    <label class="switch" aria-label="Disko- und Animationsmodus umschalten">
                         <input type="checkbox" id="partyToggle" onchange="togglePartyMode()">
                         <span class="slider"></span>
                     </label>
                 </div>
 
-                <div class="input-group" style="margin-top: 15px;">
-                    <label style="font-weight: 600;">Farbschema der App wechseln:</label>
-                    <select id="themeSelect" onchange="applyTheme(this.value)" style="width: 100%; padding: 12px; background: #2c2c2e; color: #fff; border: none; border-radius: 10px;">
+                <div class="input-group">
+                    <label for="themeSelect">Farbschema der App wechseln:</label>
+                    <select id="themeSelect" onchange="applyTheme(this.value)">
                         <option value="default">Standard Design (Dark)</option>
                         <option value="light">Light Mode ☀️</option>
                         <option value="girl">Girl Edition 🎀</option>
@@ -1159,59 +1296,65 @@
                 </div>
             </div>
 
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(255, 69, 58, 0.02); margin-bottom: 20px;">
-                <h3 style="color: var(--danger); margin-bottom: 5px;">Problem melden</h3>
+            <div class="card settings-card settings-card-support">
+                <h3>Problem melden</h3>
                 <p class="hint">Beschreibe kurz, was passiert ist. Die App erstellt daraus automatisch eine Mail an simon@asbach.tech.</p>
                 <div class="input-group">
-                    <label>Was ist passiert?</label>
+                    <label for="bugReportDescription">Was ist passiert?</label>
                     <textarea id="bugReportDescription" class="bug-report-textarea" placeholder="z.B. PDF-Analyse erkennt den 3. Ausgleich falsch ..."></textarea>
                 </div>
                 <div class="input-group">
-                    <label>Wie kann man den Fehler auslösen? optional</label>
+                    <label for="bugReportSteps">Wie kann man den Fehler auslösen? optional</label>
                     <textarea id="bugReportSteps" class="bug-report-textarea bug-report-textarea-small" placeholder="1. C&amp;R öffnen&#10;2. PDF importieren&#10;3. Ergebnis prüfen"></textarea>
                 </div>
                 <button onclick="sendBugReport()" class="btn-danger btn-animated">Fehler per Mail melden</button>
                 <p class="hint bug-report-note">Es werden nur deine Beschreibung und technische Infos wie Browser, Seite, Design und Zeitpunkt eingefügt. Keine Lagerbestände.</p>
             </div>
 
-            <div class="card" style="border: 1px solid var(--danger); background: rgba(239, 68, 68, 0.01);">
-                <h3 style="color: var(--danger); margin-bottom: 15px;">Daten-Reset (Einzeln)</h3>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="resetStatsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Statistiken löschen</button>
+            <div class="card settings-card settings-card-danger">
+                <h3>Daten-Reset (Einzeln)</h3>
+                <div class="settings-danger-row">
+                    <button onclick="resetStatsSingle()" class="btn-out btn-animated">Statistiken löschen</button>
                 </div>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="resetLogsSingle()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Protokoll löschen</button>
+                <div class="settings-danger-row">
+                    <button onclick="resetLogsSingle()" class="btn-out btn-animated">Protokoll löschen</button>
                 </div>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="clearLogBookEntries()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">Logbuch leeren</button>
+                <div class="settings-danger-row">
+                    <button onclick="clearLogBookEntries()" class="btn-out btn-animated">Logbuch leeren</button>
                 </div>
-                <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid var(--border);">
-                    <button onclick="clearAquariumTodos()" class="btn-out btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem;">ToDos leeren</button>
+                <div class="settings-danger-row">
+                    <button onclick="clearAquariumTodos()" class="btn-out btn-animated">ToDos leeren</button>
                 </div>
-                <div>
-                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated" style="max-width: 200px; padding: 8px 12px; font-size: 0.85rem; background: var(--danger);">Lagerbestand löschen</button>
+                <div class="settings-danger-row last">
+                    <button onclick="resetLagerSingle()" class="btn-danger btn-animated">Lagerbestand löschen</button>
                 </div>
             </div>
         </div>
         <!-- Wareneingang (Warenkorb) Tab Content -->
         <div id="masseneingang" class="tab-content">
-            <div class="card">
-                <h2>📦 Wareneingang</h2>
-                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
+            <div class="card bulk-entry-card">
+                <div class="section-page-head">
+                    <div>
+                        <span class="section-eyebrow">Bestand erhöhen</span>
+                        <h2>Wareneingang</h2>
+                    </div>
+                    <div class="active-context-badge"><span>Ziel-Lager</span><strong id="bulkActiveWarehouseName">Hauptlager</strong></div>
+                </div>
+                <p class="hint bulk-entry-intro">
                     Wähle ein Produkt aus. Die verfügbaren Behältergrößen erscheinen automatisch als Schnellauswahl.
                 </p>
                 
                 <div class="input-group">
-                    <label>Produkt auswählen:</label>
-                    <select id="bulkProductSelect" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;"></select>
+                    <label for="bulkProductSelect">Produkt auswählen:</label>
+                    <select id="bulkProductSelect"></select>
                 </div>
 
                 <!-- Dynamischer Container für die Behältergrößen-Schnellauswahl-Buttons -->
                 <div id="bulkQuickButtonsContainer"></div>
 
                 <div class="input-group">
-                    <label>Einheit:</label>
-                    <select id="bulkUnitSelect" onchange="toggleBulkContainerSection()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
+                    <label for="bulkUnitSelect">Einheit:</label>
+                    <select id="bulkUnitSelect" onchange="toggleBulkContainerSection()">
                         <option value="ml">Milliliter (ml)</option>
                         <option value="g">Gramm (g)</option>
                         <option value="st">Stück</option>
@@ -1219,42 +1362,46 @@
                 </div>
 
                 <!-- Tara-Abzug Sektion (nur bei Gramm sichtbar) -->
-                <div id="bulkContainerSection" style="display:none; margin-bottom:15px; padding:12px; background:rgba(255,255,255,0.04); border-radius:10px; border:1px solid var(--border);">
-                    <label style="display:flex; align-items:center; gap:10px; color:#fff; margin-bottom:10px;">
-                        <input type="checkbox" id="bulkUseTara" onchange="toggleBulkTaraSelect()" style="width:20px; height:20px; margin:0;">
+                <div id="bulkContainerSection" class="bulk-tara-section is-hidden">
+                    <label class="bulk-tara-toggle" for="bulkUseTara">
+                        <input type="checkbox" id="bulkUseTara" onchange="toggleBulkTaraSelect()">
                         Behälter-Gewicht (Tara) abziehen
                     </label>
-                    <select id="bulkContainerSelect" onchange="updateBulkTaraPreview()" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px;">
+                    <label for="bulkContainerSelect" id="bulkContainerSelectLabel" class="field-label" hidden>Behälter auswählen:</label>
+                    <select id="bulkContainerSelect" class="is-hidden" onchange="updateBulkTaraPreview()">
                     </select>
-                    <div id="bulkTaraPreview" style="margin-top:8px; font-size:0.85rem; color:var(--text-muted);"></div>
+                    <div id="bulkTaraPreview" class="bulk-tara-preview" aria-live="polite"></div>
                 </div>
 
                 <div class="input-group">
-                    <label>Menge:</label>
-                    <input type="number" step="0.01" id="bulkAmount" placeholder="Wert eintragen" oninput="updateBulkTaraPreview()" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px; margin-bottom:15px;">
+                    <label for="bulkAmount">Menge:</label>
+                    <input type="number" step="0.01" id="bulkAmount" placeholder="Wert eintragen" oninput="updateBulkTaraPreview()">
                 </div>
 
-                <button class="btn-secondary btn-animated" onclick="addToBulkCart()" style="width:100%; margin-bottom:10px;">Zum Wareneingang hinzufügen</button>
+                <button class="btn-secondary btn-animated bulk-add-button" onclick="addToBulkCart()">Zum Wareneingang hinzufügen</button>
             </div>
 
-            <div class="card" style="margin-top: 20px;">
-                <h3>🛒 Aktueller Wareneingang</h3>
-                <div id="bulkCartList" style="margin: 15px 0; min-height: 50px; color: var(--text-muted);">
+            <div class="card bulk-cart-card">
+                <div class="section-page-head">
+                    <div><span class="section-eyebrow">Zusammenfassung</span><h3>Aktueller Wareneingang</h3></div>
+                    <span class="status-badge status-neutral" id="bulkCartCount">0 Positionen</span>
+                </div>
+                <div id="bulkCartList" class="bulk-cart-list" aria-live="polite">
                     Der Wareneingang ist leer.
                 </div>
-                <button class="btn-primary btn-animated" id="btnSubmitBulk" onclick="submitBulkCart()" style="width:100%; display:none;">📦 Gesamten Wareneingang buchen</button>
+                <button class="btn-primary btn-animated is-hidden" id="btnSubmitBulk" onclick="submitBulkCart()">Gesamten Wareneingang buchen</button>
             </div>
         </div>
 
         <!-- Nachbestellen Tab -->
         <div id="nachbestellen" class="tab-content">
-            <div class="card">
-                <h2>Nachbestellen im OSCI Shop</h2>
-                <p style="color: var(--text-muted); margin-bottom: 15px; font-size: 0.9rem;">
+            <div class="card reorder-shell">
+                <div class="section-page-head"><div><span class="section-eyebrow">Bestellhilfe</span><h2>Nachbestellen im OSCI Shop</h2></div></div>
+                <p class="hint reorder-intro">
                     Wähle Artikel und Größe aus — Jeder Link öffnet das Produkt direkt in der richtigen Größe.
                 </p>
-                <div style="display:flex; gap:10px; margin-bottom:15px; flex-wrap:wrap;">
-                    <button class="btn-primary btn-animated" onclick="openShopCart()" id="btnOpenShopCart" style="display:none;">Alle markierten im Shop öffnen</button>
+                <div class="reorder-actions">
+                    <button class="btn-primary btn-animated is-hidden" onclick="openShopCart()" id="btnOpenShopCart">Alle markierten im Shop öffnen</button>
                     <button class="btn-secondary btn-animated" onclick="selectAllShopItems(true)">Alle auswählen</button>
                     <button class="btn-secondary btn-animated" onclick="selectAllShopItems(false)">Auswahl aufheben</button>
                 </div>
@@ -1272,13 +1419,36 @@
         ⌨️ <kbd>Ctrl+S</kbd> Backup · <kbd>Ctrl+F</kbd> Suche · <kbd>Ctrl+Z</kbd> Undo · <kbd>1-9</kbd> Tabs
     </div>
 
-    <div id="modal" class="modal">
-        <div class="modal-content">
+    <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
+        <div class="modal-content" tabindex="-1">
             <h3 id="modal-title">Aktion</h3>
             <div id="modal-body"></div>
             <button onclick="closeModal()" class="btn-cancel">Schließen / Abbrechen</button>
         </div>
     </div>
+
+    <div id="appDialog" class="app-dialog" role="dialog" aria-modal="true" aria-labelledby="appDialogTitle" aria-describedby="appDialogDescription" aria-hidden="true" hidden>
+        <div class="app-dialog-panel" tabindex="-1">
+            <div class="app-dialog-header">
+                <span id="appDialogStatus" class="app-dialog-status" aria-hidden="true"></span>
+                <div>
+                    <p id="appDialogEyebrow" class="app-dialog-eyebrow">Hinweis</p>
+                    <h2 id="appDialogTitle">Hinweis</h2>
+                </div>
+            </div>
+            <div class="app-dialog-body">
+                <p id="appDialogDescription"></p>
+                <div id="appDialogFields" class="app-dialog-fields"></div>
+                <p id="appDialogError" class="field-message field-message-error" role="alert" hidden></p>
+            </div>
+            <div class="app-dialog-actions">
+                <button type="button" id="appDialogCancel" class="btn btn-secondary">Abbrechen</button>
+                <button type="button" id="appDialogConfirm" class="btn btn-primary">Bestätigen</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast-container" aria-label="Mitteilungen" aria-live="polite" aria-relevant="additions" aria-atomic="false"></div>
 
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
     <div class="custom-cursor-dot" id="customCursorDot" aria-hidden="true"></div>
@@ -1291,7 +1461,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="app.js?v=2.6.8"></script>
+    <script src="sangokai-data.js?v=2.6.9-sangokai"></script>
+    <script src="app.js?v=2.6.9-sangokai"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

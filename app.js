@@ -204,7 +204,8 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
-const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null };
+const logBookUiState = { editingEntryId: null };
+const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null, photosCleared: false };
 const CORAL_STATUS_OPTIONS = [
     { value: 'neuzugang', label: 'Neuzugang' },
     { value: 'bestand', label: 'Bestandskoralle' },
@@ -395,6 +396,7 @@ let googleDriveSyncTimer = null;
 let googleDriveRemoteWatchTimer = null;
 const googleDriveMonitorState = {
     checking: false,
+    busyAction: '',
     lastCheckedAt: null,
     remoteModifiedAt: null,
     newerRemote: false,
@@ -424,19 +426,28 @@ const TAB_LABELS = {
     einstellungen: 'Einstellungen'
 };
 const TAB_ICONS = {
-    uebersicht: '⌂',
-    lager: '▦',
-    'cr-export': 'C',
-    'trace-export': 'T',
-    tools: '◇',
-    logbuch: '✓',
-    korallen: '◉',
-    statistik: '◷',
-    log: '≡',
-    masseneingang: '□',
-    nachbestellen: '!',
-    einstellungen: '⚙'
+    uebersicht: '<path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path>',
+    lager: '<path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"></path><path d="M4 7.5V16l8 5 8-5V7.5"></path><path d="M12 12v9"></path>',
+    'cr-export': '<path d="M9 3h6"></path><path d="M10 3v5l-5.5 9.5A2.3 2.3 0 0 0 6.5 21h11a2.3 2.3 0 0 0 2-3.5L14 8V3"></path><path d="M7.5 16h9"></path>',
+    'trace-export': '<path d="M12 3s6 6.2 6 11a6 6 0 0 1-12 0c0-4.8 6-11 6-11Z"></path><path d="M9 15.5a3.2 3.2 0 0 0 3 2"></path>',
+    tools: '<path d="M14.7 6.3a4 4 0 0 0-5-5l2.1 2.1-2.4 2.4-2.1-2.1a4 4 0 0 0 5 5L20 16.4a2.1 2.1 0 1 1-3 3l-7.7-7.7"></path>',
+    logbuch: '<path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22V4.5Z"></path><path d="M5 18h15"></path><path d="m9 10 2 2 4-4"></path>',
+    korallen: '<path d="M12 21V10"></path><path d="M12 14 7 9"></path><path d="M12 16l5-5"></path><path d="M7 9V5"></path><path d="M7 9H3"></path><path d="M17 11V6"></path><path d="M17 11h4"></path><path d="M12 10 9 7"></path><path d="M12 10l3-4"></path>',
+    statistik: '<path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path>',
+    log: '<path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M3.5 6h.01"></path><path d="M3.5 12h.01"></path><path d="M3.5 18h.01"></path>',
+    masseneingang: '<path d="M4 13v8h16v-8"></path><path d="M12 3v13"></path><path d="m7 11 5 5 5-5"></path>',
+    nachbestellen: '<circle cx="9" cy="20" r="1"></circle><circle cx="18" cy="20" r="1"></circle><path d="M3 4h2l2.4 10.4a2 2 0 0 0 2 1.6h7.8a2 2 0 0 0 2-1.6L21 8H6"></path>',
+    einstellungen: '<circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path>'
 };
+
+function getTabIconMarkup(tabId) {
+    const paths = TAB_ICONS[tabId] || '<circle cx="12" cy="12" r="2"></circle>';
+    return `<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+}
+
+function getMoreIconMarkup() {
+    return '<svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h16"></path><path d="M4 17h16"></path></svg>';
+}
 
 function normalizeMenuOrder(order) {
     const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : [];
@@ -1200,7 +1211,10 @@ async function checkGoogleDriveRemoteChanges({ silent = false, autoRestore = fal
         googleDriveMonitorState.message = `Cloud-Pruefung pausiert: ${err.message}`;
         renderGoogleDriveSyncCard();
         scheduleGoogleDriveRemoteWatch(8 * 60 * 1000);
-        if (!silent) alert('Google Drive Pruefung fehlgeschlagen: ' + err.message);
+        if (!silent) await appAlert('Google Drive Prüfung fehlgeschlagen: ' + err.message, {
+            title: 'Cloud-Prüfung nicht möglich',
+            type: 'warning'
+        });
         return false;
     } finally {
         googleDriveMonitorState.checking = false;
@@ -1217,11 +1231,21 @@ async function connectGoogleDriveSync() {
         showToast('Google Drive verbunden', 'success', 2200);
     } catch (err) {
         renderGoogleDriveSyncCard(`Verbindung fehlgeschlagen: ${err.message}`);
-        alert('Google Drive Verbindung fehlgeschlagen: ' + err.message);
+        await appAlert('Google Drive Verbindung fehlgeschlagen: ' + err.message, {
+            title: 'Verbindung fehlgeschlagen',
+            type: 'warning'
+        });
     }
 }
 
-function disconnectGoogleDriveSync() {
+async function disconnectGoogleDriveSync() {
+    if (googleDriveMonitorState.busyAction) return;
+    const confirmed = await appConfirm('Google Drive für dieses Gerät trennen? Deine lokalen Daten und vorhandene Cloud-Sicherungen bleiben erhalten.', {
+        title: 'Google Drive trennen',
+        type: 'warning',
+        confirmText: 'Verbindung trennen'
+    });
+    if (!confirmed) return;
     const settings = getGoogleDriveSyncSettings();
     if (googleDriveAccessToken && window.google?.accounts?.oauth2?.revoke) {
         try { google.accounts.oauth2.revoke(googleDriveAccessToken, () => {}); } catch (err) {}
@@ -1281,7 +1305,10 @@ async function inspectGoogleDriveSyncNow() {
         showToast(fileId ? 'Google Drive Backup gefunden' : 'Noch kein Google Drive Backup vorhanden', fileId ? 'success' : 'info', 2600);
     } catch (err) {
         renderGoogleDriveSyncCard(`Prüfung fehlgeschlagen: ${err.message}`);
-        alert('Google Drive Prüfung fehlgeschlagen: ' + err.message);
+        await appAlert('Google Drive Prüfung fehlgeschlagen: ' + err.message, {
+            title: 'Cloud-Prüfung nicht möglich',
+            type: 'warning'
+        });
     }
 }
 
@@ -1300,6 +1327,9 @@ async function tryRestoreGoogleDriveSession() {
 }
 
 async function syncProjectToGoogleDriveNow() {
+    if (googleDriveMonitorState.busyAction) return;
+    googleDriveMonitorState.busyAction = 'upload';
+    renderGoogleDriveSyncCard('Projekt wird in Google Drive gesichert ...');
     try {
         if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Hochladen muss die Cloud-Verbindung aktiv sein.' })) return;
         await uploadProjectBackupToGoogleDrive('manual');
@@ -1307,13 +1337,27 @@ async function syncProjectToGoogleDriveNow() {
         showToast('Projekt in Google Drive gesichert', 'success', 2400);
     } catch (err) {
         renderGoogleDriveSyncCard(`Upload fehlgeschlagen: ${err.message}`);
-        alert('Google Drive Upload fehlgeschlagen: ' + err.message);
+        await appAlert('Google Drive Upload fehlgeschlagen: ' + err.message, {
+            title: 'Upload fehlgeschlagen',
+            type: 'warning'
+        });
+    } finally {
+        googleDriveMonitorState.busyAction = '';
+        renderGoogleDriveSyncCard();
     }
 }
 
 async function restoreProjectFromGoogleDriveNow() {
+    if (googleDriveMonitorState.busyAction) return;
     try {
-        if (!confirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?')) return;
+        const confirmed = await appConfirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?', {
+            title: 'Cloud-Stand wiederherstellen',
+            type: 'warning',
+            confirmText: 'Herunterladen und ersetzen'
+        });
+        if (!confirmed) return;
+        googleDriveMonitorState.busyAction = 'restore';
+        renderGoogleDriveSyncCard('Cloud-Stand wird geladen ...');
         if (!await ensureGoogleDriveOnline({ interactive: true, showPrompt: true, reason: 'Zum Herunterladen muss die Cloud-Verbindung aktiv sein.' })) return;
         await restoreProjectBackupFromGoogleDrive();
         renderGoogleDriveSyncCard('Projekt erfolgreich aus Google Drive wiederhergestellt.');
@@ -1321,7 +1365,13 @@ async function restoreProjectFromGoogleDriveNow() {
         selectTab('lager');
     } catch (err) {
         renderGoogleDriveSyncCard(`Wiederherstellung fehlgeschlagen: ${err.message}`);
-        alert('Google Drive Wiederherstellung fehlgeschlagen: ' + err.message);
+        await appAlert('Google Drive Wiederherstellung fehlgeschlagen: ' + err.message, {
+            title: 'Wiederherstellung fehlgeschlagen',
+            type: 'warning'
+        });
+    } finally {
+        googleDriveMonitorState.busyAction = '';
+        renderGoogleDriveSyncCard();
     }
 }
 
@@ -1337,14 +1387,16 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     const lastRestoreLabel = settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch nicht';
     const backupKnown = !!settings.fileId;
     const remoteModifiedLabel = googleDriveMonitorState.remoteModifiedAt ? formatWarehouseDate(googleDriveMonitorState.remoteModifiedAt) : 'noch nicht';
+    const busy = Boolean(googleDriveMonitorState.busyAction);
+    const busyLabel = googleDriveMonitorState.busyAction === 'restore' ? 'Download läuft' : 'Upload läuft';
     if (mount) mount.innerHTML = `
-        <div class="google-drive-status-shell">
+        <div class="google-drive-status-shell" aria-busy="${busy}">
             <div class="google-drive-status-hero ${connected ? 'is-connected' : 'is-idle'}">
                 <div>
                     <strong>${connected ? 'Google Drive verbunden' : 'Google Drive noch nicht verbunden'}</strong>
                     <small>${connected ? 'Dein Projekt kann in deinem privaten App-Speicher gesichert werden.' : 'Verbinde dein Google-Konto, um Backups und Wiederherstellung zu nutzen.'}</small>
                 </div>
-                <span class="google-drive-status-pill">${connected ? 'verbunden' : 'getrennt'}</span>
+                <span class="google-drive-status-pill">${busy ? busyLabel : (connected ? 'verbunden' : 'getrennt')}</span>
             </div>
             <div class="google-drive-status-grid">
                 <div class="google-drive-status-card">
@@ -1408,15 +1460,21 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     const syncBtn = document.getElementById('googleDriveSyncBtn');
     const restoreBtn = document.getElementById('googleDriveRestoreBtn');
     const disconnectBtn = document.getElementById('googleDriveDisconnectBtn');
-    if (connectBtn) connectBtn.hidden = connected;
-    if (disconnectBtn) disconnectBtn.hidden = !connected;
+    if (connectBtn) {
+        connectBtn.hidden = connected;
+        connectBtn.disabled = busy;
+    }
+    if (disconnectBtn) {
+        disconnectBtn.hidden = !connected;
+        disconnectBtn.disabled = busy;
+    }
     if (syncBtn) {
-        syncBtn.disabled = !connected || !configured;
-        syncBtn.classList.toggle('is-disabled-soft', !connected || !configured);
+        syncBtn.disabled = busy || !connected || !configured;
+        syncBtn.classList.toggle('is-disabled-soft', busy || !connected || !configured);
     }
     if (restoreBtn) {
-        restoreBtn.disabled = !connected || !configured;
-        restoreBtn.classList.toggle('is-disabled-soft', !connected || !configured);
+        restoreBtn.disabled = busy || !connected || !configured;
+        restoreBtn.classList.toggle('is-disabled-soft', busy || !connected || !configured);
     }
     renderGoogleDriveHeaderStatus();
 }
@@ -1442,9 +1500,22 @@ Object.assign(window, {
 async function restoreLocalSnapshot(snapshotId, ask = true) {
     const snapshots = await idbGetAllSnapshots();
     const snapshot = snapshots.find(entry => entry.id === snapshotId) || null;
-    if (!snapshot || !snapshot.payload) return alert('Dieser Wiederherstellungspunkt wurde nicht gefunden.');
+    if (!snapshot || !snapshot.payload) {
+        await appAlert('Dieser Wiederherstellungspunkt wurde nicht gefunden.', {
+            title: 'Sicherung nicht gefunden',
+            type: 'warning'
+        });
+        return;
+    }
     const summary = `${formatWarehouseDate(snapshot.createdAt)} · ${getSnapshotReasonLabel(snapshot.reason)} · ${getSnapshotWarehouseLabel(snapshot)}`;
-    if (ask && !confirm(`Diesen Wiederherstellungspunkt wiederherstellen?\n\n${summary}\n\nDer aktuelle Stand dieses Geräts wird ersetzt.`)) return;
+    if (ask) {
+        const confirmed = await appConfirm(`Diesen Wiederherstellungspunkt wiederherstellen?\n\n${summary}\n\nDer aktuelle Stand dieses Geräts wird ersetzt.`, {
+            title: 'Sicherungsstand wiederherstellen',
+            type: 'warning',
+            confirmText: 'Stand wiederherstellen'
+        });
+        if (!confirmed) return;
+    }
     appState = migrateToWarehouseState(snapshot.payload);
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
     activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
@@ -1460,7 +1531,13 @@ async function restoreLocalSnapshot(snapshotId, ask = true) {
 
 async function restoreLatestLocalSnapshot() {
     const latest = await getLatestStoredSnapshot();
-    if (!latest || !latest.payload) return alert('Es wurde noch kein Wiederherstellungspunkt gefunden.');
+    if (!latest || !latest.payload) {
+        await appAlert('Es wurde noch kein Wiederherstellungspunkt gefunden.', {
+            title: 'Noch keine Sicherung',
+            type: 'info'
+        });
+        return;
+    }
     await restoreLocalSnapshot(latest.id, true);
 }
 
@@ -1474,7 +1551,12 @@ async function deleteLocalSnapshot(snapshotId) {
     const snapshots = await idbGetAllSnapshots();
     const snapshot = snapshots.find(entry => entry.id === snapshotId) || null;
     if (!snapshot) return;
-    if (!confirm(`Diesen Sicherungspunkt löschen?\n\n${formatWarehouseDate(snapshot.createdAt)} · ${getSnapshotReasonLabel(snapshot.reason)}`)) return;
+    const confirmed = await appConfirm(`Diesen Sicherungspunkt löschen?\n\n${formatWarehouseDate(snapshot.createdAt)} · ${getSnapshotReasonLabel(snapshot.reason)}`, {
+        title: 'Sicherungspunkt löschen',
+        type: 'danger',
+        confirmText: 'Sicherung löschen'
+    });
+    if (!confirmed) return;
     await idbDelete(APP_STORAGE_SNAPSHOT_STORE, snapshotId);
     const latest = await getLatestStoredSnapshot();
     latestSnapshotAt = latest?.createdAt || null;
@@ -1489,7 +1571,12 @@ async function deleteLocalSnapshot(snapshotId) {
 }
 
 async function clearLocalSnapshots() {
-    if (!confirm('Alle lokalen Wiederherstellungspunkte löschen? Der aktuelle Datenstand bleibt erhalten.')) return;
+    const confirmed = await appConfirm('Alle lokalen Wiederherstellungspunkte löschen? Der aktuelle Datenstand bleibt erhalten.', {
+        title: 'Alle Sicherungspunkte löschen',
+        type: 'danger',
+        confirmText: 'Alle Sicherungen löschen'
+    });
+    if (!confirmed) return;
     const snapshots = await idbGetAllSnapshots();
     for (const entry of snapshots) {
         await idbDelete(APP_STORAGE_SNAPSHOT_STORE, entry.id);
@@ -1750,7 +1837,10 @@ function applyMenuOrder() {
         order.forEach(tabId => {
             const button = document.getElementById('tab-' + tabId);
             if (!button) return;
-            button.textContent = TAB_LABELS[tabId] || tabId;
+            const label = TAB_LABELS[tabId] || tabId;
+            button.innerHTML = `${getTabIconMarkup(tabId)}<span class="nav-label">${escapeHtml(label)}</span>`;
+            button.dataset.tab = tabId;
+            button.setAttribute('aria-label', label);
             button.hidden = hiddenTabs.includes(tabId);
             if (!button.hidden) nav.appendChild(button);
         });
@@ -1767,10 +1857,10 @@ function renderMobileBottomNav(order = getMenuOrder()) {
     if (!nav) return;
     const quickTabs = getMobileQuickTabs();
     nav.innerHTML = quickTabs.map(tabId => `
-        <button type="button" onclick="selectTab('${tabId}')" data-tab="${tabId}">
-            <span>${TAB_ICONS[tabId] || '•'}</span>${TAB_LABELS[tabId] || tabId}
+        <button type="button" onclick="selectTab('${tabId}')" data-tab="${tabId}" aria-label="${escapeHtml(TAB_LABELS[tabId] || tabId)}">
+            ${getTabIconMarkup(tabId)}<span class="mobile-nav-label">${escapeHtml(TAB_LABELS[tabId] || tabId)}</span>
         </button>
-    `).join('') + '<button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>';
+    `).join('') + `<button type="button" onclick="toggleMenu()" data-tab="mehr" aria-label="Weitere Bereiche öffnen">${getMoreIconMarkup()}<span class="mobile-nav-label">Mehr</span></button>`;
 }
 
 function renderLegacyDomainBanner() {
@@ -1806,7 +1896,7 @@ function renderMenuOrderSettings() {
             </div>
             <button type="button" class="btn-secondary btn-animated" onclick="resetMobileQuickTabs()">Mobilen Schnellzugriff zurücksetzen</button>
         </div>
-        <div class="menu-order-list" style="margin-top:14px;">
+        <div class="menu-order-list menu-visibility-list">
             ${DEFAULT_MENU_ORDER.map(tabId => `
                 <label class="menu-order-row">
                     <span><strong>${TAB_LABELS[tabId] || tabId}</strong><small>${ALWAYS_VISIBLE_TABS.has(tabId) ? 'Immer sichtbar' : (hiddenTabs.includes(tabId) ? 'Ausgeblendet' : 'Sichtbar')}</small></span>
@@ -3613,6 +3703,7 @@ function updateWarehouseUI() {
     const meta = document.getElementById('warehouseMeta');
     const backupInfo = document.getElementById('warehouseBackupInfo');
     const accessBadge = document.getElementById('warehouseAccessBadge');
+    const activeWarehouseName = document.getElementById('activeWarehouseName');
     const shareHint = document.getElementById('shareActiveWarehouseHint');
     const shareBox = document.getElementById('shareActiveWarehouseBox');
     const warehouses = appState && appState.warehouses ? Object.values(appState.warehouses) : [];
@@ -3641,6 +3732,7 @@ function updateWarehouseUI() {
         const sync = active.remoteId ? ` · Sync: ${formatWarehouseDate(active.lastSyncAt)}` : '';
         const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}${sync}${access}`;
         if (meta) meta.innerText = info;
+        if (activeWarehouseName) activeWarehouseName.innerText = active.name;
         if (backupInfo) backupInfo.innerText = `Aktives Lager: ${active.name} · ${info} · Lokales Auto-Save: ${latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'läuft'}`;
         if (accessBadge) {
             accessBadge.innerText = accessLabel;
@@ -3713,26 +3805,80 @@ function getDashboardSettings() {
     return db.dashboardSettings;
 }
 
+let dashboardEditDraft = null;
+
+function cloneDashboardSettings(settings = getDashboardSettings()) {
+    return {
+        widgets: { ...settings.widgets },
+        range: settings.range,
+        pinnedMeasurements: [...settings.pinnedMeasurements]
+    };
+}
+
+function getDashboardRenderSettings() {
+    return dashboardEditDraft || getDashboardSettings();
+}
+
+function startDashboardEdit() {
+    dashboardEditDraft = cloneDashboardSettings();
+    renderDashboard();
+}
+
+function cancelDashboardEdit() {
+    dashboardEditDraft = null;
+    renderDashboard();
+}
+
+function resetDashboardEdit() {
+    dashboardEditDraft = {
+        widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
+        range: '30',
+        pinnedMeasurements: ['KH', 'CA', 'PO4']
+    };
+    renderDashboard();
+}
+
+function applyDashboardEdit() {
+    if (!dashboardEditDraft) return;
+    db.dashboardSettings = cloneDashboardSettings(dashboardEditDraft);
+    dashboardEditDraft = null;
+    saveDB(false);
+    renderDashboard();
+    showToast('Dashboard-Einstellungen gespeichert.', 'success');
+}
+
 function toggleDashboardWidget(widgetKey, checked) {
-    const settings = getDashboardSettings();
+    const settings = getDashboardRenderSettings();
     settings.widgets[widgetKey] = checked !== false;
+    if (dashboardEditDraft) {
+        renderDashboard();
+        return;
+    }
     saveDB(false);
     renderDashboard();
 }
 
 function setDashboardRange(value) {
-    const settings = getDashboardSettings();
+    const settings = getDashboardRenderSettings();
     settings.range = value || '30';
+    if (dashboardEditDraft) {
+        renderDashboard();
+        return;
+    }
     saveDB(false);
     renderDashboard();
 }
 
 function toggleDashboardMeasurementPin(typeId, checked) {
-    const settings = getDashboardSettings();
+    const settings = getDashboardRenderSettings();
     const set = new Set(settings.pinnedMeasurements || []);
     if (checked) set.add(typeId);
     else set.delete(typeId);
     settings.pinnedMeasurements = Array.from(set).slice(0, 6);
+    if (dashboardEditDraft) {
+        renderDashboard();
+        return;
+    }
     saveDB(false);
     renderDashboard();
 }
@@ -3887,20 +4033,10 @@ function createDashboardMeasurementChart(summary) {
     const latest = points[points.length - 1];
     return `
         <svg class="dashboard-trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Messwert Verlauf">
-            <defs>
-                <linearGradient id="dashboardMeasurementFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="var(--secondary)" stop-opacity="0.28"></stop>
-                    <stop offset="100%" stop-color="var(--secondary)" stop-opacity="0.03"></stop>
-                </linearGradient>
-                <linearGradient id="dashboardMeasurementLine" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stop-color="var(--secondary)"></stop>
-                    <stop offset="100%" stop-color="var(--primary)"></stop>
-                </linearGradient>
-            </defs>
-            <path d="${area}" fill="url(#dashboardMeasurementFill)"></path>
-            <path d="${line}" fill="none" stroke="url(#dashboardMeasurementLine)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="${area}" class="dashboard-chart-area"></path>
+            <path d="${line}" class="dashboard-chart-line"></path>
             <circle cx="${latest.x}" cy="${latest.y}" r="5.5" fill="var(--primary)"></circle>
-            <circle cx="${latest.x}" cy="${latest.y}" r="11" fill="rgba(191,90,242,0.16)"></circle>
+            <circle cx="${latest.x}" cy="${latest.y}" r="11" class="dashboard-chart-focus"></circle>
         </svg>
     `;
 }
@@ -3910,7 +4046,9 @@ function renderDashboard() {
     if (!container) return;
     const warehouse = getActiveWarehouse();
     const aquarium = getActiveAquarium();
-    const settings = getDashboardSettings();
+    const settings = getDashboardRenderSettings();
+    const isEditing = Boolean(dashboardEditDraft);
+    container.classList.toggle('dashboard-edit-active', isEditing);
     const alerts = getStockAlerts();
     const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
     const nextTodo = getDashboardNextTodo();
@@ -3941,7 +4079,7 @@ function renderDashboard() {
         const summary = getDashboardMeasurementSummary(typeId, settings.range);
         if (!summary) return '';
         return `
-            <div class="dashboard-measurement-card" onclick="openDashboardDestination('measurement-list', '${typeId}')">
+            <button type="button" class="dashboard-measurement-card dashboard-widget dashboard-widget--chart" onclick="openDashboardDestination('measurement-list', '${typeId}')" ${isEditing ? 'disabled' : ''}>
                 <div class="dashboard-measurement-head">
                     <strong>${escapeHtml(summary.meta?.label || typeId)}</strong>
                     <small>${summary.latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}</small>
@@ -3951,7 +4089,7 @@ function renderDashboard() {
                     <span>${summary.dailyTrend >= 0 ? '+' : ''}${summary.dailyTrend.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}/Tag</span>
                     <span>${formatWarehouseDate(summary.latest.at)}</span>
                 </div>
-            </div>
+            </button>
         `;
     }).join('');
     const measurementChooser = getMeasurementTypes().map(type => `
@@ -3961,71 +4099,79 @@ function renderDashboard() {
         </label>
     `).join('');
     const onboarding = db.onboardingDone ? '' : `
-        <section class="dashboard-onboarding">
+        <section class="dashboard-onboarding dashboard-attention" aria-label="Ersteinrichtung">
             <div>
                 <strong>Ersteinrichtung</strong>
                 <p>Prüfe Lagername, Aquariumgröße, sichtbare Produkte, Warnschwellen und sichere deine wichtigsten Bereiche für den Alltag.</p>
             </div>
             <div>
-                <button onclick="selectTab('lager')">Produkte prüfen</button>
-                <button onclick="selectTab('einstellungen')">Einstellungen</button>
-                <button onclick="finishOnboarding()">Erledigt</button>
+                <button type="button" class="btn btn-secondary" onclick="selectTab('lager')">Produkte prüfen</button>
+                <button type="button" class="btn btn-secondary" onclick="selectTab('einstellungen')">Einstellungen</button>
+                <button type="button" class="btn btn-primary" onclick="finishOnboarding()">Erledigt</button>
             </div>
         </section>
     `;
     container.innerHTML = `
-        <section class="dashboard-hero">
+        <section class="dashboard-hero dashboard-page-head">
             <div>
-                <small>Heute im Blick</small>
+                <small>Übersicht</small>
                 <h2>${escapeHtml(aquarium?.name || 'Aquarium')}</h2>
-                <p>${escapeHtml(warehouse?.name || 'Lager')} · ${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
+                <p><strong>${escapeHtml(warehouse?.name || 'Lager')}</strong> · ${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
             </div>
             <div class="dashboard-hero-actions">
-                <button type="button" onclick="triggerRefresh()" class="dashboard-refresh">Aktualisieren</button>
-                <button type="button" onclick="selectTab('korallen')" class="dashboard-refresh">Korallen</button>
+                <button type="button" onclick="triggerRefresh()" class="btn btn-secondary dashboard-refresh">Aktualisieren</button>
+                <button type="button" onclick="startDashboardEdit()" class="btn btn-secondary dashboard-refresh" ${isEditing ? 'disabled' : ''}>Anpassen</button>
             </div>
         </section>
+
+        ${alerts.length || dueTodos.length ? `
+        <section class="dashboard-attention dashboard-status-line" aria-label="Benötigt Aufmerksamkeit">
+            <strong>Benötigt Aufmerksamkeit</strong>
+            <span>${alerts.length} Bestandswarnung(en)</span>
+            <span>${dueTodos.length} fällige ToDo(s)</span>
+        </section>` : ''}
 
         ${onboarding}
 
         <div class="card aquarium-workspace-panel dashboard-aquarium-panel" id="dashboardAquariumPanel"></div>
 
-        <section class="dashboard-grid">
-            <button type="button" class="dashboard-tile ${alerts.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('stock')">
-                <span>Bestand</span><strong>${alerts.length}</strong><small>${alerts.length ? 'Warnung(en)' : 'alles ruhig'}</small>
+        <section class="dashboard-grid" aria-label="Schnellübersicht">
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric ${alerts.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('stock')" ${isEditing ? 'disabled' : ''}>
+                <span>Bestand</span><strong><b>${alerts.length}</b></strong><small>${alerts.length ? 'Warnung(en)' : 'Keine Warnung'}</small>
             </button>
-            <button type="button" class="dashboard-tile ${dueTodos.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('todos')">
-                <span>ToDos</span><strong>${dueTodos.length}</strong><small>${dueTodos.length ? 'fällig' : 'nichts fällig'}</small>
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric ${dueTodos.length ? 'warn' : 'ok'}" onclick="openDashboardDestination('todos')" ${isEditing ? 'disabled' : ''}>
+                <span>ToDos</span><strong><b>${dueTodos.length}</b></strong><small>${dueTodos.length ? 'Fällig' : 'Nichts fällig'}</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('measurement')">
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--status" onclick="openDashboardDestination('measurement')" ${isEditing ? 'disabled' : ''}>
                 <span>Wassertest</span><strong>${lastMeasurementAt ? formatWarehouseDate(lastMeasurementAt) : 'offen'}</strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('corals')">
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('corals')" ${isEditing ? 'disabled' : ''}>
                 <span>Korallen</span><strong>${coralCount}</strong><small>Bestand dokumentiert</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('osmose')">
-                <span>Osmose</span><strong>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} L</strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('osmose')" ${isEditing ? 'disabled' : ''}>
+                <span>Osmose</span><strong><b>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)}</b> <i>L</i></strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
             </button>
-            <button type="button" class="dashboard-tile" onclick="openDashboardDestination('products')">
+            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('products')" ${isEditing ? 'disabled' : ''}>
                 <span>Produkte</span><strong>${activeProducts}</strong><small>sichtbar</small>
             </button>
         </section>
 
-        <section class="dashboard-actions">
-            <button onclick="selectTab('lager')">Lager öffnen</button>
-            <button onclick="openSmartStockModal('in')">Einlagern</button>
-            <button onclick="openSmartStockModal('out')">Auslagern</button>
-            <button onclick="selectTab('tools')">Tools</button>
-            <button onclick="selectTab('korallen')">Korallen</button>
+        <section class="dashboard-actions dashboard-widget dashboard-widget--action" aria-label="Schnellaktionen">
+            <button type="button" class="btn btn-primary" onclick="openSmartStockModal('in')" ${isEditing ? 'disabled' : ''}>Einlagern</button>
+            <button type="button" class="btn btn-secondary" onclick="openSmartStockModal('out')" ${isEditing ? 'disabled' : ''}>Auslagern</button>
+            <button type="button" class="btn btn-secondary" onclick="selectTab('lager')" ${isEditing ? 'disabled' : ''}>Lager öffnen</button>
+            <button type="button" class="btn btn-secondary" onclick="selectTab('tools')" ${isEditing ? 'disabled' : ''}>Tools</button>
+            <button type="button" class="btn btn-secondary" onclick="selectTab('korallen')" ${isEditing ? 'disabled' : ''}>Korallen</button>
         </section>
 
-        <section class="dashboard-config">
-            <details class="dashboard-config-card">
-                <summary>
-                    <span><strong>Dashboard anpassen</strong><small>Widgets ein- oder ausblenden und Messwert-Karten wählen</small></span>
-                    <span class="settings-accordion-hint" aria-hidden="true"></span>
-                </summary>
+        ${isEditing ? `<section class="dashboard-config dashboard-edit-mode" aria-label="Dashboard bearbeiten">
+            <div class="dashboard-config-card">
+                <div class="dashboard-edit-banner">
+                    <span><strong>Bearbeitungsmodus</strong><small>Änderungen werden erst mit „Übernehmen“ gespeichert.</small></span>
+                    <span class="status-badge status-badge--info">Entwurf</span>
+                </div>
                 <div class="dashboard-config-body">
+                    <h3>Widgets anzeigen</h3>
                     <div class="dashboard-widget-grid">
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.stock ? 'checked' : ''} onchange="toggleDashboardWidget('stock', this.checked)"><span>Bestand</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.todos ? 'checked' : ''} onchange="toggleDashboardWidget('todos', this.checked)"><span>ToDos</span></label>
@@ -4038,8 +4184,8 @@ function renderDashboard() {
                     </div>
                     <div class="tool-grid">
                         <div class="input-group">
-                            <label>Diagramm-Zeitraum:</label>
-                            <select onchange="setDashboardRange(this.value)">
+                            <label for="dashboardRangeSelect">Diagramm-Zeitraum</label>
+                            <select id="dashboardRangeSelect" onchange="setDashboardRange(this.value)">
                                 <option value="14" ${settings.range === '14' ? 'selected' : ''}>14 Tage</option>
                                 <option value="30" ${settings.range === '30' ? 'selected' : ''}>30 Tage</option>
                                 <option value="90" ${settings.range === '90' ? 'selected' : ''}>90 Tage</option>
@@ -4051,67 +4197,72 @@ function renderDashboard() {
                     <div class="dashboard-widget-grid">
                         ${measurementChooser}
                     </div>
+                    <div class="dashboard-edit-actions">
+                        <button type="button" class="btn btn-secondary" onclick="cancelDashboardEdit()">Abbrechen</button>
+                        <button type="button" class="btn btn-secondary" onclick="resetDashboardEdit()">Zurücksetzen</button>
+                        <button type="button" class="btn btn-primary" onclick="applyDashboardEdit()">Übernehmen</button>
+                    </div>
                 </div>
-            </details>
-        </section>
+            </div>
+        </section>` : ''}
 
-        <section class="dashboard-panels">
+        <section class="dashboard-panels" aria-label="Dashboard-Widgets">
             ${settings.widgets.stock ? `
-            <div class="dashboard-panel">
-                <h3>Kritische Produkte</h3>
-                ${criticalRows || '<p class="hint">Keine kritischen Lagerwaren im aktuellen Warnzeitraum.</p>'}
-            </div>` : ''}
+            <article class="dashboard-panel dashboard-widget dashboard-widget--list ${alerts.length ? 'dashboard-widget--warning' : ''}">
+                <div class="dashboard-widget-head"><h3>Kritische Produkte</h3><span class="status-badge ${alerts.length ? 'status-badge--danger' : 'status-badge--success'}">${alerts.length ? `${alerts.length} offen` : 'Keine Warnung'}</span></div>
+                ${criticalRows || '<div class="empty-state dashboard-empty-state"><strong class="empty-state-title">Alles im grünen Bereich</strong><p class="empty-state-text">Keine kritischen Lagerwaren im aktuellen Warnzeitraum.</p></div>'}
+            </article>` : ''}
             ${settings.widgets.todos ? `
-            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('todos')">
-                <h3>Nächste Aufgabe</h3>
+            <article class="dashboard-panel dashboard-widget dashboard-widget--status">
+                <div class="dashboard-widget-head"><h3>Nächste Aufgabe</h3>${nextTodo?.isDue ? '<span class="status-badge status-badge--warning">Fällig</span>' : ''}</div>
                 ${nextTodo ? `
                     <div class="dashboard-next">
                         <strong>${escapeHtml(nextTodo.title)}</strong>
                         <small>${escapeHtml(nextTodo.category || 'Wartung')} · ${formatWarehouseDate(nextTodo.dueAt)}</small>
-                        <button onclick="event.stopPropagation(); completeAquariumTodo('${nextTodo.id}')">Erledigt</button>
+                        <div class="dashboard-widget-actions"><button type="button" class="btn btn-secondary" onclick="completeAquariumTodo('${nextTodo.id}')">Erledigt</button><button type="button" class="btn btn-secondary" onclick="openDashboardDestination('todos')">Öffnen</button></div>
                     </div>
-                ` : '<p class="hint">Keine ToDos geplant.</p>'}
-            </div>` : ''}
+                ` : '<div class="empty-state dashboard-empty-state"><strong class="empty-state-title">Keine ToDos geplant</strong><p class="empty-state-text">Neue Aufgaben kannst du im Logbuch anlegen.</p></div>'}
+            </article>` : ''}
             ${settings.widgets.logs ? `
-            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('protocol')">
-                <h3>Letzte Buchung</h3>
+            <article class="dashboard-panel dashboard-widget dashboard-widget--list">
+                <div class="dashboard-widget-head"><h3>Letzte Buchung</h3></div>
                 <p class="hint">${escapeHtml(lastLogText)}</p>
                 <div class="dashboard-subtle-list">
                     <span>Letztes Logbuch:</span>
                     <strong>${recentLogBookEntry ? escapeHtml(recentLogBookEntry.title || recentLogBookEntry.category) : 'Noch kein Eintrag'}</strong>
                     <small>${recentLogBookEntry ? formatWarehouseDate(recentLogBookEntry.at || recentLogBookEntry.createdAt) : ''}</small>
                 </div>
-                <button onclick="event.stopPropagation(); openDashboardDestination('logbook-entry')">Zum Logbuch</button>
-            </div>` : ''}
+                <div class="dashboard-widget-actions"><button type="button" class="btn btn-secondary" onclick="openDashboardDestination('protocol')">Protokoll</button><button type="button" class="btn btn-secondary" onclick="openDashboardDestination('logbook-entry')">Logbuch</button></div>
+            </article>` : ''}
             ${settings.widgets.osmose ? `
-            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('osmose')">
-                <h3>Osmosevorrat</h3>
+            <article class="dashboard-panel dashboard-widget dashboard-widget--status">
+                <div class="dashboard-widget-head"><h3>Osmosevorrat</h3></div>
                 <p class="hint">${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} Litern verfügbar.</p>
-                <div class="dashboard-progress">
-                    <span style="width:${Math.max(4, Math.min(100, ((parseFloat(osmose.currentLiters) || 0) / Math.max(1, parseFloat(osmose.capacityLiters) || 1)) * 100))}%"></span>
-                </div>
-            </div>` : ''}
+                <progress class="dashboard-progress" max="100" value="${Math.max(0, Math.min(100, ((parseFloat(osmose.currentLiters) || 0) / Math.max(1, parseFloat(osmose.capacityLiters) || 1)) * 100))}" aria-label="Osmosefüllstand in Prozent"></progress>
+                <button type="button" class="btn btn-secondary dashboard-widget-open" onclick="openDashboardDestination('osmose')">Osmosetank öffnen</button>
+            </article>` : ''}
             ${settings.widgets.dosing ? `
-            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('dosing')">
-                <h3>Vorratsbehälter</h3>
+            <article class="dashboard-panel dashboard-widget dashboard-widget--list">
+                <div class="dashboard-widget-head"><h3>Vorratsbehälter</h3>${dosingCritical.length ? `<span class="status-badge status-badge--warning">${dosingCritical.length} knapp</span>` : '<span class="status-badge status-badge--success">Stabil</span>'}</div>
                 ${dosingCritical.length ? dosingCritical.slice(0, 3).map(entry => `
                     <div class="dashboard-subtle-list">
                         <strong>${escapeHtml(entry.name || 'Behälter')}</strong>
                         <small>${(parseFloat(entry.currentMl) || 0).toFixed(0)} / ${(parseFloat(entry.capacityMl) || 0).toFixed(0)} ml</small>
                     </div>
                 `).join('') : '<p class="hint">Aktuell kein Behälter im kritischen Bereich.</p>'}
-            </div>` : ''}
+                <button type="button" class="btn btn-secondary dashboard-widget-open" onclick="openDashboardDestination('dosing')">Behälter öffnen</button>
+            </article>` : ''}
             ${settings.widgets.corals ? `
-            <div class="dashboard-panel dashboard-panel-actionable" onclick="openDashboardDestination('corals')">
-                <h3>Korallen im Fokus</h3>
+            <article class="dashboard-panel dashboard-widget dashboard-widget--status">
+                <div class="dashboard-widget-head"><h3>Korallen im Fokus</h3></div>
                 <p class="hint">${coralCount ? `${coralCount} Korallen gespeichert und durchsuchbar.` : 'Noch keine Korallen angelegt.'}</p>
-                <button onclick="event.stopPropagation(); openDashboardDestination('corals')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
-            </div>` : ''}
+                <button type="button" class="btn btn-secondary dashboard-widget-open" onclick="openDashboardDestination('corals')">${coralCount ? 'Korallen öffnen' : 'Erste Koralle anlegen'}</button>
+            </article>` : ''}
         </section>
 
         ${settings.widgets.measurements ? `
         <section class="dashboard-measurements-grid">
-            ${pinnedMeasurementCards || '<div class="dashboard-panel"><h3>Messwert-Diagramme</h3><p class="hint">Wähle oben mindestens einen Messwert aus oder trage zuerst Messungen im Logbuch ein.</p></div>'}
+            ${pinnedMeasurementCards || '<div class="dashboard-panel dashboard-widget dashboard-widget--wide empty-state"><strong class="empty-state-title">Noch keine Diagramme</strong><p class="empty-state-text">Wähle im Bearbeitungsmodus Messwerte aus oder trage zuerst Messungen im Logbuch ein.</p></div>'}
         </section>` : ''}
     `;
     renderAquariumWorkspacePanels();
@@ -4229,6 +4380,7 @@ function applyCoralFormData(data = {}) {
 function resetCoralForm() {
     coralUiState.editingId = null;
     coralUiState.pendingPhotos = [];
+    coralUiState.photosCleared = false;
     ['coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralTradeName', 'coralColor', 'coralSearch'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'coralSearch') el.value = '';
@@ -4247,6 +4399,19 @@ function resetCoralForm() {
     });
     const preview = document.getElementById('coralPhotoPreview');
     if (preview) preview.innerHTML = '<span>Noch kein Foto gewählt</span>';
+    updateCoralFormMode();
+}
+
+function updateCoralFormMode() {
+    const title = document.getElementById('coralFormTitle');
+    const saveButton = document.getElementById('coralSaveButton');
+    const status = document.getElementById('coralFormStatus');
+    const editing = Boolean(coralUiState.editingId);
+    if (title) title.innerText = editing ? 'Koralle bearbeiten' : 'Koralle anlegen';
+    if (saveButton) saveButton.innerText = editing ? 'Änderungen speichern' : 'Koralle speichern';
+    if (status) status.innerHTML = editing
+        ? '<span class="status-badge status-warning">Bearbeitungsmodus</span><span>Abbrechen setzt das Formular ohne Speicherung zurück.</span>'
+        : '<span class="status-badge status-neutral">Neuer Eintrag</span>';
 }
 
 function renderCoralPhotoPreview(dataUrl = '') {
@@ -4268,13 +4433,17 @@ function handleCoralPhotoSelection(event) {
         reader.readAsDataURL(file);
     }))).then(results => {
         const newPhotos = results.filter(Boolean);
+        if (newPhotos.length) coralUiState.photosCleared = false;
         coralUiState.pendingPhotos = [...coralUiState.pendingPhotos, ...newPhotos];
         renderCoralPhotoPreview(coralUiState.pendingPhotos);
     });
 }
 
 function clearCoralPhoto() {
+    if (!coralUiState.pendingPhotos.length) return;
+    if (!confirm('Alle ausgewählten Korallenbilder aus diesem Eintrag entfernen?')) return;
     coralUiState.pendingPhotos = [];
+    coralUiState.photosCleared = true;
     renderCoralPhotoPreview([]);
     ['coralPhotoLibraryInput', 'coralPhotoCameraInput'].forEach(id => {
         const input = document.getElementById(id);
@@ -4286,7 +4455,9 @@ function saveCoralEntry() {
     const form = getCoralFormData();
     if (!form.scientificName && !form.tradeName) return alert('Bitte gib mindestens einen wissenschaftlichen Namen oder einen Handelsnamen ein.');
     const target = coralUiState.editingId ? getCoralById(coralUiState.editingId) : null;
-    const photoGallery = coralUiState.pendingPhotos.length ? [...coralUiState.pendingPhotos] : getCoralPhotoList(target);
+    const photoGallery = coralUiState.photosCleared
+        ? []
+        : (coralUiState.pendingPhotos.length ? [...coralUiState.pendingPhotos] : getCoralPhotoList(target));
     const photo = photoGallery[0] || '';
     if (target) {
         Object.assign(target, {
@@ -4319,8 +4490,10 @@ function editCoralEntry(id) {
     if (!coral) return;
     coralUiState.editingId = id;
     coralUiState.pendingPhotos = getCoralPhotoList(coral);
+    coralUiState.photosCleared = false;
     applyCoralFormData(coral);
     renderCoralPhotoPreview(coralUiState.pendingPhotos);
+    updateCoralFormMode();
     document.getElementById('coralScientificName')?.focus();
 }
 
@@ -4369,14 +4542,36 @@ function deleteCoralEntry(id) {
     renderDashboard();
 }
 
+function renderCoralTransfers() {
+    const transfersList = document.getElementById('coralTransferList');
+    if (!transfersList) return;
+    const transfers = getCoralTransfers().slice().sort((a, b) => new Date(b.transferredAt || 0) - new Date(a.transferredAt || 0));
+    transfersList.innerHTML = transfers.length
+        ? transfers.map(entry => `
+            <article class="coral-transfer-card">
+                <div class="coral-transfer-head">
+                    <strong>${escapeHtml(getCoralDisplayName(entry.coralSnapshot || {}))}</strong>
+                    <small>${formatWarehouseDate(entry.transferredAt)}</small>
+                </div>
+                <div class="coral-meta-grid">
+                    <span><strong>An</strong><small>${escapeHtml(entry.recipientName || '-')}</small></span>
+                    <span><strong>Kontakt</strong><small>${escapeHtml(entry.recipientContact || '-')}</small></span>
+                    <span><strong>Typ</strong><small>${escapeHtml(entry.coralSnapshot?.coralType || entry.coralSnapshot?.species || '-')}</small></span>
+                </div>
+                <p class="hint">${escapeHtml(entry.note || 'Keine weitere Notiz gespeichert.')}</p>
+            </article>
+        `).join('')
+        : '<div class="coral-empty-state"><strong>Noch keine Abgaben</strong><p>Abgegebene Korallen bleiben hier mit Empfänger und Kontakt nachvollziehbar.</p></div>';
+}
+
 function renderCoralCatalog() {
     renderAquariumWorkspacePanels();
     const list = document.getElementById('coralCatalogList');
     const stats = document.getElementById('coralLibraryStats');
-    const transfersList = document.getElementById('coralTransferList');
     if (!list) return;
     const search = (document.getElementById('coralSearch')?.value || '').trim().toLowerCase();
     const statusFilter = document.getElementById('coralStatusFilter')?.value || 'all';
+    const filterStatus = document.getElementById('coralFilterStatus');
     const corals = getCoralCatalog()
         .map(entry => ({ ...entry, status: normalizeCoralStatus(entry.status || 'bestand') }))
         .filter(entry => statusFilter === 'all' || entry.status === statusFilter)
@@ -4386,6 +4581,7 @@ function renderCoralCatalog() {
         })
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
     if (!coralUiState.editingId && !coralUiState.pendingPhotos.length) renderCoralPhotoPreview([]);
+    updateCoralFormMode();
     if (stats) {
         stats.innerHTML = `
             <span><strong>${getCoralCatalog().length}</strong><small>gesamt</small></span>
@@ -4393,8 +4589,14 @@ function renderCoralCatalog() {
             <span><strong>${getCoralTransfers().length}</strong><small>abgegeben</small></span>
         `;
     }
+    if (filterStatus) {
+        const active = [search ? `Suche „${search}“` : '', statusFilter !== 'all' ? getCoralStatusLabel(statusFilter) : ''].filter(Boolean);
+        filterStatus.innerHTML = `<span><strong>${corals.length}</strong> ${corals.length === 1 ? 'Koralle' : 'Korallen'}</span>${active.length ? `<span class="status-badge status-info">${active.map(escapeHtml).join(' · ')}</span>` : '<span class="status-badge status-neutral">Gesamter Bestand</span>'}`;
+    }
+    renderCoralTransfers();
     if (!corals.length) {
-        list.innerHTML = '<div class="dashboard-panel"><h3>Noch keine Korallen</h3><p class="hint">Lege die erste Koralle an und dokumentiere deinen Bestand.</p></div>';
+        const filtered = Boolean(search) || statusFilter !== 'all';
+        list.innerHTML = `<div class="coral-empty-state" role="status"><strong>${filtered ? 'Keine passenden Korallen' : 'Noch keine Korallen'}</strong><p>${filtered ? 'Passe Suche oder Statusfilter an.' : 'Lege die erste Koralle an und dokumentiere deinen Bestand.'}</p>${filtered ? '<button type="button" class="btn-secondary" onclick="resetCoralFilters()">Filter zurücksetzen</button>' : ''}</div>`;
         return;
     }
     list.innerHTML = corals.map(coral => `
@@ -4411,39 +4613,28 @@ function renderCoralCatalog() {
                     <span class="coral-status-badge coral-status-${escapeHtml(coral.status || 'bestand')}">${escapeHtml(getCoralStatusLabel(coral.status || 'bestand'))}</span>
                 </div>
                 <div class="coral-meta-grid">
-                    <span><strong>Gattung</strong><small>${escapeHtml(coral.genus || '-')}</small></span>
-                    <span><strong>Art</strong><small>${escapeHtml(coral.speciesName || '-')}</small></span>
-                    <span><strong>Typ</strong><small>${escapeHtml(coral.coralType || '-')}</small></span>
-                    <span><strong>Wuchsform</strong><small>${escapeHtml(coral.growthForm || '-')}</small></span>
-                    <span><strong>Farbe</strong><small>${escapeHtml(coral.color || '-')}</small></span>
+                    ${coral.genus ? `<span><strong>Gattung</strong><small>${escapeHtml(coral.genus)}</small></span>` : ''}
+                    ${coral.speciesName ? `<span><strong>Art</strong><small>${escapeHtml(coral.speciesName)}</small></span>` : ''}
+                    ${coral.coralType ? `<span><strong>Typ</strong><small>${escapeHtml(coral.coralType)}</small></span>` : ''}
+                    ${coral.growthForm ? `<span><strong>Wuchsform</strong><small>${escapeHtml(coral.growthForm)}</small></span>` : ''}
+                    ${coral.color ? `<span><strong>Farbe</strong><small>${escapeHtml(coral.color)}</small></span>` : ''}
                     <span><strong>Fotos</strong><small>${getCoralPhotoList(coral).length || 0}</small></span>
                 </div>
-                <div class="btn-group" style="flex-wrap:wrap;">
+                <div class="btn-group coral-card-actions">
                     <button class="btn-secondary btn-animated" onclick="editCoralEntry('${coral.id}')">Bearbeiten</button>
                     <button class="btn-out btn-animated" onclick="deleteCoralEntry('${coral.id}')">Abgeben / Löschen</button>
                 </div>
             </div>
         </article>
     `).join('');
-    if (transfersList) {
-        const transfers = getCoralTransfers().slice().sort((a, b) => new Date(b.transferredAt || 0) - new Date(a.transferredAt || 0));
-        transfersList.innerHTML = transfers.length
-            ? transfers.map(entry => `
-                <article class="coral-transfer-card">
-                    <div class="coral-transfer-head">
-                        <strong>${escapeHtml(getCoralDisplayName(entry.coralSnapshot || {}))}</strong>
-                        <small>${formatWarehouseDate(entry.transferredAt)}</small>
-                    </div>
-                    <div class="coral-meta-grid">
-                        <span><strong>An</strong><small>${escapeHtml(entry.recipientName || '-')}</small></span>
-                        <span><strong>Kontakt</strong><small>${escapeHtml(entry.recipientContact || '-')}</small></span>
-                        <span><strong>Typ</strong><small>${escapeHtml(entry.coralSnapshot?.coralType || entry.coralSnapshot?.species || '-')}</small></span>
-                    </div>
-                    <p class="hint">${escapeHtml(entry.note || 'Keine weitere Notiz gespeichert.')}</p>
-                </article>
-            `).join('')
-            : '<div class="dashboard-panel"><h3>Noch keine Abgaben</h3><p class="hint">Wenn du eine Koralle abgibst, kannst du sie hier mit Empfänger und Kontakt wiederfinden.</p></div>';
-    }
+}
+
+function resetCoralFilters() {
+    const search = document.getElementById('coralSearch');
+    const status = document.getElementById('coralStatusFilter');
+    if (search) search.value = '';
+    if (status) status.value = 'all';
+    renderCoralCatalog();
 }
 
 function openQuickActionMenu() {
@@ -4495,6 +4686,7 @@ function switchWarehouse(id) {
     const current = getActiveWarehouse();
     if (current) current.data = db;
     syncActiveAquariumDataFromDb(false);
+    dashboardEditDraft = null;
     activeWarehouseId = id;
     appState.activeWarehouseId = id;
     const next = getActiveWarehouse();
@@ -4513,6 +4705,7 @@ function switchAquarium(id) {
         return;
     }
     syncActiveAquariumDataFromDb();
+    dashboardEditDraft = null;
     activeAquariumId = id;
     appState.activeAquariumId = id;
     overlayActiveAquariumData();
@@ -4552,31 +4745,55 @@ function deleteAquarium() {
     renderCurrentWarehouseViews();
 }
 
-function createWarehouse() {
-    const name = prompt('Name für das neue Lager:', `Lager ${Object.keys(appState.warehouses || {}).length + 1}`);
+async function createWarehouse() {
+    const name = await appPrompt('Lege einen eindeutigen Namen für das neue Lager fest.', `Lager ${Object.keys(appState.warehouses || {}).length + 1}`, {
+        title: 'Neues Lager',
+        label: 'Lagername',
+        required: true,
+        confirmText: 'Lager erstellen'
+    });
     if (!name || !name.trim()) return;
     const record = createWarehouseRecord(name.trim(), { theme: db.theme, settings: { forecastWeeks: (db.settings && db.settings.forecastWeeks) || 4 } });
     appState.warehouses[record.id] = record;
     switchWarehouse(record.id);
 }
 
-function renameWarehouse() {
+async function renameWarehouse() {
     const warehouse = getActiveWarehouse();
     if (!warehouse) return;
-    if (warehouse.isShared || warehouse.readOnly) return alert('Geteilte Lager können lokal nicht umbenannt werden.');
-    const name = prompt('Neuer Name für dieses Lager:', warehouse.name);
+    if (warehouse.isShared || warehouse.readOnly) {
+        await appAlert('Geteilte Lager können lokal nicht umbenannt werden.', { title: 'Nur Ansicht', type: 'warning' });
+        return;
+    }
+    const name = await appPrompt(`Du benennst das aktive Lager „${warehouse.name}“ um.`, warehouse.name, {
+        title: 'Lager umbenennen',
+        label: 'Neuer Lagername',
+        required: true,
+        confirmText: 'Namen übernehmen'
+    });
     if (!name || !name.trim()) return;
     warehouse.name = name.trim();
     saveDB();
 }
 
-function deleteWarehouse() {
+async function deleteWarehouse() {
     const warehouse = getActiveWarehouse();
     if (!warehouse) return;
-    if (warehouse.isShared || warehouse.readOnly) return alert('Geteilte Lager können hier nicht gelöscht werden.');
+    if (warehouse.isShared || warehouse.readOnly) {
+        await appAlert('Geteilte Lager können hier nicht gelöscht werden.', { title: 'Nur Ansicht', type: 'warning' });
+        return;
+    }
     const ids = Object.keys(appState.warehouses || {});
-    if (ids.length <= 1) return alert('Es muss mindestens ein Lager vorhanden bleiben.');
-    if (!confirm(`Lager "${warehouse.name}" wirklich löschen? Bestand, Statistik, Protokoll und Einstellungen dieses Lagers werden entfernt.`)) return;
+    if (ids.length <= 1) {
+        await appAlert('Es muss mindestens ein Lager vorhanden bleiben.', { title: 'Lager bleibt erhalten', type: 'warning' });
+        return;
+    }
+    const confirmed = await appConfirm(`Lager „${warehouse.name}“ wirklich löschen? Bestand, Statistik, Protokoll und Einstellungen dieses Lagers werden entfernt.`, {
+        title: 'Lager löschen',
+        type: 'danger',
+        confirmText: 'Lager löschen'
+    });
+    if (!confirmed) return;
     const deletedWarehouseName = warehouse.name;
     queueDeletedWarehouseRemoteId(warehouse.remoteId);
     delete appState.warehouses[warehouse.id];
@@ -4687,6 +4904,11 @@ function setMenuOpenState(isOpen) {
     const nav = document.getElementById('main-nav');
     const backdrop = document.getElementById('menu-backdrop');
     if (!nav || !backdrop) return;
+    const toggle = document.querySelector('.menu-toggle');
+    if (toggle) {
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        toggle.setAttribute('aria-label', isOpen ? 'Menü schließen' : 'Menü öffnen');
+    }
 
     if (isOpen) {
         nav.classList.add('open');
@@ -4730,7 +4952,10 @@ function showTab(tabId) {
     if (!targetTab || !targetBtn) tabId = 'lager';
 
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-    document.querySelectorAll('.nav-links button').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-links button').forEach(el => {
+        el.classList.remove('active');
+        el.removeAttribute('aria-current');
+    });
     
     const resolvedTab = document.getElementById(tabId);
     const resolvedBtn = document.getElementById('tab-' + tabId);
@@ -4741,10 +4966,16 @@ function showTab(tabId) {
         resolvedTab.style.animation = '';
         resolvedTab.classList.add('active');
         resolvedBtn.classList.add('active');
+        resolvedBtn.setAttribute('aria-current', 'page');
     }
     document.querySelectorAll('.mobile-bottom-nav button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.tab === tabId);
+        const isActive = btn.dataset.tab === tabId;
+        btn.classList.toggle('active', isActive);
+        if (isActive) btn.setAttribute('aria-current', 'page');
+        else btn.removeAttribute('aria-current');
     });
+    const activePageTitle = document.getElementById('activePageTitle');
+    if (activePageTitle) activePageTitle.textContent = TAB_LABELS[tabId] || tabId;
     const header = document.getElementById('appHeader');
     if (header) header.classList.toggle('warehouse-tools-hidden', tabId !== 'lager');
     document.body.dataset.activeTab = tabId;
@@ -4758,10 +4989,20 @@ function showTab(tabId) {
     
     if(tabId === 'uebersicht') renderDashboard();
     if(tabId === 'lager') renderLager();
-    if(tabId === 'cr-export') syncCRPreferredUnitUI();
+    if(tabId === 'cr-export') {
+        syncCRPreferredUnitUI();
+        setupPriority4CalculatorUI();
+    }
     if(tabId === 'statistik') renderStats();
-    if(tabId === 'trace-export') renderTraceExportInputs();
+    if(tabId === 'trace-export') {
+        renderTraceExportInputs();
+        setupPriority4CalculatorUI();
+    }
     if(tabId === 'log') renderLogs();
+    if(tabId === 'masseneingang') {
+        initBulkProductSelect();
+        renderBulkCart();
+    }
     if(tabId === 'nachbestellen') renderNachbestellen();
     if(tabId === 'tools') initTools();
     if(tabId === 'logbuch') renderLogBook();
@@ -4824,16 +5065,20 @@ function setupSettingsAccordions() {
     });
 
     renderSettingsGroupLabels(settings);
+    renderSettingsGroupNavigation(settings);
 
     settings.querySelectorAll('details').forEach(details => {
         details.open = false;
     });
+    filterSettingsGroup(activeSettingsGroup, false);
 }
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Sicherung', hint: 'Google Drive, Teilen und Wiederherstellen', keywords: 'google drive sync cloud teilen freunde lesen schreiben sicherung backup wiederherstellen' };
-    if (/app|system|update|problem|bug|backup/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates, Ordnung und Hilfe', keywords: 'app system update version backup bug problem mail menü reihenfolge' };
+    if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Cloud', hint: 'Google Drive und geräteübergreifende Sicherung', keywords: 'google drive sync cloud upload download wiederherstellen' };
+    if (/datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Lokale Sicherungen, Import und Export', keywords: 'sicherung backup export import wiederherstellen datei lokal' };
+    if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
+    if (/app|system|update|problem|bug/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
     if (/eigene produkte|produktlisten|preset|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen und Links', keywords: 'produkt eigene waren preset produktlisten shop link größe dichte stück gramm ml' };
@@ -4862,6 +5107,13 @@ function applySettingsMetadata(card, title) {
 
 function renderSettingsGroupLabels(settings) {
     settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
+    const groupOrder = ['Allgemein', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Cloud', 'Sicherung', 'Zurücksetzen', 'Weitere'];
+    const cards = Array.from(settings.querySelectorAll(':scope > .card'));
+    cards.sort((a, b) => {
+        const aIndex = groupOrder.indexOf(a.dataset.settingsGroup || 'Weitere');
+        const bIndex = groupOrder.indexOf(b.dataset.settingsGroup || 'Weitere');
+        return (aIndex < 0 ? groupOrder.length : aIndex) - (bIndex < 0 ? groupOrder.length : bIndex);
+    }).forEach(card => settings.appendChild(card));
     const seen = new Set();
     settings.querySelectorAll(':scope > .card').forEach(card => {
         card.style.display = '';
@@ -4871,9 +5123,54 @@ function renderSettingsGroupLabels(settings) {
         const label = document.createElement('div');
         label.className = 'settings-group-label';
         label.dataset.settingsGroupLabel = group;
+        label.id = `settings-group-${normalizeSettingsGroupId(group)}`;
         label.innerHTML = `<span>${group}</span>`;
         settings.insertBefore(label, card);
     });
+}
+
+let activeSettingsGroup = 'all';
+
+function normalizeSettingsGroupId(group) {
+    return String(group || 'weitere').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+function renderSettingsGroupNavigation(settings = document.getElementById('einstellungen')) {
+    const nav = document.getElementById('settingsGroupNav');
+    if (!settings || !nav) return;
+    const groups = Array.from(settings.querySelectorAll(':scope > .card'))
+        .map(card => card.dataset.settingsGroup || 'Weitere')
+        .filter((group, index, list) => list.indexOf(group) === index);
+    nav.innerHTML = [
+        '<button type="button" data-settings-filter="all" onclick="filterSettingsGroup(\'all\')">Alle</button>',
+        ...groups.map(group => `<button type="button" data-settings-filter="${escapeHtml(group)}" onclick='filterSettingsGroup(${jsArg(group)})'>${escapeHtml(group)}</button>`)
+    ].join('');
+}
+
+function filterSettingsGroup(group = 'all', focusGroup = true) {
+    const settings = document.getElementById('einstellungen');
+    if (!settings) return;
+    const availableGroups = new Set(Array.from(settings.querySelectorAll(':scope > .card')).map(card => card.dataset.settingsGroup || 'Weitere'));
+    activeSettingsGroup = group === 'all' || availableGroups.has(group) ? group : 'all';
+    settings.querySelectorAll(':scope > .card').forEach(card => {
+        const visible = activeSettingsGroup === 'all' || card.dataset.settingsGroup === activeSettingsGroup;
+        card.hidden = !visible;
+        if (!visible) card.querySelectorAll('details').forEach(details => { details.open = false; });
+    });
+    settings.querySelectorAll('.settings-group-label').forEach(label => {
+        label.hidden = activeSettingsGroup !== 'all' && label.dataset.settingsGroupLabel !== activeSettingsGroup;
+    });
+    document.querySelectorAll('#settingsGroupNav button').forEach(button => {
+        const active = button.dataset.settingsFilter === activeSettingsGroup;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+    });
+    const status = document.getElementById('settingsGroupStatus');
+    if (status) status.textContent = activeSettingsGroup === 'all' ? 'Alle Bereiche' : activeSettingsGroup;
+    if (focusGroup && activeSettingsGroup !== 'all') {
+        const label = document.getElementById(`settings-group-${normalizeSettingsGroupId(activeSettingsGroup)}`);
+        label?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 }
 
 // --- DESIGN / THEME STEUERUNG ---
@@ -5033,7 +5330,12 @@ function initLiveUpdateChecks() {
 }
 
 async function forceUpdateApp(ask = true) {
-    if (!ask || confirm("Möchtest du ein App-Update erzwingen? Dabei wird der interne Zwischenspeicher (Cache) geleert und die allerneueste Version geladen. Deine Bestandsdaten bleiben erhalten!")) {
+    const confirmed = !ask || await appConfirm('Dabei wird der interne Zwischenspeicher geleert und die neueste App-Version geladen. Deine Bestandsdaten bleiben erhalten.', {
+        title: 'App-Update laden',
+        type: 'warning',
+        confirmText: 'Update laden'
+    });
+    if (confirmed) {
         // 1. Service Worker deregistrieren
         if ('serviceWorker' in navigator) {
             try {
@@ -5689,7 +5991,7 @@ function renderCustomProductSettings() {
 
     if (!list) return;
     if (!db.customProducts || db.customProducts.length === 0) {
-        list.innerHTML = '<p class="hint" style="margin-top: 12px;">Noch keine eigenen Produkte angelegt.</p>';
+        list.innerHTML = '<p class="hint settings-empty-state">Noch keine eigenen Produkte angelegt.</p>';
         return;
     }
 
@@ -5701,12 +6003,12 @@ function renderCustomProductSettings() {
         return `
         <div class="custom-product-row">
             <span>
-                <strong>${product.name}</strong>
-                <small>${product.cat} · ${displaySizes} · Dichte ${product.density || 1}</small>
+                <strong>${escapeHtml(product.name)}</strong>
+                <small>${escapeHtml(product.cat)} · ${escapeHtml(displaySizes)} · Dichte ${escapeHtml(product.density || 1)}</small>
             </span>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button type="button" onclick="editCustomProduct(${index})">Bearbeiten</button>
-                <button type="button" onclick="deleteCustomProduct(${index})">Löschen</button>
+            <div class="settings-row-actions">
+                <button type="button" class="btn-secondary" onclick="editCustomProduct(${index})">Bearbeiten</button>
+                <button type="button" class="btn-out" onclick="deleteCustomProduct(${index})">Löschen</button>
             </div>
         </div>
     `;
@@ -5850,10 +6152,15 @@ function editCustomProduct(index) {
     initBulkProductSelect();
 }
 
-function deleteCustomProduct(index) {
+async function deleteCustomProduct(index) {
     const product = db.customProducts && db.customProducts[index];
     if (!product) return;
-    if (!confirm(`${product.name} wirklich löschen? Bestehende Lager- und Statistikdaten für dieses Produkt werden entfernt.`)) return;
+    const confirmed = await appConfirm(`${product.name} wirklich löschen? Bestehende Lager- und Statistikdaten für dieses Produkt werden entfernt.`, {
+        title: 'Eigenes Produkt löschen',
+        type: 'danger',
+        confirmText: 'Produkt löschen'
+    });
+    if (!confirmed) return;
 
     db.customProducts.splice(index, 1);
     if (db.inventory[product.cat]) delete db.inventory[product.cat][product.name];
@@ -5863,8 +6170,13 @@ function deleteCustomProduct(index) {
     if (db.alerts && db.alerts.disabled) delete db.alerts.disabled[product.name];
     delete densityFactors[product.name];
     saveDB();
-
-    window.location.reload();
+    resetCatalogToBase();
+    applyCustomProductsToCatalog();
+    renderCustomProductSettings();
+    renderProductVisibilitySettings();
+    renderLager();
+    initBulkProductSelect();
+    showToast('Eigenes Produkt gelöscht', 'success', 2200);
 }
 
 function renderCustomContainers() {
@@ -5872,15 +6184,15 @@ function renderCustomContainers() {
     if (!list) return;
     const entries = Object.entries(db.customContainers || {});
     if (entries.length === 0) {
-        list.innerHTML = '<p class="hint" style="margin-top: 12px;">Noch keine eigenen Behälter angelegt.</p>';
+        list.innerHTML = '<p class="hint settings-empty-state">Noch keine eigenen Behälter angelegt.</p>';
         return;
     }
     list.innerHTML = entries.map(([name, weight]) => `
         <div class="custom-product-row">
-            <span><strong>${name}</strong><small>Leergewicht: ${parseFloat(weight).toFixed(1)} g</small></span>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button type="button" onclick='editCustomContainer(${jsArg(name)})'>Bearbeiten</button>
-                <button type="button" onclick='deleteCustomContainer(${jsArg(name)})'>Löschen</button>
+            <span><strong>${escapeHtml(name)}</strong><small>Leergewicht: ${parseFloat(weight).toFixed(1)} g</small></span>
+            <div class="settings-row-actions">
+                <button type="button" class="btn-secondary" onclick='editCustomContainer(${jsArg(name)})'>Bearbeiten</button>
+                <button type="button" class="btn-out" onclick='deleteCustomContainer(${jsArg(name)})'>Löschen</button>
             </div>
         </div>
     `).join('');
@@ -5916,9 +6228,14 @@ function editCustomContainer(name) {
     initBulkProductSelect();
 }
 
-function deleteCustomContainer(name) {
+async function deleteCustomContainer(name) {
     if (!db.customContainers || db.customContainers[name] === undefined) return;
-    if (!confirm(`Behälter "${name}" löschen?`)) return;
+    const confirmed = await appConfirm(`Behälter "${name}" löschen? Das gespeicherte Tara-Gewicht wird entfernt.`, {
+        title: 'Tara-Behälter löschen',
+        type: 'danger',
+        confirmText: 'Behälter löschen'
+    });
+    if (!confirmed) return;
     delete db.customContainers[name];
     saveDB();
     renderCustomContainers();
@@ -6005,10 +6322,15 @@ function renderWarehouseEventLog() {
     `).join('');
 }
 
-function setThreshold(item) {
+async function setThreshold(item) {
     let current = db.thresholds[item] || 0;
     const unitLabel = getUnitLabel(getItemUnit(item));
-    let val = prompt(`Warnschwelle für ${item} (in ${unitLabel}) festlegen:\nFällt der Bestand auf oder unter diesen Wert, wird die Karte rot markiert.\n(Aktuell: ${current} ${unitLabel})`, current);
+    let val = await appPrompt(`Fällt der Bestand auf oder unter diesen Wert, wird die Karte als Warnung markiert. Aktuell: ${current} ${unitLabel}.`, current, {
+        title: `Warnschwelle für ${item}`,
+        label: `Warnschwelle in ${unitLabel}`,
+        inputType: 'number',
+        confirmText: 'Warnschwelle speichern'
+    });
     
     if (val !== null) {
         let parsed = parseFloat(val);
@@ -6018,7 +6340,7 @@ function setThreshold(item) {
             filterLager(); // Aktualisiert die UI sofort
             checkAndNotifyStockAlerts('manual');
         } else {
-            alert("Bitte eine gültige Zahl eingeben.");
+            await appAlert('Bitte eine gültige Zahl eingeben.', { title: 'Ungültige Warnschwelle', type: 'warning' });
         }
     }
 }
@@ -6056,33 +6378,47 @@ function renderProductCard(cat, item) {
         .reverse()
         .map(log => `<li>${log.action === 'out' ? '-' : '+'}${formatItemAmount(item, log.amount)} · ${new Date(getLogTime(log) || Date.now()).toLocaleDateString('de-DE')}</li>`)
         .join('');
+    const latestLog = (db.logs || []).filter(log => log.item === item).slice(-1)[0] || null;
     let crossHint = "";
     if (item === "Fluor (F)" && stock === 0) {
         let nafStock = (db.inventory["C&R Produkte"] && db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"]) || 0;
-        crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml)</span>`;
+        crossHint = `<span class="cross-hint">Leer. Alternativ NaF prüfen: ${nafStock.toFixed(1)} ml</span>`;
     } else if (item === "Natriumfluorid (NaF)" && stock === 0) {
         let fStock = (db.inventory["Anionen"] && db.inventory["Anionen"]["Fluor (F)"]) || 0;
-        crossHint = `<span class="cross-hint">⚠️ Leer! (Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml)</span>`;
+        crossHint = `<span class="cross-hint">Leer. Alternativ Fluor prüfen: ${fStock.toFixed(1)} ml</span>`;
     }
     const readOnlyView = isWarehouseReadOnlyView();
+    const warehouse = getActiveWarehouse();
+    const statusKey = stock <= 0 ? 'empty' : (warningClass ? 'warning' : 'ok');
+    const statusLabel = stock <= 0 ? 'Leer' : (warningClass ? 'Warnung' : 'Ausreichend');
+    const thresholdText = threshold > 0 ? formatItemAmount(item, threshold) : 'Nicht gesetzt';
     return `
-        <div class="card ${warningClass}">
-            <h4>
-                <span style="display:flex; align-items:center; gap:8px; min-width:0;">
-                    ${warningClass ? '<span style="width:8px;height:8px;border-radius:50%;background:var(--danger);flex-shrink:0;"></span>' : ''}
-                    <button class="threshold-btn favorite-btn ${favorite ? 'active' : ''}" onclick='toggleFavoriteProduct(${jsArg(item)})' title="Favorit umschalten">${favorite ? '★' : '☆'}</button>
-                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${item}</span>
-                    <button class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen">🔔</button>
-                </span>
-                <span class="stock" style="display:flex; flex-direction:column; align-items:flex-end;">
-                    <span>${formatItemAmount(item, stock)}</span>
-                    ${showMassSubline ? `<span style="font-size: 0.7rem; opacity: 0.6; font-weight: normal;">${stockG} g</span>` : ''}
-                </span>
-            </h4>
+        <article class="card inventory-card ${warningClass}" data-name="${escapeHtml(item)}" data-category="${escapeHtml(cat)}" data-stock-status="${statusKey}">
+            <header class="inventory-card-head">
+                <div class="inventory-product-copy">
+                    <span class="inventory-category">${escapeHtml(cat)}</span>
+                    <h3>${escapeHtml(item)}</h3>
+                </div>
+                <div class="inventory-card-tools">
+                    <button type="button" class="threshold-btn favorite-btn ${favorite ? 'active' : ''}" onclick='toggleFavoriteProduct(${jsArg(item)})' title="Favorit umschalten" aria-label="${favorite ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}">${favorite ? '★' : '☆'}</button>
+                    <button type="button" class="threshold-btn" onclick='setThreshold(${jsArg(item)})' title="Warnschwelle setzen" aria-label="Warnschwelle für ${escapeHtml(item)} setzen">Limit</button>
+                </div>
+            </header>
+            <div class="inventory-stock-row">
+                <div class="inventory-stock-value">
+                    <span class="stock">${formatItemAmount(item, stock)}</span>
+                    ${showMassSubline ? `<small>${stockG} g</small>` : ''}
+                </div>
+                <span class="inventory-status status-badge status-badge--${statusKey === 'ok' ? 'success' : (statusKey === 'warning' ? 'warning' : 'danger')}">${statusLabel}</span>
+            </div>
             ${crossHint}
-            ${prognosisHint}
-            ${thresholdHint}
-            ${disabledHint}
+            <dl class="inventory-facts">
+                <div><dt>Reichweite</dt><dd>${reachText}</dd></div>
+                <div><dt>Warnschwelle</dt><dd>${thresholdText}</dd></div>
+                <div><dt>Lager</dt><dd>${escapeHtml(warehouse?.name || 'Lager')}</dd></div>
+                <div><dt>Letzte Änderung</dt><dd>${latestLog ? formatWarehouseDate(getLogTime(latestLog)) : 'Noch keine Buchung'}</dd></div>
+            </dl>
+            <div class="inventory-hints">${prognosisHint}${thresholdHint}${disabledHint}</div>
             <details class="product-history">
                 <summary>Verlauf & Prognose</summary>
                 <div>
@@ -6091,13 +6427,13 @@ function renderProductCard(cat, item) {
                     <ul>${recentLogs || '<li>Noch keine Buchungen</li>'}</ul>
                 </div>
             </details>
-            <div class="btn-group" style="margin-top: 10px;">
+            <div class="btn-group inventory-card-actions">
                 ${readOnlyView
-                    ? '<button class="btn-secondary" type="button" disabled>Nur Ansicht</button>'
-                    : `<button class="btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
-                <button class="btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>`}
+                    ? '<button class="btn btn-secondary" type="button" disabled>Nur Ansicht</button>'
+                    : `<button type="button" class="btn btn-primary btn-in btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button>
+                <button type="button" class="btn btn-secondary btn-out btn-animated" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>`}
             </div>
-        </div>
+        </article>
     `;
 }
 
@@ -6117,43 +6453,67 @@ function renderLager() {
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
         container.innerHTML = `
+            <section class="warehouse-page-head">
+                <div>
+                    <small>Lagerverwaltung</small>
+                    <h2>Lagerbestand</h2>
+                    <p>Alle Buchungen wirken auf <strong id="activeWarehouseName">das aktive Lager</strong>.</p>
+                </div>
+                <div class="warehouse-head-actions">
+                    <button type="button" class="btn btn-primary" onclick="openSmartStockModal('in')">Einlagern</button>
+                    <button type="button" class="btn btn-secondary" onclick="openSmartStockModal('out')">Auslagern</button>
+                </div>
+            </section>
             <section class="warehouse-control-card">
                 <div class="warehouse-control-head">
                     <div>
-                        <span>Lagerauswahl</span>
-                        <strong>Aktives Lager verwalten</strong>
+                        <span>Aktives Lager</span>
+                        <strong>Lager auswählen und verwalten</strong>
                     </div>
                     <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
                 </div>
                 <div class="warehouse-switcher">
                     <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
-                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen">Neu</button>
-                    <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen">✎</button>
-                    <button type="button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen">×</button>
+                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen" aria-label="Neues Lager erstellen">Neu</button>
+                    <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen" aria-label="Aktuelles Lager umbenennen">✎</button>
+                    <button type="button" class="warehouse-delete-button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen" aria-label="Aktuelles Lager löschen">×</button>
                 </div>
                 <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
             </section>
-            <div class="lager-toolbar">
-                <div class="toolbar-field">
-                    <span class="toolbar-icon">🔍</span>
-                    <input type="text" id="searchInput" class="search-input" placeholder="Chemikalie suchen..." oninput="filterLager()">
+            <section class="warehouse-filter-panel" aria-label="Lager durchsuchen und filtern">
+                <div class="lager-toolbar">
+                    <div class="toolbar-field">
+                        <label for="searchInput">Suche</label>
+                        <input type="search" id="searchInput" class="search-input" aria-label="Lagerbestand durchsuchen" placeholder="Produkt suchen" oninput="filterLager()">
+                    </div>
+                    <div class="toolbar-divider"></div>
+                    <div class="toolbar-field">
+                        <label for="categoryFilter">Kategorie</label>
+                        <select id="categoryFilter" class="filter-select" aria-label="Lager nach Kategorie filtern" onchange="filterLager()">
+                            <option value="all">Alle Kategorien</option>
+                            ${categoryOptions}
+                        </select>
+                    </div>
                 </div>
-                <div class="toolbar-divider"></div>
-                <div class="toolbar-field">
-                    <span class="toolbar-icon">📂</span>
-                    <select id="categoryFilter" class="filter-select" onchange="filterLager()">
-                        <option value="all">Alle Kategorien</option>
-                        ${categoryOptions}
-                    </select>
+                <div class="warehouse-filter-foot">
+                    <div class="lager-filter-chips" aria-label="Schnellfilter">
+                        <button type="button" class="active" data-filter="all" aria-pressed="true" onclick="setLagerQuickFilter('all')">Alle</button>
+                        <button type="button" data-filter="low" aria-pressed="false" onclick="setLagerQuickFilter('low')">Knapp</button>
+                        <button type="button" data-filter="favorites" aria-pressed="false" onclick="setLagerQuickFilter('favorites')">Favoriten</button>
+                    </div>
+                    <div class="warehouse-filter-result">
+                        <span id="lager-result-count" aria-live="polite">Bestand wird geladen</span>
+                        <button type="button" id="lager-filter-reset" class="btn btn-ghost" onclick="resetLagerFilters()" hidden>Filter zurücksetzen</button>
+                    </div>
                 </div>
-            </div>
-            <div class="lager-filter-chips">
-                <button type="button" class="active" data-filter="all" onclick="setLagerQuickFilter('all')">Alle</button>
-                <button type="button" data-filter="low" onclick="setLagerQuickFilter('low')">Knapp</button>
-                <button type="button" data-filter="favorites" onclick="setLagerQuickFilter('favorites')">Favoriten</button>
-            </div>
+            </section>
             <div id="stock-alerts"></div>
             <div id="lager-container"></div>
+            <div id="lager-empty-state" class="empty-state warehouse-empty-state" hidden>
+                <strong class="empty-state-title">Keine Produkte gefunden</strong>
+                <p class="empty-state-text">Passe Suche oder Filter an, um wieder Produkte anzuzeigen.</p>
+                <button type="button" class="btn btn-secondary" onclick="resetLagerFilters()">Filter zurücksetzen</button>
+            </div>
         `;
         updateWarehouseUI();
     }
@@ -6166,8 +6526,17 @@ function setLagerQuickFilter(filter) {
     lagerQuickFilter = filter || 'all';
     document.querySelectorAll('.lager-filter-chips button').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.filter === lagerQuickFilter);
+        btn.setAttribute('aria-pressed', btn.dataset.filter === lagerQuickFilter ? 'true' : 'false');
     });
     filterLager();
+}
+
+function resetLagerFilters() {
+    const searchInput = document.getElementById('searchInput');
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (searchInput) searchInput.value = '';
+    if (categoryFilter) categoryFilter.value = 'all';
+    setLagerQuickFilter('all');
 }
 
 function filterLager() {
@@ -6175,6 +6544,9 @@ function filterLager() {
     const searchInput = document.getElementById('searchInput');
     const categoryFilter = document.getElementById('categoryFilter');
     const alertsContainer = document.getElementById('stock-alerts');
+    const resultCount = document.getElementById('lager-result-count');
+    const emptyState = document.getElementById('lager-empty-state');
+    const resetButton = document.getElementById('lager-filter-reset');
     const term = searchInput ? searchInput.value.toLowerCase() : '';
     const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
     const alertItems = new Set(getStockAlerts().map(alert => alert.item));
@@ -6184,6 +6556,7 @@ function filterLager() {
     renderStockAlerts(alertsContainer);
 
     const favoriteRows = [];
+    const matchedItems = new Set();
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
             if (isProductHidden(item)) continue;
@@ -6192,16 +6565,17 @@ function filterLager() {
             if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
             if (!item.toLowerCase().includes(term)) continue;
             favoriteRows.push(renderProductCard(cat, item));
+            matchedItems.add(`${cat}\u0000${item}`);
         }
     }
     if (lagerQuickFilter === 'all' && favoriteRows.length > 0) {
-        listContainer.innerHTML += `<h2 class="category-title">Favoriten</h2>${favoriteRows.join('')}`;
+        listContainer.innerHTML += `<section class="inventory-category-section"><h2 class="category-title">Favoriten</h2><div class="inventory-card-grid">${favoriteRows.join('')}</div></section>`;
     }
     
     for (let cat in catalog) {
         if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
 
-        let catHTML = `<h2 class="category-title">${cat}</h2>`;
+        let catHTML = '';
         let hasItems = false;
         
         for (let item in catalog[cat]) {
@@ -6211,12 +6585,19 @@ function filterLager() {
             if (item.toLowerCase().includes(term)) {
                 hasItems = true;
                 catHTML += renderProductCard(cat, item);
+                matchedItems.add(`${cat}\u0000${item}`);
             }
         }
         if (hasItems) {
-            listContainer.innerHTML += catHTML;
+            listContainer.innerHTML += `<section class="inventory-category-section"><h2 class="category-title">${escapeHtml(cat)}</h2><div class="inventory-card-grid">${catHTML}</div></section>`;
         }
     }
+    const matchCount = matchedItems.size;
+    const filtersActive = Boolean(term || selectedCategory !== 'all' || lagerQuickFilter !== 'all');
+    if (resultCount) resultCount.textContent = `${matchCount} ${matchCount === 1 ? 'Produkt' : 'Produkte'}`;
+    if (resetButton) resetButton.hidden = !filtersActive;
+    if (emptyState) emptyState.hidden = matchCount !== 0;
+    listContainer.hidden = matchCount === 0;
 }
 
 function renderStockAlerts(container) {
@@ -6271,11 +6652,11 @@ function renderTraceExportInputs() {
             const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
-                <label>${item}</label>
+                <label for="${id}">${item}</label>
                 <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
-                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                <div class="trace-unit-stack">
                     <span class="unit-label">ml</span>
-                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
+                    <span id="${id}-g" class="trace-gram-value">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
                 </div>
             </div>
         `}).join('');
@@ -6286,11 +6667,11 @@ function renderTraceExportInputs() {
             const value = db.traceDraft[item] || '';
             return `
             <div class="trace-grid">
-                <label>${item}</label>
+                <label for="${id}">${item}</label>
                 <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
-                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                <div class="trace-unit-stack">
                     <span class="unit-label">ml</span>
-                    <span id="${id}-g" style="font-size: 0.75rem; color: var(--secondary); font-weight: 600;">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
+                    <span id="${id}-g" class="trace-gram-value">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
                 </div>
             </div>
         `}).join('');
@@ -6314,6 +6695,12 @@ function getTraceInputId(prefix, itemName) {
         .replace(/[^\w]+/g, '-')
         .replace(/^-+|-+$/g, '')
         .toLowerCase();
+}
+
+function getTraceInputElement(prefix, itemName) {
+    const canonicalId = getTraceInputId(prefix, itemName);
+    const legacyId = `mix-${prefix}-` + String(itemName).replace(/[^a-zA-Z]/g, '');
+    return document.getElementById(canonicalId) || document.getElementById(legacyId);
 }
 
 function calcTraceGrams(inputId, itemName) {
@@ -6428,6 +6815,50 @@ function clearReefManagerImport() {
     previewReefManagerImport('');
 }
 
+function setupPriority4CalculatorUI() {
+    const scopedSections = document.querySelectorAll(
+        '#tools details[data-section-id="dosieren-und-messwerte"], ' +
+        '#tools details[data-section-id="salinitaet-und-wasserwechsel"], ' +
+        '#tools details[data-section-id="c-und-r-und-mischen"]'
+    );
+    scopedSections.forEach(section => {
+        section.classList.add('calculator-section');
+        section.querySelectorAll('.tool-compact-card').forEach(card => card.classList.add('calculator-card'));
+        section.querySelectorAll('.tool-grid').forEach(grid => grid.classList.add('calculator-input-grid'));
+        section.querySelectorAll('.btn-group').forEach(group => group.classList.add('calculator-actions'));
+        section.querySelectorAll('input[type="number"]').forEach(input => {
+            if (!input.hasAttribute('inputmode')) input.setAttribute('inputmode', 'decimal');
+        });
+    });
+
+    [
+        'majorCorrectionResult', 'consumptionResult', 'testCorrectionResult', 'nutritionResult',
+        'salinityResult', 'simpleSalinityResult', 'specificGravityResult', 'saltCorrectionResult',
+        'waterChangeResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
+    ].forEach(id => {
+        const result = document.getElementById(id);
+        if (!result) return;
+        result.classList.add('calculator-result-region');
+        result.setAttribute('aria-live', 'polite');
+        result.setAttribute('aria-atomic', 'false');
+    });
+    [
+        'hannaPhosphorusResult', 'salifertConverterResult'
+    ].forEach(id => {
+        const result = document.getElementById(id);
+        if (!result) return;
+        result.classList.add('calculator-result-region');
+        result.setAttribute('aria-live', 'polite');
+        result.setAttribute('aria-atomic', 'false');
+    });
+
+    const warehouseName = getActiveWarehouse()?.name || 'Lager';
+    ['crActiveWarehouseName', 'traceActiveWarehouseName'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = warehouseName;
+    });
+}
+
 function initTools() {
     renderAquariumWorkspacePanels();
     const select = document.getElementById('macroRecipeSelect');
@@ -6452,6 +6883,9 @@ function initTools() {
     renderMajorCorrectionCalculator();
     renderConsumptionCalculator();
     renderTestCorrectionTool();
+    renderHannaPhosphorusConverter();
+    populateSalifertSyringeSelect();
+    renderSalifertConverter();
     renderWaterChangeCalculator();
     renderSaltCorrectionCalculator();
     renderFeedNutrientLog();
@@ -6459,6 +6893,7 @@ function initTools() {
     renderOsmoseTank();
     renderDosingContainers();
     renderPsuCorrectionSettings();
+    renderSangokaiAssistant();
     renderImplementationLog();
     renderCommunityMapCard();
     updateSalinityCalculator();
@@ -6466,6 +6901,7 @@ function initTools() {
     setupToolTiles();
     setupToolSections();
     renderToolFavorites();
+    setupPriority4CalculatorUI();
 }
 
 function getToolSettings() {
@@ -6532,6 +6968,8 @@ function getToolTileVisual(toolId, title = '') {
         'kh-ca-korrektur': { icon: 'KH', subtitle: 'Zielwerte anpassen' },
         'verbrauch-pro-tag': { icon: '24', subtitle: 'Tagesverbrauch rechnen' },
         'test-korrekturfaktor': { icon: 'IC', subtitle: 'Tests abgleichen' },
+        'hanna-phosphor-zu-phosphat': { icon: 'PO', subtitle: 'P zu PO4 rechnen' },
+        'salifert-umrechner': { icon: 'Sa', subtitle: 'Spritzenwert waehlen' },
         'nutrition-rechner': { icon: 'N', subtitle: 'Naehrstoffe dosieren' },
         'salzgehalt-rechner': { icon: 'PS', subtitle: 'PSU und Dichte pruefen' },
         'salz-korrektur': { icon: 'SG', subtitle: 'Salz angleichen' },
@@ -6539,6 +6977,7 @@ function getToolTileVisual(toolId, title = '') {
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
         'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
         'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
+        'sangokai-a-z-assistent': { icon: 'AZ', subtitle: 'PDF Wissen suchen' },
         'hilfreiche-quellen': { icon: 'Q', subtitle: 'Links und Wissen' }
     };
     return map[toolId] || { icon: (title || 'T').slice(0, 2).toUpperCase(), subtitle: 'Tool oeffnen' };
@@ -6738,6 +7177,186 @@ function toggleToolTile(card) {
     card.querySelector('h3')?.setAttribute('aria-expanded', String(willOpen));
 }
 
+const SANGOKAI_SEARCH_STOPWORDS = new Set([
+    'aber', 'alle', 'als', 'also', 'am', 'an', 'auch', 'auf', 'aus', 'bei', 'bis', 'da',
+    'das', 'dass', 'dem', 'den', 'der', 'des', 'die', 'dies', 'diese', 'dieser', 'doch',
+    'durch', 'ein', 'eine', 'einem', 'einen', 'einer', 'er', 'es', 'fuer', 'gegen', 'gibt',
+    'habe', 'haben', 'hat', 'im', 'in', 'ist', 'ja', 'kann', 'mit', 'nach', 'nicht', 'noch',
+    'nur', 'oder', 'sich', 'sind', 'soll', 'sollte', 'um', 'und', 'von', 'was', 'wenn',
+    'wer', 'wie', 'wir', 'wird', 'wo', 'zu', 'zum', 'zur'
+]);
+
+const SANGOKAI_SEARCH_SYNONYMS = {
+    po4: ['phosphat', 'phosphor'],
+    phosphat: ['po4', 'phosphor'],
+    no3: ['nitrat', 'stickstoff'],
+    nitrat: ['no3', 'stickstoff'],
+    kh: ['karbonathaerte', 'alkalinitaet'],
+    karbonathaerte: ['kh', 'alkalinitaet'],
+    alkalinitaet: ['kh', 'karbonathaerte'],
+    salinitaet: ['salzgehalt', 'psu'],
+    salzgehalt: ['salinitaet', 'psu'],
+    psu: ['salinitaet', 'salzgehalt'],
+    cyanos: ['cyanobakterien'],
+    cyanobakterien: ['cyanos', 'cyanobakterie'],
+    dinos: ['dinoflagellaten'],
+    dinoflagellaten: ['dinos', 'zooxanthellen'],
+    led: ['beleuchtung', 'lampe', 'licht'],
+    t5: ['beleuchtung', 'lampe', 'licht'],
+    abschaeumer: ['eiweissabschaeumer', 'skimmer'],
+    eiweissabschaeumer: ['abschaeumer', 'skimmer'],
+    aktivkohle: ['kohle', 'filterkohle'],
+    iod: ['jod'],
+    jod: ['iod']
+};
+
+function normalizeSangokaiText(value = '') {
+    return String(value)
+        .toLowerCase()
+        .replace(/ä/g, 'ae')
+        .replace(/ö/g, 'oe')
+        .replace(/ü/g, 'ue')
+        .replace(/ß/g, 'ss')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function getSangokaiQueryTerms(query) {
+    const baseTerms = normalizeSangokaiText(query)
+        .split(' ')
+        .map(term => term.trim())
+        .filter(term => term.length > 1 && !SANGOKAI_SEARCH_STOPWORDS.has(term));
+    const expanded = new Set(baseTerms);
+    baseTerms.forEach(term => {
+        (SANGOKAI_SEARCH_SYNONYMS[term] || []).forEach(alias => expanded.add(alias));
+    });
+    return Array.from(expanded);
+}
+
+function scoreSangokaiChunk(chunk, query, terms) {
+    const normalized = chunk._normalized || (chunk._normalized = normalizeSangokaiText(chunk.t));
+    const exact = normalizeSangokaiText(query);
+    let score = 0;
+    if (exact.length > 2 && normalized.includes(exact)) score += 12 + Math.min(18, exact.length / 3);
+    terms.forEach(term => {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const matches = normalized.match(new RegExp(`(^| )${escaped}`, 'g'));
+        if (matches) score += matches.length * (term.length > 4 ? 4 : 2);
+    });
+    const uniqueMatches = terms.filter(term => normalized.includes(term)).length;
+    score += uniqueMatches * uniqueMatches;
+    return score;
+}
+
+function searchSangokaiKnowledge(query, limit = 5) {
+    const data = window.SANGOKAI_AZ_DATA;
+    if (!data?.chunks?.length) return { terms: [], matches: [] };
+    const terms = getSangokaiQueryTerms(query);
+    if (!terms.length) return { terms, matches: [] };
+    const matches = data.chunks
+        .map(chunk => ({ chunk, score: scoreSangokaiChunk(chunk, query, terms) }))
+        .filter(match => match.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, limit);
+    return { terms, matches };
+}
+
+function splitSangokaiSentences(text = '') {
+    return text
+        .replace(/\s+/g, ' ')
+        .split(/(?<=[.!?])\s+(?=[A-ZÄÖÜ0-9])/)
+        .map(sentence => sentence.trim())
+        .filter(Boolean);
+}
+
+function buildSangokaiAnswer(matches, terms) {
+    const picked = [];
+    const seen = new Set();
+    matches.slice(0, 4).forEach(match => {
+        splitSangokaiSentences(match.chunk.t).forEach(sentence => {
+            if (picked.length >= 4) return;
+            const normalized = normalizeSangokaiText(sentence);
+            const hitCount = terms.filter(term => normalized.includes(term)).length;
+            const key = normalized.slice(0, 90);
+            if (hitCount && !seen.has(key) && sentence.length > 45) {
+                seen.add(key);
+                picked.push({ sentence, page: match.chunk.p, hitCount });
+            }
+        });
+    });
+    return picked.sort((a, b) => b.hitCount - a.hitCount).slice(0, 3);
+}
+
+function formatSangokaiSnippet(text, terms) {
+    const best = splitSangokaiSentences(text)
+        .map(sentence => ({
+            sentence,
+            hits: terms.filter(term => normalizeSangokaiText(sentence).includes(term)).length
+        }))
+        .sort((a, b) => b.hits - a.hits)[0]?.sentence || text;
+    return best.length > 320 ? `${best.slice(0, 317).trim()}...` : best;
+}
+
+function renderSangokaiAssistant(force = false) {
+    const result = document.getElementById('sangokaiSearchResult');
+    const input = document.getElementById('sangokaiSearchInput');
+    const sourceLabel = document.getElementById('sangokaiSourceLabel');
+    if (!result || !input) return;
+    if (sourceLabel && window.SANGOKAI_AZ_DATA?.source) sourceLabel.textContent = `Quelle: ${window.SANGOKAI_AZ_DATA.source}`;
+    const query = input.value.trim();
+    if (!query) {
+        result.innerHTML = '<p class="hint">Stelle eine Frage oder suche nach einem Begriff. Die Antwort wird nur aus dem eingebauten Sangokai A-Z PDF gebildet.</p>';
+        return;
+    }
+    if (query.length < 3 && !force) {
+        result.innerHTML = '<p class="hint">Bitte mindestens drei Zeichen eingeben.</p>';
+        return;
+    }
+    const { terms, matches } = searchSangokaiKnowledge(query, 6);
+    const bestScore = matches[0]?.score || 0;
+    if (bestScore < 8 || !terms.length) {
+        result.innerHTML = `
+            <div class="sangokai-answer sangokai-answer-empty">
+                <strong>Nicht belastbar im Dokument gefunden.</strong>
+                <p>Im Sangokai A-Z PDF habe ich zu „${escapeHtml(query)}“ keine ausreichend klare Stelle gefunden. Ich erfinde dazu keine Antwort.</p>
+            </div>
+        `;
+        return;
+    }
+    const answerSentences = buildSangokaiAnswer(matches, terms);
+    const answerHtml = answerSentences.length
+        ? answerSentences.map(item => `<p>${escapeHtml(item.sentence)} <small>Seite ${item.page}</small></p>`).join('')
+        : '<p>Es gibt Treffer im Dokument, aber keine kurze eindeutige Antwortstelle. Bitte prüfe die Treffer unten.</p>';
+    result.innerHTML = `
+        <div class="sangokai-answer">
+            <strong>Antwort aus dem Sangokai A-Z PDF</strong>
+            ${answerHtml}
+        </div>
+        <div class="sangokai-match-list">
+            ${matches.slice(0, 4).map(match => `
+                <details class="sangokai-match">
+                    <summary><span>Seite ${match.chunk.p}</span><small>Treffer ${Math.round(match.score)}</small></summary>
+                    <p>${escapeHtml(formatSangokaiSnippet(match.chunk.t, terms))}</p>
+                </details>
+            `).join('')}
+        </div>
+    `;
+}
+
+function handleSangokaiSearchKey(event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    renderSangokaiAssistant(true);
+}
+
+Object.assign(window, {
+    renderSangokaiAssistant,
+    handleSangokaiSearchKey
+});
+
 document.addEventListener('click', event => {
     if (event.target.closest?.('.tool-inline-fav')) return;
     const title = event.target.closest?.('#tools .tool-tile-card > h3');
@@ -6751,9 +7370,220 @@ document.addEventListener('click', event => {
 document.addEventListener('click', event => {
     const insideQuickSync = event.target.closest?.('.header-sync-actions-wrap');
     if (!insideQuickSync) closeCloudQuickSyncMenu();
+    if (!event.target.closest?.('.salifert-select')) closeSalifertDropdowns();
+});
+
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') closeSalifertDropdowns();
 });
 
 const majorCorrectionDefaultSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
+
+function clampTestSyringeValue(value) {
+    if (!Number.isFinite(value)) return null;
+    return Math.max(0, Math.min(1, value));
+}
+
+function interpolateTestScale(value, points) {
+    if (!Number.isFinite(value) || !Array.isArray(points) || points.length === 0) return null;
+    const sorted = points.slice().sort((a, b) => a.ml - b.ml);
+    if (value <= sorted[0].ml) return sorted[0].value;
+    const last = sorted[sorted.length - 1];
+    if (value >= last.ml) return last.value;
+    for (let index = 1; index < sorted.length; index += 1) {
+        const previous = sorted[index - 1];
+        const next = sorted[index];
+        if (value <= next.ml) {
+            const span = next.ml - previous.ml;
+            const ratio = span ? (value - previous.ml) / span : 0;
+            return previous.value + ((next.value - previous.value) * ratio);
+        }
+    }
+    return last.value;
+}
+
+function renderHannaPhosphorusConverter() {
+    const result = document.getElementById('hannaPhosphorusResult');
+    if (!result) return;
+    const phosphorus = parseFloat(document.getElementById('hannaPhosphorusInput')?.value);
+    if (!Number.isFinite(phosphorus) || phosphorus < 0) {
+        result.innerHTML = '<p class="hint">Bitte den Phosphor-Wert des Hanna Checkers eintragen.</p>';
+        return;
+    }
+    const phosphate = phosphorus * 3.066 / 1000;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Phosphat PO4</strong><small>Formel: P × 3,066 ÷ 1000</small></span>
+                <span>${phosphate.toFixed(4)} mg/l</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Gerundet</strong><small>Praxiswert für Logbuch und Dosierung.</small></span>
+                <span>${phosphate.toFixed(3)} mg/l</span>
+            </div>
+        </div>
+    `;
+}
+
+const salifertKhPoints = [
+    { ml: 0.00, value: 15.7 },
+    { ml: 0.02, value: 15.3 },
+    { ml: 0.20, value: 12.5 },
+    { ml: 0.40, value: 9.3 },
+    { ml: 0.98, value: 0 }
+];
+
+const salifertConverterState = {
+    type: 'calcium',
+    typeLabel: 'Calcium',
+    syringe: '0.20',
+    syringeLabel: '0,20 ml'
+};
+
+function getSalifertDropdownElements(kind) {
+    if (kind === 'type') {
+        return {
+            button: document.getElementById('salifertConverterTypeButton'),
+            label: document.getElementById('salifertConverterTypeLabel'),
+            menu: document.getElementById('salifertConverterTypeMenu')
+        };
+    }
+    return {
+        button: document.getElementById('salifertSyringeValueButton'),
+        label: document.getElementById('salifertSyringeValueLabel'),
+        menu: document.getElementById('salifertSyringeValueMenu')
+    };
+}
+
+function closeSalifertDropdowns(exceptKind = '') {
+    ['type', 'syringe'].forEach(kind => {
+        if (kind === exceptKind) return;
+        const { button, menu } = getSalifertDropdownElements(kind);
+        if (menu) menu.hidden = true;
+        if (button) button.setAttribute('aria-expanded', 'false');
+    });
+}
+
+function toggleSalifertDropdown(event, kind) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const { button, menu } = getSalifertDropdownElements(kind);
+    if (!button || !menu) return;
+    const willOpen = menu.hidden;
+    closeSalifertDropdowns(kind);
+    menu.hidden = !willOpen;
+    button.setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) {
+        const selected = menu.querySelector('[aria-selected="true"]');
+        selected?.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function updateSalifertDropdownLabels() {
+    const typeElements = getSalifertDropdownElements('type');
+    const syringeElements = getSalifertDropdownElements('syringe');
+    if (typeElements.label) typeElements.label.textContent = salifertConverterState.typeLabel;
+    if (syringeElements.label) syringeElements.label.textContent = salifertConverterState.syringeLabel;
+    typeElements.menu?.querySelectorAll('button[data-value]').forEach(button => {
+        button.setAttribute('aria-selected', String(button.dataset.value === salifertConverterState.type));
+    });
+    syringeElements.menu?.querySelectorAll('button[data-value]').forEach(button => {
+        button.setAttribute('aria-selected', String(button.dataset.value === salifertConverterState.syringe));
+    });
+}
+
+function selectSalifertOption(event, kind, value, label) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (kind === 'type') {
+        salifertConverterState.type = value;
+        salifertConverterState.typeLabel = label;
+    } else {
+        salifertConverterState.syringe = value;
+        salifertConverterState.syringeLabel = label;
+    }
+    closeSalifertDropdowns();
+    updateSalifertDropdownLabels();
+    renderSalifertConverter();
+}
+
+function populateSalifertSyringeSelect() {
+    const menu = document.getElementById('salifertSyringeValueMenu');
+    if (!menu || menu.children.length > 0) {
+        updateSalifertDropdownLabels();
+        return;
+    }
+    const options = [];
+    for (let value = 0; value <= 100; value += 1) {
+        const ml = value / 100;
+        const optionValue = ml.toFixed(2);
+        const label = `${optionValue.replace('.', ',')} ml`;
+        options.push(`<button type="button" role="option" data-value="${optionValue}" aria-selected="${optionValue === salifertConverterState.syringe ? 'true' : 'false'}" onclick="selectSalifertOption(event, 'syringe', '${optionValue}', '${label}')">${label}</button>`);
+    }
+    menu.innerHTML = options.join('');
+    updateSalifertDropdownLabels();
+}
+
+function renderSalifertConverter() {
+    populateSalifertSyringeSelect();
+    const result = document.getElementById('salifertConverterResult');
+    if (!result) return;
+    const type = salifertConverterState.type || 'calcium';
+    const rawSyringe = parseFloat(salifertConverterState.syringe);
+    const syringe = clampTestSyringeValue(rawSyringe);
+    if (syringe === null) {
+        result.innerHTML = '<p class="hint">Bitte den Restinhalt der Spritze auswählen.</p>';
+        return;
+    }
+    if (type === 'kh') {
+        const dkh = Math.max(0, interpolateTestScale(syringe, salifertKhPoints) || 0);
+        result.innerHTML = `
+            <div class="tool-result">
+                <div class="tool-row">
+                    <span><strong>KH</strong><small>Zwischenwerte per linearer Interpolation aus deiner Skala.</small></span>
+                    <span>${dkh.toFixed(2)} dKH</span>
+                </div>
+                <div class="tool-row">
+                    <span><strong>KH gerundet</strong><small>Praxiswert für Messwerte.</small></span>
+                    <span>${dkh.toFixed(1)} dKH</span>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    const ppm = Math.max(0, 500 - (syringe * 500));
+    const mgL = ppm * 1.023;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Salifert Anzeige</strong><small>Linear: 0,00 ml = 500 ppm, 1,00 ml = 0 ppm.</small></span>
+                <span>${ppm.toFixed(0)} ppm</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Calcium</strong><small>Umrechnung ppm × 1,023 für Meerwasser.</small></span>
+                <span>${mgL.toFixed(1)} mg/l</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Gerundet</strong><small>Praxiswert für Messwerte.</small></span>
+                <span>${Math.round(mgL)} mg/l</span>
+            </div>
+        </div>
+    `;
+}
+
+function renderSalifertCalciumConverter() {
+    salifertConverterState.type = 'calcium';
+    salifertConverterState.typeLabel = 'Calcium';
+    updateSalifertDropdownLabels();
+    renderSalifertConverter();
+}
+
+function renderSalifertKhConverter() {
+    salifertConverterState.type = 'kh';
+    salifertConverterState.typeLabel = 'KH / Alkalinität';
+    updateSalifertDropdownLabels();
+    renderSalifertConverter();
+}
 
 function getMajorCorrectionUnit(element) {
     return element === 'KH' ? 'dKH' : 'mg/l';
@@ -7217,7 +8047,7 @@ function renderOsmoseTank(updateInputs = true) {
                 <span><strong>Reicht noch ca.</strong><small>Warnung ab ${tank.warnDays || 0} Tag(en) Restreichweite.</small></span>
                 <span>${daysLeft !== null ? daysLeft.toFixed(1) + ' Tage' : 'unbekannt'}</span>
             </div>
-            ${recentRows ? `<div style="margin-top:8px;">${recentRows}</div>` : ''}
+            ${recentRows ? `<div class="osmose-history">${recentRows}</div>` : ''}
         </div>
     `;
 }
@@ -7365,7 +8195,7 @@ function renderDosingContainers() {
                         <div>
                             <strong>${escapeHtml(container.name)}</strong>
                             <small>${current.toFixed(1)} / ${capacity.toFixed(1)} ml · ${daily.toFixed(2)} ml/Tag · leer in ${hoursLeft === null ? 'unbekannt' : formatDuration(hoursLeft * 60)}</small>
-                            <div class="mini-progress"><span style="width:${percent}%"></span></div>
+                            <progress class="mini-progress" value="${percent}" max="100" aria-label="Füllstand ${escapeHtml(container.name)}: ${percent.toFixed(0)} Prozent">${percent.toFixed(0)}%</progress>
                             <small>Letzte Füllung: ${container.lastFilledAt ? formatWarehouseDate(container.lastFilledAt) : 'noch nie'}${warn ? ' · Warnbereich erreicht' : ''}</small>
                         </div>
                         <div class="logbook-actions">
@@ -7420,7 +8250,7 @@ function renderNutritionCalculator() {
     const dailyMl = totalMl / days;
     const resolved = resolveRecipeItem({ item: rule.product });
     const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
-    const stockHint = resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}` : 'nicht lagergeführt';
+    const stockHint = resolved ? `${stock < totalMl ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)}` : 'nicht lagergeführt';
     const missingClass = resolved && stock < totalMl ? ' missing' : '';
     const planRows = Array.from({ length: days }, (_, index) => `
         <label class="dose-plan-row">
@@ -7441,8 +8271,8 @@ function renderNutritionCalculator() {
             </div>
             <div class="dose-plan">${planRows}</div>
         </div>
-        <div class="tool-action-row">
-            <button class="btn-danger btn-animated" onclick="bookNutritionDose()">Aus Lager auslagern</button>
+        <div class="tool-action-row calculator-actions">
+            <button class="btn-primary btn-animated booking-action" onclick="bookNutritionDose()">Aus Lager auslagern</button>
         </div>
     `;
 }
@@ -8650,7 +9480,7 @@ function renderSeaWaterMix() {
             <div class="tool-row ${missing ? 'missing' : ''}">
                 <span>
                     <strong>${entry.item || entry.label}</strong>
-                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)} · Dichte ${density.toFixed(3)} g/ml` : 'nicht lagergeführt · ca. 1.000 g/ml'}</small>
+                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)} · Dichte ${density.toFixed(3)} g/ml` : 'nicht lagergeführt · ca. 1.000 g/ml'}</small>
                 </span>
                 <span>${amountLabel}</span>
             </div>
@@ -8658,20 +9488,33 @@ function renderSeaWaterMix() {
     }).join('');
     result.innerHTML = `
         <div class="tool-result">${rows}</div>
-        <button class="btn-danger btn-animated" onclick="bookSeaWaterMix()">Lagergeführte Zutaten auslagern</button>
+        <div class="tool-action-row calculator-actions">
+            <button class="btn-primary btn-animated booking-action" onclick="bookSeaWaterMix()">Lagergeführte Zutaten auslagern</button>
+        </div>
     `;
 }
 
-function saveSeaWaterPreset() {
+async function saveSeaWaterPreset() {
     const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
-    if (!liters) return alert('Bitte erst eine Meerwassermenge eintragen.');
-    const name = prompt('Preset-Name:', `${liters} L Meerwasser`);
+    if (!liters) {
+        await appAlert('Bitte erst eine Meerwassermenge eintragen.', {
+            title: 'Menge fehlt',
+            type: 'warning'
+        });
+        return;
+    }
+    const name = await appPrompt('Unter diesem Namen findest du die Meerwassermenge später wieder.', `${liters} L Meerwasser`, {
+        title: 'Meerwasser-Preset speichern',
+        label: 'Preset-Name',
+        required: true,
+        confirmText: 'Preset speichern'
+    });
     if (!name || !name.trim()) return;
     if (!db.crSeaWaterPresets) db.crSeaWaterPresets = {};
     db.crSeaWaterPresets[name.trim()] = liters;
     saveDB();
     renderSeaWaterPresetSelect();
-    alert(`Preset "${name.trim()}" gespeichert.`);
+    showToast(`Preset "${name.trim()}" gespeichert`, 'success', 2600);
 }
 
 function loadSeaWaterPreset(name) {
@@ -8681,11 +9524,22 @@ function loadSeaWaterPreset(name) {
     renderSeaWaterMix();
 }
 
-function deleteSeaWaterPreset() {
+async function deleteSeaWaterPreset() {
     const select = document.getElementById('seaWaterPresetSelect');
     const name = select?.value || '';
-    if (!name) return alert('Bitte zuerst ein Preset auswählen.');
-    if (!confirm(`Preset "${name}" löschen?`)) return;
+    if (!name) {
+        await appAlert('Bitte zuerst ein Preset auswählen.', {
+            title: 'Kein Preset ausgewählt',
+            type: 'info'
+        });
+        return;
+    }
+    const confirmed = await appConfirm(`Preset "${name}" löschen?`, {
+        title: 'Meerwasser-Preset löschen',
+        type: 'danger',
+        confirmText: 'Preset löschen'
+    });
+    if (!confirmed) return;
     delete db.crSeaWaterPresets[name];
     saveDB();
     renderSeaWaterPresetSelect();
@@ -8785,7 +9639,7 @@ function renderMacroRecipe() {
             <div class="tool-row ${missing ? 'missing' : ''}">
                 <span>
                     <strong>${entry.item || entry.label}</strong>
-                    <small>${resolved ? `Bestand: ${formatItemAmount(resolved.item, stock)}${entry.unit === 'ml' && entry.item ? ` · Dichte ${density.toFixed(3)} g/ml` : ''}` : 'nicht lagergeführt'}</small>
+                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)}${entry.unit === 'ml' && entry.item ? ` · Dichte ${density.toFixed(3)} g/ml` : ''}` : 'nicht lagergeführt'}</small>
                 </span>
                 <span>${amountLabel}</span>
             </div>
@@ -8793,7 +9647,9 @@ function renderMacroRecipe() {
     }).join('');
     result.innerHTML = `
         <div class="tool-result">${rows}</div>
-        <button class="btn-danger btn-animated" onclick="bookMacroRecipe()">Lagergeführte Zutaten auslagern</button>
+        <div class="tool-action-row calculator-actions">
+            <button class="btn-primary btn-animated booking-action" onclick="bookMacroRecipe()">Lagergeführte Zutaten auslagern</button>
+        </div>
     `;
 }
 
@@ -8962,7 +9818,20 @@ function editMeasurementEntry(entryId) {
     if (noteInput) noteInput.value = entry.note || '';
     measurementUiState.selectedEntryId = entry.id;
     measurementUiState.editingEntryId = entry.id;
+    const details = document.getElementById('measurementDetails');
+    if (details) details.open = true;
     renderMeasurementTracker(entry.typeId);
+}
+
+function cancelMeasurementEdit() {
+    measurementUiState.editingEntryId = null;
+    const valueInput = document.getElementById('measurementValue');
+    const dateInput = document.getElementById('measurementDate');
+    const noteInput = document.getElementById('measurementNote');
+    if (valueInput) valueInput.value = '';
+    if (noteInput) noteInput.value = '';
+    if (dateInput) dateInput.value = formatDateTimeLocal();
+    renderMeasurementTracker();
 }
 
 function deleteMeasurementEntry(entryId) {
@@ -8984,7 +9853,12 @@ function renderMeasurementTracker(forceTypeId = null) {
     const typeSelect = document.getElementById('measurementType');
     const rangeSelect = document.getElementById('measurementRange');
     const dateInput = document.getElementById('measurementDate');
+    const saveButton = document.getElementById('measurementSaveButton');
+    const cancelButton = document.getElementById('measurementCancelButton');
     if (!container || !typeSelect || !rangeSelect) return;
+
+    if (saveButton) saveButton.innerText = measurementUiState.editingEntryId ? 'Änderungen speichern' : 'Messwert speichern';
+    if (cancelButton) cancelButton.classList.toggle('is-hidden', !measurementUiState.editingEntryId);
 
     const types = getMeasurementTypes();
     const currentType = forceTypeId || typeSelect.value || types[0]?.id || 'KH';
@@ -9030,7 +9904,7 @@ function renderMeasurementTracker(forceTypeId = null) {
     if (visibleEntries.length === 0) {
         const currentTypeMeta = getMeasurementTypeById(currentType);
         container.innerHTML = `
-            <div class="measurement-empty">
+            <div class="measurement-empty" role="status">
                 <strong>${escapeHtml(currentTypeMeta?.label || currentType)}</strong>
                 <p class="hint">Noch keine Messwerte gespeichert. Trage den ersten Wert ein, dann erscheint hier automatisch der Verlauf.</p>
                 <div class="measurement-type-actions">
@@ -9109,7 +9983,8 @@ function renderMeasurementTracker(forceTypeId = null) {
                         <button class="btn-out btn-animated" onclick="deleteMeasurementType('${currentType}')">Art löschen</button>
                     </div>
                 </div>
-                <svg class="measurement-chart ${isCompactMeasurementView ? 'compact' : ''}" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Messwert Verlauf">
+                <div class="measurement-chart-scroll" tabindex="0" aria-label="Diagramm horizontal ansehen">
+                <svg class="measurement-chart ${isCompactMeasurementView ? 'compact' : ''}" viewBox="0 0 ${chartWidth} ${chartHeight}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Verlauf ${escapeHtml(typeMeta.label)} in ${escapeHtml(unit)}">
                     <defs>
                         <linearGradient id="measurementFill" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.32"></stop>
@@ -9130,7 +10005,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                     <path d="${areaD}" class="measurement-area"></path>
                     <path d="${pathD}" class="measurement-line"></path>
                     ${points.map(point => `
-                        <g class="measurement-point-group ${selectedDetail?.id === point.id ? 'active' : ''}" onclick="selectMeasurementEntry('${point.id}')">
+                        <g class="measurement-point-group ${selectedDetail?.id === point.id ? 'active' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(typeMeta.label)} ${point.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}, ${escapeHtml(formatWarehouseDate(point.at))}" onclick="selectMeasurementEntry('${point.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMeasurementEntry('${point.id}');}">
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 14 : 11}" class="measurement-point-hit"></circle>
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 15 : 11}" class="measurement-point-halo"></circle>
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 8.6 : 6.5}" class="measurement-point-ring"></circle>
@@ -9141,6 +10016,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                         <text x="${point.x}" y="${chartHeight - 10}" text-anchor="middle" class="measurement-label">${escapeHtml(new Date(point.at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}</text>
                     `).join('')}
                 </svg>
+                </div>
                 <div class="measurement-chart-meta">
                     <span>Min: ${minValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
                     <span>Mittel: ${avg.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
@@ -9173,9 +10049,41 @@ function renderMeasurementTracker(forceTypeId = null) {
                     </div>
                 `).join('')}
             </div>
-            ${measurementUiState.editingEntryId ? '<p class="hint">Bearbeitungsmodus aktiv: Nach dem Speichern wird der geladene Messwert aktualisiert.</p>' : ''}
+            ${measurementUiState.editingEntryId ? '<p class="measurement-editing-status" role="status">Bearbeitungsmodus aktiv. Änderungen überschreiben ausschließlich den geladenen Messwert.</p>' : ''}
         </div>
     `;
+}
+
+function openLogBookEntryForm() {
+    const details = document.getElementById('logBookEntryDetails');
+    if (details) details.open = true;
+    document.getElementById('logBookTitle')?.focus();
+}
+
+function cancelLogBookEdit() {
+    logBookUiState.editingEntryId = null;
+    const title = document.getElementById('logBookTitle');
+    const note = document.getElementById('logBookNote');
+    const date = document.getElementById('logBookDate');
+    if (title) title.value = '';
+    if (note) note.value = '';
+    if (date) date.value = formatDateTimeLocal();
+    updateLogBookFormMode();
+}
+
+function updateLogBookFormMode() {
+    const saveButton = document.getElementById('logBookSaveButton');
+    const cancelButton = document.getElementById('logBookCancelButton');
+    if (saveButton) saveButton.innerText = logBookUiState.editingEntryId ? 'Änderungen speichern' : 'Log speichern';
+    if (cancelButton) cancelButton.classList.toggle('is-hidden', !logBookUiState.editingEntryId);
+}
+
+function resetLogBookFilters() {
+    const search = document.getElementById('logBookSearch');
+    const category = document.getElementById('logBookFilterCategory');
+    if (search) search.value = '';
+    if (category) category.value = 'all';
+    renderLogBookEntries();
 }
 
 function renderLogBook() {
@@ -9214,11 +10122,14 @@ function renderLogBook() {
     if (entryCount) entryCount.innerText = String((db.logBookEntries || []).length);
     if (openCount) openCount.innerText = String(todos.filter(todo => !todo.done).length);
     if (dueCount) dueCount.innerText = String(todos.filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= now).length);
+    updateLogBookFormMode();
     updateTodoIntervalLabel();
     renderLogBookCategories();
     renderLogBookEntries();
     renderAquariumTodos();
     renderMeasurementTracker();
+    renderDosingContainers();
+    renderOsmoseTank();
 }
 
 function addLogBookCategory() {
@@ -9308,13 +10219,15 @@ function saveLogBookEntry(editId = null) {
     const note = (noteEl?.value || '').trim();
     const at = dateEl?.value ? new Date(dateEl.value).toISOString() : new Date().toISOString();
     if (!title && !note) return alert('Bitte Titel oder Notiz eintragen.');
-    if (editId) {
-        const entry = db.logBookEntries.find(item => item.id === editId);
+    const targetEditId = editId || logBookUiState.editingEntryId || null;
+    if (targetEditId) {
+        const entry = db.logBookEntries.find(item => item.id === targetEditId);
         if (!entry) return;
         Object.assign(entry, { category, title, note, at, updatedAt: new Date().toISOString() });
     } else {
         db.logBookEntries.unshift({ id: createWarehouseId(), category, title: title || category, note, at, createdAt: new Date().toISOString() });
     }
+    logBookUiState.editingEntryId = null;
     saveDB();
     if (titleEl) titleEl.value = '';
     if (noteEl) noteEl.value = '';
@@ -9325,19 +10238,19 @@ function saveLogBookEntry(editId = null) {
 function editLogBookEntry(id) {
     const entry = (db.logBookEntries || []).find(item => item.id === id);
     if (!entry) return;
-    const title = prompt('Titel:', entry.title || '');
-    if (title === null) return;
-    const note = prompt('Notiz:', entry.note || '');
-    if (note === null) return;
-    const category = prompt('Kategorie:', entry.category || 'Sonstiges');
-    if (category === null) return;
-    entry.title = title.trim() || category.trim() || 'Log';
-    entry.note = note.trim();
-    entry.category = category.trim() || 'Sonstiges';
-    entry.updatedAt = new Date().toISOString();
-    if (!db.logBookCategories.includes(entry.category)) db.logBookCategories.push(entry.category);
-    saveDB();
-    renderLogBook();
+    const details = document.getElementById('logBookEntryDetails');
+    const category = document.getElementById('logBookCategory');
+    const title = document.getElementById('logBookTitle');
+    const note = document.getElementById('logBookNote');
+    const date = document.getElementById('logBookDate');
+    if (details) details.open = true;
+    if (category) category.value = db.logBookCategories.includes(entry.category) ? entry.category : 'Sonstiges';
+    if (title) title.value = entry.title || '';
+    if (note) note.value = entry.note || '';
+    if (date) date.value = formatDateTimeLocal(entry.at);
+    logBookUiState.editingEntryId = entry.id;
+    updateLogBookFormMode();
+    title?.focus();
 }
 
 function deleteLogBookEntry(id) {
@@ -9351,25 +10264,45 @@ function renderLogBookEntries() {
     const container = document.getElementById('log-book-list');
     if (!container) return;
     const filter = document.getElementById('logBookFilterCategory')?.value || 'all';
+    const search = (document.getElementById('logBookSearch')?.value || '').trim().toLocaleLowerCase('de-DE');
+    const status = document.getElementById('logBookFilterStatus');
     const entries = (db.logBookEntries || [])
         .filter(entry => filter === 'all' || (entry.category || 'Sonstiges') === filter)
+        .filter(entry => {
+            if (!search) return true;
+            return [entry.title, entry.note, entry.category]
+                .some(value => String(value || '').toLocaleLowerCase('de-DE').includes(search));
+        })
         .slice(0, 80);
+    const activeFilters = [filter !== 'all' ? filter : '', search ? `„${search}“` : ''].filter(Boolean);
+    if (status) {
+        status.innerHTML = `<span><strong>${entries.length}</strong> ${entries.length === 1 ? 'Eintrag' : 'Einträge'}</span>${activeFilters.length ? `<span class="status-badge status-info">Filter: ${activeFilters.map(escapeHtml).join(' · ')}</span>` : '<span class="status-badge status-neutral">Alle Einträge</span>'}`;
+    }
     if (entries.length === 0) {
-        container.innerHTML = `<p class="hint">${filter === 'all' ? 'Noch keine Logbuch-Einträge.' : 'Für diese Kategorie gibt es noch keine Einträge.'}</p>`;
+        const hasFilters = filter !== 'all' || Boolean(search);
+        container.innerHTML = `
+            <div class="logbook-empty-state" role="status">
+                <strong>${hasFilters ? 'Keine passenden Einträge' : 'Noch keine Logbuch-Einträge'}</strong>
+                <p>${hasFilters ? 'Passe Suche oder Kategorie an, um andere Einträge zu sehen.' : 'Dokumentiere die erste Maßnahme, Messung oder Beobachtung.'}</p>
+                ${hasFilters ? '<button type="button" class="btn-secondary" onclick="resetLogBookFilters()">Filter zurücksetzen</button>' : '<button type="button" class="btn-primary" onclick="openLogBookEntryForm()">Ersten Eintrag anlegen</button>'}
+            </div>`;
         return;
     }
     container.innerHTML = entries.map(entry => `
-        <div class="logbook-entry">
-            <div>
+        <article class="logbook-entry">
+            <div class="logbook-entry-content">
+                <div class="logbook-entry-meta">
+                    <time datetime="${escapeHtml(entry.at || '')}">${formatWarehouseDate(entry.at)}</time>
+                    <span class="status-badge status-info">${escapeHtml(entry.category || 'Sonstiges')}</span>
+                </div>
                 <strong>${escapeHtml(entry.title || entry.category)}</strong>
-                <small>${formatWarehouseDate(entry.at)} · ${escapeHtml(entry.category || 'Sonstiges')}</small>
-                ${entry.note ? `<p>${escapeHtml(entry.note)}</p>` : ''}
+                ${entry.note ? `<details class="logbook-entry-note"><summary>Notiz anzeigen</summary><p>${escapeHtml(entry.note)}</p></details>` : ''}
             </div>
             <div class="logbook-actions">
-                <button onclick="editLogBookEntry('${entry.id}')">Bearbeiten</button>
-                <button onclick="deleteLogBookEntry('${entry.id}')" class="btn-out">Löschen</button>
+                <button onclick="editLogBookEntry('${entry.id}')" aria-label="${escapeHtml(entry.title || entry.category)} bearbeiten">Bearbeiten</button>
+                <button onclick="deleteLogBookEntry('${entry.id}')" class="btn-out" aria-label="${escapeHtml(entry.title || entry.category)} löschen">Löschen</button>
             </div>
-        </div>
+        </article>
     `).join('');
 }
 
@@ -9392,7 +10325,7 @@ function saveAquariumTodo(editId = null) {
     saveDB();
     document.getElementById('todoTitle').value = '';
     document.getElementById('todoDueAt').value = formatDateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
-    renderAquariumTodos();
+    renderLogBook();
 }
 
 function completeAquariumTodo(id) {
@@ -9411,7 +10344,7 @@ function completeAquariumTodo(id) {
     }
     addWarehouseEvent('todo', `ToDo erledigt: ${todo.title}`);
     saveDB();
-    renderAquariumTodos();
+    renderLogBook();
 }
 
 function snoozeAquariumTodo(id) {
@@ -9425,7 +10358,7 @@ function snoozeAquariumTodo(id) {
     todo.done = false;
     addWarehouseEvent('todo', `ToDo verschoben: ${todo.title} (${parsed} Tag(e))`);
     saveDB();
-    renderAquariumTodos();
+    renderLogBook();
 }
 
 function toggleTodoNotification(id) {
@@ -9434,7 +10367,7 @@ function toggleTodoNotification(id) {
     todo.notifyEnabled = todo.notifyEnabled === false;
     todo.remindedAt = null;
     saveDB();
-    renderAquariumTodos();
+    renderLogBook();
 }
 
 function editAquariumTodo(id) {
@@ -9469,7 +10402,7 @@ function deleteAquariumTodo(id) {
     if (!confirm('ToDo löschen?')) return;
     db.aquariumTodos = (db.aquariumTodos || []).filter(todo => todo.id !== id);
     saveDB();
-    renderAquariumTodos();
+    renderLogBook();
 }
 
 function clearLogBookEntries() {
@@ -9493,7 +10426,7 @@ function renderAquariumTodos() {
     if (!container) return;
     const todos = (db.aquariumTodos || []).slice().sort((a, b) => new Date(a.dueAt) - new Date(b.dueAt));
     if (todos.length === 0) {
-        container.innerHTML = '<p class="hint">Keine ToDos geplant.</p>';
+        container.innerHTML = '<div class="logbook-empty-state" role="status"><strong>Keine ToDos geplant</strong><p>Neue Aufgaben erscheinen hier nach Fälligkeit sortiert.</p></div>';
         return;
     }
     const now = Date.now();
@@ -9504,14 +10437,15 @@ function renderAquariumTodos() {
         const notify = todo.notifyEnabled !== false;
         return `
             <div class="todo-row ${state}">
-                <div>
+                <div class="todo-row-content">
+                    <div class="todo-status-line"><span class="status-badge status-${state === 'due' ? 'danger' : state === 'done' ? 'success' : 'neutral'}">${label}</span><span class="status-badge status-neutral">${escapeHtml(todo.category || 'Wartung')}</span></div>
                     <strong>${escapeHtml(todo.title)}</strong>
-                    <small>Kategorie: ${escapeHtml(todo.category || 'Wartung')} · Intervall: ${todo.intervalDays ? `alle ${todo.intervalDays} Tage` : 'einmalig'} · ${label} · Erinnerung ${notify ? 'an' : 'aus'}</small>
+                    <small>Intervall: ${todo.intervalDays ? `alle ${todo.intervalDays} Tage` : 'einmalig'} · Erinnerung ${notify ? 'an' : 'aus'}</small>
                     <small>Zuletzt erledigt: ${todo.lastDoneAt ? formatWarehouseDate(todo.lastDoneAt) : 'noch nie'} · Wieder anstehend: ${formatWarehouseDate(todo.dueAt)}</small>
                 </div>
                 <div class="logbook-actions">
-                    <button onclick="completeAquariumTodo('${todo.id}')">Erledigt</button>
-                    <button onclick="snoozeAquariumTodo('${todo.id}')">Erinnern in...</button>
+                    <button onclick="completeAquariumTodo('${todo.id}')" aria-label="${escapeHtml(todo.title)} als erledigt markieren">Erledigt</button>
+                    <button onclick="snoozeAquariumTodo('${todo.id}')" aria-label="${escapeHtml(todo.title)} später erinnern">Erinnern in...</button>
                     <button onclick="toggleTodoNotification('${todo.id}')">${notify ? 'Erinnerung aus' : 'Erinnerung an'}</button>
                     <button onclick="editAquariumTodo('${todo.id}')">Bearbeiten</button>
                     <button onclick="deleteAquariumTodo('${todo.id}')" class="btn-out">Löschen</button>
@@ -9892,39 +10826,24 @@ function renderStats() {
             let widthPct = maxConsumed > 0 ? (totalConsumed / maxConsumed) * 100 : 0;
 
             content += `
-                <div class="stat-block">
-                    <h4 style="margin:0 0 5px 0; color: var(--primary); display:flex; justify-content:space-between;">
-                        ${item}
-                        ${showMassSubline ? `<span style="font-size: 0.85rem; color: var(--text-muted); font-weight: normal;">${getGrams(item, totalConsumed)} g gesamt</span>` : ''}
-                    </h4>
-                    <div style="font-size:0.85rem; margin-bottom:5px;">
-                        Gesamtverbrauch: <strong>${formatItemAmount(item, totalConsumed)}</strong>
+                <article class="stat-block usage-stat-card">
+                    <div class="usage-stat-head">
+                        <h4>${escapeHtml(item)}</h4>
+                        ${showMassSubline ? `<span>${getGrams(item, totalConsumed)} g gesamt</span>` : ''}
                     </div>
-                    
-                    <div class="visual-bar-bg">
-                        <div class="visual-bar-fill" style="width: ${widthPct}%;"></div>
+                    <div class="usage-stat-total">Gesamtverbrauch <strong>${formatItemAmount(item, totalConsumed)}</strong></div>
+                    <progress class="usage-stat-progress" value="${widthPct}" max="100" aria-label="Relativer Gesamtverbrauch ${escapeHtml(item)}"></progress>
+                    <div class="stat-grid usage-period-grid">
+                        <div><strong>${formatItemAmount(item, perWeek)}</strong>${showMassSubline ? `<small>${getGrams(item, perWeek)} g / Woche</small>` : '<small>pro Woche</small>'}</div>
+                        <div><strong>${formatItemAmount(item, perMonth)}</strong>${showMassSubline ? `<small>${getGrams(item, perMonth)} g / Monat</small>` : '<small>pro Monat</small>'}</div>
+                        <div><strong>${formatItemAmount(item, perYear)}</strong>${showMassSubline ? `<small>${getGrams(item, perYear)} g / Jahr</small>` : '<small>pro Jahr</small>'}</div>
                     </div>
-
-                    <div class="stat-grid" style="margin-top: 10px;">
-                        <div>
-                            <strong>${formatItemAmount(item, perWeek)}</strong><br>
-                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perWeek)} g</span>/Wo` : '<span style="font-size:0.7rem; opacity:0.7;">pro Woche</span>'}
-                        </div>
-                        <div>
-                            <strong>${formatItemAmount(item, perMonth)}</strong><br>
-                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perMonth)} g</span>/Mo` : '<span style="font-size:0.7rem; opacity:0.7;">pro Monat</span>'}
-                        </div>
-                        <div>
-                            <strong>${formatItemAmount(item, perYear)}</strong><br>
-                            ${showMassSubline ? `<span style="font-size:0.7rem; opacity:0.7;">${getGrams(item, perYear)} g</span>/Jahr` : '<span style="font-size:0.7rem; opacity:0.7;">pro Jahr</span>'}
-                        </div>
-                    </div>
-                    <div class="prognose-badge">${prognosisText}</div>
-                </div>
+                    <div class="prognose-badge" role="status"><strong>Prognose</strong><span>${escapeHtml(prognosisText)}</span></div>
+                </article>
             `;
         }
     }
-    container.innerHTML = content || '<p class="hint">Noch keine Verbräuche aufgezeichnet.</p>';
+    container.innerHTML = content || '<div class="section-empty-state" role="status"><strong>Noch keine Verbrauchsdaten</strong><p>Nach Auslagerungen erscheinen hier Verbrauch und Prognose.</p></div>';
 }
 
 function exportConsumptionPdf() {
@@ -10017,18 +10936,34 @@ function renderLogs() {
     if (!container) return;
     container.innerHTML = '';
     
+    const search = (document.getElementById('protocolSearch')?.value || '').trim().toLowerCase();
+    const actionFilter = document.getElementById('protocolActionFilter')?.value || 'all';
+    const filterStatus = document.getElementById('protocolFilterStatus');
+
     if (!db.logs || db.logs.length === 0) {
-        container.innerHTML = '<p class="hint">Noch keine Aktionen protokolliert.</p>';
+        container.innerHTML = '<div class="section-empty-state" role="status"><strong>Noch keine Aktionen</strong><p>Ein- und Auslagerungen erscheinen automatisch in diesem Protokoll.</p></div>';
+        if (filterStatus) filterStatus.innerHTML = '<span><strong>0</strong> Einträge</span><span class="status-badge status-neutral">Gesamtes Protokoll</span>';
         return;
     }
-    
-    // Kopie erstellen und umdrehen, damit das Neueste oben steht
-    let sortedLogs = [...db.logs].reverse();
 
-    let logHTML = sortedLogs.map((log, index) => {
-        let originalIndex = db.logs.length - 1 - index; // Wichtig für den "Rückgängig"-Button
+    const sortedLogs = db.logs
+        .map((log, originalIndex) => ({ log, originalIndex }))
+        .reverse()
+        .filter(({ log }) => actionFilter === 'all' || log.action === actionFilter)
+        .filter(({ log }) => !search || [log.item, log.cat, log.action].join(' ').toLowerCase().includes(search));
+
+    if (filterStatus) {
+        const active = [search ? `Suche „${search}“` : '', actionFilter === 'in' ? 'Eingelagert' : actionFilter === 'out' ? 'Ausgelagert' : ''].filter(Boolean);
+        filterStatus.innerHTML = `<span><strong>${sortedLogs.length}</strong> ${sortedLogs.length === 1 ? 'Eintrag' : 'Einträge'}</span>${active.length ? `<span class="status-badge status-info">${active.map(escapeHtml).join(' · ')}</span>` : '<span class="status-badge status-neutral">Gesamtes Protokoll</span>'}`;
+    }
+
+    if (!sortedLogs.length) {
+        container.innerHTML = '<div class="section-empty-state" role="status"><strong>Keine passenden Aktionen</strong><p>Ändere die Suche oder setze die Filter zurück.</p><button type="button" class="btn-secondary" onclick="resetProtocolFilters()">Filter zurücksetzen</button></div>';
+        return;
+    }
+
+    let logHTML = sortedLogs.map(({ log, originalIndex }) => {
         let isOut = log.action === 'out';
-        let actionColor = isOut ? 'var(--danger)' : 'var(--success)';
         let sign = isOut ? '-' : '+';
         let actionText = isOut ? 'Ausgelagert' : 'Eingelagert';
         
@@ -10037,26 +10972,35 @@ function renderLogs() {
         let showMassSubline = itemUsesVolume(log.item);
         
         return `
-            <div class="log-item ${log.action}" style="border-left: 4px solid ${actionColor};">
-                <div>
-                    <div class="log-details"><strong>${log.item}</strong></div>
-                    <div class="log-date">${new Date(getLogTime(log) || Date.now()).toLocaleString()} | ${actionText}</div>
+            <article class="log-item protocol-entry ${log.action}">
+                <div class="protocol-entry-main">
+                    <div class="protocol-entry-head"><strong>${escapeHtml(log.item)}</strong><span class="status-badge ${isOut ? 'status-warning' : 'status-success'}">${actionText}</span></div>
+                    <div class="log-date">${new Date(getLogTime(log) || Date.now()).toLocaleString()}</div>
                 </div>
-                <div style="text-align: right;">
-                    <div style="color: ${actionColor}; font-weight: bold;">${sign}${formatItemAmount(log.item, log.amount)}</div>
-                    ${showMassSubline ? `<div style="font-size: 0.75rem; color: var(--text-muted);">${sign}${gAmount} g</div>` : ''}
-                    <button onclick="undoLog(${originalIndex})" style="background:none; border:none; color: var(--text-muted); text-decoration: underline; font-size: 0.75rem; padding:0; margin-top:4px; cursor:pointer;">Rückgängig</button>
+                <div class="protocol-entry-value">
+                    <strong>${sign}${formatItemAmount(log.item, log.amount)}</strong>
+                    ${showMassSubline ? `<small>${sign}${gAmount} g</small>` : ''}
+                    <button type="button" class="protocol-undo-button" onclick="undoLog(${originalIndex})" aria-label="${escapeHtml(actionText)} von ${escapeHtml(log.item)} rückgängig machen">Rückgängig</button>
                 </div>
-            </div>
+            </article>
         `;
     }).join('');
     
     container.innerHTML = logHTML;
 }
 
+function resetProtocolFilters() {
+    const search = document.getElementById('protocolSearch');
+    const action = document.getElementById('protocolActionFilter');
+    if (search) search.value = '';
+    if (action) action.value = 'all';
+    renderLogs();
+}
+
 // --- MODAL & EINGABELOGIK ---
 function openModal(cat, item, action) {
     if (!requireWarehouseWriteAccess(action === 'in' ? 'Einlagern' : 'Auslagern')) return;
+    stockModalReturnFocus = document.activeElement;
     currentAction = { cat, item, action };
     const modal = document.getElementById('modal');
     const modalBody = document.getElementById('modal-body');
@@ -10071,57 +11015,60 @@ function openModal(cat, item, action) {
     modalBody.innerHTML = `
         <div class="input-group">
             <label>Einheit auswählen:</label>
-            <select id="unitSelect" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:100%; padding:12px; background:#2c2c2e; color:#fff; border:none; border-radius:10px;">
+            <select id="unitSelect" onchange="toggleContainerOptions(); updateLiveConversion();">
                 ${unitOptions}
             </select>
         </div>
         
-        <div id="containerSection" style="display:none; margin-top:15px; padding:10px; background:rgba(255,255,255,0.05); border-radius:10px;">
-            <label style="display:flex; align-items:center; gap:10px; color:#fff;">
-                <input type="checkbox" id="useContainer" onchange="toggleContainerOptions(); updateLiveConversion();" style="width:20px; height:20px; margin:0;"> 
+        <div id="containerSection" class="modal-container-options" hidden>
+            <label class="modal-checkbox-label">
+                <input type="checkbox" id="useContainer" onchange="toggleContainerOptions(); updateLiveConversion();"> 
                 Behälter-Gewicht (Tara) abziehen
                 <button type="button" class="mini-help" onclick="showHelp('tara')" aria-label="Tara Hilfe">?</button>
             </label>
-            <select id="containerSelect" onchange="updateLiveConversion();" style="display:none; width:100%; padding:12px; background:#1c1c1e; color:#fff; border:1px solid #3a3a3c; border-radius:8px; margin-top:10px;">
+            <select id="containerSelect" onchange="updateLiveConversion();" hidden>
                 ${Object.entries(getAllContainers()).map(([c, weight]) => `<option value="${c}">${c} (wiegt ${weight}g)</option>`).join('')}
             </select>
         </div>
 
-        <div class="input-group" style="margin-top:15px;">
+        <div class="input-group modal-field-group">
             <label>Menge eingeben:</label>
-            <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" oninput="updateLiveConversion()" style="width:100%; padding:12px;">
-            <div id="liveConversion" style="margin-top: 8px; font-size: 0.9rem; color: var(--secondary); font-weight: 600; text-align: center; height: 1.2rem;"></div>
+            <input type="number" step="0.01" id="amount" placeholder="Wert eintragen" oninput="updateLiveConversion()">
+            <div id="liveConversion" class="modal-live-conversion" aria-live="polite"></div>
         </div>
         ${action === 'out' ? `
-            <div class="input-group" style="margin-top:15px;">
+            <div class="input-group modal-field-group">
                 <label>Neuer Lagerbestand (optional):</label>
-                <input type="number" step="0.01" id="targetAmount" placeholder="z.B. 80" oninput="updateLiveConversion()" style="width:100%; padding:12px;">
-                <div id="targetStockPreview" style="margin-top: 8px; font-size: 0.85rem; color: var(--text-muted); text-align: center; min-height: 1.2rem;"></div>
+                <input type="number" step="0.01" id="targetAmount" placeholder="z.B. 80" oninput="updateLiveConversion()">
+                <div id="targetStockPreview" class="modal-stock-preview" aria-live="polite"></div>
             </div>
         ` : ''}
-        <div class="tool-result" style="margin-top:12px;">
+        <div class="tool-result modal-current-stock">
             <strong>Aktueller Bestand</strong><br>
             <span id="currentStockText">${formatItemAmount(item, currentStock)}</span>
         </div>
         ${action === 'out'
-            ? `<div class="btn-group" style="margin-top:10px; flex-wrap:wrap;">
+            ? `<div class="btn-group modal-action-group">
                     <button class="btn-primary btn-animated" onclick="executeAction('log')">Auslagerung buchen</button>
                     <button class="btn-secondary btn-animated" onclick="executeAction('correct')">Nur Bestand korrigieren</button>
                </div>
-               <p class="hint" style="margin-top:8px;">Wenn du den neuen Lagerbestand einträgst, kannst du wählen, ob nur korrigiert oder die Differenz als Auslagerung protokolliert werden soll.</p>`
-            : `<button class="btn-primary btn-animated" style="margin-top:10px;" onclick="executeAction('log')">Buchung ausführen</button>`
+               <p class="hint modal-action-hint">Wenn du den neuen Lagerbestand einträgst, kannst du wählen, ob nur korrigiert oder die Differenz als Auslagerung protokolliert werden soll.</p>`
+            : `<button class="btn-primary btn-animated modal-action-submit" onclick="executeAction('log')">Buchung ausführen</button>`
         }
     `;
     modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
     acquireBodyScrollLock('modal');
+    enhanceFormAccessibility(modalBody);
     updateLiveConversion();
+    window.setTimeout(() => document.getElementById('amount')?.focus(), 0);
 }
 
 function toggleContainerOptions() {
     const isGram = document.getElementById('unitSelect').value === 'g';
     const isChecked = document.getElementById('useContainer').checked;
-    document.getElementById('containerSection').style.display = isGram ? 'block' : 'none';
-    document.getElementById('containerSelect').style.display = (isGram && isChecked) ? 'block' : 'none';
+    document.getElementById('containerSection').hidden = !isGram;
+    document.getElementById('containerSelect').hidden = !(isGram && isChecked);
 }
 
 function updateLiveConversion() {
@@ -10176,15 +11123,25 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function closeModal() {
-    document.getElementById('modal').style.display = 'none';
+    const modal = document.getElementById('modal');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
     releaseBodyScrollLock('modal');
+    const returnFocus = stockModalReturnFocus;
+    stockModalReturnFocus = null;
+    window.setTimeout(() => {
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
+    }, 0);
 }
 
 function showHelp(topic) {
     const texts = {
         tara: 'Tara bedeutet: Du wiegst den vollen Behälter, wählst den passenden leeren Behälter aus und die App zieht dessen Leergewicht automatisch ab.'
     };
-    alert(texts[topic] || 'Für dieses Feld gibt es noch keinen Hilfetext.');
+    appAlert(texts[topic] || 'Für dieses Feld gibt es noch keinen Hilfetext.', {
+        title: 'Tara richtig verwenden',
+        type: 'info'
+    });
 }
 
 function executeAction(mode = 'log') {
@@ -10393,17 +11350,17 @@ function previewCRPaste() {
     const matches = text.match(/([\d.]+)\s*ml/g);
 
     if (!text.trim()) {
-        previewContainer.style.display = 'none';
+        previewContainer.hidden = true;
         return;
     }
 
     if (!matches || matches.length < crOrder.length) {
-        previewContainer.style.display = 'block';
-        previewList.innerHTML = `<span style="color: var(--danger); font-size: 0.85rem;">Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span>`;
+        previewContainer.hidden = false;
+        previewList.innerHTML = '<div class="workflow-message workflow-message--error" role="alert"><strong>Eingabe unvollständig</strong><span>Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span></div>';
         return;
     }
 
-    let html = '<div style="display: flex; flex-direction: column; gap: 6px;">';
+    let html = '<div class="cr-preview-list">';
     for (let i = 0; i < crOrder.length; i++) {
         let amountMl = parseFloat(matches[i].replace(/[^\d.]/g, ''));
         let itemName = crOrder[i].name;
@@ -10417,14 +11374,14 @@ function previewCRPaste() {
             if (currentStock < amountMl) {
                 const missingDisplay = formatCRPreferredAmountHtml(itemName, amountMl - currentStock);
                 const stockDisplay = formatCRPreferredAmountHtml(itemName, currentStock);
-                stockWarning = `<span style="color: var(--danger); font-size: 0.8rem; margin-left: 8px;">⚠️ Fehlt: ${missingDisplay.plain} (Bestand: ${stockDisplay.plain})</span>`;
+                stockWarning = `<span class="cr-stock-warning"><strong>Bestand reicht nicht</strong> · Fehlt: ${missingDisplay.plain} (Bestand: ${stockDisplay.plain})</span>`;
             }
             html += `
-                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px; flex-wrap: wrap; gap: 4px;">
-                    <span style="color: #fff;">${itemName}${stockWarning}</span>
-                    <span style="text-align: right;">
+                <div class="cr-preview-row ${currentStock < amountMl ? 'missing' : ''}">
+                    <span class="cr-preview-product"><strong>${itemName}</strong>${stockWarning}</span>
+                    <span class="cr-preview-amount">
                         ${formatCRPreferredAmountHtml(itemName, amountMl).html}
-                        <small style="display:block; color: var(--text-muted); margin-top: 2px;">Neu: ${newStockDisplay.plain}</small>
+                        <small>Neuer Bestand: ${newStockDisplay.plain}</small>
                     </span>
                 </div>
             `;
@@ -10433,7 +11390,7 @@ function previewCRPaste() {
     html += '</div>';
 
     previewList.innerHTML = html;
-    previewContainer.style.display = 'block';
+    previewContainer.hidden = false;
 }
 
 function processCRPaste() {
@@ -11062,12 +12019,12 @@ function exportCRAdjustment(index) {
 }
 
 function auslagernMischung(typ) {
-    let prefix = typ === 'kationen' ? 'mix-kat-' : 'mix-an-';
+    let prefix = typ === 'kationen' ? 'kat' : 'an';
     let catName = typ === 'kationen' ? 'Kationen' : 'Anionen';
     let queue = [];
     
     for (let item of mixDefinitions[typ]) {
-        let inputEl = document.getElementById(prefix + item.replace(/[^a-zA-Z]/g, ''));
+        let inputEl = getTraceInputElement(prefix, item);
         let amount = inputEl ? parseFloat(inputEl.value) : 0;
         if (amount > 0) queue.push({ cat: catName, item, amount });
     }
@@ -11121,8 +12078,9 @@ function exportData() {
     let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_Backup_${exportedAt.split('T')[0]}.json`;
+    a.download = `OSCI_Backup_${payload.exportedAt.split('T')[0]}.json`;
     a.click();
+    showToast('Projekt-Backup exportiert', 'success', 2200);
 }
 
 function exportWarehouseInventoryTxt() {
@@ -11449,12 +12407,16 @@ function togglePartyMode() { document.body.classList.toggle('party-mode'); }
 
 // --- MASSEN-EINGANG (WARENKORB SYSTEM MIT DYNAMISCHER SCHNELLAUSWAHL) ---
 let bulkCart = [];
+let bulkBookingInProgress = false;
 
 function initBulkProductSelect() {
     const select = document.getElementById('bulkProductSelect');
     if (!select) return;
     
     select.innerHTML = '';
+    const warehouseName = document.getElementById('bulkActiveWarehouseName');
+    const activeWarehouse = getActiveWarehouse();
+    if (warehouseName) warehouseName.innerText = activeWarehouse ? activeWarehouse.name : 'Kein Lager gewählt';
     
     // Leere Option als Standard
     let defaultOpt = document.createElement('option');
@@ -11530,25 +12492,16 @@ function updateBulkQuickButtons() {
     
     let label = document.createElement('label');
     label.innerText = "Schnellauswahl Behältergröße:";
-    label.style.display = "block";
-    label.style.marginBottom = "5px";
-    label.style.fontSize = "0.85rem";
-    label.style.color = "var(--text-muted)";
+    label.className = 'bulk-quick-label';
     container.appendChild(label);
     
     let btnGroup = document.createElement('div');
-    btnGroup.style.display = "flex";
-    btnGroup.style.gap = "10px";
-    btnGroup.style.flexWrap = "wrap";
-    btnGroup.style.marginBottom = "15px";
+    btnGroup.className = 'bulk-quick-actions';
     
     sizes.forEach(size => {
         let btn = document.createElement('button');
-        btn.className = "btn-secondary";
+        btn.className = "btn-secondary bulk-quick-button";
         btn.type = "button";
-        btn.style.padding = "8px 12px";
-        btn.style.fontSize = "0.85rem";
-        btn.style.borderRadius = "8px";
         btn.innerText = `${size} ${unitLabel}`;
         btn.onclick = () => {
             document.getElementById('bulkAmount').value = size;
@@ -11565,12 +12518,14 @@ function toggleBulkContainerSection() {
     const unit = document.getElementById('bulkUnitSelect').value;
     const section = document.getElementById('bulkContainerSection');
     if (!section) return;
-    section.style.display = unit === 'g' ? 'block' : 'none';
+    section.classList.toggle('is-hidden', unit !== 'g');
     if (unit !== 'g') {
         const cb = document.getElementById('bulkUseTara');
         if (cb) cb.checked = false;
         const sel = document.getElementById('bulkContainerSelect');
-        if (sel) sel.style.display = 'none';
+        if (sel) sel.classList.add('is-hidden');
+        const label = document.getElementById('bulkContainerSelectLabel');
+        if (label) label.hidden = true;
     }
     updateBulkTaraPreview();
 }
@@ -11578,7 +12533,9 @@ function toggleBulkContainerSection() {
 function toggleBulkTaraSelect() {
     const isChecked = document.getElementById('bulkUseTara').checked;
     const sel = document.getElementById('bulkContainerSelect');
-    if (sel) sel.style.display = isChecked ? 'block' : 'none';
+    if (sel) sel.classList.toggle('is-hidden', !isChecked);
+    const label = document.getElementById('bulkContainerSelectLabel');
+    if (label) label.hidden = !isChecked;
     updateBulkTaraPreview();
 }
 
@@ -11595,9 +12552,9 @@ function updateBulkTaraPreview() {
     if (!isNaN(amountRaw) && amountRaw > 0) {
         const netG = amountRaw - taraG;
         if (netG <= 0) {
-            preview.innerHTML = `<span style="color:var(--danger)">⚠️ Tara (${taraG} g) ist größer oder gleich der Eingabe!</span>`;
+            preview.innerHTML = `<span class="bulk-tara-error">Tara (${taraG} g) ist größer oder gleich der Eingabe.</span>`;
         } else {
-            preview.innerHTML = `Tara: −${taraG} g &rarr; Netto: <strong style="color:var(--success);">${netG.toFixed(1)} g</strong>`;
+            preview.innerHTML = `Tara: −${taraG} g <span aria-hidden="true">→</span> Netto: <strong class="bulk-tara-success">${netG.toFixed(1)} g</strong>`;
         }
     } else {
         preview.innerText = `Tara: ${taraG} g werden abgezogen.`;
@@ -11647,47 +12604,55 @@ function removeFromBulkCart(index) {
 function renderBulkCart() {
     const listDiv = document.getElementById('bulkCartList');
     const submitBtn = document.getElementById('btnSubmitBulk');
+    const cartCount = document.getElementById('bulkCartCount');
+    if (!listDiv || !submitBtn) return;
+    if (cartCount) cartCount.innerText = `${bulkCart.length} ${bulkCart.length === 1 ? 'Position' : 'Positionen'}`;
     
     if (bulkCart.length === 0) {
-        listDiv.innerHTML = '<span style="color: var(--text-muted); font-style: italic;">Der Warenkorb ist leer.</span>';
-        submitBtn.style.display = 'none';
+        listDiv.innerHTML = '<div class="section-empty-state compact" role="status"><strong>Noch keine Positionen</strong><p>Wähle oben Produkt, Menge und Einheit aus.</p></div>';
+        submitBtn.classList.add('is-hidden');
         return;
     }
     
-    submitBtn.style.display = 'block';
+    submitBtn.classList.remove('is-hidden');
     listDiv.innerHTML = bulkCart.map((entry, index) => `
-        <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(255,255,255,0.03); padding:10px; border-radius:8px; margin-bottom:8px; border: 1px solid var(--border);">
-            <div>
-                <strong style="color: var(--text);">${entry.item}</strong><br>
-                <small style="color: var(--text-muted);">${entry.cat}</small>
+        <article class="bulk-cart-row">
+            <div class="bulk-cart-product">
+                <strong>${escapeHtml(entry.item)}</strong>
+                <small>${escapeHtml(entry.cat)}</small>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span style="color: var(--success); font-weight:600;">${formatItemAmount(entry.item, entry.ml)}</span>
-                <button onclick="removeFromBulkCart(${index})" style="background:none; color:var(--danger); padding:4px 8px; font-size:1.1rem; border:none; cursor:pointer;">✕</button>
+            <div class="bulk-cart-value">
+                <strong>${formatItemAmount(entry.item, entry.ml)}</strong>
+                <button type="button" class="bulk-cart-remove" onclick="removeFromBulkCart(${index})" aria-label="${escapeHtml(entry.item)} aus der Zusammenfassung entfernen">Entfernen</button>
             </div>
-        </div>
+        </article>
     `).join('');
 }
 
 function submitBulkCart() {
     if (!requireWarehouseWriteAccess('Wareneingang')) return;
-    if (bulkCart.length === 0) return;
+    if (bulkCart.length === 0 || bulkBookingInProgress) return;
     
     if (!confirm(`${bulkCart.length} Positionen jetzt final in das Lager einbuchen?`)) return;
-    
-    bulkCart.forEach(entry => {
-        db.inventory[entry.cat][entry.item] = (db.inventory[entry.cat][entry.item] || 0) + entry.ml;
-        addLog(entry.cat, entry.item, 'in', entry.ml);
-    });
-    
-    saveDB();
-    bulkCart = [];
-    renderBulkCart();
-    renderLager();
-    checkAndNotifyStockAlerts();
-    
-    alert("Wareneingang erfolgreich verbucht!");
-    showTab('lager');
+    bulkBookingInProgress = true;
+    const submitBtn = document.getElementById('btnSubmitBulk');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+        bulkCart.forEach(entry => {
+            db.inventory[entry.cat][entry.item] = (db.inventory[entry.cat][entry.item] || 0) + entry.ml;
+            addLog(entry.cat, entry.item, 'in', entry.ml);
+        });
+        saveDB();
+        bulkCart = [];
+        renderBulkCart();
+        renderLager();
+        checkAndNotifyStockAlerts();
+        alert("Wareneingang erfolgreich verbucht!");
+        showTab('lager');
+    } finally {
+        bulkBookingInProgress = false;
+        if (submitBtn) submitBtn.disabled = false;
+    }
 }
 
 // --- NACHBESTELLEN & SHOP-LINKS ---
@@ -11740,32 +12705,31 @@ function renderNachbestellen() {
             const weeksLeft = getWeeksLeft(item);
             const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
             const isLow = (threshold > 0 && stock <= threshold) || (weeksLeft !== null && weeksLeft <= warningWeeks) || stock <= 0;
-            const stockColor = isLow ? 'var(--danger)' : 'var(--success)';
             if (isLow) suggestedItems.add(item);
 
             catRows += `
-                <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); flex-wrap:wrap;">
-                    <input type="checkbox" id="${checkId}" data-item="${item}"
+                <div class="shop-order-row ${isLow ? 'is-low' : 'is-ok'}">
+                    <input type="checkbox" id="${checkId}" data-item="${item}" aria-label="${escapeHtml(item)} zum Shop-Warenkorb hinzufügen"
                         data-selected-url="${defaultUrl}"
-                        onchange="updateShopCartBtn()" style="width:20px; height:20px; flex-shrink:0; cursor:pointer;">
-                    <div style="flex:1; min-width:160px;">
-                        <strong style="color:var(--text);">${item}</strong><br>
-                        <small style="color:${stockColor};">Bestand: ${formatItemAmount(item, stock)}${isLow ? ' ⚠️' : ''}</small>
+                        onchange="updateShopCartBtn()" class="shop-order-check">
+                    <div class="shop-order-product">
+                        <strong>${escapeHtml(item)}</strong>
+                        <small>Bestand: ${formatItemAmount(item, stock)}${isLow ? ' · Nachbestellung prüfen' : ''}</small>
                     </div>
-                    <div style="display:flex; gap:6px; flex-wrap:wrap;">${sizeBtns}</div>
+                    <div class="shop-size-options" aria-label="Gebindegröße für ${escapeHtml(item)}">${sizeBtns}</div>
                 </div>
             `;
         });
-        html += `<div style="margin-bottom:20px;"><h3 style="color:var(--secondary); margin-bottom:8px;">${cat}</h3>${catRows}</div>`;
+        html += `<section class="shop-order-section"><h3>${escapeHtml(cat)}</h3>${catRows}</section>`;
     }
 
     if (!html) {
-        html = '<p class="hint">Keine Shop-Links konfiguriert. Bitte unter Einstellungen &rarr; Shop-Links verwalten die Links einpflegen.</p>';
+        html = '<div class="section-empty-state" role="status"><strong>Keine Nachbestellungen verfügbar</strong><p>Für sichtbare Produkte sind noch keine Shop-Links konfiguriert.</p></div>';
     } else if (suggestedItems.size > 0) {
         html = `
-            <div class="alert-summary" style="margin-bottom:12px;">
-                Bestellvorschlag: ${suggestedItems.size} kritische Artikel erkannt.
-                <button type="button" onclick="selectSuggestedShopItems()" style="margin-top:8px;">Vorschlag markieren</button>
+            <div class="alert-summary reorder-suggestion" role="status">
+                <div><strong>Bestellvorschlag</strong><span>${suggestedItems.size} kritische ${suggestedItems.size === 1 ? 'Ware' : 'Waren'} erkannt.</span></div>
+                <button type="button" class="btn-secondary" onclick="selectSuggestedShopItems()">Vorschlag markieren</button>
             </div>
         ` + html;
     }
@@ -11791,7 +12755,7 @@ function updateShopCartBtn() {
     const btn = document.getElementById('btnOpenShopCart');
     if (!btn) return;
     const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
-    btn.style.display = checked.length > 0 ? 'inline-block' : 'none';
+    btn.classList.toggle('is-hidden', checked.length === 0);
     btn.innerText = `Alle ${checked.length} markierten im Shop öffnen`;
 }
 
@@ -11817,7 +12781,7 @@ function selectShopSize(btn) {
     // Diesen Button selektieren
     btn.classList.add('selected');
     // URL im zugehörigen Checkbox-Datensatz aktualisieren
-    const row = btn.closest('div[style*="align-items:center"]');
+    const row = btn.closest('.shop-order-row');
     if (row) {
         const cb = row.querySelector('input[type=checkbox]');
         if (cb) cb.dataset.selectedUrl = url;
@@ -11865,7 +12829,7 @@ function renderShopLinkSettings() {
 
     let html = '';
     for (let cat in byCat) {
-        html += `<div style="margin-bottom:20px;"><strong style="color:var(--secondary); font-size:0.95rem; display:block; margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--border);">${cat}</strong>`;
+        html += `<section class="shop-link-category"><h4>${escapeHtml(cat)}</h4>`;
         byCat[cat].forEach(({ item, sizes }) => {
             const urlMap = getShopUrlMap(item) || {};
             const dbEntry = (db.shopLinks && db.shopLinks[item]) || {};
@@ -11888,22 +12852,21 @@ function renderShopLinkSettings() {
                 const label = unit === 'ml' && size >= 1000 ? (size / 1000) + ' L' : size ? size + ' ' + getUnitLabel(unit) : 'Größe';
                 const inputId = `shopurl-${safeId}-${size}`;
                 return `
-                    <div style="display:flex; align-items:center; gap:8px; margin-top:6px; flex-wrap:wrap;">
-                        <span style="min-width:50px; font-size:0.8rem; color:var(--text-muted); flex-shrink:0;">${label}</span>
-                        <input type="text" id="${inputId}" data-item="${item}" data-size="${size}"
-                            value="${currentUrl}" placeholder="https://osci-motion.de/product/..."
-                            style="flex:1; min-width:200px; padding:6px 10px; background:#2c2c2e; color:#fff; border:1px solid var(--border); border-radius:8px; font-size:0.8rem;">
-                        ${currentUrl ? `<a href="${currentUrl}" target="_blank" rel="noopener" title="Testen" style="color:var(--secondary); font-size:0.9rem; flex-shrink:0;">↗</a>` : ''}
+                    <div class="shop-link-size-row">
+                        <span>${escapeHtml(label)}</span>
+                        <input type="text" id="${escapeHtml(inputId)}" data-item="${escapeHtml(item)}" data-size="${escapeHtml(size)}" aria-label="Shop-Link für ${escapeHtml(item)}, ${escapeHtml(label)}"
+                            value="${escapeHtml(currentUrl)}" placeholder="https://osci-motion.de/product/...">
+                        ${currentUrl ? `<a href="${escapeHtml(currentUrl)}" target="_blank" rel="noopener" aria-label="Shop-Link für ${escapeHtml(item)} testen" title="Link testen">Öffnen</a>` : ''}
                     </div>`;
             }).join('');
 
             html += `
-                <div style="padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.04);">
-                    <div style="font-size:0.85rem; color:var(--text); font-weight:600; margin-bottom:2px;">${item}</div>
+                <div class="shop-link-product">
+                    <strong>${escapeHtml(item)}</strong>
                     ${sizeRows}
                 </div>`;
         });
-        html += '</div>';
+        html += '</section>';
     }
 
     container.innerHTML = html || '<p class="hint">Keine Produkte im Katalog.</p>';
@@ -11928,8 +12891,13 @@ function saveShopLinks() {
     alert('Shop-Links gespeichert!');
 }
 
-function resetShopLinksToPreset() {
-    if (!confirm('Alle eigenen Shop-Link-Änderungen zurücksetzen? Das Preset wird wiederhergestellt.')) return;
+async function resetShopLinksToPreset() {
+    const confirmed = await appConfirm('Alle eigenen Shop-Link-Änderungen zurücksetzen? Das Preset wird wiederhergestellt.', {
+        title: 'Shop-Links zurücksetzen',
+        type: 'warning',
+        confirmText: 'Zurücksetzen'
+    });
+    if (!confirmed) return;
     db.shopLinks = {};
     saveDB();
     renderShopLinkSettings();
@@ -11938,7 +12906,7 @@ function resetShopLinksToPreset() {
 
 // --- PRODUKT-PRESETS ---
 
-function saveProductPreset() {
+async function saveProductPreset() {
     const nameEl = document.getElementById('presetNameInput');
     const name = nameEl ? nameEl.value.trim() : '';
     if (!name) return alert('Bitte einen Preset-Namen eingeben.');
@@ -11946,7 +12914,12 @@ function saveProductPreset() {
 
     if (!db.productPresets) db.productPresets = {};
     if (db.productPresets[name]) {
-        if (!confirm(`Preset "${name}" existiert bereits. Überschreiben?`)) return;
+        const confirmed = await appConfirm(`Preset "${name}" existiert bereits. Die gespeicherte Produktliste wird ersetzt.`, {
+            title: 'Preset überschreiben',
+            type: 'warning',
+            confirmText: 'Preset überschreiben'
+        });
+        if (!confirmed) return;
     }
     db.productPresets[name] = JSON.parse(JSON.stringify(db.customProducts));
     saveDB();
@@ -11955,10 +12928,15 @@ function saveProductPreset() {
     alert(`Preset "${name}" mit ${db.customProducts.length} Produkt(en) gespeichert.`);
 }
 
-function loadProductPreset(name) {
+async function loadProductPreset(name) {
     const preset = db.productPresets && db.productPresets[name];
     if (!preset) return;
-    if (!confirm(`Preset "${name}" laden? Dies überschreibt alle aktuellen eigenen Produkte (${(db.customProducts || []).length} Stk).`)) return;
+    const confirmed = await appConfirm(`Preset "${name}" laden? Dies überschreibt alle aktuellen eigenen Produkte (${(db.customProducts || []).length} Stk).`, {
+        title: 'Produktliste laden',
+        type: 'warning',
+        confirmText: 'Preset laden'
+    });
+    if (!confirmed) return;
 
     // Remove current custom products from catalog
     (db.customProducts || []).forEach(p => {
@@ -11983,9 +12961,14 @@ function loadProductPreset(name) {
     alert(`Preset "${name}" geladen.`);
 }
 
-function deleteProductPreset(name) {
+async function deleteProductPreset(name) {
     if (name === OSCI_SHOP_PRESET_NAME) return alert('Das Standard-Preset kann nicht gelöscht werden.');
-    if (!confirm(`Preset "${name}" wirklich löschen?`)) return;
+    const confirmed = await appConfirm(`Preset "${name}" wirklich löschen?`, {
+        title: 'Preset löschen',
+        type: 'danger',
+        confirmText: 'Preset löschen'
+    });
+    if (!confirmed) return;
     if (db.productPresets) delete db.productPresets[name];
     saveDB();
     renderProductPresets();
@@ -12011,20 +12994,20 @@ function renderProductPresets() {
         const count = (presets[name] || []).length;
         const items = (presets[name] || []).map(p => p.name).join(', ');
         const badge = isBuiltIn
-            ? `<span style="font-size:0.7rem; background:rgba(100,210,255,0.15); color:var(--secondary); border:1px solid var(--secondary); border-radius:12px; padding:2px 8px; margin-left:8px; vertical-align:middle;">Standard</span>`
+            ? `<span class="settings-preset-badge">Standard</span>`
             : '';
         const actionBtn = isBuiltIn
-            ? `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem;">Laden</button>`
-            : `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated" style="padding:6px 12px; font-size:0.8rem;">Laden</button>
-               <button type="button" onclick='deleteProductPreset(${jsArg(name)})' style="background:none; color:var(--danger); border:1px solid var(--danger); border-radius:8px; padding:6px 12px; font-size:0.8rem; cursor:pointer;">Löschen</button>`;
+            ? `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated">Laden</button>`
+            : `<button type="button" onclick='loadProductPreset(${jsArg(name)})' class="btn-secondary btn-animated">Laden</button>
+               <button type="button" onclick='deleteProductPreset(${jsArg(name)})' class="btn-out btn-animated">Löschen</button>`;
 
         return `
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px; background:${isBuiltIn ? 'rgba(100,210,255,0.04)' : 'rgba(255,255,255,0.03)'}; border:1px solid ${isBuiltIn ? 'var(--secondary)' : 'var(--border)'}; border-radius:10px; margin-bottom:8px; flex-wrap:wrap;">
-                <div style="flex:1; min-width:0;">
-                    <strong style="color:var(--text);">${name}${badge}</strong>
-                    <small style="display:block; color:var(--text-muted); margin-top:2px;">${count} Produkt(e): ${items}</small>
+            <div class="settings-preset-card${isBuiltIn ? ' is-built-in' : ''}">
+                <div class="settings-preset-copy">
+                    <strong>${escapeHtml(name)}${badge}</strong>
+                    <small>${count} Produkt(e): ${escapeHtml(items)}</small>
                 </div>
-                <div style="display:flex; gap:8px; flex-shrink:0;">
+                <div class="settings-row-actions">
                     ${actionBtn}
                 </div>
             </div>
@@ -12040,36 +13023,343 @@ function showToast(message, type = 'info', duration = 4000) {
     if (!container) {
         container = document.createElement('div');
         container.className = 'toast-container';
+        container.setAttribute('aria-label', 'Mitteilungen');
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-relevant', 'additions');
         document.body.appendChild(container);
     }
 
-    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const normalizedType = ['success', 'error', 'info', 'warning'].includes(type) ? type : 'info';
+    const icons = { success: '✓', error: '!', info: 'i', warning: '!' };
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-        <span class="toast-icon">${icons[type] || icons.info}</span>
-        <span class="toast-message">${message}</span>
-        <button class="toast-close" onclick="this.parentElement.classList.add('removing'); setTimeout(() => this.parentElement.remove(), 300);">&times;</button>
-    `;
+    toast.className = `toast ${normalizedType}`;
+    toast.setAttribute('role', normalizedType === 'error' ? 'alert' : 'status');
+
+    const icon = document.createElement('span');
+    icon.className = 'toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = icons[normalizedType];
+
+    const messageNode = document.createElement('span');
+    messageNode.className = 'toast-message';
+    messageNode.textContent = String(message ?? '');
+
+    const closeButton = document.createElement('button');
+    closeButton.type = 'button';
+    closeButton.className = 'toast-close';
+    closeButton.setAttribute('aria-label', 'Mitteilung schließen');
+    closeButton.textContent = '×';
+
+    let removeTimer = null;
+    const removeToast = () => {
+        if (!toast.isConnected || toast.classList.contains('removing')) return;
+        toast.classList.add('removing');
+        window.setTimeout(() => toast.remove(), 300);
+    };
+    closeButton.addEventListener('click', removeToast);
+    toast.append(icon, messageNode, closeButton);
     container.appendChild(toast);
 
-    setTimeout(() => {
-        toast.classList.add('removing');
-        setTimeout(() => toast.remove(), 300);
-    }, duration);
+    while (container.children.length > 4) container.firstElementChild?.remove();
+
+    const visibleDuration = normalizedType === 'error'
+        ? Math.max(Number(duration) || 0, 6500)
+        : Math.max(Number(duration) || 0, 1800);
+    const startTimer = () => { removeTimer = window.setTimeout(removeToast, visibleDuration); };
+    const stopTimer = () => { if (removeTimer) window.clearTimeout(removeTimer); };
+    toast.addEventListener('mouseenter', stopTimer);
+    toast.addEventListener('mouseleave', startTimer);
+    toast.addEventListener('focusin', stopTimer);
+    toast.addEventListener('focusout', startTimer);
+    startTimer();
 }
+
+// ==========================================================================
+// ACCESSIBLE APP DIALOGS
+// ==========================================================================
+let appDialogState = null;
+let stockModalReturnFocus = null;
+
+function getDialogFocusableElements(panel) {
+    if (!panel) return [];
+    return Array.from(panel.querySelectorAll(
+        'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+    )).filter(element => !element.hidden && element.offsetParent !== null);
+}
+
+function closeAppDialog(result = null) {
+    const dialog = document.getElementById('appDialog');
+    if (!dialog || !appDialogState) return;
+    const { resolve, returnFocus } = appDialogState;
+    appDialogState = null;
+    dialog.classList.remove('is-open', 'is-warning', 'is-danger', 'is-success');
+    dialog.hidden = true;
+    dialog.setAttribute('aria-hidden', 'true');
+    releaseBodyScrollLock('app-dialog');
+    resolve(result);
+    window.setTimeout(() => {
+        if (returnFocus && returnFocus.isConnected && typeof returnFocus.focus === 'function') returnFocus.focus();
+    }, 0);
+}
+
+function readAppDialogValue() {
+    const fields = Array.from(document.querySelectorAll('#appDialogFields [data-dialog-field]'));
+    if (!fields.length) return true;
+    const values = {};
+    for (const field of fields) {
+        const value = field.type === 'checkbox' ? field.checked : field.value;
+        if (field.required && String(value).trim() === '') {
+            field.setAttribute('aria-invalid', 'true');
+            field.focus();
+            const error = document.getElementById('appDialogError');
+            if (error) {
+                error.textContent = 'Bitte fülle das markierte Pflichtfeld aus.';
+                error.hidden = false;
+            }
+            return undefined;
+        }
+        field.removeAttribute('aria-invalid');
+        values[field.dataset.dialogField] = value;
+    }
+    return fields.length === 1 ? values[fields[0].dataset.dialogField] : values;
+}
+
+function showAppDialog(options = {}) {
+    const dialog = document.getElementById('appDialog');
+    if (!dialog) return Promise.resolve(options.kind === 'confirm' ? false : null);
+    if (appDialogState) closeAppDialog(null);
+
+    const kind = options.kind || 'alert';
+    const type = ['info', 'warning', 'danger', 'success'].includes(options.type) ? options.type : 'info';
+    const title = options.title || (type === 'danger' ? 'Aktion bestätigen' : type === 'warning' ? 'Bitte prüfen' : 'Hinweis');
+    const fields = Array.isArray(options.fields) ? options.fields : [];
+    const normalizedFields = options.input ? [{ name: 'value', ...options.input }] : fields;
+
+    document.getElementById('appDialogEyebrow').textContent = options.eyebrow || (type === 'danger' ? 'Wichtige Aktion' : type === 'warning' ? 'Achtung' : 'Information');
+    document.getElementById('appDialogTitle').textContent = title;
+    document.getElementById('appDialogDescription').textContent = String(options.message || '');
+    const status = document.getElementById('appDialogStatus');
+    status.textContent = type === 'success' ? '✓' : type === 'info' ? 'i' : '!';
+
+    const fieldsMount = document.getElementById('appDialogFields');
+    fieldsMount.replaceChildren();
+    normalizedFields.forEach((field, index) => {
+        const fieldId = `appDialogField${index}`;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'form-field';
+        const label = document.createElement('label');
+        label.htmlFor = fieldId;
+        label.textContent = field.label || 'Eingabe';
+        let control;
+        if (Array.isArray(field.options)) {
+            control = document.createElement('select');
+            field.options.forEach(option => {
+                const optionElement = document.createElement('option');
+                const optionValue = typeof option === 'object' ? option.value : option;
+                optionElement.value = String(optionValue);
+                optionElement.textContent = String(typeof option === 'object' ? option.label : option);
+                control.appendChild(optionElement);
+            });
+        } else if (field.multiline) {
+            control = document.createElement('textarea');
+        } else {
+            control = document.createElement('input');
+            control.type = field.type || 'text';
+        }
+        control.id = fieldId;
+        control.dataset.dialogField = field.name || `field${index}`;
+        control.value = field.value ?? '';
+        control.placeholder = field.placeholder || '';
+        control.required = field.required === true;
+        if (field.autocomplete) control.autocomplete = field.autocomplete;
+        if (field.inputMode) control.inputMode = field.inputMode;
+        wrapper.append(label, control);
+        if (field.description) {
+            const description = document.createElement('small');
+            description.className = 'field-description';
+            description.textContent = field.description;
+            wrapper.insertBefore(description, control);
+        }
+        fieldsMount.appendChild(wrapper);
+    });
+
+    const error = document.getElementById('appDialogError');
+    error.hidden = true;
+    error.textContent = '';
+    const cancelButton = document.getElementById('appDialogCancel');
+    const confirmButton = document.getElementById('appDialogConfirm');
+    const needsCancel = kind !== 'alert';
+    cancelButton.hidden = !needsCancel;
+    cancelButton.textContent = options.cancelText || 'Abbrechen';
+    confirmButton.textContent = options.confirmText || (kind === 'alert' ? 'OK' : 'Bestätigen');
+    confirmButton.className = `btn ${type === 'danger' ? 'btn-danger' : type === 'warning' ? 'btn-warning' : 'btn-primary'}`;
+
+    dialog.classList.toggle('is-warning', type === 'warning');
+    dialog.classList.toggle('is-danger', type === 'danger');
+    dialog.classList.toggle('is-success', type === 'success');
+    dialog.hidden = false;
+    dialog.setAttribute('aria-hidden', 'false');
+    dialog.classList.add('is-open');
+    acquireBodyScrollLock('app-dialog');
+
+    return new Promise(resolve => {
+        appDialogState = {
+            resolve,
+            kind,
+            allowEscape: options.allowEscape !== false,
+            closeOnBackdrop: options.closeOnBackdrop === true,
+            returnFocus: document.activeElement
+        };
+        cancelButton.onclick = () => closeAppDialog(kind === 'confirm' ? false : null);
+        confirmButton.onclick = () => {
+            const value = readAppDialogValue();
+            if (value === undefined) return;
+            closeAppDialog(kind === 'confirm' ? true : value);
+        };
+        window.setTimeout(() => {
+            const firstField = fieldsMount.querySelector('[data-dialog-field]');
+            (firstField || confirmButton).focus();
+            if (firstField && typeof firstField.select === 'function') firstField.select();
+        }, 0);
+    });
+}
+
+function appAlert(message, options = {}) {
+    return showAppDialog({ ...options, kind: 'alert', message });
+}
+
+function appConfirm(message, options = {}) {
+    return showAppDialog({ ...options, kind: 'confirm', message });
+}
+
+function appPrompt(message, defaultValue = '', options = {}) {
+    return showAppDialog({
+        ...options,
+        kind: 'prompt',
+        message,
+        input: {
+            name: 'value',
+            label: options.label || 'Eingabe',
+            value: defaultValue,
+            placeholder: options.placeholder || '',
+            required: options.required === true,
+            type: options.inputType || 'text'
+        }
+    });
+}
+
+document.addEventListener('keydown', event => {
+    const appDialog = document.getElementById('appDialog');
+    const stockModal = document.getElementById('modal');
+    const activeDialog = appDialogState ? appDialog : (stockModal?.style.display === 'flex' ? stockModal : null);
+    if (!activeDialog) return;
+    if (event.key === 'Escape') {
+        if (appDialogState && appDialogState.allowEscape) {
+            event.preventDefault();
+            closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+        } else if (!appDialogState && stockModal?.style.display === 'flex') {
+            event.preventDefault();
+            closeModal();
+        }
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const panel = activeDialog.querySelector('.app-dialog-panel, .modal-content');
+    const focusable = getDialogFocusableElements(panel);
+    if (!focusable.length) {
+        event.preventDefault();
+        panel?.focus();
+        return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+});
+
+document.addEventListener('click', event => {
+    if (event.target?.id === 'appDialog' && appDialogState?.closeOnBackdrop) {
+        closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+    }
+});
+
+function enhanceFormAccessibility(root = document) {
+    let linked = 0;
+    root.querySelectorAll('label:not([for])').forEach(label => {
+        if (label.querySelector('input, select, textarea')) return;
+        const candidate = label.nextElementSibling;
+        if (!candidate || !candidate.matches('input[id], select[id], textarea[id]')) return;
+        label.htmlFor = candidate.id;
+        linked += 1;
+    });
+    root.querySelectorAll('input[required], select[required], textarea[required]').forEach(field => {
+        field.setAttribute('aria-required', 'true');
+    });
+    return linked;
+}
+
+function setFieldError(fieldId, message = '') {
+    const field = document.getElementById(fieldId);
+    if (!field) return;
+    const errorId = `${fieldId}Error`;
+    let error = document.getElementById(errorId);
+    if (message) {
+        if (!error) {
+            error = document.createElement('p');
+            error.id = errorId;
+            error.className = 'field-message field-message-error';
+            error.setAttribute('role', 'alert');
+            field.insertAdjacentElement('afterend', error);
+        }
+        error.textContent = message;
+        field.setAttribute('aria-invalid', 'true');
+        field.setAttribute('aria-describedby', errorId);
+    } else {
+        field.removeAttribute('aria-invalid');
+        if (field.getAttribute('aria-describedby') === errorId) field.removeAttribute('aria-describedby');
+        error?.remove();
+    }
+}
+
+Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, setFieldError, enhanceFormAccessibility });
+enhanceFormAccessibility(document);
+document.addEventListener('DOMContentLoaded', () => enhanceFormAccessibility(document));
+window.setTimeout(() => enhanceFormAccessibility(document), 500);
 
 // ==========================================================================
 // 📭 EMPTY STATE HELPER
 // ==========================================================================
-function createEmptyState(icon, title, text) {
+function createEmptyState(icon, title, text, action = null) {
     return `
-        <div class="empty-state">
-            <div class="empty-state-icon">${icon}</div>
+        <div class="empty-state" role="status">
+            ${icon ? `<div class="empty-state-icon" aria-hidden="true">${icon}</div>` : ''}
             <div class="empty-state-title">${title}</div>
             <div class="empty-state-text">${text}</div>
+            ${action ? `<div class="state-action">${action}</div>` : ''}
         </div>
     `;
+}
+
+function createErrorState(title, text, action = null) {
+    return `<div class="error-state" role="alert">
+        <div class="state-icon" aria-hidden="true">!</div>
+        <div class="state-title">${title}</div>
+        <div class="state-description">${text}</div>
+        ${action ? `<div class="state-action">${action}</div>` : ''}
+    </div>`;
+}
+
+function createLoadingState(title = 'Wird geladen', text = 'Bitte einen Moment warten.') {
+    return `<div class="loading-state" role="status" aria-live="polite">
+        <div class="state-icon" aria-hidden="true"></div>
+        <div class="state-title">${title}</div>
+        <div class="state-description">${text}</div>
+    </div>`;
 }
 
 // ==========================================================================
@@ -12578,30 +13868,40 @@ function showQuickPreview(item, category) {
     
     const preview = document.createElement('div');
     preview.className = 'quick-preview';
+    preview.setAttribute('role', 'dialog');
+    preview.setAttribute('aria-modal', 'true');
+    preview.setAttribute('aria-label', `Schnellansicht ${item}`);
     preview.innerHTML = `
         <div class="quick-preview-header">
-            <h3 style="margin:0;">${item}</h3>
-            <button class="quick-preview-close" onclick="closeQuickPreview()">&times;</button>
+            <h3>${escapeHtml(item)}</h3>
+            <button class="quick-preview-close" onclick="closeQuickPreview()" aria-label="Schnellansicht schließen">&times;</button>
         </div>
-        <div style="margin-bottom:16px;">
-            <span class="stock" style="font-size:1.2rem;">${formatItemAmount(item, stock)}</span>
-            <span style="color:var(--text-muted); margin-left:8px;">${category}</span>
+        <div class="quick-preview-stockline">
+            <span class="stock">${escapeHtml(formatItemAmount(item, stock))}</span>
+            <span>${escapeHtml(category)}</span>
         </div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
-                <div style="font-size:0.75rem; color:var(--text-muted);">Warnschwelle</div>
-                <div style="font-size:1.2rem; font-weight:600;">${threshold} ${getUnitLabel(getItemUnit(item))}</div>
+        <div class="quick-preview-metrics">
+            <div>
+                <small>Warnschwelle</small>
+                <strong>${escapeHtml(threshold)} ${escapeHtml(getUnitLabel(getItemUnit(item)))}</strong>
             </div>
-            <div style="background:rgba(255,255,255,0.05); padding:12px; border-radius:10px;">
-                <div style="font-size:0.75rem; color:var(--text-muted);">Reichweite</div>
-                <div style="font-size:1.2rem; font-weight:600;">${weeksLeft !== null ? weeksLeft + ' Wochen' : '—'}</div>
+            <div>
+                <small>Reichweite</small>
+                <strong>${escapeHtml(weeksLeft !== null ? weeksLeft + ' Wochen' : '—')}</strong>
             </div>
         </div>
-        <div style="margin-top:16px; display:flex; gap:10px;">
-            <button class="btn-in btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'in');">Einlagern</button>
-            <button class="btn-out btn-animated" style="flex:1;" onclick="closeQuickPreview(); openModalForItem('${item}', '${category}', 'out');">Auslagern</button>
+        <div class="quick-preview-actions">
+            <button class="btn-in btn-animated" data-quick-action="in">Einlagern</button>
+            <button class="btn-out btn-animated" data-quick-action="out">Auslagern</button>
         </div>
     `;
+    preview.querySelectorAll('[data-quick-action]').forEach(button => {
+        button.addEventListener('click', () => {
+            const action = button.dataset.quickAction;
+            closeQuickPreview();
+            openModalForItem(item, category, action);
+        });
+    });
     
     document.body.appendChild(backdrop);
     document.body.appendChild(preview);
