@@ -70,6 +70,15 @@ body.theme-girl {
     --status-warning: #b7791f;
     --status-danger: #d90452;
     --secondary: #d93679;
+    --bg: var(--app-bg);
+    --card-bg: var(--surface-card);
+    --primary: var(--accent);
+    --text: var(--text-primary);
+    --text-muted: var(--text-secondary);
+    --danger: var(--status-danger);
+    --success: var(--status-success);
+    --warning: var(--status-warning);
+    --border: var(--border-color);
 }
 
 /* 🌊 HIER IST JETZT DEIN SAUBERES MINT/OCEAN MEERES-THEME 🌊 */
@@ -88,6 +97,15 @@ body.theme-mint {
     --status-warning: #e2a33b;
     --status-danger: #e05b70;
     --secondary: #64ffda;
+    --bg: var(--app-bg);
+    --card-bg: var(--surface-card);
+    --primary: var(--accent);
+    --text: var(--text-primary);
+    --text-muted: var(--text-secondary);
+    --danger: var(--status-danger);
+    --success: var(--status-success);
+    --warning: var(--status-warning);
+    --border: var(--border-color);
 }
 
 /* 🦈 BADMAN SHARK EDITION - Schwarz, Grau, Rot 🦈 */
@@ -106,6 +124,15 @@ body.theme-badman {
     --status-warning: #d8a23c;
     --status-danger: #e63946;
     --secondary: #a0a0a0;
+    --bg: var(--app-bg);
+    --card-bg: var(--surface-card);
+    --primary: var(--accent);
+    --text: var(--text-primary);
+    --text-muted: var(--text-secondary);
+    --danger: var(--status-danger);
+    --success: var(--status-success);
+    --warning: var(--status-warning);
+    --border: var(--border-color);
     background-color: var(--bg);
     background-image:
         linear-gradient(rgba(26, 26, 26, 0.76), rgba(26, 26, 26, 0.9)),
@@ -2295,7 +2322,7 @@ body.party-mode button.btn-animated {
 
 
 /* ==========================================================================
-   🎀 SUPER CUTE PINK GIRL EDITION OVERRIDES 🎀
+   Pink theme legacy overrides
    ========================================================================== */
 body.theme-girl textarea,
 body.theme-girl input[type="number"],
@@ -2316,7 +2343,7 @@ body.theme-girl select option { background: #ffffff !important; color: #4a0026 !
 body.theme-girl .modal-content { background: #ffffff !important; border: 2px solid #ff66a4 !important; color: #4a0026 !important; }
 
 body.theme-girl h1, body.theme-girl h2, body.theme-girl h3, body.theme-girl h4, 
-body.theme-girl label, body.theme-girl span, body.theme-girl strong, 
+body.theme-girl label, body.theme-girl strong, 
 body.theme-girl .stat-grid div strong, body.theme-girl .trace-grid label {
     color: #4a0026 !important;
 }
@@ -2342,13 +2369,13 @@ body.theme-girl .cross-hint { color: #d90452 !important; }
     body.theme-girl .nav-links button.active { background: rgba(255, 102, 164, 0.1) !important; color: #ff1493 !important; border-bottom: 3px solid #ff1493 !important; }
 }
 
-body.theme-girl header h1::before { content: "💖 "; }
-body.theme-girl header h1::after { content: " 🎀"; }
-body.theme-girl .category-title::before { content: "💕 "; }
-body.theme-girl .category-title::after { content: " 💕"; }
-body.theme-girl .card h4 span::before { content: "🌸 "; }
-body.theme-girl .btn-in::before { content: "🎀 "; }
-body.theme-girl .btn-out::before { content: "💗 "; }
+body.theme-girl header h1::before,
+body.theme-girl header h1::after,
+body.theme-girl .category-title::before,
+body.theme-girl .category-title::after,
+body.theme-girl .card h4 span::before,
+body.theme-girl .btn-in::before,
+body.theme-girl .btn-out::before { content: none; }
 
 body.theme-girl.party-mode { 
     animation: pinkDiscoGradient 8s ease infinite !important; 
@@ -2392,7 +2419,7 @@ body.theme-mint .modal-content { background: #0a2540 !important; border: 2px sol
 
 /* Alle Texte im Mint/Ocean Mode auf klares Meeres-Weiß umschalten */
 body.theme-mint h1, body.theme-mint h2, body.theme-mint h3, body.theme-mint h4, 
-body.theme-mint label, body.theme-mint span, body.theme-mint strong, 
+body.theme-mint label, body.theme-mint strong, 
 body.theme-mint .stat-grid div strong, body.theme-mint .trace-grid label {
     color: #e6f1ff !important;
 }
@@ -2425,14 +2452,14 @@ body.theme-mint .cross-hint { color: #ff4a74 !important; }
 }
 
 /* 🌊 AUTOMATISCHE OZEAN & SUBMARIN AKZENTE (Motto Emojis) 🐬 */
-body.theme-mint header h1::before { content: "🌊 "; }
-body.theme-mint header h1::after { content: " 🐬"; }
-body.theme-mint .category-title::before { content: "🐠 "; }
-body.theme-mint .category-title::after { content: " 🐙"; }
-/*body.theme-mint .card h4 span::before { content: "🐚 "; }*/
-body.theme-mint .stock span::before { content: "🐚 "; }
-body.theme-mint .btn-in::before { content: "⚓ "; }
-body.theme-mint .btn-out::before { content: "🌊 "; }
+body.theme-mint header h1::before,
+body.theme-mint header h1::after,
+body.theme-mint .category-title::before,
+body.theme-mint .category-title::after,
+body.theme-mint .card h4 span::before,
+body.theme-mint .stock span::before,
+body.theme-mint .btn-in::before,
+body.theme-mint .btn-out::before { content: none; }
 
 /* 🧬 SPEZIAL: BIOLUMINESZENTER TIEFSEE-RAVE IM PARTY MODUS */
 body.theme-mint.party-mode { 
@@ -6532,7 +6559,7 @@ body.theme-badman .modal-content { background: #2a2a2a !important; border: 2px s
 
 /* Alle Texte im Badman Mode */
 body.theme-badman h1, body.theme-badman h2, body.theme-badman h3, body.theme-badman h4, 
-body.theme-badman label, body.theme-badman span, body.theme-badman strong, 
+body.theme-badman label, body.theme-badman strong, 
 body.theme-badman .stat-grid div strong, body.theme-badman .trace-grid label {
     color: #f1f1f1 !important;
 }
@@ -7925,6 +7952,15 @@ body.theme-light {
     --status-warning: #a96f19;
     --status-danger: #c94b4b;
     --secondary: #397f9c;
+    --bg: var(--app-bg);
+    --card-bg: var(--surface-card);
+    --primary: var(--accent);
+    --text: var(--text-primary);
+    --text-muted: var(--text-secondary);
+    --danger: var(--status-danger);
+    --success: var(--status-success);
+    --warning: var(--status-warning);
+    --border: var(--border-color);
 }
 body.theme-light textarea,
 body.theme-light input[type="number"],
@@ -7943,7 +7979,7 @@ body.theme-light #containerSection {
 body.theme-light select option { background: #ffffff !important; color: #1c1c1e !important; }
 body.theme-light .modal-content { background: #ffffff !important; border: 2px solid #007aff !important; color: #1c1c1e !important; }
 body.theme-light h1, body.theme-light h2, body.theme-light h3, body.theme-light h4,
-body.theme-light label, body.theme-light span, body.theme-light strong,
+body.theme-light label, body.theme-light strong,
 body.theme-light .stat-grid div strong, body.theme-light .trace-grid label {
     color: #1c1c1e !important;
 }
@@ -10766,4 +10802,308 @@ body.theme-badman .prognose-badge { color: var(--accent) !important; border-colo
 @media (max-width: 390px) {
     .quick-preview-metrics,
     .quick-preview-actions { grid-template-columns: 1fr; }
+}
+
+/* BADMAN final polish: visible brand background with readable glass surfaces */
+body.theme-badman {
+    --app-bg: #101012;
+    --nav-bg: #151517;
+    --surface-card: #202023;
+    --surface-raised: #29292d;
+    --border-color: rgba(255, 102, 112, 0.28);
+    --text-primary: #f7f7f8;
+    --text-secondary: #b9b9bf;
+    --accent: #ff6670;
+    --accent-strong: #e63946;
+    --secondary: #d3d3d8;
+    background-color: #101012 !important;
+    background-image:
+        radial-gradient(circle at 50% 42%, rgba(255, 102, 112, 0.16) 0, transparent 34%),
+        linear-gradient(180deg, rgba(16, 16, 18, 0.58) 0%, rgba(16, 16, 18, 0.84) 48%, rgba(16, 16, 18, 0.95) 100%),
+        url("badman.svg") !important;
+    background-repeat: no-repeat !important;
+    background-position: center 42%, center center, center 42% !important;
+    background-size: min(92vw, 760px) auto, cover, min(82vw, 700px) auto !important;
+    background-attachment: fixed !important;
+}
+
+body.theme-badman #appHeader,
+body.theme-badman header {
+    background: rgba(16, 16, 18, 0.74) !important;
+    border-color: rgba(255, 102, 112, 0.22) !important;
+    box-shadow: 0 1px 0 rgba(255, 102, 112, 0.15), 0 18px 44px rgba(0, 0, 0, 0.28) !important;
+    backdrop-filter: blur(18px) saturate(1.2);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+body.theme-badman .nav-menu,
+body.theme-badman .mobile-bottom-nav {
+    background: rgba(18, 18, 20, 0.78) !important;
+    border-color: rgba(255, 102, 112, 0.2) !important;
+    backdrop-filter: blur(18px) saturate(1.18);
+    -webkit-backdrop-filter: blur(18px) saturate(1.18);
+}
+
+body.theme-badman .card,
+body.theme-badman .dashboard-card,
+body.theme-badman .tool-card,
+body.theme-badman .settings-card,
+body.theme-badman .log-item,
+body.theme-badman .stat-block,
+body.theme-badman .quick-preview-metrics > div,
+body.theme-badman #cr-preview-container,
+body.theme-badman #containerSection {
+    background: linear-gradient(180deg, rgba(35, 35, 39, 0.74), rgba(24, 24, 27, 0.72)) !important;
+    border-color: rgba(255, 102, 112, 0.18) !important;
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+    backdrop-filter: blur(10px) saturate(1.12);
+    -webkit-backdrop-filter: blur(10px) saturate(1.12);
+}
+
+body.theme-badman textarea,
+body.theme-badman input[type="number"],
+body.theme-badman input[type="text"],
+body.theme-badman input[type="password"],
+body.theme-badman input[type="file"],
+body.theme-badman input[type="email"],
+body.theme-badman input[type="date"],
+body.theme-badman input[type="datetime-local"],
+body.theme-badman select {
+    background: rgba(16, 16, 18, 0.78) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(255, 102, 112, 0.24) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+body.theme-badman textarea:focus,
+body.theme-badman input:focus,
+body.theme-badman select:focus {
+    border-color: rgba(255, 102, 112, 0.72) !important;
+    box-shadow: 0 0 0 3px rgba(255, 102, 112, 0.16) !important;
+}
+
+body.theme-badman .btn-primary,
+body.theme-badman .nav-links button.active {
+    background: linear-gradient(135deg, #ff6670, #c92532) !important;
+    color: #fff !important;
+    border-color: rgba(255, 102, 112, 0.52) !important;
+    box-shadow: 0 10px 24px rgba(230, 57, 70, 0.24) !important;
+}
+
+body.theme-badman .btn-secondary,
+body.theme-badman .btn-cancel,
+body.theme-badman .nav-links button {
+    background: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.theme-badman .btn-out,
+body.theme-badman .stock,
+body.theme-badman .version-badge,
+body.theme-badman .prognose-badge {
+    background: rgba(255, 102, 112, 0.13) !important;
+    color: #ff8a92 !important;
+}
+
+body.theme-badman .subtitle,
+body.theme-badman .hint,
+body.theme-badman .unit-label,
+body.theme-badman .log-date {
+    color: var(--text-secondary) !important;
+}
+
+body.theme-badman .app-footer {
+    background: rgba(16, 16, 18, 0.58) !important;
+    border-color: rgba(255, 102, 112, 0.14) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+}
+
+@media (max-width: 767px) {
+    body.theme-badman {
+        background-image: none !important;
+        background-attachment: initial !important;
+    }
+
+    body.theme-badman::before {
+        background-color: #101012 !important;
+        background-image:
+            radial-gradient(circle at 50% 20%, rgba(255, 102, 112, 0.18) 0, transparent 38%),
+            linear-gradient(180deg, rgba(16, 16, 18, 0.42) 0%, rgba(16, 16, 18, 0.8) 46%, rgba(16, 16, 18, 0.95) 100%),
+            url("badman.svg") !important;
+        background-repeat: no-repeat !important;
+        background-position: center 72px, center center, center 74px !important;
+        background-size: min(150vw, 620px) auto, cover, min(136vw, 560px) auto !important;
+    }
+
+    body.theme-badman #appHeader,
+    body.theme-badman header,
+    body.theme-badman .mobile-bottom-nav {
+        background: rgba(16, 16, 18, 0.68) !important;
+    }
+
+    body.theme-badman .card,
+    body.theme-badman .dashboard-card,
+    body.theme-badman .tool-card,
+    body.theme-badman .settings-card,
+    body.theme-badman .log-item,
+    body.theme-badman .stat-block {
+        background: linear-gradient(180deg, rgba(35, 35, 39, 0.7), rgba(24, 24, 27, 0.68)) !important;
+    }
+}
+
+/* Theme cleanup: keep the pink theme polished and consistent with the app UI */
+body.theme-girl {
+    color-scheme: light;
+    --app-bg: #fff7fb;
+    --nav-bg: #fffafd;
+    --surface-card: #ffffff;
+    --surface-raised: #fff0f6;
+    --border-color: #f3bfd2;
+    --text-primary: #351324;
+    --text-secondary: #7d5b6a;
+    --accent: #c52f70;
+    --accent-strong: #9d2459;
+    --status-success: #2f8f65;
+    --status-warning: #a86b16;
+    --status-danger: #c92d4f;
+    --secondary: #8d4770;
+    background: linear-gradient(180deg, #fff8fb 0%, #ffeef5 100%) !important;
+}
+
+body.theme-girl header h1::before,
+body.theme-girl header h1::after,
+body.theme-girl .category-title::before,
+body.theme-girl .category-title::after,
+body.theme-girl .card h4 span::before,
+body.theme-girl .btn-in::before,
+body.theme-girl .btn-out::before {
+    content: none !important;
+}
+
+body.theme-girl #appHeader,
+body.theme-girl header,
+body.theme-girl .nav-menu,
+body.theme-girl .mobile-bottom-nav {
+    background: rgba(255, 250, 253, 0.84) !important;
+    border-color: rgba(197, 47, 112, 0.16) !important;
+    box-shadow: 0 1px 0 rgba(197, 47, 112, 0.08), 0 14px 36px rgba(80, 18, 45, 0.08) !important;
+    backdrop-filter: blur(18px) saturate(1.12);
+    -webkit-backdrop-filter: blur(18px) saturate(1.12);
+}
+
+body.theme-girl .card,
+body.theme-girl .dashboard-card,
+body.theme-girl .tool-card,
+body.theme-girl .settings-card,
+body.theme-girl .log-item,
+body.theme-girl .stat-block,
+body.theme-girl #cr-preview-container,
+body.theme-girl #containerSection {
+    background: rgba(255, 255, 255, 0.88) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(197, 47, 112, 0.14) !important;
+    box-shadow: 0 16px 40px rgba(80, 18, 45, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+body.theme-girl textarea,
+body.theme-girl input[type="number"],
+body.theme-girl input[type="text"],
+body.theme-girl input[type="password"],
+body.theme-girl input[type="file"],
+body.theme-girl input[type="email"],
+body.theme-girl input[type="date"],
+body.theme-girl input[type="datetime-local"],
+body.theme-girl input[type="search"],
+body.theme-girl select {
+    background: rgba(255, 255, 255, 0.94) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(197, 47, 112, 0.18) !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72) !important;
+}
+
+body.theme-girl textarea:focus,
+body.theme-girl input:focus,
+body.theme-girl select:focus {
+    border-color: rgba(197, 47, 112, 0.62) !important;
+    box-shadow: 0 0 0 3px rgba(197, 47, 112, 0.14) !important;
+}
+
+body.theme-girl h1,
+body.theme-girl h2,
+body.theme-girl h3,
+body.theme-girl h4,
+body.theme-girl label,
+body.theme-girl strong,
+body.theme-girl .stat-grid div strong,
+body.theme-girl .trace-grid label {
+    color: var(--text-primary) !important;
+}
+
+body.theme-girl .subtitle,
+body.theme-girl .hint,
+body.theme-girl .unit-label,
+body.theme-girl .log-date,
+body.theme-girl small {
+    color: var(--text-secondary) !important;
+}
+
+body.theme-girl .btn-primary,
+body.theme-girl .nav-links button.active {
+    background: linear-gradient(135deg, #d94a85, #a82761) !important;
+    color: #ffffff !important;
+    border-color: rgba(197, 47, 112, 0.42) !important;
+    box-shadow: 0 10px 24px rgba(197, 47, 112, 0.18) !important;
+}
+
+body.theme-girl .btn-secondary,
+body.theme-girl .btn-cancel,
+body.theme-girl .nav-links button {
+    background: rgba(255, 255, 255, 0.74) !important;
+    color: var(--text-primary) !important;
+    border-color: rgba(197, 47, 112, 0.15) !important;
+}
+
+body.theme-girl .btn-out,
+body.theme-girl .btn-danger {
+    background: rgba(201, 45, 79, 0.1) !important;
+    color: #a41f3f !important;
+    border-color: rgba(201, 45, 79, 0.22) !important;
+}
+
+body.theme-girl .btn-in,
+body.theme-girl .stock,
+body.theme-girl .version-badge,
+body.theme-girl .prognose-badge {
+    background: rgba(197, 47, 112, 0.1) !important;
+    color: #8f2455 !important;
+    border-color: rgba(197, 47, 112, 0.18) !important;
+}
+
+body.theme-girl .app-footer {
+    background: rgba(255, 250, 253, 0.72) !important;
+    border-color: rgba(197, 47, 112, 0.12) !important;
+}
+
+.coral-form-actions {
+    justify-content: flex-start;
+    align-items: center;
+}
+
+.coral-form-actions .btn-secondary {
+    order: 2;
+}
+
+@media (max-width: 767px) {
+    .coral-section-head > button { width: auto; }
+    .coral-form-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+    .coral-form-actions > button {
+        width: 100%;
+    }
 }
