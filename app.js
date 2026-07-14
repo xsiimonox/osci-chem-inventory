@@ -4164,6 +4164,18 @@ function renderDashboard() {
             <button type="button" class="btn btn-secondary" onclick="selectTab('korallen')" ${isEditing ? 'disabled' : ''}>Korallen</button>
         </section>
 
+        <section class="dashboard-support-card dashboard-widget" aria-label="Projekt unterstützen">
+            <div>
+                <small>Freiwillig</small>
+                <strong>Reeftools.de unterstützen</strong>
+                <span>Hilft bei Hosting, Weiterentwicklung und Tests.</span>
+            </div>
+            <div class="dashboard-support-actions">
+                <a class="btn btn-primary" href="https://www.paypal.com/paypalme/simonasbach" target="_blank" rel="noopener noreferrer">PayPal</a>
+                <a class="btn btn-secondary" href="https://buymeacoffee.com/simonasbaca" target="_blank" rel="noopener noreferrer">Coffee</a>
+            </div>
+        </section>
+
         ${isEditing ? `<section class="dashboard-config dashboard-edit-mode" aria-label="Dashboard bearbeiten">
             <div class="dashboard-config-card">
                 <div class="dashboard-edit-banner">
@@ -5078,7 +5090,7 @@ function getSettingsMeta(title) {
     if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Cloud', hint: 'Google Drive und geräteübergreifende Sicherung', keywords: 'google drive sync cloud upload download wiederherstellen' };
     if (/datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Lokale Sicherungen, Import und Export', keywords: 'sicherung backup export import wiederherstellen datei lokal' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
-    if (/app|system|update|problem|bug/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail' };
+    if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
     if (/eigene produkte|produktlisten|preset|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen und Links', keywords: 'produkt eigene waren preset produktlisten shop link größe dichte stück gramm ml' };
