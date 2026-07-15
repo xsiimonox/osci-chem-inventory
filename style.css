@@ -8163,44 +8163,356 @@ body.theme-badman.party-mode .card {
     border-left-color: var(--status-warning);
 }
 
+.trace-history-chart-wrap {
+    display: grid;
+    gap: 8px;
+    overflow: visible;
+    border: 1px solid var(--workflow-border);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.trace-history-chart-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.trace-history-chart-head::-webkit-details-marker {
+    display: none;
+}
+
+.trace-history-chart-wrap[open] > .trace-history-chart-head {
+    border-bottom: 1px solid var(--workflow-border);
+}
+
+.trace-history-chart-head strong {
+    color: var(--text-primary);
+    font-size: 0.78rem;
+}
+
+.trace-history-chart-head small {
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    text-align: right;
+}
+
+.trace-history-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+}
+
+.trace-history-chart-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.trace-history-chart-legend span::before {
+    content: '';
+    width: 16px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+}
+
+.trace-legend-value {
+    color: color-mix(in srgb, var(--accent) 72%, var(--text-secondary));
+}
+
+.trace-legend-trend {
+    color: var(--status-warning);
+}
+
+.trace-legend-average {
+    color: var(--text-secondary);
+}
+
+.trace-legend-optimal {
+    color: var(--status-success);
+}
+
 .trace-history-chart {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
+    padding: 0 12px 12px;
 }
 
-.trace-history-spark {
+.trace-history-element-card {
     display: grid;
-    grid-template-columns: 30px minmax(0, 1fr) 76px;
     gap: 8px;
-    align-items: center;
     min-width: 0;
-    padding: 7px 9px;
-    border: 1px solid var(--workflow-border);
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--workflow-border) 76%, transparent);
     border-radius: 8px;
-    color: var(--accent);
-    background: var(--surface-raised);
+    background:
+        linear-gradient(145deg, color-mix(in srgb, var(--surface-raised) 92%, var(--accent) 8%), var(--surface-raised));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-.trace-history-spark > span {
+.trace-history-element-empty {
+    align-content: start;
+}
+
+.trace-history-element-empty p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    line-height: 1.45;
+}
+
+.trace-history-element-head {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+}
+
+.trace-history-element-head span {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+
+.trace-history-element-head strong {
     color: var(--text-primary);
-    font-size: 0.7rem;
+    font-size: 0.78rem;
     font-weight: 800;
 }
 
-.trace-history-spark svg {
-    width: 100%;
-    height: 30px;
-    color: var(--accent);
-}
-
-.trace-history-spark small {
+.trace-history-element-head small,
+.trace-history-element-head em {
     overflow: hidden;
     color: var(--text-secondary);
     font-size: 0.62rem;
-    text-align: right;
+    font-style: normal;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.trace-history-chart-stage {
+    position: relative;
+    overflow: visible;
+    width: 100%;
+    aspect-ratio: 320 / 150;
+    min-height: 150px;
+    --trace-value-color: color-mix(in srgb, var(--accent) 72%, var(--text-secondary));
+}
+
+.trace-history-element-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    color: var(--trace-value-color);
+    overflow: visible;
+}
+
+.trace-history-plot-bg {
+    fill: color-mix(in srgb, var(--surface-card) 55%, transparent);
+    stroke: color-mix(in srgb, var(--workflow-border) 70%, transparent);
+    stroke-width: 1;
+}
+
+.trace-history-grid-line {
+    stroke: color-mix(in srgb, var(--workflow-border) 64%, transparent);
+    stroke-width: 0.8;
+}
+
+.trace-history-grid-line-x {
+    stroke-dasharray: 2 5;
+    opacity: 0.55;
+}
+
+.trace-history-axis-line {
+    stroke: color-mix(in srgb, var(--text-secondary) 56%, transparent);
+    stroke-width: 1;
+}
+
+.trace-history-axis-text {
+    fill: var(--text-secondary);
+    font-size: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.trace-history-axis-y {
+    text-anchor: end;
+}
+
+.trace-history-axis-x {
+    text-anchor: middle;
+}
+
+.trace-history-axis-title {
+    fill: color-mix(in srgb, var(--text-secondary) 84%, transparent);
+    font-size: 6px;
+    font-weight: 750;
+    text-anchor: middle;
+    text-transform: uppercase;
+}
+
+.trace-history-value-line {
+    stroke: var(--trace-value-color);
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    opacity: 0.92;
+}
+
+.trace-history-value-points circle {
+    fill: var(--surface-card);
+    stroke: var(--trace-value-color);
+    stroke-width: 1.5;
+}
+
+.trace-history-trend-line {
+    stroke: var(--status-warning);
+    stroke-width: 2;
+    stroke-dasharray: 5 4;
+}
+
+.trace-history-average-line {
+    stroke: var(--text-secondary);
+    stroke-width: 1.4;
+    stroke-dasharray: 2 4;
+    opacity: 0.82;
+}
+
+.trace-history-optimal-line {
+    stroke: var(--status-success);
+    stroke-width: 1.5;
+    opacity: 0.9;
+}
+
+.trace-history-point-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+}
+
+.trace-history-point {
+    position: absolute;
+    z-index: 2;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 0;
+    aspect-ratio: 1 / 1;
+    margin: -9px 0 0 -9px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    appearance: none;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+.trace-history-point::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    border: 1.5px solid var(--trace-value-color, var(--accent));
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    box-sizing: border-box;
+    background: var(--surface-card);
+    opacity: 0.88;
+    transition: transform 0.16s ease, opacity 0.16s ease, box-shadow 0.16s ease;
+}
+
+.trace-history-point span {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 4;
+    display: grid;
+    gap: 2px;
+    min-width: 116px;
+    padding: 7px 9px;
+    border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--workflow-border));
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--surface-card) 94%, black 6%);
+    color: var(--text-secondary);
+    font-size: 0.62rem;
+    line-height: 1.25;
+    opacity: 0;
+    pointer-events: none;
+    text-align: left;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.14s ease, transform 0.14s ease;
+    white-space: nowrap;
+}
+
+.trace-history-point span strong {
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.trace-history-point:hover::after,
+.trace-history-point:focus-visible::after {
+    transform: scale(1.18);
+    opacity: 1;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--trace-value-color, var(--accent)) 15%, transparent);
+}
+
+.trace-history-point:hover span,
+.trace-history-point:focus-visible span {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+.trace-history-element-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.trace-history-element-stats span {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+    padding: 5px 6px;
+    border: 1px solid color-mix(in srgb, var(--workflow-border) 78%, transparent);
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--surface-card) 45%, transparent);
+}
+
+.trace-history-element-stats small {
+    color: var(--text-secondary);
+    font-size: 0.52rem;
+    text-transform: uppercase;
+}
+
+.trace-history-element-stats strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 0.6rem;
+    font-variant-numeric: tabular-nums;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trace-history-element-stats .trace-history-distance-ok strong {
+    color: var(--status-success);
+}
+
+.trace-history-element-stats .trace-history-distance-high strong,
+.trace-history-element-stats .trace-history-distance-low strong {
+    color: var(--status-warning);
 }
 
 .trace-history-list {
@@ -8359,6 +8671,20 @@ body.theme-badman.party-mode .card {
 
     .trace-history-chart {
         grid-template-columns: 1fr;
+    }
+
+    .trace-history-chart-head {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .trace-history-chart-head small {
+        text-align: left;
+    }
+
+    .trace-history-element-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .trace-history-row {

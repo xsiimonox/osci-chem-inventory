@@ -6921,6 +6921,12 @@ function formatTraceMixtureDate(entry) {
         : new Date(entry?.createdAt || Date.now()).toLocaleDateString('de-DE');
 }
 
+function formatTraceShortDateFromTime(time) {
+    const date = new Date(time);
+    if (!Number.isFinite(date.getTime())) return '-';
+    return date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+}
+
 function getTraceHistoryTotalGrams(entry, group) {
     const saved = traceCalcNumber(entry?.totals?.[group]?.volumeG, null);
     if (saved !== null) return saved;
@@ -7166,6 +7172,31 @@ function renderTraceCalculatorIcpInputs() {
         input.addEventListener('input', () => updateTraceCalculatorIcp(input.dataset.traceCalcItem, input.value));
     });
     container.dataset.traceCalcReady = 'true';
+}
+
+function getTraceCalculatorIcpValidation() {
+    const state = ensureTraceCalculatorState();
+    const invalid = traceCalculatorElements.filter(element => {
+        const raw = state.icp?.[element.item];
+        if (raw === null || raw === undefined || String(raw).trim() === '') return true;
+        const value = traceCalcNumber(raw, null);
+        return value === null || value < 0;
+    });
+    return {
+        valid: invalid.length === 0,
+        invalid
+    };
+}
+
+function showTraceCalculatorIcpValidationError(invalid) {
+    const labels = invalid.map(element => element.symbol).join(', ');
+    alert(`Bitte alle Kationen- und Anionen-ICP-Werte logisch ausfüllen.\n\nFehlt oder ungültig: ${labels}`);
+    const first = invalid[0];
+    const input = first ? document.getElementById(`traceCalcIcp-${first.symbol}`) : null;
+    if (input) {
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 function renderTraceRecipeTable(recipe, group) {
@@ -7439,6 +7470,7 @@ function renderTraceCalculationGuide() {
                     <p>Die Analyse vergleicht immer die letzten zwei gespeicherten Mischungen. Für jedes Element wird der absolute Abstand zum Optimalwert vor und nach der Anpassung berechnet.</p>
                     <p>Eine Verbesserung wird erst ab mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} kleinerem Abstand gezählt. Mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} größerer Abstand gilt als Verschlechterung; alles dazwischen als stabil.</p>
                     <p><code>ICP-Entwicklung % = (neuer ICP-Wert − alter ICP-Wert) / |alter ICP-Wert| × 100</code><br><code>Mengenentwicklung % = (neue Menge − alte Menge) / |alte Menge| × 100</code></p>
+                    <p>Die Verlaufsgrafen nutzen alle gespeicherten ICP-Werte je Element. Die durchgezogene Linie zeigt die Messwerte, die gestrichelte Linie die lineare Trendlinie, die graue Linie den Durchschnitt und die grüne Linie den Optimalwert.</p>
                     <p><strong>Speichern</strong> legt Rezept, ICP-Werte, Datum und Konfiguration in der Historie ab. <strong>Speichern &amp; Auslagern</strong> prüft zuerst alle benötigten Lagerbestände. Fehlt eine Ware, wird nichts gespeichert und nichts teilweise ausgelagert. Bei ausreichendem Bestand werden alle verwendeten Trace-Produkte im aktiven Lager abgezogen und einzeln protokolliert.</p>
                 </div>
             </details>
@@ -7493,32 +7525,177 @@ function renderTraceCalculatorHistoryAnalysis(history) {
     `;
 }
 
-function renderTraceCalculatorHistoryChart(history) {
-    const chartEntries = traceCalculatorElements.map(element => {
-        const values = history
-            .map(entry => traceCalcNumber(entry.icp?.[element.item], null))
-            .filter(value => value !== null);
-        if (values.length < 2) return '';
-        const min = Math.min(...values, element.min);
-        const max = Math.max(...values, element.max);
-        const range = max - min || 1;
-        const points = values.map((value, index) => {
-            const x = values.length === 1 ? 0 : (index / (values.length - 1)) * 100;
-            const y = 36 - ((value - min) / range) * 32;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-        }).join(' ');
+function getTraceHistoryEntryTime(entry, fallbackIndex = 0) {
+    const dateValue = entry?.mixtureDate || entry?.createdAt || '';
+    const date = entry?.mixtureDate
+        ? new Date(`${entry.mixtureDate}T00:00:00`)
+        : new Date(dateValue || Date.now());
+    const time = date.getTime();
+    return Number.isFinite(time) ? time : fallbackIndex;
+}
+
+function getTraceHistoryTrend(values) {
+    if (!Array.isArray(values) || values.length < 2) return null;
+    const n = values.length;
+    const minX = Math.min(...values.map(point => point.x));
+    const maxX = Math.max(...values.map(point => point.x));
+    const xRange = maxX - minX || 1;
+    const normalized = values.map(point => ({ ...point, nx: (point.x - minX) / xRange }));
+    const meanX = normalized.reduce((sum, point) => sum + point.nx, 0) / n;
+    const meanY = values.reduce((sum, point) => sum + point.value, 0) / n;
+    const denominator = normalized.reduce((sum, point) => sum + ((point.nx - meanX) ** 2), 0);
+    if (!denominator) return null;
+    const slope = normalized.reduce((sum, point) => sum + ((point.nx - meanX) * (point.value - meanY)), 0) / denominator;
+    const intercept = meanY - (slope * meanX);
+    return {
+        slope,
+        start: intercept,
+        end: intercept + slope
+    };
+}
+
+function renderTraceHistoryElementChart(element, history) {
+    const values = history
+        .map((entry, index) => ({
+            value: traceCalcNumber(entry.icp?.[element.item], null),
+            time: getTraceHistoryEntryTime(entry, index),
+            date: formatTraceMixtureDate(entry)
+        }))
+        .filter(point => point.value !== null)
+        .sort((a, b) => a.time - b.time);
+
+    if (!values.length) {
         return `
-            <div class="trace-history-spark">
-                <span>${element.symbol}</span>
-                <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
-                    <polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"></polyline>
-                </svg>
-                <small>${traceCalcFormatValue(values[values.length - 1], 2)} ${element.unit}</small>
+            <div class="trace-history-element-card trace-history-element-empty">
+                <div class="trace-history-element-head">
+                    <span><strong>${escapeHtml(element.symbol)}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small></span>
+                    <em>kein Verlauf</em>
+                </div>
+                <p>Für dieses Element wurde noch kein ICP-Wert gespeichert.</p>
             </div>
         `;
-    }).filter(Boolean).join('');
+    }
 
-    return chartEntries ? `<div class="trace-history-chart">${chartEntries}</div>` : '<p class="hint">Für Verlaufsgrafen mindestens zwei gespeicherte ICP-Messungen eintragen.</p>';
+    const average = values.reduce((sum, point) => sum + point.value, 0) / values.length;
+    const latest = values[values.length - 1];
+    const trendInput = values.map(point => ({ ...point, x: point.time }));
+    const trend = getTraceHistoryTrend(trendInput);
+    const trendPercent = values.length > 1 && values[0].value !== 0
+        ? ((latest.value - values[0].value) / Math.abs(values[0].value)) * 100
+        : null;
+    const chartValues = [
+        ...values.map(point => point.value),
+        element.optimal,
+        average,
+        trend?.start,
+        trend?.end
+    ].filter(value => value !== null && value !== undefined && Number.isFinite(value));
+    const min = Math.min(...chartValues);
+    const max = Math.max(...chartValues);
+    const padding = Math.max((max - min) * 0.14, Math.abs(element.optimal || 1) * 0.04, 0.1);
+    const chartMin = min - padding;
+    const chartMax = max + padding;
+    const range = chartMax - chartMin || 1;
+    const minTime = Math.min(...values.map(point => point.time));
+    const maxTime = Math.max(...values.map(point => point.time));
+    const timeRange = maxTime - minTime || 1;
+    const width = 320;
+    const height = 150;
+    const top = 14;
+    const bottom = 34;
+    const left = 40;
+    const right = 16;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const xForTime = time => left + (values.length === 1 ? plotWidth / 2 : ((time - minTime) / timeRange) * plotWidth);
+    const yForValue = value => top + ((chartMax - value) / range) * plotHeight;
+    const chartPoints = values.map(point => ({
+        ...point,
+        x: xForTime(point.time),
+        y: yForValue(point.value)
+    }));
+    const points = chartPoints.map(point => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+    const averageY = yForValue(average).toFixed(1);
+    const optimalY = yForValue(element.optimal).toFixed(1);
+    const yTicks = [chartMax, (chartMax + chartMin) / 2, chartMin];
+    const xTicks = values.length === 1
+        ? [{ x: xForTime(values[0].time), label: formatTraceShortDateFromTime(values[0].time) }]
+        : [
+            { x: left, label: formatTraceShortDateFromTime(minTime) },
+            { x: left + plotWidth / 2, label: formatTraceShortDateFromTime(minTime + timeRange / 2) },
+            { x: left + plotWidth, label: formatTraceShortDateFromTime(maxTime) }
+        ];
+    const trendLine = trend
+        ? `<line class="trace-history-trend-line" x1="${left}" y1="${yForValue(trend.start).toFixed(1)}" x2="${width - right}" y2="${yForValue(trend.end).toFixed(1)}"></line>`
+        : '';
+    const valueDots = chartPoints.map(point => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3.4"></circle>`).join('');
+    const interactiveDots = chartPoints.map(point => `
+        <button type="button" class="trace-history-point" style="left:${(point.x / width * 100).toFixed(3)}%; top:${(point.y / height * 100).toFixed(3)}%;" aria-label="${escapeHtml(point.date)}: ${traceCalcFormatValue(point.value, 2)} ${escapeHtml(element.unit)}">
+            <span>${escapeHtml(point.date)}<strong>${traceCalcFormatValue(point.value, 2)} ${escapeHtml(element.unit)}</strong></span>
+        </button>
+    `).join('');
+    const distanceToOptimal = latest.value - element.optimal;
+    const distanceClass = Math.abs(distanceToOptimal) <= Math.abs(element.optimal) * 0.05 ? 'trace-history-distance-ok' : distanceToOptimal > 0 ? 'trace-history-distance-high' : 'trace-history-distance-low';
+    const trendLabel = trend
+        ? `${trend.slope >= 0 ? '+' : ''}${traceCalcFormatValue(trend.slope, 3)} ${element.unit}/Verlauf`
+        : 'noch offen';
+
+    return `
+        <div class="trace-history-element-card">
+            <div class="trace-history-element-head">
+                <span><strong>${escapeHtml(element.symbol)}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small></span>
+                <em>${values.length} Wert${values.length === 1 ? '' : 'e'}</em>
+            </div>
+            <div class="trace-history-chart-stage">
+                <svg class="trace-history-element-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Verlauf ${escapeHtml(element.item)}">
+                    <rect class="trace-history-plot-bg" x="${left}" y="${top}" width="${plotWidth}" height="${plotHeight}" rx="4"></rect>
+                    ${yTicks.map(value => `<line class="trace-history-grid-line" x1="${left}" y1="${yForValue(value).toFixed(1)}" x2="${width - right}" y2="${yForValue(value).toFixed(1)}"></line>`).join('')}
+                    ${xTicks.map(tick => `<line class="trace-history-grid-line trace-history-grid-line-x" x1="${tick.x.toFixed(1)}" y1="${top}" x2="${tick.x.toFixed(1)}" y2="${top + plotHeight}"></line>`).join('')}
+                    <line class="trace-history-axis-line" x1="${left}" y1="${top}" x2="${left}" y2="${top + plotHeight}"></line>
+                    <line class="trace-history-axis-line" x1="${left}" y1="${top + plotHeight}" x2="${width - right}" y2="${top + plotHeight}"></line>
+                    ${yTicks.map(value => `<text class="trace-history-axis-text trace-history-axis-y" x="${left - 5}" y="${(yForValue(value) + 3).toFixed(1)}">${traceCalcFormatValue(value, 2)}</text>`).join('')}
+                    ${xTicks.map(tick => `<text class="trace-history-axis-text trace-history-axis-x" x="${tick.x.toFixed(1)}" y="${height - 8}">${escapeHtml(tick.label)}</text>`).join('')}
+                    <text class="trace-history-axis-title trace-history-axis-title-y" x="7" y="${top + plotHeight / 2}" transform="rotate(-90 7 ${top + plotHeight / 2})">${escapeHtml(element.unit)}</text>
+                    <text class="trace-history-axis-title trace-history-axis-title-x" x="${left + plotWidth / 2}" y="${height - 1}">Zeit</text>
+                    <line class="trace-history-optimal-line" x1="${left}" y1="${optimalY}" x2="${width - right}" y2="${optimalY}"></line>
+                    <line class="trace-history-average-line" x1="${left}" y1="${averageY}" x2="${width - right}" y2="${averageY}"></line>
+                    ${trendLine}
+                    <polyline class="trace-history-value-line" points="${points}" fill="none"></polyline>
+                    <g class="trace-history-value-points">${valueDots}</g>
+                </svg>
+                <div class="trace-history-point-layer">${interactiveDots}</div>
+            </div>
+            <div class="trace-history-element-stats">
+                <span><small>Aktuell</small><strong>${traceCalcFormatValue(latest.value, 2)} ${escapeHtml(element.unit)}</strong></span>
+                <span><small>Durchschnitt</small><strong>${traceCalcFormatValue(average, 2)} ${escapeHtml(element.unit)}</strong></span>
+                <span><small>Trend</small><strong>${escapeHtml(trendLabel)}</strong></span>
+                <span><small>Entwicklung</small><strong>${traceCalcFormatPercent(trendPercent)}</strong></span>
+                <span class="${distanceClass}"><small>Abweichung Ziel</small><strong>${distanceToOptimal >= 0 ? '+' : ''}${traceCalcFormatValue(distanceToOptimal, 2)} ${escapeHtml(element.unit)}</strong></span>
+            </div>
+        </div>
+    `;
+}
+
+function renderTraceCalculatorHistoryChart(history) {
+    const hasValues = traceCalculatorElements.some(element => history.some(entry => traceCalcNumber(entry.icp?.[element.item], null) !== null));
+    if (!hasValues) return '<p class="hint">Für Verlaufsgrafen gespeicherte ICP-Messwerte eintragen.</p>';
+    return `
+        <details class="trace-history-chart-wrap">
+            <summary class="trace-history-chart-head">
+                <strong>Verlauf je Element</strong>
+                <small>Messwertkurve, Trendlinie, Durchschnitt und Optimalwert</small>
+            </summary>
+            <div class="trace-history-chart-legend" aria-hidden="true">
+                <span class="trace-legend-value">ICP</span>
+                <span class="trace-legend-trend">Trend</span>
+                <span class="trace-legend-average">Durchschnitt</span>
+                <span class="trace-legend-optimal">Optimal</span>
+            </div>
+            <div class="trace-history-chart">
+                ${traceCalculatorElements.map(element => renderTraceHistoryElementChart(element, history)).join('')}
+            </div>
+        </details>
+    `;
 }
 
 function renderTraceCalculatorHistory() {
@@ -7818,6 +7995,11 @@ function loadTraceCalculatorHistoryEntry(id) {
 
 function createTraceCalculatorMixturePayload() {
     const state = ensureTraceCalculatorState();
+    const validation = getTraceCalculatorIcpValidation();
+    if (!validation.valid) {
+        showTraceCalculatorIcpValidationError(validation.invalid);
+        return null;
+    }
     const recipe = calculateTraceRecipe(getTraceCalculatorConfigFromUi());
     const mixtureDate = document.getElementById('traceCalcMixtureDate')?.value || state.currentMixtureDate;
     if (!mixtureDate) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v305-trace-plan-suggestions';
+const CACHE_NAME = 'reef-storage-tools-cache-v310-round-chart-points';
 const ASSETS = [
   './',
   './index.html',
