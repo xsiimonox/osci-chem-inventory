@@ -7064,6 +7064,18 @@ body.theme-badman.party-mode .card {
     font-size: 0.72rem;
 }
 
+.trace-config-warnings {
+    margin-top: var(--space-3);
+}
+
+.trace-config-warnings:empty {
+    display: none;
+}
+
+.trace-plan-warning {
+    margin: 0;
+}
+
 .trace-config-grid input,
 .trace-config-grid select {
     width: 100%;

@@ -6902,6 +6902,12 @@ function traceCalcFormatValue(value, digits = 1) {
     return parsed.toLocaleString('de-DE', { maximumFractionDigits: digits });
 }
 
+function traceCalcFormatRawMl(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return '-';
+    return `${number.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ml`;
+}
+
 function formatTraceDateInput(value) {
     if (!value) return '-';
     const date = new Date(`${value}T00:00:00`);
@@ -6933,14 +6939,21 @@ function getTraceCalculatorConfigFromUi() {
     const state = ensureTraceCalculatorState();
     const saved = state.config;
     const dateValue = document.getElementById('traceCalcMixtureDate')?.value || state.currentMixtureDate || getTodayDateInputValue();
+    const readConfigNumber = (id, fallback, minimum) => {
+        const input = document.getElementById(id);
+        if (!input) return Math.max(minimum, traceCalcNumber(fallback, minimum));
+        const raw = String(input.value ?? '').trim();
+        if (raw === '') return Math.max(minimum, traceCalcNumber(fallback, minimum));
+        return Math.max(minimum, traceCalcNumber(raw, fallback));
+    };
     state.currentMixtureDate = dateValue;
     const config = {
-        tankLiters: Math.max(1, traceCalcNumber(document.getElementById('traceCalcTankLiters')?.value, saved.tankLiters || 500)),
+        tankLiters: readConfigNumber('traceCalcTankLiters', saved.tankLiters || 500, 1),
         interval: document.getElementById('traceCalcInterval')?.value || saved.interval || 'monthly',
         stocking: document.getElementById('traceCalcStocking')?.value || saved.stocking || 'normal',
-        days: Math.max(1, traceCalcNumber(document.getElementById('traceCalcDays')?.value, saved.days || 40)),
-        dailyDoseMl: Math.max(0.1, traceCalcNumber(document.getElementById('traceCalcDailyDose')?.value, saved.dailyDoseMl || 5)),
-        bottleMaxMl: Math.max(1, traceCalcNumber(document.getElementById('traceCalcBottleMax')?.value, saved.bottleMaxMl || 450))
+        days: readConfigNumber('traceCalcDays', saved.days || 40, 1),
+        dailyDoseMl: readConfigNumber('traceCalcDailyDose', saved.dailyDoseMl || 5, 0.01),
+        bottleMaxMl: readConfigNumber('traceCalcBottleMax', saved.bottleMaxMl || 450, 0.01)
     };
     state.config = config;
     return config;
@@ -6960,7 +6973,7 @@ function syncTraceCalculatorConfigUi() {
     ];
     setters.forEach(([id, value]) => {
         const el = document.getElementById(id);
-        if (el && (el.value === '' || el.dataset.traceCalcSynced !== 'true')) {
+        if (el && el.dataset.traceCalcSynced !== 'true') {
             el.value = value;
             el.dataset.traceCalcSynced = 'true';
         }
@@ -7551,6 +7564,37 @@ function renderTraceCalculatorHistory() {
     `;
 }
 
+function getTraceCalculatorConfigWarnings(config) {
+    const plannedVolume = traceCalcRound(config.dailyDoseMl * config.days);
+    if (plannedVolume <= config.bottleMaxMl) return [];
+    const maxDailyDose = config.days > 0 ? config.bottleMaxMl / config.days : 0;
+    const maxRuntime = config.dailyDoseMl > 0 ? Math.floor(config.bottleMaxMl / config.dailyDoseMl) : 0;
+    return [
+        `K+: ${traceCalcFormatMl(plannedVolume)} überschreitet ${traceCalcFormatMl(config.bottleMaxMl)} Flaschenvolumen.`,
+        `A-: ${traceCalcFormatMl(plannedVolume)} überschreitet ${traceCalcFormatMl(config.bottleMaxMl)} Flaschenvolumen.`,
+        `Vorschlag: Bei ${traceCalcFormatValue(config.days, 0)} Tagen und ${traceCalcFormatMl(config.bottleMaxMl)} Flaschenvolumen maximal ${traceCalcFormatRawMl(maxDailyDose)} pro Tag dosieren.`,
+        `Alternative: Bei ${traceCalcFormatMl(config.dailyDoseMl)} pro Tag reicht ${traceCalcFormatMl(config.bottleMaxMl)} für maximal ${traceCalcFormatValue(maxRuntime, 0)} Tage.`
+    ];
+}
+
+function renderTraceCalculatorConfigWarnings(config) {
+    const container = document.getElementById('traceCalcConfigWarnings');
+    if (!container) return;
+    const warnings = getTraceCalculatorConfigWarnings(config);
+    if (!warnings.length) {
+        container.innerHTML = '';
+        container.hidden = true;
+        return;
+    }
+    container.hidden = false;
+    container.innerHTML = `
+        <div class="workflow-message workflow-message--error trace-plan-warning" role="alert">
+            <strong>Bitte prüfen</strong>
+            <span>${warnings.map(escapeHtml).join('<br>')}</span>
+        </div>
+    `;
+}
+
 function renderTraceCalculator() {
     const root = document.getElementById('traceCalculatorResult');
     if (!root) return;
@@ -7560,12 +7604,12 @@ function renderTraceCalculator() {
     const config = getTraceCalculatorConfigFromUi();
     const recipe = calculateTraceRecipe(config);
     state.latestRecipe = recipe;
+    renderTraceCalculatorConfigWarnings(config);
 
     const warnings = [];
     ['kationen', 'anionen'].forEach(group => {
         const total = recipe.totals[group];
         const label = group === 'kationen' ? 'K+' : 'A-';
-        if (total.volumeMl > config.bottleMaxMl) warnings.push(`${label}: ${traceCalcFormatMl(total.volumeMl)} überschreitet ${traceCalcFormatMl(config.bottleMaxMl)} Flaschenvolumen.`);
         if (total.osmoseMl < 0) warnings.push(`${label}: Elementmengen sind größer als das Zielvolumen.`);
     });
 
