@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.2-trace-lock">
+    <link rel="stylesheet" href="style.css?v=3.0.3-trace-support-link">
 </head>
 <body>
 
@@ -45,6 +45,7 @@
                             <button type="button" onclick="runCloudQuickAction('settings')">Einstellungen</button>
                         </div>
                     </div>
+                    <button type="button" class="header-quick-sync-button" onclick="openProjectSupportSettings()" aria-label="Projekt unterstützen öffnen">Projekt unterstützen</button>
                 </div>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen" aria-controls="main-nav" aria-expanded="false">
@@ -152,22 +153,12 @@
                     <span><strong>Trace Calculator</strong><small>ICP auswerten und neue K+ / A- Mischung berechnen</small></span>
                     <span class="settings-accordion-hint" aria-hidden="true"></span>
                 </summary>
-                <div id="traceCalculatorLockState" class="trace-lock-card" hidden>
-                    <div class="trace-lock-copy">
-                        <strong>Trace Calculator geschützt</strong>
-                        <small>Zum Öffnen das hinterlegte Passwort eingeben.</small>
-                    </div>
-                    <div class="password-field trace-lock-field">
-                        <input type="password" id="traceCalculatorPasswordInput" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') unlockTraceCalculator()">
-                        <button type="button" class="btn-primary" onclick="unlockTraceCalculator()">Entsperren</button>
-                    </div>
-                </div>
-                <div id="traceCalculatorProtectedContent" class="trace-calculator-body">
+                <div class="trace-calculator-body">
                     <div class="workflow-message workflow-message--warning trace-calculator-warning" role="note">
                         <span class="trace-warning-mark" aria-hidden="true">!</span>
                         <span class="trace-warning-copy">
-                            <strong>Nicht von OSCI verifiziert</strong>
-                            <small>Eigene Rechenhilfe: vorsichtig verwenden und alle Werte sowie Mischungen vor dem Ansetzen manuell prüfen.</small>
+                            <strong>In Entwicklung · experimenteller Status</strong>
+                            <small>Dieses Tool befindet sich noch in der Entwicklung und ist aktuell experimentell. Nicht von OSCI verifiziert. Bitte alle Werte, Berechnungen und Mischungen vor dem Ansetzen manuell prüfen.</small>
                         </span>
                     </div>
 
@@ -252,7 +243,6 @@
                         <button class="btn-secondary btn-animated" type="button" onclick="loadTraceCalculatorFromLast()">Letzte Mischung laden</button>
                         <button class="btn-secondary btn-animated" type="button" onclick="saveTraceCalculatorMixture()">Speichern</button>
                         <button class="btn-primary btn-animated booking-action" type="button" onclick="saveAndBookTraceCalculatorMixture()">Speichern &amp; Auslagern</button>
-                        <button class="btn-out btn-animated" type="button" onclick="lockTraceCalculator()">Sperren</button>
                     </div>
                 </div>
             </details>
@@ -1425,7 +1415,7 @@
                 </div>
             </div>
 
-            <div class="card settings-card settings-card-support settings-card-project-support">
+            <div class="card settings-card settings-card-support settings-card-project-support" id="projectSupportCard">
                 <h3>Projekt unterstützen</h3>
                 <p class="hint">Reeftools.de bleibt kostenlos. Wenn dir die App hilft, kannst du die Weiterentwicklung freiwillig unterstützen.</p>
                 <div class="project-support-actions">
@@ -1596,7 +1586,7 @@
     </nav>
 
     <script src="sangokai-data.js?v=3.0.0-sangokai-section"></script>
-    <script src="app.js?v=3.0.2-trace-lock"></script>
+    <script src="app.js?v=3.0.3-trace-support-link"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

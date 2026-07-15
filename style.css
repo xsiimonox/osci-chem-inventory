@@ -6942,41 +6942,6 @@ body.theme-badman.party-mode .card {
     padding-top: var(--space-4);
 }
 
-.trace-lock-card {
-    display: grid;
-    gap: 14px;
-    padding-top: var(--space-4);
-}
-
-.trace-lock-copy {
-    display: grid;
-    gap: 4px;
-    padding: 14px;
-    border: 1px solid var(--workflow-border);
-    border-radius: 8px;
-    background: color-mix(in srgb, var(--surface-raised, rgba(255,255,255,0.06)) 86%, transparent);
-}
-
-.trace-lock-copy strong {
-    color: var(--text-primary);
-    font-size: 0.95rem;
-}
-
-.trace-lock-copy small {
-    color: var(--text-secondary);
-    line-height: 1.45;
-}
-
-.trace-lock-field {
-    grid-template-columns: minmax(0, 1fr) auto;
-    margin: 0;
-}
-
-.trace-lock-field input,
-.trace-lock-field button {
-    margin-bottom: 0;
-}
-
 .trace-calculator-warning {
     grid-template-columns: 32px minmax(0, 1fr);
     align-items: center;

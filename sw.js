@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-trace-lock';
+const CACHE_NAME = 'reef-storage-tools-cache-v303-trace-support-link';
 const ASSETS = [
   './',
   './index.html',

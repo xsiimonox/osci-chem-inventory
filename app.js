@@ -500,8 +500,6 @@ const communityUiState = {
 };
 const CUSTOM_CR_UNLOCK_KEY = 'osci-custom-cr-unlocked';
 const CUSTOM_CR_PASSWORD = 'OSCI';
-const TRACE_CALCULATOR_UNLOCK_KEY = 'trace-calculator-unlocked';
-const TRACE_CALCULATOR_PASSWORD = 'TRACE';
 
 function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
     if (CLOUD_SYNC_ENABLED) return true;
@@ -799,6 +797,16 @@ function openGoogleDriveSyncSettings() {
     requestAnimationFrame(() => {
         setTimeout(() => {
             document.querySelector('.google-drive-sync-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 120);
+    });
+}
+
+function openProjectSupportSettings() {
+    closeCloudQuickSyncMenu();
+    selectTab('einstellungen');
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            document.getElementById('projectSupportCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 120);
     });
 }
@@ -6846,47 +6854,6 @@ function getTodayDateInputValue() {
     return offsetDate.toISOString().slice(0, 10);
 }
 
-function isTraceCalculatorUnlocked() {
-    try {
-        return localStorage.getItem(TRACE_CALCULATOR_UNLOCK_KEY) === 'true';
-    } catch (err) {
-        return false;
-    }
-}
-
-function syncTraceCalculatorLockUI() {
-    const lockState = document.getElementById('traceCalculatorLockState');
-    const protectedContent = document.getElementById('traceCalculatorProtectedContent');
-    const unlocked = isTraceCalculatorUnlocked();
-    if (lockState) lockState.hidden = unlocked;
-    if (protectedContent) protectedContent.hidden = !unlocked;
-}
-
-function unlockTraceCalculator() {
-    const input = document.getElementById('traceCalculatorPasswordInput');
-    const value = (input?.value || '').trim();
-    if (value !== TRACE_CALCULATOR_PASSWORD) {
-        showToast('Falsches Passwort', 'warning', 2600);
-        if (input) {
-            input.value = '';
-            input.focus();
-        }
-        return;
-    }
-    localStorage.setItem(TRACE_CALCULATOR_UNLOCK_KEY, 'true');
-    if (input) input.value = '';
-    syncTraceCalculatorLockUI();
-    renderTraceCalculator();
-    showToast('Trace Calculator entsperrt', 'success', 2200);
-}
-
-function lockTraceCalculator() {
-    localStorage.removeItem(TRACE_CALCULATOR_UNLOCK_KEY);
-    syncTraceCalculatorLockUI();
-    renderTraceCalculatorHistory();
-    showToast('Trace Calculator gesperrt', 'info', 2200);
-}
-
 function traceCalcNumber(value, fallback = 0) {
     const parsed = parseFloat(String(value ?? '').replace(',', '.'));
     return Number.isFinite(parsed) ? parsed : fallback;
@@ -7544,18 +7511,6 @@ function renderTraceCalculatorHistoryChart(history) {
 function renderTraceCalculatorHistory() {
     const container = document.getElementById('traceCalculatorHistory');
     if (!container) return;
-    if (!isTraceCalculatorUnlocked()) {
-        container.innerHTML = `
-            <div class="card workflow-card trace-history-block trace-history-empty trace-history-locked">
-                <div class="trace-history-head">
-                    <span><strong>Historie &amp; Analyse</strong><small>Mit Passwort geschuetzt</small></span>
-                    <span class="trace-history-count">gesperrt</span>
-                </div>
-                <p>Historie, Verlaufsgrafen und Auswertung werden erst nach Eingabe des Passworts angezeigt.</p>
-            </div>
-        `;
-        return;
-    }
     const state = ensureTraceCalculatorState();
     const history = state.history;
     if (!history.length) {
@@ -7599,12 +7554,6 @@ function renderTraceCalculatorHistory() {
 function renderTraceCalculator() {
     const root = document.getElementById('traceCalculatorResult');
     if (!root) return;
-    syncTraceCalculatorLockUI();
-    if (!isTraceCalculatorUnlocked()) {
-        root.innerHTML = '';
-        renderTraceCalculatorHistory();
-        return;
-    }
     const state = ensureTraceCalculatorState();
     syncTraceCalculatorConfigUi();
     renderTraceCalculatorIcpInputs();
@@ -7650,7 +7599,6 @@ function renderTraceCalculator() {
 }
 
 function updateTraceCalculatorIcp(item, value) {
-    if (!isTraceCalculatorUnlocked()) return;
     const state = ensureTraceCalculatorState();
     if (String(value || '').trim() === '') delete state.icp[item];
     else state.icp[item] = String(value).replace(',', '.');
@@ -7731,10 +7679,6 @@ function setTraceCalculatorIcpImportStatus(type, title, details = '') {
 }
 
 function importTraceCalculatorIcpText(sourceText) {
-    if (!isTraceCalculatorUnlocked()) {
-        showToast('Trace Calculator ist gesperrt', 'info', 2200);
-        return false;
-    }
     const textarea = document.getElementById('traceCalcIcpPaste');
     const text = sourceText === undefined ? textarea?.value || '' : String(sourceText || '');
     const parsed = parseTraceCalculatorIcpText(text);
@@ -7790,7 +7734,6 @@ function handleTraceCalculatorIcpPaste(event) {
 }
 
 function clearTraceCalculatorIcpImport() {
-    if (!isTraceCalculatorUnlocked()) return;
     const textarea = document.getElementById('traceCalcIcpPaste');
     const status = document.getElementById('traceCalcIcpImportStatus');
     if (textarea) {
@@ -7805,10 +7748,6 @@ function clearTraceCalculatorIcpImport() {
 }
 
 function loadTraceCalculatorFromLast() {
-    if (!isTraceCalculatorUnlocked()) {
-        showToast('Trace Calculator ist gesperrt', 'info', 2200);
-        return;
-    }
     const latest = getTraceCalculatorLatestHistory();
     if (!latest) {
         showToast('Noch keine gespeicherte Trace-Mischung vorhanden', 'info');
@@ -7818,7 +7757,6 @@ function loadTraceCalculatorFromLast() {
 }
 
 function loadTraceCalculatorHistoryEntry(id) {
-    if (!isTraceCalculatorUnlocked()) return;
     const state = ensureTraceCalculatorState();
     const entry = state.history.find(item => item.id === id);
     if (!entry) return;
@@ -7835,10 +7773,6 @@ function loadTraceCalculatorHistoryEntry(id) {
 }
 
 function createTraceCalculatorMixturePayload() {
-    if (!isTraceCalculatorUnlocked()) {
-        showToast('Trace Calculator ist gesperrt', 'info', 2200);
-        return null;
-    }
     const state = ensureTraceCalculatorState();
     const recipe = calculateTraceRecipe(getTraceCalculatorConfigFromUi());
     const mixtureDate = document.getElementById('traceCalcMixtureDate')?.value || state.currentMixtureDate;
