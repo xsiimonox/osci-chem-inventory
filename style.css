@@ -6236,6 +6236,31 @@ body.theme-light .nav-links button.active {
     line-height: 1.35;
 }
 
+.resource-tools-card {
+    grid-column: 1 / -1;
+}
+
+.resource-assistant-details {
+    margin-top: var(--space-4);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--surface-raised) 62%, transparent);
+    overflow: hidden;
+}
+
+.resource-assistant-details .settings-native-summary {
+    padding: var(--space-4);
+}
+
+.resource-assistant-details .settings-detail-intro,
+.resource-assistant-details .sangokai-search-card {
+    margin-inline: var(--space-4);
+}
+
+.resource-assistant-details .sangokai-search-card {
+    margin-bottom: var(--space-4);
+}
+
 .sync-diagnostics-result {
     margin-top: 12px;
 }

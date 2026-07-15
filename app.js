@@ -7195,7 +7195,7 @@ const SANGOKAI_SEARCH_STOPWORDS = new Set([
     'durch', 'ein', 'eine', 'einem', 'einen', 'einer', 'er', 'es', 'fuer', 'gegen', 'gibt',
     'habe', 'haben', 'hat', 'im', 'in', 'ist', 'ja', 'kann', 'mit', 'nach', 'nicht', 'noch',
     'nur', 'oder', 'sich', 'sind', 'soll', 'sollte', 'um', 'und', 'von', 'was', 'wenn',
-    'wer', 'wie', 'wir', 'wird', 'wo', 'zu', 'zum', 'zur'
+    'wer', 'wie', 'wir', 'wird', 'wo', 'zu', 'zum', 'zur', 'ich', 'gehalt'
 ]);
 
 const SANGOKAI_SEARCH_SYNONYMS = {
@@ -7219,7 +7219,16 @@ const SANGOKAI_SEARCH_SYNONYMS = {
     eiweissabschaeumer: ['abschaeumer', 'skimmer'],
     aktivkohle: ['kohle', 'filterkohle'],
     iod: ['jod'],
-    jod: ['iod']
+    jod: ['iod'],
+    ca: ['calcium', 'calciumgehalt'],
+    calcium: ['ca', 'calciumgehalt', 'calciumdefizit'],
+    calium: ['calcium', 'ca', 'calciumgehalt', 'calciumdefizit'],
+    kalzium: ['calcium', 'ca', 'calciumgehalt', 'calciumdefizit'],
+    erhoehen: ['erhoehung', 'anheben', 'anhebung', 'ausgleichen', 'ausgeglichen', 'defizit'],
+    erhoehung: ['erhoehen', 'anheben', 'anhebung', 'ausgleichen', 'defizit'],
+    anheben: ['erhoehen', 'erhoehung', 'anhebung', 'ausgleichen', 'defizit'],
+    anhebung: ['erhoehen', 'erhoehung', 'anheben', 'ausgleichen', 'defizit'],
+    schnell: ['innerhalb', 'zeit', 'stunden', 'einzeldosierung', 'einzeldosierungen']
 };
 
 function normalizeSangokaiText(value = '') {
@@ -7248,6 +7257,21 @@ function getSangokaiQueryTerms(query) {
     return Array.from(expanded);
 }
 
+function getSangokaiIntentBoost(normalizedChunk, normalizedQuery) {
+    let boost = 0;
+    const asksCalcium = /\b(ca|calcium|calium|kalzium)\b/.test(normalizedQuery);
+    const asksIncrease = /\b(erhoehen|erhoehung|anheben|anhebung|ausgleichen|defizit)\b/.test(normalizedQuery);
+    const asksTiming = /\b(schnell|zeit|stunden|tage|langsam|rasch)\b/.test(normalizedQuery);
+    const asksDeficit = /\b(defizit|ausgleichen|ausgleich|angleichen)\b/.test(normalizedQuery);
+    if (asksCalcium && normalizedChunk.includes('calcium')) boost += 6;
+    if (asksCalcium && normalizedChunk.includes('calciumdefizit')) boost += 14;
+    if (asksCalcium && asksDeficit && normalizedChunk.includes('calciumdefizit')) boost += 22;
+    if (asksIncrease && /\b(ausgeglichen|ausgleichen|erhoehung|defizit)\b/.test(normalizedChunk)) boost += 8;
+    if (asksTiming && /\b(innerhalb|stunden|12 24|einzeldosierungen|pro 2 stunden)\b/.test(normalizedChunk)) boost += 12;
+    if (asksCalcium && asksIncrease && asksTiming && /calciumdefizit.*12 24.*einzeldosierungen/.test(normalizedChunk)) boost += 28;
+    return boost;
+}
+
 function scoreSangokaiChunk(chunk, query, terms) {
     const normalized = chunk._normalized || (chunk._normalized = normalizeSangokaiText(chunk.t));
     const exact = normalizeSangokaiText(query);
@@ -7260,6 +7284,7 @@ function scoreSangokaiChunk(chunk, query, terms) {
     });
     const uniqueMatches = terms.filter(term => normalized.includes(term)).length;
     score += uniqueMatches * uniqueMatches;
+    score += getSangokaiIntentBoost(normalized, exact);
     return score;
 }
 

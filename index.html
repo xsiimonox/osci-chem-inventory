@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.0-support">
+    <link rel="stylesheet" href="style.css?v=3.0.0-sangokai-rank">
 </head>
 <body>
 
@@ -611,23 +611,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="sangokai-a-z-assistent">
-                            <h3>Sangokai A-Z Assistent <button type="button" class="tool-inline-fav" data-tool-id="sangokai-a-z-assistent">☆ Fav</button></h3>
-                            <p class="hint">Durchsuche das Sangokai A-Z PDF lokal und nutze die Quellenlinks als Ergänzung.</p>
-                            <div class="sangokai-search-card" role="search" aria-label="Sangokai A-Z durchsuchen">
-                                <div class="sangokai-search-head">
-                                    <div>
-                                        <strong>Sangokai A-Z Assistent</strong>
-                                        <span>Antwortet nur mit Wissen aus dem lokal eingebauten PDF.</span>
-                                    </div>
-                                    <small id="sangokaiSourceLabel">Quelle: Sangokai Empfehlungen A-Z</small>
-                                </div>
-                                <div class="sangokai-search-controls">
-                                    <input type="search" id="sangokaiSearchInput" placeholder="Frage oder Stichwort, z.B. Dinoflagellaten, Blauphase, Aktivkohle" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
-                                    <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
-                                </div>
-                                <div id="sangokaiSearchResult" class="sangokai-search-result" aria-live="polite"></div>
-                            </div>
+                        <div class="card resource-tools-card">
                             <div class="resource-link-grid">
                                 <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Anleitungen</strong>
@@ -649,6 +633,27 @@
                                     <span>PDF mit kompakten Empfehlungen und Hintergründen für Meerwasseraquaristik</span>
                                 </a>
                             </div>
+                            <details class="resource-assistant-details">
+                                <summary class="settings-native-summary">
+                                    <h3>Sangokai A-Z Assistent</h3>
+                                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                                </summary>
+                                <p class="hint settings-detail-intro">Durchsuche das Sangokai A-Z PDF lokal und nutze die Quellenlinks als Ergänzung.</p>
+                                <div class="sangokai-search-card" role="search" aria-label="Sangokai A-Z durchsuchen">
+                                    <div class="sangokai-search-head">
+                                        <div>
+                                            <strong>Sangokai A-Z Assistent</strong>
+                                            <span>Antwortet nur mit Wissen aus dem lokal eingebauten PDF.</span>
+                                        </div>
+                                        <small id="sangokaiSourceLabel">Quelle: Sangokai Empfehlungen A-Z</small>
+                                    </div>
+                                    <div class="sangokai-search-controls">
+                                        <input type="search" id="sangokaiSearchInput" placeholder="Frage oder Stichwort, z.B. Dinoflagellaten, Blauphase, Aktivkohle" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
+                                        <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
+                                    </div>
+                                    <div id="sangokaiSearchResult" class="sangokai-search-result" aria-live="polite"></div>
+                                </div>
+                            </details>
                             <p class="hint resource-subheading"><strong>Buchtipps</strong></p>
                             <div class="resource-link-grid">
                                 <a href="https://www.daehne-aquaristik.de/products/algen?srsltid=AfmBOoqKmGgUCKXVBe3oyi8OLUVeRnyhifAH7BVkkYqbc3VFovAVXY6D" target="_blank" rel="noopener" class="resource-link-card">
@@ -1466,8 +1471,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.0-support"></script>
-    <script src="app.js?v=3.0.0-support"></script>
+    <script src="sangokai-data.js?v=3.0.0-sangokai-rank"></script>
+    <script src="app.js?v=3.0.0-sangokai-rank"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
