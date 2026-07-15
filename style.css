@@ -11205,3 +11205,38 @@ body.theme-girl .app-footer {
         width: 100%;
     }
 }
+
+/* Mobile navigation final safe-area polish */
+@media (max-width: 767px) {
+    .mobile-bottom-nav {
+        left: max(10px, env(safe-area-inset-left, 0px)) !important;
+        right: max(10px, env(safe-area-inset-right, 0px)) !important;
+        bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+        width: auto !important;
+        min-height: 72px !important;
+        padding: 7px !important;
+        gap: 6px !important;
+        border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent) !important;
+        border-radius: 24px !important;
+        overflow: hidden !important;
+        box-shadow: 0 -10px 34px rgba(0, 8, 12, 0.26) !important;
+    }
+
+    .mobile-bottom-nav button {
+        min-height: 56px !important;
+        padding: 6px 1px !important;
+        border-radius: 18px !important;
+        font-size: 0.68rem !important;
+    }
+
+    .mobile-bottom-nav .mobile-nav-label {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    body {
+        padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}

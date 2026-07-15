@@ -5077,12 +5077,13 @@ function setupSettingsAccordions() {
     });
 
     renderSettingsGroupLabels(settings);
-    renderSettingsGroupNavigation(settings);
 
     settings.querySelectorAll('details').forEach(details => {
         details.open = false;
     });
-    filterSettingsGroup(activeSettingsGroup, false);
+    settings.querySelectorAll(':scope > .card, .settings-group-label').forEach(el => {
+        el.hidden = false;
+    });
 }
 
 function getSettingsMeta(title) {
@@ -5141,48 +5142,8 @@ function renderSettingsGroupLabels(settings) {
     });
 }
 
-let activeSettingsGroup = 'all';
-
 function normalizeSettingsGroupId(group) {
     return String(group || 'weitere').toLowerCase().replace(/[^a-z0-9]+/g, '-');
-}
-
-function renderSettingsGroupNavigation(settings = document.getElementById('einstellungen')) {
-    const nav = document.getElementById('settingsGroupNav');
-    if (!settings || !nav) return;
-    const groups = Array.from(settings.querySelectorAll(':scope > .card'))
-        .map(card => card.dataset.settingsGroup || 'Weitere')
-        .filter((group, index, list) => list.indexOf(group) === index);
-    nav.innerHTML = [
-        '<button type="button" data-settings-filter="all" onclick="filterSettingsGroup(\'all\')">Alle</button>',
-        ...groups.map(group => `<button type="button" data-settings-filter="${escapeHtml(group)}" onclick='filterSettingsGroup(${jsArg(group)})'>${escapeHtml(group)}</button>`)
-    ].join('');
-}
-
-function filterSettingsGroup(group = 'all', focusGroup = true) {
-    const settings = document.getElementById('einstellungen');
-    if (!settings) return;
-    const availableGroups = new Set(Array.from(settings.querySelectorAll(':scope > .card')).map(card => card.dataset.settingsGroup || 'Weitere'));
-    activeSettingsGroup = group === 'all' || availableGroups.has(group) ? group : 'all';
-    settings.querySelectorAll(':scope > .card').forEach(card => {
-        const visible = activeSettingsGroup === 'all' || card.dataset.settingsGroup === activeSettingsGroup;
-        card.hidden = !visible;
-        if (!visible) card.querySelectorAll('details').forEach(details => { details.open = false; });
-    });
-    settings.querySelectorAll('.settings-group-label').forEach(label => {
-        label.hidden = activeSettingsGroup !== 'all' && label.dataset.settingsGroupLabel !== activeSettingsGroup;
-    });
-    document.querySelectorAll('#settingsGroupNav button').forEach(button => {
-        const active = button.dataset.settingsFilter === activeSettingsGroup;
-        button.classList.toggle('active', active);
-        button.setAttribute('aria-pressed', String(active));
-    });
-    const status = document.getElementById('settingsGroupStatus');
-    if (status) status.textContent = activeSettingsGroup === 'all' ? 'Alle Bereiche' : activeSettingsGroup;
-    if (focusGroup && activeSettingsGroup !== 'all') {
-        const label = document.getElementById(`settings-group-${normalizeSettingsGroupId(activeSettingsGroup)}`);
-        label?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 }
 
 // --- DESIGN / THEME STEUERUNG ---

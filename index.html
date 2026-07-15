@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.0-sangokai-rank">
+    <link rel="stylesheet" href="style.css?v=3.0.0-settings-nav">
 </head>
 <body>
 
@@ -1084,11 +1084,9 @@
                 <div>
                     <span class="section-eyebrow">App konfigurieren</span>
                     <h2 id="settingsPageTitle">Einstellungen</h2>
-                    <p>Alle Bereiche bleiben standardmäßig geschlossen. Wähle eine Gruppe und öffne nur die Einstellung, die du gerade brauchst.</p>
+                    <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
-                <span class="status-badge status-neutral" id="settingsGroupStatus">Alle Bereiche</span>
             </section>
-            <nav class="settings-group-nav" id="settingsGroupNav" aria-label="Einstellungsgruppen"></nav>
 
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">Datenspeicher &amp; Sicherung</h3>
@@ -1471,8 +1469,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.0-sangokai-rank"></script>
-    <script src="app.js?v=3.0.0-sangokai-rank"></script>
+    <script src="sangokai-data.js?v=3.0.0-settings-nav"></script>
+    <script src="app.js?v=3.0.0-settings-nav"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

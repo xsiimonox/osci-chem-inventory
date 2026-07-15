@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v300-sangokai-rank';
+const CACHE_NAME = 'reef-storage-tools-cache-v300-settings-nav';
 const ASSETS = [
   './',
   './index.html',
