@@ -6801,6 +6801,21 @@ body.theme-badman.party-mode .card {
     line-height: 1.5;
 }
 
+.osci-system-note {
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
+    margin-top: var(--space-2);
+    padding: 7px 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-color));
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 720;
+    line-height: 1.25;
+}
+
 .workflow-eyebrow {
     color: var(--accent);
     font-size: 0.72rem;

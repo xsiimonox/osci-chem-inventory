@@ -6461,6 +6461,7 @@ function renderLager() {
                     <small>Lagerverwaltung</small>
                     <h2>Lagerbestand</h2>
                     <p>Alle Buchungen wirken auf <strong id="activeWarehouseName">das aktive Lager</strong>.</p>
+                    <div class="osci-system-note">Dieser Lagerbereich ist auf das OSCI Motion Versorgungssystem, C&amp;R und Trace-Produkte abgestimmt.</div>
                 </div>
                 <div class="warehouse-head-actions">
                     <button type="button" class="btn btn-primary" onclick="openSmartStockModal('in')">Einlagern</button>

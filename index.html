@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.10-dashboard-support-removed">
+    <link rel="stylesheet" href="style.css?v=3.0.10-osci-system-note">
 </head>
 <body>
 
@@ -105,6 +105,7 @@
                     <span class="workflow-eyebrow">C&amp;R Auslagerung</span>
                     <h2>C&amp;R Liste übernehmen</h2>
                     <p>Werte einfügen, Bestand prüfen und anschließend verbindlich auslagern.</p>
+                    <div class="osci-system-note">Für das OSCI Motion Versorgungssystem mit C&amp;R Produkten ausgelegt.</div>
                 </div>
                 <div class="workflow-context" aria-label="Aktives Lager">
                     <span>Aktives Lager</span>
@@ -142,6 +143,7 @@
                     <span class="workflow-eyebrow">Trace Mischungen</span>
                     <h2>Trace Calculator &amp; Auslagerung</h2>
                     <p>ICP-Werte auswerten, Kationen und Anionen getrennt berechnen, Verlauf prüfen und die fertige Mischung auslagern.</p>
+                    <div class="osci-system-note">Für OSCI Motion Trace-Mischungen und lagergeführte OSCI Produkte gedacht.</div>
                 </div>
                 <div class="workflow-context" aria-label="Aktives Lager">
                     <span>Aktives Lager</span>
@@ -1586,8 +1588,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.10-dashboard-support-removed"></script>
-    <script src="app.js?v=3.0.10-dashboard-support-removed"></script>
+    <script src="sangokai-data.js?v=3.0.10-osci-system-note"></script>
+    <script src="app.js?v=3.0.10-osci-system-note"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

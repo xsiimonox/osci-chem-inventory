@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v310-dashboard-support-removed';
+const CACHE_NAME = 'reef-storage-tools-cache-v310-osci-system-note';
 const ASSETS = [
   './',
   './index.html',
