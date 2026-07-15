@@ -44,6 +44,36 @@ const mixDefinitions = {
     anionen: ["Fluor (F)", "Iod (I)", "Vanadium (V)", "Selen (Se)"]
 };
 
+const traceCalculatorElements = [
+    { item: "Cobalt (Co)", symbol: "Co", group: "kationen", unit: "µg/l", min: 0.3, optimal: 1.0, max: 2.5, normal: 30, weak: 15 },
+    { item: "Nickel (Ni)", symbol: "Ni", group: "kationen", unit: "µg/l", min: 0.5, optimal: 4.0, max: 6, normal: 15, weak: 7.5 },
+    { item: "Eisen (Fe)", symbol: "Fe", group: "kationen", unit: "µg/l", min: 0, optimal: 1.0, max: 2.5, normal: 4, weak: 2 },
+    { item: "Mangan (Mn)", symbol: "Mn", group: "kationen", unit: "µg/l", min: 0.25, optimal: 0.5, max: 1, normal: 0.5, weak: 0.3 },
+    { item: "Kupfer (Cu)", symbol: "Cu", group: "kationen", unit: "µg/l", min: 1, optimal: 4, max: 6, normal: 1, weak: 0.5 },
+    { item: "Chrom (Cr)", symbol: "Cr", group: "kationen", unit: "µg/l", min: 0.5, optimal: 1, max: 2.5, normal: 0.4, weak: 0.2 },
+    { item: "Zink (Zn)", symbol: "Zn", group: "kationen", unit: "µg/l", min: 2, optimal: 4, max: 8, normal: 2, weak: 1 },
+    { item: "Fluor (F)", symbol: "F", group: "anionen", unit: "mg/l", min: 1, optimal: 1.3, max: 1.8, normal: 90, weak: 45 },
+    { item: "Iod (I)", symbol: "I", group: "anionen", unit: "µg/l", min: 50, optimal: 65, max: 90, normal: 1.2, weak: 0.9 },
+    { item: "Vanadium (V)", symbol: "V", group: "anionen", unit: "µg/l", min: 1, optimal: 4.5, max: 8, normal: 0.8, weak: 0.4 },
+    { item: "Selen (Se)", symbol: "Se", group: "anionen", unit: "µg/l", min: 1.5, optimal: 3.5, max: 8, normal: 1.5, weak: 0.8 }
+];
+
+const traceCalculatorIntervalRules = {
+    monthly: { label: '4 Wochen oder mehr', adjustmentLabel: '4 Wochen oder mehr', days: 40, maxDoseChange: 0.10 },
+    biweekly: { label: '2 Wochen', adjustmentLabel: '2 Wochen', days: 20, maxDoseChange: 0.20 },
+    weekly: { label: '1 Woche', adjustmentLabel: '1 Woche', days: 10, maxDoseChange: 0.30 }
+};
+
+const traceCalculatorBase = { liters: 500, days: 40, volumeMl: 200, dailyDoseMl: 5 };
+
+// Single source of truth for both the calculation and its in-app explanation.
+const traceCalculatorRules = {
+    roundingMl: 0.01,
+    targetLabel: 'Exakter Optimalwert',
+    historyDistanceTolerance: 0.05,
+    osmoseDensityGPerMl: 1
+};
+
 const macroRecipes = {
     'KH-Tag': [
         { label: 'Osmosewasser (RO-Wasser)', amount: 977, unit: 'ml', stock: false },
@@ -222,6 +252,7 @@ const AQUARIUM_FIELD_KEYS = [
     'feedNutrientLog',
     'osmoseTank',
     'traceDraft',
+    'traceCalculator',
     'testCorrections',
     'majorCorrectionSettings',
     'psuCorrectionOffset',
@@ -469,6 +500,8 @@ const communityUiState = {
 };
 const CUSTOM_CR_UNLOCK_KEY = 'osci-custom-cr-unlocked';
 const CUSTOM_CR_PASSWORD = 'OSCI';
+const TRACE_CALCULATOR_UNLOCK_KEY = 'trace-calculator-unlocked';
+const TRACE_CALCULATOR_PASSWORD = 'TRACE';
 
 function ensureCloudSyncEnabled(actionLabel = 'Cloud Login & Share') {
     if (CLOUD_SYNC_ENABLED) return true;
@@ -5008,6 +5041,7 @@ function showTab(tabId) {
     if(tabId === 'statistik') renderStats();
     if(tabId === 'trace-export') {
         renderTraceExportInputs();
+        renderTraceCalculator();
         setupPriority4CalculatorUI();
     }
     if(tabId === 'log') renderLogs();
@@ -6626,7 +6660,7 @@ function renderTraceExportInputs() {
             return `
             <div class="trace-grid">
                 <label for="${id}">${item}</label>
-                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
+                <input type="number" step="0.01" min="0" placeholder="0.00" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
                 <div class="trace-unit-stack">
                     <span class="unit-label">ml</span>
                     <span id="${id}-g" class="trace-gram-value">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
@@ -6641,7 +6675,7 @@ function renderTraceExportInputs() {
             return `
             <div class="trace-grid">
                 <label for="${id}">${item}</label>
-                <input type="number" step="0.1" min="0" placeholder="0.0" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
+                <input type="number" step="0.01" min="0" placeholder="0.00" id="${id}" value="${value}" oninput="updateTraceDraft('${id}', ${jsArg(item)})">
                 <div class="trace-unit-stack">
                     <span class="unit-label">ml</span>
                     <span id="${id}-g" class="trace-gram-value">${((parseFloat(value) || 0) * (densityFactors[item] || 1)).toFixed(2)} g</span>
@@ -6788,6 +6822,1147 @@ function clearReefManagerImport() {
     previewReefManagerImport('');
 }
 
+function ensureTraceCalculatorState() {
+    if (!db.traceCalculator || typeof db.traceCalculator !== 'object') db.traceCalculator = {};
+    if (!db.traceCalculator.config) {
+        db.traceCalculator.config = {
+            tankLiters: 500,
+            interval: 'monthly',
+            stocking: 'normal',
+            days: 40,
+            dailyDoseMl: 5,
+            bottleMaxMl: 450
+        };
+    }
+    if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
+    if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
+    if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
+    return db.traceCalculator;
+}
+
+function getTodayDateInputValue() {
+    const now = new Date();
+    const offsetDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    return offsetDate.toISOString().slice(0, 10);
+}
+
+function isTraceCalculatorUnlocked() {
+    try {
+        return localStorage.getItem(TRACE_CALCULATOR_UNLOCK_KEY) === 'true';
+    } catch (err) {
+        return false;
+    }
+}
+
+function syncTraceCalculatorLockUI() {
+    const lockState = document.getElementById('traceCalculatorLockState');
+    const protectedContent = document.getElementById('traceCalculatorProtectedContent');
+    const unlocked = isTraceCalculatorUnlocked();
+    if (lockState) lockState.hidden = unlocked;
+    if (protectedContent) protectedContent.hidden = !unlocked;
+}
+
+function unlockTraceCalculator() {
+    const input = document.getElementById('traceCalculatorPasswordInput');
+    const value = (input?.value || '').trim();
+    if (value !== TRACE_CALCULATOR_PASSWORD) {
+        showToast('Falsches Passwort', 'warning', 2600);
+        if (input) {
+            input.value = '';
+            input.focus();
+        }
+        return;
+    }
+    localStorage.setItem(TRACE_CALCULATOR_UNLOCK_KEY, 'true');
+    if (input) input.value = '';
+    syncTraceCalculatorLockUI();
+    renderTraceCalculator();
+    showToast('Trace Calculator entsperrt', 'success', 2200);
+}
+
+function lockTraceCalculator() {
+    localStorage.removeItem(TRACE_CALCULATOR_UNLOCK_KEY);
+    syncTraceCalculatorLockUI();
+    renderTraceCalculatorHistory();
+    showToast('Trace Calculator gesperrt', 'info', 2200);
+}
+
+function traceCalcNumber(value, fallback = 0) {
+    const parsed = parseFloat(String(value ?? '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function traceCalcRound(value) {
+    const step = traceCalculatorRules.roundingMl;
+    return Math.max(0, Math.round((Number(value) || 0) / step) * step);
+}
+
+function traceCalcRoundWithinDoseLimit(value, previousAmount, maximumChange) {
+    const step = traceCalculatorRules.roundingMl;
+    const previous = Math.max(0, Number(previousAmount) || 0);
+    const lowerLimit = Math.max(0, previous * (1 - maximumChange));
+    const upperLimit = previous * (1 + maximumChange);
+    let rounded = traceCalcRound(value);
+    if (rounded > upperLimit + 0.000001) {
+        rounded = Math.floor((upperLimit + 0.000001) / step) * step;
+    }
+    if (rounded < lowerLimit - 0.000001) {
+        rounded = Math.ceil((lowerLimit - 0.000001) / step) * step;
+    }
+    return traceCalcRound(rounded);
+}
+
+function traceCalcFormatMl(value) {
+    return `${traceCalcRound(value).toFixed(2).replace('.', ',')} ml`;
+}
+
+function traceCalcFormatG(value) {
+    return `${traceCalcRound(value).toFixed(2).replace('.', ',')} g`;
+}
+
+function traceCalcFormatMlG(ml, grams) {
+    return `${traceCalcFormatMl(ml)} / ${traceCalcFormatG(grams)}`;
+}
+
+function traceCalcElementGrams(item, ml) {
+    return traceCalcRound((Number(ml) || 0) * (densityFactors[item] || 1));
+}
+
+function traceCalcFormatValue(value, digits = 1) {
+    if (value === null || value === undefined || value === '') return '-';
+    const parsed = traceCalcNumber(value, null);
+    if (parsed === null) return '-';
+    return parsed.toLocaleString('de-DE', { maximumFractionDigits: digits });
+}
+
+function formatTraceDateInput(value) {
+    if (!value) return '-';
+    const date = new Date(`${value}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return escapeHtml(value);
+    return date.toLocaleDateString('de-DE');
+}
+
+function formatTraceMixtureDate(entry) {
+    return entry?.mixtureDate
+        ? formatTraceDateInput(entry.mixtureDate)
+        : new Date(entry?.createdAt || Date.now()).toLocaleDateString('de-DE');
+}
+
+function getTraceHistoryTotalGrams(entry, group) {
+    const saved = traceCalcNumber(entry?.totals?.[group]?.volumeG, null);
+    if (saved !== null) return saved;
+    const groupItems = traceCalculatorElements.filter(element => element.group === group).map(element => element.item);
+    const elementsG = groupItems.reduce((sum, item) => {
+        const grams = traceCalcNumber(entry?.grams?.[item], null);
+        const amount = traceCalcNumber(entry?.amounts?.[item], 0);
+        return sum + (grams !== null ? grams : traceCalcElementGrams(item, amount));
+    }, 0);
+    const volumeMl = traceCalcNumber(entry?.totals?.[group]?.volumeMl, 0);
+    const elementsMl = groupItems.reduce((sum, item) => sum + traceCalcNumber(entry?.amounts?.[item], 0), 0);
+    return traceCalcRound(elementsG + Math.max(0, volumeMl - elementsMl));
+}
+
+function getTraceCalculatorConfigFromUi() {
+    const state = ensureTraceCalculatorState();
+    const saved = state.config;
+    const dateValue = document.getElementById('traceCalcMixtureDate')?.value || state.currentMixtureDate || getTodayDateInputValue();
+    state.currentMixtureDate = dateValue;
+    const config = {
+        tankLiters: Math.max(1, traceCalcNumber(document.getElementById('traceCalcTankLiters')?.value, saved.tankLiters || 500)),
+        interval: document.getElementById('traceCalcInterval')?.value || saved.interval || 'monthly',
+        stocking: document.getElementById('traceCalcStocking')?.value || saved.stocking || 'normal',
+        days: Math.max(1, traceCalcNumber(document.getElementById('traceCalcDays')?.value, saved.days || 40)),
+        dailyDoseMl: Math.max(0.1, traceCalcNumber(document.getElementById('traceCalcDailyDose')?.value, saved.dailyDoseMl || 5)),
+        bottleMaxMl: Math.max(1, traceCalcNumber(document.getElementById('traceCalcBottleMax')?.value, saved.bottleMaxMl || 450))
+    };
+    state.config = config;
+    return config;
+}
+
+function syncTraceCalculatorConfigUi() {
+    const state = ensureTraceCalculatorState();
+    const config = state.config;
+    const setters = [
+        ['traceCalcTankLiters', config.tankLiters],
+        ['traceCalcInterval', config.interval],
+        ['traceCalcStocking', config.stocking],
+        ['traceCalcDays', config.days],
+        ['traceCalcDailyDose', config.dailyDoseMl],
+        ['traceCalcBottleMax', config.bottleMaxMl],
+        ['traceCalcMixtureDate', state.currentMixtureDate || getTodayDateInputValue()]
+    ];
+    setters.forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el && (el.value === '' || el.dataset.traceCalcSynced !== 'true')) {
+            el.value = value;
+            el.dataset.traceCalcSynced = 'true';
+        }
+    });
+}
+
+function getTraceCalculatorScale(config) {
+    return (config.tankLiters / traceCalculatorBase.liters) * (config.days / traceCalculatorBase.days);
+}
+
+function getTraceCalculatorBaseRecipe(config) {
+    const scale = getTraceCalculatorScale(config);
+    return traceCalculatorElements.reduce((recipe, element) => {
+        recipe[element.item] = traceCalcRound(element[config.stocking === 'weak' ? 'weak' : 'normal'] * scale);
+        return recipe;
+    }, {});
+}
+
+function getTraceCalculatorLatestHistory() {
+    const state = ensureTraceCalculatorState();
+    return state.history.length ? state.history[state.history.length - 1] : null;
+}
+
+function getTraceCalculatorStartingRecipe(config) {
+    const latest = getTraceCalculatorLatestHistory();
+    if (!latest || !latest.amounts || !latest.config) return getTraceCalculatorBaseRecipe(config);
+    const oldScale = getTraceCalculatorScale(latest.config || config) || 1;
+    const newScale = getTraceCalculatorScale(config) || 1;
+    return traceCalculatorElements.reduce((recipe, element) => {
+        const latestAmount = traceCalcNumber(latest.amounts[element.item], null);
+        if (latestAmount === null) {
+            recipe[element.item] = getTraceCalculatorBaseRecipe(config)[element.item] || 0;
+        } else {
+            recipe[element.item] = traceCalcRound((latestAmount / oldScale) * newScale);
+        }
+        return recipe;
+    }, {});
+}
+
+function getTraceCalculatorAdjustment(element, measured, previousAmount, config) {
+    const intervalRule = traceCalculatorIntervalRules[config.interval] || traceCalculatorIntervalRules.monthly;
+    const maximumChange = intervalRule.maxDoseChange;
+    if (measured === null || measured === undefined || measured === '') {
+        return {
+            amount: previousAmount,
+            status: 'basis',
+            label: 'kein ICP-Wert',
+            note: 'Menge aus Basis/Verlauf übernommen.'
+        };
+    }
+
+    const value = traceCalcNumber(measured, null);
+    if (value === null) {
+        return {
+            amount: previousAmount,
+            status: 'basis',
+            label: 'kein ICP-Wert',
+            note: 'Menge aus Basis/Verlauf übernommen.'
+        };
+    }
+
+    if (value <= 0) {
+        const amount = traceCalcRoundWithinDoseLimit(previousAmount * (1 + maximumChange), previousAmount, maximumChange);
+        const actualChangePercent = previousAmount > 0 ? ((amount - previousAmount) / previousAmount) * 100 : 0;
+        return {
+            amount,
+            status: 'low',
+            label: 'unter Optimalwert',
+            note: `Bei ${traceCalcFormatValue(value, 2)} ${element.unit} ist keine Quotientenrechnung möglich; maximal +${traceCalcRulePercent(maximumChange)} nach ${intervalRule.adjustmentLabel}-Regel, nach Rundung ${traceCalcFormatPercent(actualChangePercent)}. Manuell prüfen.`
+        };
+    }
+
+    const targetFactor = element.optimal / value;
+    const factor = Math.min(1 + maximumChange, Math.max(1 - maximumChange, targetFactor));
+    const amount = traceCalcRoundWithinDoseLimit(previousAmount * factor, previousAmount, maximumChange);
+    const targetChangePercent = (targetFactor - 1) * 100;
+    const appliedChangePercent = (factor - 1) * 100;
+    const actualChangePercent = previousAmount > 0 ? ((amount - previousAmount) / previousAmount) * 100 : 0;
+    const wasLimited = Math.abs(targetFactor - factor) > 0.000001;
+    const roundingNote = Math.abs(actualChangePercent - appliedChangePercent) > 0.05
+        ? ` Nach 0,01-ml-Rundung tatsächlich ${traceCalcFormatPercent(actualChangePercent)}.`
+        : '';
+    const adjustmentNote = (wasLimited
+        ? `Rechnerisch ${traceCalcFormatPercent(targetChangePercent)} bis zum Ziel; auf ${traceCalcFormatPercent(appliedChangePercent)} nach ${intervalRule.adjustmentLabel}-Regel begrenzt.`
+        : `Proportionale Änderung um ${traceCalcFormatPercent(appliedChangePercent)} auf Ziel ${traceCalcFormatValue(element.optimal, 2)} ${element.unit}.`) + roundingNote;
+
+    if (value < element.optimal) {
+        return {
+            amount,
+            status: 'low',
+            label: 'unter Optimalwert',
+            note: adjustmentNote
+        };
+    }
+
+    if (value > element.optimal) {
+        return {
+            amount,
+            status: 'high',
+            label: 'über Optimalwert',
+            note: adjustmentNote
+        };
+    }
+
+    return {
+        amount,
+        status: 'ok',
+        label: 'Optimalwert erreicht',
+        note: `ICP-Wert entspricht exakt dem Ziel ${traceCalcFormatValue(element.optimal, 2)} ${element.unit}; Menge beibehalten.`
+    };
+}
+
+function calculateTraceRecipe(config = getTraceCalculatorConfigFromUi()) {
+    const state = ensureTraceCalculatorState();
+    const startingRecipe = getTraceCalculatorStartingRecipe(config);
+    const rows = traceCalculatorElements.map(element => {
+        const measured = state.icp[element.item];
+        const previousAmount = startingRecipe[element.item] || 0;
+        const adjustment = getTraceCalculatorAdjustment(element, measured, previousAmount, config);
+        return {
+            ...element,
+            measured,
+            previousAmount,
+            amount: adjustment.amount,
+            grams: traceCalcElementGrams(element.item, adjustment.amount),
+            previousGrams: traceCalcElementGrams(element.item, previousAmount),
+            status: adjustment.status,
+            statusLabel: adjustment.label,
+            note: adjustment.note
+        };
+    });
+    const volumeMl = config.dailyDoseMl * config.days;
+    const totals = ['kationen', 'anionen'].reduce((acc, group) => {
+        const elementSum = rows
+            .filter(row => row.group === group)
+            .reduce((sum, row) => sum + row.amount, 0);
+        acc[group] = {
+            elementsMl: traceCalcRound(elementSum),
+            elementsG: traceCalcRound(rows
+                .filter(row => row.group === group)
+                .reduce((sum, row) => sum + row.grams, 0)),
+            osmoseMl: traceCalcRound(volumeMl - elementSum),
+            osmoseG: traceCalcRound(volumeMl - elementSum),
+            volumeMl: traceCalcRound(volumeMl),
+            volumeG: traceCalcRound(rows
+                .filter(row => row.group === group)
+                .reduce((sum, row) => sum + row.grams, 0) + Math.max(0, volumeMl - elementSum))
+        };
+        return acc;
+    }, {});
+    return { config, rows, totals };
+}
+
+function renderTraceCalculatorIcpInputs() {
+    const state = ensureTraceCalculatorState();
+    const container = document.getElementById('traceCalcIcpInputs');
+    if (!container) return;
+    if (container.dataset.traceCalcReady === 'true' && container.querySelectorAll('input').length === traceCalculatorElements.length) return;
+    const renderGroup = (group, title, symbol, description) => `
+        <div class="trace-icp-group trace-icp-group-${group}">
+            <div class="trace-icp-group-head">
+                <span class="trace-group-symbol" aria-hidden="true">${symbol}</span>
+                <span><strong>${title}</strong><small>${description}</small></span>
+            </div>
+            <div class="trace-icp-fields">
+                ${traceCalculatorElements.filter(element => element.group === group).map(element => {
+                    const id = `traceCalcIcp-${element.symbol}`;
+                    const optimumId = `${id}-optimum`;
+                    const value = state.icp[element.item] ?? '';
+                    const name = element.item.replace(` (${element.symbol})`, '');
+                    return `
+                        <div class="trace-icp-input">
+                            <label for="${id}">
+                                <span class="trace-icp-element"><strong>${element.symbol}</strong><small>${escapeHtml(name)}</small></span>
+                                <span class="trace-target-range">${traceCalcFormatValue(element.min, 2)}-${traceCalcFormatValue(element.max, 2)}</span>
+                            </label>
+                            <div class="trace-input-with-unit">
+                                <input type="number" id="${id}" step="0.01" value="${escapeHtml(value)}" placeholder="${String(element.optimal).replace('.', ',')}" data-trace-calc-item="${escapeHtml(element.item)}" aria-describedby="${optimumId}">
+                                <span>${element.unit}</span>
+                            </div>
+                            <small class="trace-optimum" id="${optimumId}">Optimal ${traceCalcFormatValue(element.optimal, 2)} ${element.unit}</small>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+    container.innerHTML = renderGroup('kationen', 'Kationen K+', 'K+', '7 Spurenelemente') + renderGroup('anionen', 'Anionen A-', 'A-', '4 Spurenelemente');
+    container.querySelectorAll('input[data-trace-calc-item]').forEach(input => {
+        input.addEventListener('input', () => updateTraceCalculatorIcp(input.dataset.traceCalcItem, input.value));
+    });
+    container.dataset.traceCalcReady = 'true';
+}
+
+function renderTraceRecipeTable(recipe, group) {
+    const groupRows = recipe.rows.filter(row => row.group === group);
+    const total = recipe.totals[group];
+    const title = group === 'kationen' ? 'Kationen Mischung K+' : 'Anionen Mischung A-';
+    const shortTitle = group === 'kationen' ? 'Kationen K+' : 'Anionen A-';
+    const groupSymbol = group === 'kationen' ? 'K+' : 'A-';
+    return `
+        <section class="trace-recipe-block trace-recipe-block-${group}" aria-label="${title}">
+            <div class="trace-recipe-head">
+                <div class="trace-recipe-title">
+                    <span class="trace-group-symbol" aria-hidden="true">${groupSymbol}</span>
+                    <span><strong>${shortTitle}</strong><small>${groupRows.length} Elemente</small></span>
+                </div>
+                <div class="trace-recipe-total">
+                    <small>Flasche gesamt</small>
+                    <strong>${traceCalcFormatMl(total.volumeMl)}</strong>
+                    <span>${traceCalcFormatG(total.volumeG)}</span>
+                </div>
+            </div>
+            <div class="trace-recipe-totals" aria-label="${title} Zusammenfassung">
+                <span><small>Trace-Elemente</small><strong>${traceCalcFormatMl(total.elementsMl)}</strong><em>${traceCalcFormatG(total.elementsG)}</em></span>
+                <span><small>Osmosewasser</small><strong>${traceCalcFormatMl(total.osmoseMl)}</strong><em>${traceCalcFormatG(total.osmoseG)}</em></span>
+            </div>
+            <div class="trace-recipe-table">
+                <div class="trace-recipe-table-head" aria-hidden="true">
+                    <span>Element</span>
+                    <span>ICP-Status</span>
+                    <span>Neue Mischung</span>
+                </div>
+                ${groupRows.map(row => {
+                    const amountChangePercent = row.previousAmount > 0
+                        ? ((row.amount - row.previousAmount) / row.previousAmount) * 100
+                        : null;
+                    const amountChangeClass = amountChangePercent > 0.000001
+                        ? 'trace-change-up'
+                        : amountChangePercent < -0.000001
+                            ? 'trace-change-down'
+                            : 'trace-change-even';
+                    return `
+                    <div class="trace-recipe-row trace-status-${row.status}">
+                        <span class="trace-recipe-element">
+                            <span class="trace-recipe-symbol">${escapeHtml(row.symbol)}</span>
+                            <span><strong>${escapeHtml(row.item.replace(` (${row.symbol})`, ''))}</strong><small>${escapeHtml(row.symbol)}</small></span>
+                        </span>
+                        <span class="trace-recipe-icp">
+                            <strong class="trace-status-pill">${escapeHtml(row.statusLabel)}</strong>
+                            <small>${traceCalcFormatValue(row.measured, 2)} ${row.unit}</small>
+                        </span>
+                        <span class="trace-recipe-amount">
+                            <span><strong>${traceCalcFormatMl(row.amount)}</strong><small>${traceCalcFormatG(row.grams)}</small></span>
+                            <em>Vorher ${traceCalcFormatMlG(row.previousAmount, row.previousGrams)}</em>
+                            <em class="${amountChangeClass}">${traceCalcFormatPercent(amountChangePercent)}</em>
+                        </span>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </section>
+    `;
+}
+
+function getTraceCalculatorHistoryAnalysis(history) {
+    if (!Array.isArray(history) || history.length < 2) {
+        return {
+            summary: 'Für eine belastbare Analyse mindestens zwei gespeicherte ICP-Mischungen erfassen.',
+            improved: 0,
+            worsened: 0,
+            stable: 0,
+            rows: []
+        };
+    }
+    const previous = history[history.length - 2];
+    const latest = history[history.length - 1];
+    const rows = traceCalculatorElements.map(element => {
+        const before = traceCalcNumber(previous.icp?.[element.item], null);
+        const after = traceCalcNumber(latest.icp?.[element.item], null);
+        const prevAmount = traceCalcNumber(previous.amounts?.[element.item], null);
+        const nextAmount = traceCalcNumber(latest.amounts?.[element.item], null);
+        const valuePercent = before && after !== null ? ((after - before) / Math.abs(before)) * 100 : null;
+        const amountPercent = prevAmount && nextAmount !== null ? ((nextAmount - prevAmount) / Math.abs(prevAmount)) * 100 : null;
+        const beforeDistance = before === null ? null : Math.abs(before - element.optimal);
+        const afterDistance = after === null ? null : Math.abs(after - element.optimal);
+        const tolerance = traceCalculatorRules.historyDistanceTolerance;
+        let trend = 'unknown';
+        if (beforeDistance !== null && afterDistance !== null) {
+            if (afterDistance < beforeDistance * (1 - tolerance)) trend = 'improved';
+            else if (afterDistance > beforeDistance * (1 + tolerance)) trend = 'worsened';
+            else trend = 'stable';
+        }
+        return { element, before, after, prevAmount, nextAmount, valuePercent, amountPercent, trend };
+    });
+    const improved = rows.filter(row => row.trend === 'improved').length;
+    const worsened = rows.filter(row => row.trend === 'worsened').length;
+    const stable = rows.filter(row => row.trend === 'stable').length;
+    const known = improved + worsened + stable;
+    let summary = 'Noch zu wenige vergleichbare ICP-Werte für eine klare Bewertung.';
+    if (known > 0 && improved > worsened) summary = `${improved} Werte bewegen sich näher ans Optimum, ${worsened} entfernen sich. Die Anpassungen wirken insgesamt positiv.`;
+    if (known > 0 && worsened > improved) summary = `${worsened} Werte entfernen sich vom Optimum, ${improved} verbessern sich. Die letzten Anpassungen sollten vorsichtig geprüft werden.`;
+    if (known > 0 && worsened === improved) summary = `${improved} Werte verbessern sich und ${worsened} verschlechtern sich. Der Verlauf ist gemischt.`;
+    return { summary, improved, worsened, stable, rows };
+}
+
+function traceCalcFormatPercent(value) {
+    if (value === null || value === undefined || !Number.isFinite(value)) return '-';
+    const sign = value > 0 ? '+' : '';
+    return `${sign}${value.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} %`;
+}
+
+function traceCalcRulePercent(value, digits = 0) {
+    return `${(Number(value || 0) * 100).toLocaleString('de-DE', { maximumFractionDigits: digits })} %`;
+}
+
+function renderTraceCalculationGuideTable(rows, columns, className = '') {
+    return `
+        <div class="trace-guide-table-wrap">
+            <table class="trace-guide-table ${className}">
+                <thead><tr>${columns.map(column => `<th>${escapeHtml(column.label)}</th>`).join('')}</tr></thead>
+                <tbody>
+                    ${rows.map(row => `
+                        <tr>${columns.map(column => `<td data-label="${escapeHtml(column.label)}">${row[column.key] || '-'}</td>`).join('')}</tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderTraceCalculationGuideElementTable(group) {
+    const rows = traceCalculatorElements
+        .filter(element => element.group === group)
+        .map(element => {
+            const density = densityFactors[element.item] || 1;
+            return {
+                element: `<strong>${escapeHtml(element.symbol)}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small>`,
+                target: `${traceCalcFormatValue(element.min, 2)} / ${traceCalcFormatValue(element.optimal, 2)} / ${traceCalcFormatValue(element.max, 2)} ${escapeHtml(element.unit)}`,
+                density: `${traceCalcFormatValue(density, 3)} g/ml`,
+                normal: `<strong>${traceCalcFormatMl(element.normal)}</strong><small>${traceCalcFormatG(traceCalcElementGrams(element.item, element.normal))}</small>`,
+                weak: `<strong>${traceCalcFormatMl(element.weak)}</strong><small>${traceCalcFormatG(traceCalcElementGrams(element.item, element.weak))}</small>`
+            };
+        });
+    return renderTraceCalculationGuideTable(rows, [
+        { key: 'element', label: 'Element' },
+        { key: 'target', label: 'Min / Ziel / Max' },
+        { key: 'density', label: 'Dichte' },
+        { key: 'normal', label: 'Start normal' },
+        { key: 'weak', label: 'Start schwach' }
+    ], `trace-guide-element-table trace-guide-element-table-${group}`);
+}
+
+function renderTraceCalculationGuide() {
+    const config = getTraceCalculatorConfigFromUi();
+    const recipe = calculateTraceRecipe(config);
+    const latest = getTraceCalculatorLatestHistory();
+    const intervalRule = traceCalculatorIntervalRules[config.interval] || traceCalculatorIntervalRules.monthly;
+    const scale = getTraceCalculatorScale(config);
+    const requiredVolume = traceCalcRound(config.dailyDoseMl * config.days);
+    const basisLabel = latest
+        ? `Letzte gespeicherte Mischung vom ${formatTraceMixtureDate(latest)}`
+        : `Startrezept für Besatz „${config.stocking === 'weak' ? 'schwach' : 'normal'}“`;
+
+    const currentRows = recipe.rows.map(row => {
+        const change = row.previousAmount > 0
+            ? ((row.amount - row.previousAmount) / row.previousAmount) * 100
+            : null;
+        const measured = row.measured === null || row.measured === undefined || row.measured === ''
+            ? 'nicht eingetragen'
+            : `${traceCalcFormatValue(row.measured, 2)} ${escapeHtml(row.unit)}`;
+        return {
+            element: `<strong>${escapeHtml(row.symbol)}</strong><small>${escapeHtml(row.item.replace(` (${row.symbol})`, ''))}</small>`,
+            measured,
+            rule: `<strong>${escapeHtml(row.statusLabel)}</strong><small>${escapeHtml(row.note)}</small>`,
+            previous: `<strong>${traceCalcFormatMl(row.previousAmount)}</strong><small>${traceCalcFormatG(row.previousGrams)}</small>`,
+            result: `<strong>${traceCalcFormatMl(row.amount)}</strong><small>${traceCalcFormatG(row.grams)}</small>`,
+            change: traceCalcFormatPercent(change)
+        };
+    });
+    const intervalRows = Object.values(traceCalculatorIntervalRules).map(rule => ({
+        interval: escapeHtml(rule.adjustmentLabel),
+        change: `±${traceCalcRulePercent(rule.maxDoseChange)}`
+    }));
+
+    return `
+        <div class="trace-guide">
+            <div class="trace-guide-warning">
+                <strong>Nicht von OSCI verifiziert</strong>
+                <span>Der Calculator ist eine regelbasierte Rechenhilfe, keine chemische Simulation. Jede Mischung vor dem Ansetzen manuell prüfen.</span>
+            </div>
+            <p class="trace-guide-intro">Diese Anleitung wird aus denselben aktiven Regeln, Sollwerten, Startrezepten und Dichtefaktoren erzeugt wie die Berechnung. Änderungen an diesen Rechenparametern erscheinen dadurch automatisch auch hier.</p>
+
+            <div class="trace-guide-summary" aria-label="Aktuelle Berechnungsgrundlage">
+                <span><small>Grundlage</small><strong>${escapeHtml(basisLabel)}</strong></span>
+                <span><small>Skalierungsfaktor</small><strong>${traceCalcFormatValue(scale, 3)}</strong></span>
+                <span><small>Ziel je Lösung</small><strong>K+ ${traceCalcFormatMlG(recipe.totals.kationen.volumeMl, recipe.totals.kationen.volumeG)}<br>A- ${traceCalcFormatMlG(recipe.totals.anionen.volumeMl, recipe.totals.anionen.volumeG)}</strong></span>
+                <span><small>Ziel &amp; Intervallgrenze</small><strong>${escapeHtml(traceCalculatorRules.targetLabel)}<br>±${traceCalcRulePercent(intervalRule.maxDoseChange)}</strong></span>
+            </div>
+
+            <details class="trace-guide-section" open>
+                <summary><span>Aktuelle Berechnung</span><small>${escapeHtml(intervalRule.label)} · ${traceCalcFormatValue(config.tankLiters, 2)} L · ${traceCalcFormatValue(config.days, 0)} Tage</small></summary>
+                <div class="trace-guide-section-body">
+                    <p>Für jedes Element zeigt die Tabelle den verwendeten Ausgangswert, die angewendete Regel und das gerundete Ergebnis. „Ausgang“ ist entweder das skalierte Startrezept oder die auf die neuen Becken- und Laufzeitdaten skalierte letzte Mischung.</p>
+                    ${renderTraceCalculationGuideTable(currentRows, [
+                        { key: 'element', label: 'Element' },
+                        { key: 'measured', label: 'ICP-Wert' },
+                        { key: 'rule', label: 'Angewendete Regel' },
+                        { key: 'previous', label: 'Ausgang' },
+                        { key: 'result', label: 'Ergebnis' },
+                        { key: 'change', label: 'Änderung' }
+                    ], 'trace-guide-current-table')}
+                </div>
+            </details>
+
+            <details class="trace-guide-section">
+                <summary><span>1. Ausgangsrezept und Skalierung</span><small>Woher die erste Menge kommt</small></summary>
+                <div class="trace-guide-section-body">
+                    <p><strong>Ohne Historie:</strong> Der Rechner verwendet das Startrezept für normalen oder schwachen Besatz. Diese Basis gilt für ${traceCalculatorBase.liters} L Aquarium und ${traceCalculatorBase.days} Tage Laufzeit.</p>
+                    <p><code>Skalierungsfaktor = Aquariumvolumen / ${traceCalculatorBase.liters} × Laufzeit / ${traceCalculatorBase.days}</code></p>
+                    <p><code>Ausgangsmenge = Startmenge × Skalierungsfaktor</code></p>
+                    <p><strong>Mit Historie:</strong> Die zuletzt gespeicherte Elementmenge wird zuerst durch ihren alten Skalierungsfaktor geteilt und anschließend mit dem neuen Faktor multipliziert. So wird die vorherige Rezeptur auf das aktuelle Aquarium und die aktuelle Laufzeit übertragen.</p>
+                    <p><code>Neue Ausgangsmenge = letzte Menge / alter Faktor × neuer Faktor</code></p>
+                    <p>Die Besatz-Auswahl wirkt auf das Startrezept. Sobald für ein Element eine gespeicherte Menge vorhanden ist, hat der Verlauf Vorrang. Jede berechnete Elementmenge wird auf ${traceCalcFormatMl(traceCalculatorRules.roundingMl)} gerundet.</p>
+                </div>
+            </details>
+
+            <details class="trace-guide-section">
+                <summary><span>2. ICP-Regeln für Erhöhung und Reduktion</span><small>Wann sich eine Menge ändert</small></summary>
+                <div class="trace-guide-section-body">
+                    <p><strong>Ziel ist bei jedem Element immer der exakte Optimalwert.</strong> Minimum und Maximum dienen nur zur Einordnung und Warnung. Sie bilden keinen Bereich mehr, in dem die Mischung unverändert bleibt.</p>
+                    <p><strong>Copy-&amp;-Paste-Import:</strong> Aus jeder Zeile wird der erste Messwert direkt hinter dem Elementnamen übernommen. Bei <code>nwb</code> mit zwei Grenzwerten verwendet der Import deren arithmetischen Mittelwert; <code>nn</code> wird als 0 eingelesen. Die Übernahme erfolgt nur, wenn alle ${traceCalculatorElements.length} Elemente von Fluorid bis Zink erkannt wurden, damit keine alten Einzelwerte unbemerkt stehen bleiben.</p>
+                    <p><strong>Kein ICP-Wert:</strong> Die Ausgangsmenge wird unverändert übernommen, weil keine Korrektur berechnet werden kann.</p>
+                    <p><strong>Positiver ICP-Wert:</strong> Der Calculator nimmt eine lineare Beziehung zwischen eingesetzter Elementmenge und später gemessenem ICP-Wert an.</p>
+                    <p><code>Ziel-Korrekturfaktor = Optimalwert / gemessener ICP-Wert</code><br><code>Erlaubter Faktor = Ziel-Korrekturfaktor begrenzt auf 1 ± Intervallgrenze</code><br><code>Neue Menge = Ausgangsmenge × erlaubter Faktor</code></p>
+                    <p>Liegt der ICP-Wert <strong>unter</strong> dem Optimalwert, wird die Menge erhöht. Liegt er <strong>über</strong> dem Optimalwert, wird sie reduziert. Nur beim exakt erreichten Optimalwert bleibt sie unverändert. Der Optimalwert bleibt das Ziel, wird bei größeren Abweichungen aber kontrolliert über mehrere ICP-Intervalle angenähert.</p>
+                    ${renderTraceCalculationGuideTable(intervalRows, [
+                        { key: 'interval', label: 'ICP-Intervall' },
+                        { key: 'change', label: 'Maximale Dosisänderung' }
+                    ], 'trace-guide-rule-table')}
+                    <p><strong>Beispiel bei 4 Wochen:</strong> Gemessen 2 bei Optimalwert 4 würde rechnerisch +100 % verlangen, wird aber auf +10 % begrenzt. Gemessen 8 bei Optimalwert 4 würde −50 % verlangen, wird auf −10 % begrenzt.</p>
+                    <p><strong>ICP-Wert 0:</strong> Eine Division durch 0 ist nicht möglich. Deshalb verwendet der Calculator die maximale erlaubte Erhöhung des gewählten ICP-Intervalls und markiert die Zeile zusätzlich zur manuellen Prüfung.</p>
+                    <p>Das Ergebnis wird auf ${traceCalcFormatMl(traceCalculatorRules.roundingMl)} gerundet. Die Rundung darf die Intervallgrenze niemals überschreiten: Bei sehr kleinen Mengen bleibt die Dosis deshalb gegebenenfalls unverändert, wenn der nächste 0,1-ml-Schritt bereits über der erlaubten Prozentänderung läge.</p>
+                </div>
+            </details>
+
+            <details class="trace-guide-section">
+                <summary><span>3. Sollwerte und Startmengen</span><small>Gemeinsame Datenbasis des Calculators</small></summary>
+                <div class="trace-guide-section-body">
+                    <p>Die mittlere Zahl ist bei jedem Element der verbindliche Korrektur-Zielwert. Minimum und Maximum sind nur Orientierung. Die Startmengen gelten jeweils für ${traceCalculatorBase.liters} L, ${traceCalculatorBase.days} Tage und ${traceCalcFormatMl(traceCalculatorBase.volumeMl)} Zielvolumen je Lösung. Die Grammwerte entstehen aus der hinterlegten Produktdichte und können deshalb vom Zahlenwert in ml abweichen.</p>
+                    <h4>Kationen K+</h4>
+                    ${renderTraceCalculationGuideElementTable('kationen')}
+                    <h4>Anionen A-</h4>
+                    ${renderTraceCalculationGuideElementTable('anionen')}
+                </div>
+            </details>
+
+            <details class="trace-guide-section">
+                <summary><span>4. Flaschenvolumen, Osmosewasser und Gramm</span><small>Wie die fertige Lösung entsteht</small></summary>
+                <div class="trace-guide-section-body">
+                    <p><code>Zielvolumen je Lösung = Tagesdosierung × Laufzeit</code></p>
+                    <p>Aktuell: ${traceCalcFormatMl(config.dailyDoseMl)} × ${traceCalcFormatValue(config.days, 0)} Tage = <strong>${traceCalcFormatMl(requiredVolume)}</strong> Zielvolumen je Lösung. Fertige K+ Lösung: <strong>${traceCalcFormatMlG(recipe.totals.kationen.volumeMl, recipe.totals.kationen.volumeG)}</strong>. Fertige A- Lösung: <strong>${traceCalcFormatMlG(recipe.totals.anionen.volumeMl, recipe.totals.anionen.volumeG)}</strong>.</p>
+                    <p><code>Osmosewasser = Zielvolumen − Summe aller Elementmengen</code></p>
+                    <p>Kationen: Elemente ${traceCalcFormatMlG(recipe.totals.kationen.elementsMl, recipe.totals.kationen.elementsG)}, Osmosewasser ${traceCalcFormatMlG(recipe.totals.kationen.osmoseMl, recipe.totals.kationen.osmoseG)}.</p>
+                    <p>Anionen: Elemente ${traceCalcFormatMlG(recipe.totals.anionen.elementsMl, recipe.totals.anionen.elementsG)}, Osmosewasser ${traceCalcFormatMlG(recipe.totals.anionen.osmoseMl, recipe.totals.anionen.osmoseG)}.</p>
+                    <p>Element-Grammwerte werden mit <code>ml × Produktdichte</code> berechnet. Für Osmosewasser werden ${traceCalcFormatValue(traceCalculatorRules.osmoseDensityGPerMl, 2)} g/ml angesetzt. Das maximale Flaschenvolumen von ${traceCalcFormatMl(config.bottleMaxMl)} ist eine Prüfgrenze: Es erzeugt eine Warnung, kürzt das berechnete Rezept aber nicht automatisch.</p>
+                </div>
+            </details>
+
+            <details class="trace-guide-section">
+                <summary><span>5. Historie, Prozententwicklung und Auslagerung</span><small>Wie die Wirkung bewertet wird</small></summary>
+                <div class="trace-guide-section-body">
+                    <p>Die Analyse vergleicht immer die letzten zwei gespeicherten Mischungen. Für jedes Element wird der absolute Abstand zum Optimalwert vor und nach der Anpassung berechnet.</p>
+                    <p>Eine Verbesserung wird erst ab mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} kleinerem Abstand gezählt. Mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} größerer Abstand gilt als Verschlechterung; alles dazwischen als stabil.</p>
+                    <p><code>ICP-Entwicklung % = (neuer ICP-Wert − alter ICP-Wert) / |alter ICP-Wert| × 100</code><br><code>Mengenentwicklung % = (neue Menge − alte Menge) / |alte Menge| × 100</code></p>
+                    <p><strong>Speichern</strong> legt Rezept, ICP-Werte, Datum und Konfiguration in der Historie ab. <strong>Speichern &amp; Auslagern</strong> prüft zuerst alle benötigten Lagerbestände. Fehlt eine Ware, wird nichts gespeichert und nichts teilweise ausgelagert. Bei ausreichendem Bestand werden alle verwendeten Trace-Produkte im aktiven Lager abgezogen und einzeln protokolliert.</p>
+                </div>
+            </details>
+        </div>
+    `;
+}
+
+function openTraceCalculationGuide() {
+    return appAlert('', {
+        eyebrow: 'Transparente Rechenlogik',
+        title: 'So berechnet der Trace Calculator',
+        confirmText: 'Schließen',
+        html: renderTraceCalculationGuide(),
+        wide: true,
+        allowEscape: true
+    });
+}
+
+function renderTraceCalculatorHistoryAnalysis(history) {
+    const analysis = getTraceCalculatorHistoryAnalysis(history);
+    const trendLabel = {
+        improved: 'besser',
+        worsened: 'schlechter',
+        stable: 'stabil',
+        unknown: 'offen'
+    };
+    const rows = analysis.rows.filter(row => row.before !== null || row.after !== null || row.amountPercent !== null);
+    return `
+        <div class="trace-analysis-block">
+            <div class="trace-analysis-summary">
+                <span class="trace-analysis-good"><strong>${analysis.improved}</strong><small>näher am Optimum</small></span>
+                <span class="trace-analysis-neutral"><strong>${analysis.stable}</strong><small>stabil</small></span>
+                <span class="trace-analysis-bad"><strong>${analysis.worsened}</strong><small>weiter entfernt</small></span>
+            </div>
+            <p class="trace-analysis-copy">${escapeHtml(analysis.summary)}</p>
+            ${rows.length ? `
+                <details class="trace-analysis-details">
+                    <summary>Entwicklung je Element <span>${rows.length}</span></summary>
+                    <div class="trace-analysis-table">
+                        ${rows.map(row => `
+                            <div class="trace-analysis-row trace-trend-${row.trend}">
+                                <span><strong>${escapeHtml(row.element.symbol)}</strong><small>${escapeHtml(trendLabel[row.trend] || 'offen')}</small></span>
+                                <span><strong>${traceCalcFormatPercent(row.valuePercent)}</strong><small>ICP-Wert</small></span>
+                                <span><strong>${traceCalcFormatPercent(row.amountPercent)}</strong><small>Mischung ml/g</small></span>
+                                <span><strong>${traceCalcFormatValue(row.after, 2)} ${row.element.unit}</strong><small>aktuell</small></span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </details>
+            ` : ''}
+        </div>
+    `;
+}
+
+function renderTraceCalculatorHistoryChart(history) {
+    const chartEntries = traceCalculatorElements.map(element => {
+        const values = history
+            .map(entry => traceCalcNumber(entry.icp?.[element.item], null))
+            .filter(value => value !== null);
+        if (values.length < 2) return '';
+        const min = Math.min(...values, element.min);
+        const max = Math.max(...values, element.max);
+        const range = max - min || 1;
+        const points = values.map((value, index) => {
+            const x = values.length === 1 ? 0 : (index / (values.length - 1)) * 100;
+            const y = 36 - ((value - min) / range) * 32;
+            return `${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+        return `
+            <div class="trace-history-spark">
+                <span>${element.symbol}</span>
+                <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+                    <polyline points="${points}" fill="none" stroke="currentColor" stroke-width="2"></polyline>
+                </svg>
+                <small>${traceCalcFormatValue(values[values.length - 1], 2)} ${element.unit}</small>
+            </div>
+        `;
+    }).filter(Boolean).join('');
+
+    return chartEntries ? `<div class="trace-history-chart">${chartEntries}</div>` : '<p class="hint">Für Verlaufsgrafen mindestens zwei gespeicherte ICP-Messungen eintragen.</p>';
+}
+
+function renderTraceCalculatorHistory() {
+    const container = document.getElementById('traceCalculatorHistory');
+    if (!container) return;
+    if (!isTraceCalculatorUnlocked()) {
+        container.innerHTML = `
+            <div class="card workflow-card trace-history-block trace-history-empty trace-history-locked">
+                <div class="trace-history-head">
+                    <span><strong>Historie &amp; Analyse</strong><small>Mit Passwort geschuetzt</small></span>
+                    <span class="trace-history-count">gesperrt</span>
+                </div>
+                <p>Historie, Verlaufsgrafen und Auswertung werden erst nach Eingabe des Passworts angezeigt.</p>
+            </div>
+        `;
+        return;
+    }
+    const state = ensureTraceCalculatorState();
+    const history = state.history;
+    if (!history.length) {
+        container.innerHTML = `
+            <div class="card workflow-card trace-history-block trace-history-empty">
+                <div class="trace-history-head">
+                    <span><strong>Historie &amp; Analyse</strong><small>Vergleich der gespeicherten Mischungen</small></span>
+                    <span class="trace-history-count">0 Mischungen</span>
+                </div>
+                <p>Nach dem ersten Speichern erscheinen hier Verlauf, prozentuale Entwicklung und die Wirkung der Anpassungen.</p>
+            </div>
+        `;
+        return;
+    }
+    const recent = history.slice(-5).reverse();
+    container.innerHTML = `
+        <div class="card workflow-card trace-history-block">
+            <div class="trace-history-head">
+                <span><strong>Historie &amp; Analyse</strong><small>Letzter Ansatz ${formatTraceMixtureDate(history[history.length - 1])}</small></span>
+                <span class="trace-history-count">${history.length} Mischung${history.length === 1 ? '' : 'en'}</span>
+            </div>
+            <div class="trace-history-content">
+                ${renderTraceCalculatorHistoryAnalysis(history)}
+                ${renderTraceCalculatorHistoryChart(history)}
+                <div class="trace-history-list">
+                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Die letzten ${recent.length}</small></div>
+                    ${recent.map(entry => `
+                        <div class="trace-history-row">
+                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage</small></span>
+                            <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
+                            <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
+                            <button type="button" class="btn-secondary" onclick='loadTraceCalculatorHistoryEntry(${jsArg(entry.id)})'>Laden</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderTraceCalculator() {
+    const root = document.getElementById('traceCalculatorResult');
+    if (!root) return;
+    syncTraceCalculatorLockUI();
+    if (!isTraceCalculatorUnlocked()) {
+        root.innerHTML = '';
+        renderTraceCalculatorHistory();
+        return;
+    }
+    const state = ensureTraceCalculatorState();
+    syncTraceCalculatorConfigUi();
+    renderTraceCalculatorIcpInputs();
+    const config = getTraceCalculatorConfigFromUi();
+    const recipe = calculateTraceRecipe(config);
+    state.latestRecipe = recipe;
+
+    const warnings = [];
+    ['kationen', 'anionen'].forEach(group => {
+        const total = recipe.totals[group];
+        const label = group === 'kationen' ? 'K+' : 'A-';
+        if (total.volumeMl > config.bottleMaxMl) warnings.push(`${label}: ${traceCalcFormatMl(total.volumeMl)} überschreitet ${traceCalcFormatMl(config.bottleMaxMl)} Flaschenvolumen.`);
+        if (total.osmoseMl < 0) warnings.push(`${label}: Elementmengen sind größer als das Zielvolumen.`);
+    });
+
+    const dailyKationenG = recipe.totals.kationen.volumeMl
+        ? traceCalcRound(config.dailyDoseMl * recipe.totals.kationen.volumeG / recipe.totals.kationen.volumeMl)
+        : traceCalcRound(config.dailyDoseMl);
+    const dailyAnionenG = recipe.totals.anionen.volumeMl
+        ? traceCalcRound(config.dailyDoseMl * recipe.totals.anionen.volumeG / recipe.totals.anionen.volumeMl)
+        : traceCalcRound(config.dailyDoseMl);
+
+    root.innerHTML = `
+        <div class="trace-calculator-result">
+            ${warnings.length ? `<div class="workflow-message workflow-message--error" role="alert"><strong>Bitte prüfen</strong><span>${warnings.map(escapeHtml).join('<br>')}</span></div>` : ''}
+            <div class="trace-result-head">
+                <span><small>Berechnung</small><strong>Rezeptvorschlag</strong><em>Ansatzdatum ${formatTraceDateInput(state.currentMixtureDate)}</em></span>
+                <span class="trace-result-dose"><small>Täglich je Lösung</small><strong>${traceCalcFormatMl(config.dailyDoseMl)}</strong><em>K+ ${traceCalcFormatG(dailyKationenG)} · A- ${traceCalcFormatG(dailyAnionenG)}</em></span>
+            </div>
+            <div class="trace-summary-strip">
+                <span class="trace-summary-kationen"><small>Kationen K+ gesamt</small><strong>${traceCalcFormatMl(recipe.totals.kationen.volumeMl)}</strong><em>${traceCalcFormatG(recipe.totals.kationen.volumeG)}</em></span>
+                <span class="trace-summary-anionen"><small>Anionen A- gesamt</small><strong>${traceCalcFormatMl(recipe.totals.anionen.volumeMl)}</strong><em>${traceCalcFormatG(recipe.totals.anionen.volumeG)}</em></span>
+                <span><small>Laufzeit</small><strong>${traceCalcFormatValue(config.days, 0)} Tage</strong><em>${traceCalcFormatValue(config.tankLiters, 2)} L Aquarium</em></span>
+            </div>
+            <div class="trace-recipe-split">
+                ${renderTraceRecipeTable(recipe, 'kationen')}
+                ${renderTraceRecipeTable(recipe, 'anionen')}
+            </div>
+        </div>
+    `;
+    renderTraceCalculatorHistory();
+    saveDB(false);
+}
+
+function updateTraceCalculatorIcp(item, value) {
+    if (!isTraceCalculatorUnlocked()) return;
+    const state = ensureTraceCalculatorState();
+    if (String(value || '').trim() === '') delete state.icp[item];
+    else state.icp[item] = String(value).replace(',', '.');
+    renderTraceCalculator();
+}
+
+function parseTraceCalculatorIcpCell(cell) {
+    const clean = String(cell || '')
+        .replace(/[\*_`]/g, '')
+        .replace(/\u00a0/g, ' ')
+        .trim();
+    if (!clean) return null;
+
+    if (/^nn\b/i.test(clean)) {
+        return { value: 0, method: 'nn' };
+    }
+
+    if (/\bnwb\b/i.test(clean)) {
+        const range = clean.match(/\bnwb\b[^\d+-]*([+-]?\d+(?:[.,]\d+)?)\s*[-\u2013\u2014]\s*([+-]?\d+(?:[.,]\d+)?)/i);
+        if (!range) return null;
+        const minimum = Number(range[1].replace(',', '.'));
+        const maximum = Number(range[2].replace(',', '.'));
+        if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return null;
+        return {
+            value: (minimum + maximum) / 2,
+            method: 'nwb',
+            minimum,
+            maximum
+        };
+    }
+
+    const numeric = clean.match(/^[^\d+-]*([+-]?\d+(?:[.,]\d+)?)/);
+    if (!numeric) return null;
+    const value = Number(numeric[1].replace(',', '.'));
+    return Number.isFinite(value) ? { value, method: 'numeric' } : null;
+}
+
+function parseTraceCalculatorIcpText(text) {
+    const lines = String(text || '')
+        .replace(/\r/g, '')
+        .split('\n')
+        .map(line => line.replace(/\u00a0/g, ' '));
+
+    return traceCalculatorElements.reduce((parsed, element) => {
+        const symbolPattern = new RegExp(`\\(${element.symbol}\\)`, 'i');
+        const rowIndex = lines.findIndex(line => symbolPattern.test(line));
+        if (rowIndex < 0) return parsed;
+
+        const row = lines[rowIndex];
+        const symbolMatch = row.match(symbolPattern);
+        const remainder = symbolMatch
+            ? row.slice((symbolMatch.index || 0) + symbolMatch[0].length)
+            : '';
+        const tabCells = remainder
+            .split(/\t+/)
+            .map(cell => cell.trim())
+            .filter(Boolean);
+        const measuredCell = tabCells[0] || remainder.trim() || String(lines[rowIndex + 1] || '').trim();
+        const measurement = parseTraceCalculatorIcpCell(measuredCell);
+        if (!measurement) return parsed;
+
+        parsed.push({
+            ...measurement,
+            item: element.item,
+            symbol: element.symbol,
+            unit: element.unit
+        });
+        return parsed;
+    }, []);
+}
+
+function setTraceCalculatorIcpImportStatus(type, title, details = '') {
+    const status = document.getElementById('traceCalcIcpImportStatus');
+    if (!status) return;
+    status.className = `trace-icp-import-status trace-icp-import-status-${type}`;
+    status.innerHTML = `<strong>${escapeHtml(title)}</strong>${details ? `<span>${escapeHtml(details)}</span>` : ''}`;
+    status.hidden = false;
+}
+
+function importTraceCalculatorIcpText(sourceText) {
+    if (!isTraceCalculatorUnlocked()) {
+        showToast('Trace Calculator ist gesperrt', 'info', 2200);
+        return false;
+    }
+    const textarea = document.getElementById('traceCalcIcpPaste');
+    const text = sourceText === undefined ? textarea?.value || '' : String(sourceText || '');
+    const parsed = parseTraceCalculatorIcpText(text);
+    const parsedItems = new Set(parsed.map(entry => entry.item));
+    const missing = traceCalculatorElements.filter(element => !parsedItems.has(element.item));
+
+    if (missing.length) {
+        const missingLabels = missing.map(element => element.symbol).join(', ');
+        setTraceCalculatorIcpImportStatus(
+            'error',
+            'ICP-Werte wurden nicht übernommen',
+            `Erkannt: ${parsed.length} von ${traceCalculatorElements.length}. Nicht erkannt: ${missingLabels}. Bitte den vollständigen Bereich von Fluorid bis Zink erneut kopieren.`
+        );
+        return false;
+    }
+
+    const state = ensureTraceCalculatorState();
+    parsed.forEach(entry => {
+        state.icp[entry.item] = String(entry.value);
+    });
+    const inputContainer = document.getElementById('traceCalcIcpInputs');
+    if (inputContainer) delete inputContainer.dataset.traceCalcReady;
+    renderTraceCalculator();
+
+    const values = parsed
+        .map(entry => `${entry.symbol} ${traceCalcFormatValue(entry.value, 3)} ${entry.unit}`)
+        .join(' · ');
+    const conversions = parsed
+        .filter(entry => entry.method !== 'numeric')
+        .map(entry => entry.method === 'nn'
+            ? `${entry.symbol}: nn = 0 ${entry.unit}`
+            : `${entry.symbol}: nwb ${traceCalcFormatValue(entry.minimum, 3)}-${traceCalcFormatValue(entry.maximum, 3)} = Mittelwert ${traceCalcFormatValue(entry.value, 3)} ${entry.unit}`)
+        .join(' · ');
+    setTraceCalculatorIcpImportStatus(
+        'success',
+        `${parsed.length} ICP-Werte übernommen`,
+        conversions ? `${values}. Umgerechnet: ${conversions}.` : values
+    );
+    showToast(`${parsed.length} ICP-Werte übernommen`, 'success');
+    return true;
+}
+
+function handleTraceCalculatorIcpPaste(event) {
+    const pastedText = event?.clipboardData?.getData('text/plain');
+    if (!pastedText) {
+        window.setTimeout(() => importTraceCalculatorIcpText(), 0);
+        return;
+    }
+    event.preventDefault();
+    const textarea = event.currentTarget || document.getElementById('traceCalcIcpPaste');
+    if (textarea) textarea.value = pastedText;
+    importTraceCalculatorIcpText(pastedText);
+}
+
+function clearTraceCalculatorIcpImport() {
+    if (!isTraceCalculatorUnlocked()) return;
+    const textarea = document.getElementById('traceCalcIcpPaste');
+    const status = document.getElementById('traceCalcIcpImportStatus');
+    if (textarea) {
+        textarea.value = '';
+        textarea.focus();
+    }
+    if (status) {
+        status.hidden = true;
+        status.textContent = '';
+        status.className = 'trace-icp-import-status';
+    }
+}
+
+function loadTraceCalculatorFromLast() {
+    if (!isTraceCalculatorUnlocked()) {
+        showToast('Trace Calculator ist gesperrt', 'info', 2200);
+        return;
+    }
+    const latest = getTraceCalculatorLatestHistory();
+    if (!latest) {
+        showToast('Noch keine gespeicherte Trace-Mischung vorhanden', 'info');
+        return;
+    }
+    loadTraceCalculatorHistoryEntry(latest.id);
+}
+
+function loadTraceCalculatorHistoryEntry(id) {
+    if (!isTraceCalculatorUnlocked()) return;
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => item.id === id);
+    if (!entry) return;
+    state.config = { ...state.config, ...(entry.config || {}) };
+    state.currentMixtureDate = entry.mixtureDate || getTodayDateInputValue();
+    state.icp = { ...(entry.icp || {}) };
+    document.querySelectorAll('[id^="traceCalc"]').forEach(el => {
+        if (el && el.dataset) delete el.dataset.traceCalcSynced;
+    });
+    const icpContainer = document.getElementById('traceCalcIcpInputs');
+    if (icpContainer) delete icpContainer.dataset.traceCalcReady;
+    renderTraceCalculator();
+    showToast('Trace-Mischung geladen', 'success');
+}
+
+function createTraceCalculatorMixturePayload() {
+    if (!isTraceCalculatorUnlocked()) {
+        showToast('Trace Calculator ist gesperrt', 'info', 2200);
+        return null;
+    }
+    const state = ensureTraceCalculatorState();
+    const recipe = calculateTraceRecipe(getTraceCalculatorConfigFromUi());
+    const mixtureDate = document.getElementById('traceCalcMixtureDate')?.value || state.currentMixtureDate;
+    if (!mixtureDate) {
+        alert('Bitte das Datum der angesetzten Mischung angeben.');
+        return null;
+    }
+    const amounts = recipe.rows.reduce((acc, row) => {
+        acc[row.item] = row.amount;
+        return acc;
+    }, {});
+    const grams = recipe.rows.reduce((acc, row) => {
+        acc[row.item] = row.grams;
+        return acc;
+    }, {});
+    const entry = {
+        id: createWarehouseId(),
+        createdAt: Date.now(),
+        mixtureDate,
+        config: { ...recipe.config },
+        icp: { ...state.icp },
+        amounts,
+        grams,
+        totals: recipe.totals
+    };
+
+    return { state, recipe, amounts, entry };
+}
+
+function commitTraceCalculatorMixture(payload) {
+    if (!payload) return null;
+    const { state, amounts, entry } = payload;
+    state.history.push(entry);
+    if (state.history.length > 60) state.history = state.history.slice(-60);
+    db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
+    return entry;
+}
+
+function refreshTraceCalculatorAfterSave() {
+    saveDB();
+    renderTraceExportInputs();
+    renderTraceCalculator();
+}
+
+function saveTraceCalculatorMixture() {
+    const payload = createTraceCalculatorMixturePayload();
+    if (!payload) return null;
+    const entry = commitTraceCalculatorMixture(payload);
+    refreshTraceCalculatorAfterSave();
+    showToast('Trace-Mischung gespeichert', 'success');
+    return entry;
+}
+
+function saveAndBookTraceCalculatorMixture() {
+    if (!requireWarehouseWriteAccess('Trace-Mischung speichern und auslagern')) return;
+    const payload = createTraceCalculatorMixturePayload();
+    if (!payload) return;
+
+    const queue = payload.recipe.rows
+        .filter(row => row.amount > 0)
+        .map(row => ({
+            cat: row.group === 'kationen' ? 'Kationen' : 'Anionen',
+            item: row.item,
+            amount: row.amount,
+            grams: row.grams
+        }));
+
+    if (!queue.length) {
+        alert('Die berechnete Mischung enthält keine Waren zum Auslagern.');
+        return;
+    }
+
+    const shortages = queue.filter(position => {
+        const stock = traceCalcNumber(db.inventory?.[position.cat]?.[position.item], 0);
+        return stock + 0.0001 < position.amount;
+    });
+
+    if (shortages.length) {
+        const details = shortages.map(position => {
+            const stockMl = traceCalcNumber(db.inventory?.[position.cat]?.[position.item], 0);
+            const stockG = traceCalcElementGrams(position.item, stockMl);
+            return `${position.item}: benötigt ${traceCalcFormatMlG(position.amount, position.grams)}, verfügbar ${traceCalcFormatMlG(stockMl, stockG)}`;
+        }).join('\n');
+        alert(`Nicht genügend Lagerbestand. Es wurde nichts gespeichert oder ausgelagert.\n\n${details}`);
+        return;
+    }
+
+    const kationenTotal = payload.recipe.totals.kationen;
+    const anionenTotal = payload.recipe.totals.anionen;
+    const confirmed = confirm(
+        `Trace-Mischung speichern und ${queue.length} Warenpositionen auslagern?\n\n` +
+        `Kationen: ${traceCalcFormatMlG(kationenTotal.elementsMl, kationenTotal.elementsG)}\n` +
+        `Anionen: ${traceCalcFormatMlG(anionenTotal.elementsMl, anionenTotal.elementsG)}`
+    );
+    if (!confirmed) return;
+
+    const logs = queue.map(position => {
+        db.inventory[position.cat][position.item] -= position.amount;
+        db.stats[position.item] = (db.stats[position.item] || 0) + position.amount;
+        return addLog(position.cat, position.item, 'out', position.amount);
+    });
+
+    payload.entry.inventoryBooking = {
+        warehouseId: activeWarehouseId,
+        bookedAt: Date.now(),
+        logIds: logs.map(log => log.id)
+    };
+    commitTraceCalculatorMixture(payload);
+    refreshTraceCalculatorAfterSave();
+    renderLager();
+    checkAndNotifyStockAlerts();
+    showToast(`Trace-Mischung gespeichert und ${queue.length} Warenpositionen ausgelagert`, 'success');
+}
+
+window.updateTraceCalculatorIcp = updateTraceCalculatorIcp;
+window.importTraceCalculatorIcpText = importTraceCalculatorIcpText;
+window.handleTraceCalculatorIcpPaste = handleTraceCalculatorIcpPaste;
+window.clearTraceCalculatorIcpImport = clearTraceCalculatorIcpImport;
+window.loadTraceCalculatorFromLast = loadTraceCalculatorFromLast;
+window.loadTraceCalculatorHistoryEntry = loadTraceCalculatorHistoryEntry;
+window.saveTraceCalculatorMixture = saveTraceCalculatorMixture;
+window.saveAndBookTraceCalculatorMixture = saveAndBookTraceCalculatorMixture;
+window.openTraceCalculationGuide = openTraceCalculationGuide;
+
 function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
         '#tools details[data-section-id="dosieren-und-messwerte"], ' +
@@ -6808,6 +7983,7 @@ function setupPriority4CalculatorUI() {
         'majorCorrectionResult', 'consumptionResult', 'testCorrectionResult', 'nutritionResult',
         'salinityResult', 'simpleSalinityResult', 'specificGravityResult', 'saltCorrectionResult',
         'waterChangeResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
+        , 'traceCalculatorResult', 'traceCalculatorHistory'
     ].forEach(id => {
         const result = document.getElementById(id);
         if (!result) return;
@@ -6944,6 +8120,7 @@ function getToolTileVisual(toolId, title = '') {
         'hanna-phosphor-zu-phosphat': { icon: 'PO', subtitle: 'P zu PO4 rechnen' },
         'salifert-umrechner': { icon: 'Sa', subtitle: 'Spritzenwert waehlen' },
         'nutrition-rechner': { icon: 'N', subtitle: 'Naehrstoffe dosieren' },
+        'trace-calculator': { icon: 'Tr', subtitle: 'ICP Rezept planen' },
         'salzgehalt-rechner': { icon: 'PS', subtitle: 'PSU und Dichte pruefen' },
         'salz-korrektur': { icon: 'SG', subtitle: 'Salz angleichen' },
         'wasserwechsel-effekt': { icon: 'WW', subtitle: 'Wasserwechsel planen' },
@@ -7156,8 +8333,25 @@ const SANGOKAI_SEARCH_STOPWORDS = new Set([
     'durch', 'ein', 'eine', 'einem', 'einen', 'einer', 'er', 'es', 'fuer', 'gegen', 'gibt',
     'habe', 'haben', 'hat', 'im', 'in', 'ist', 'ja', 'kann', 'mit', 'nach', 'nicht', 'noch',
     'nur', 'oder', 'sich', 'sind', 'soll', 'sollte', 'um', 'und', 'von', 'was', 'wenn',
-    'wer', 'wie', 'wir', 'wird', 'wo', 'zu', 'zum', 'zur', 'ich', 'gehalt'
+    'wer', 'wie', 'wir', 'wird', 'wo', 'zu', 'zum', 'zur', 'ich', 'mein', 'meine', 'meinem',
+    'meinen', 'man', 'mir', 'dir', 'bitte', 'mal', 'thema', 'gehalt'
 ]);
+
+const SANGOKAI_TERM_CORRECTIONS = {
+    calium: 'calcium',
+    kalzium: 'calcium',
+    kalcium: 'calcium',
+    calzium: 'calcium',
+    phosphatwert: 'phosphat',
+    nitratwert: 'nitrat',
+    salz: 'salzgehalt',
+    salinität: 'salinitaet',
+    dino: 'dinoflagellaten',
+    cyano: 'cyanobakterien',
+    cyanos: 'cyanobakterien',
+    abschäumer: 'abschaeumer',
+    eiweißabschäumer: 'eiweissabschaeumer'
+};
 
 const SANGOKAI_SEARCH_SYNONYMS = {
     po4: ['phosphat', 'phosphor'],
@@ -7185,12 +8379,83 @@ const SANGOKAI_SEARCH_SYNONYMS = {
     calcium: ['ca', 'calciumgehalt', 'calciumdefizit'],
     calium: ['calcium', 'ca', 'calciumgehalt', 'calciumdefizit'],
     kalzium: ['calcium', 'ca', 'calciumgehalt', 'calciumdefizit'],
+    magnesium: ['mg', 'magnesiumgehalt'],
+    mg: ['magnesium', 'magnesiumgehalt'],
+    strontium: ['sr', 'strontiumgehalt'],
+    sr: ['strontium', 'strontiumgehalt'],
+    bor: ['b', 'borgehalt'],
+    fluor: ['f', 'fluorid', 'fluorgehalt'],
+    kalium: ['k', 'kaliumgehalt'],
+    brom: ['br', 'bromgehalt'],
     erhoehen: ['erhoehung', 'anheben', 'anhebung', 'ausgleichen', 'ausgeglichen', 'defizit'],
     erhoehung: ['erhoehen', 'anheben', 'anhebung', 'ausgleichen', 'defizit'],
     anheben: ['erhoehen', 'erhoehung', 'anhebung', 'ausgleichen', 'defizit'],
     anhebung: ['erhoehen', 'erhoehung', 'anheben', 'ausgleichen', 'defizit'],
-    schnell: ['innerhalb', 'zeit', 'stunden', 'einzeldosierung', 'einzeldosierungen']
+    senken: ['absenken', 'reduktion', 'verringern'],
+    reduzieren: ['senken', 'absenken', 'verringern'],
+    schnell: ['innerhalb', 'zeit', 'stunden', 'einzeldosierung', 'einzeldosierungen'],
+    dosieren: ['dosierung', 'einzeldosierung', 'einzeldosierungen', 'zufuehren'],
+    dosis: ['dosierung', 'einzeldosierung', 'zufuehren'],
+    mangel: ['defizit', 'mangelsituation'],
+    defizit: ['mangel', 'ausgleichen', 'ausgeglichen'],
+    zielwert: ['referenzwert', 'referenzbereich', 'sollwert'],
+    optimal: ['referenzbereich', 'referenzwert', 'empfohlen'],
+    problem: ['kritisch', 'ursache', 'problemfall'],
+    plagen: ['plage', 'cyanobakterien', 'dinoflagellaten'],
+    algen: ['mikroalgen', 'makroalgen'],
+    aktivkohlefilterung: ['aktivkohle', 'kohle']
 };
+
+const SANGOKAI_INTENT_RULES = [
+    {
+        id: 'timing',
+        label: 'Zeit / Geschwindigkeit',
+        query: /\b(schnell|langsam|zeit|wie lange|stunden|tage|innerhalb|tempo|rasch)\b/,
+        terms: ['innerhalb', 'stunden', 'tage', 'zeit', 'einzeldosierung', 'einzeldosierungen', 'schnell', 'langsam']
+    },
+    {
+        id: 'dose',
+        label: 'Dosierung / Anwendung',
+        query: /\b(dosieren|dosis|zugeben|anwenden|menge|ml|mg|einzeldosierung|ausgleichen|angleichen|erhoehen|senken|anheben)\b/,
+        terms: ['dosierung', 'dosis', 'zufuehren', 'einzeldosierung', 'einzeldosierungen', 'mg', 'ml', 'ausgleichen', 'erhoehung']
+    },
+    {
+        id: 'target',
+        label: 'Zielwert / Referenzbereich',
+        query: /\b(wert|zielwert|optimal|referenz|bereich|soll|hoch|niedrig|liegen)\b/,
+        terms: ['referenzwert', 'referenzbereich', 'sollte', 'liegen', 'empfohlen', 'kritischer', 'bereich']
+    },
+    {
+        id: 'cause',
+        label: 'Ursache / Erklärung',
+        query: /\b(warum|wieso|ursache|grund|kommt|entsteht|entstehen|passiert)\b/,
+        terms: ['ursache', 'dadurch', 'weil', 'grund', 'problem', 'entsteht', 'entstehen', 'hintergrund']
+    },
+    {
+        id: 'risk',
+        label: 'Risiko / Warnung',
+        query: /\b(gefahr|risk|risiko|kritisch|problem|schaden|schlimm|warnung|giftig|toxisch)\b/,
+        terms: ['kritisch', 'problem', 'gefahr', 'schaden', 'unguenstig', 'warnung', 'verhindern']
+    }
+];
+
+const SANGOKAI_SUBJECT_HINTS = [
+    ['calcium', ['calcium', 'calciumgehalt', 'calciumdefizit', 'ca']],
+    ['karbonathärte', ['karbonathaerte', 'alkalinitaet', 'kh']],
+    ['magnesium', ['magnesium', 'magnesiumgehalt', 'mg']],
+    ['phosphat', ['phosphat', 'phosphor', 'po4']],
+    ['nitrat', ['nitrat', 'stickstoff', 'no3']],
+    ['salinität', ['salinitaet', 'salzgehalt', 'psu', 'dichte']],
+    ['iod', ['iod', 'jod']],
+    ['bor', ['bor', 'borgehalt']],
+    ['strontium', ['strontium', 'strontiumgehalt', 'sr']],
+    ['fluor', ['fluor', 'fluorid', 'fluorgehalt']],
+    ['kalium', ['kalium', 'kaliumgehalt']],
+    ['cyanobakterien', ['cyanobakterien', 'cyanos', 'cyanobakterie']],
+    ['dinoflagellaten', ['dinoflagellaten', 'dinos']],
+    ['aktivkohle', ['aktivkohle', 'kohle', 'filterkohle']],
+    ['beleuchtung', ['beleuchtung', 'licht', 'led', 't5']]
+];
 
 function normalizeSangokaiText(value = '') {
     return String(value)
@@ -7206,8 +8471,25 @@ function normalizeSangokaiText(value = '') {
         .trim();
 }
 
-function getSangokaiQueryTerms(query) {
-    const baseTerms = normalizeSangokaiText(query)
+function normalizeSangokaiToken(term = '') {
+    const normalized = normalizeSangokaiText(term);
+    return SANGOKAI_TERM_CORRECTIONS[normalized] || normalized;
+}
+
+function hasSangokaiAliasMatch(alias, profileTerms, baseTerms, normalizedQuery) {
+    if (!alias) return false;
+    if (alias.length <= 2) return baseTerms.includes(alias);
+    if (profileTerms.includes(alias)) return true;
+    const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^| )${escaped}( |$)`).test(normalizedQuery);
+}
+
+function getSangokaiQuestionProfile(query) {
+    const normalizedQuery = normalizeSangokaiText(query)
+        .split(' ')
+        .map(normalizeSangokaiToken)
+        .join(' ');
+    const baseTerms = normalizedQuery
         .split(' ')
         .map(term => term.trim())
         .filter(term => term.length > 1 && !SANGOKAI_SEARCH_STOPWORDS.has(term));
@@ -7215,27 +8497,59 @@ function getSangokaiQueryTerms(query) {
     baseTerms.forEach(term => {
         (SANGOKAI_SEARCH_SYNONYMS[term] || []).forEach(alias => expanded.add(alias));
     });
-    return Array.from(expanded);
+    const intents = SANGOKAI_INTENT_RULES
+        .filter(rule => rule.query.test(normalizedQuery))
+        .map(rule => {
+            rule.terms.forEach(term => expanded.add(term));
+            return rule;
+        });
+    const terms = Array.from(new Set(Array.from(expanded).map(normalizeSangokaiToken).filter(Boolean)));
+    const subjectMatches = SANGOKAI_SUBJECT_HINTS
+        .filter(([, aliases]) => aliases.some(alias => hasSangokaiAliasMatch(alias, terms, baseTerms, normalizedQuery)))
+        .map(([label, aliases]) => ({ label, aliases }));
+    return { query, normalizedQuery, baseTerms, terms, intents, subjectMatches };
 }
 
-function getSangokaiIntentBoost(normalizedChunk, normalizedQuery) {
+function getSangokaiQueryTerms(query) {
+    return getSangokaiQuestionProfile(query).terms;
+}
+
+function countSangokaiTermHits(normalizedText, terms) {
+    return terms.reduce((sum, term) => {
+        const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const matches = normalizedText.match(new RegExp(`(^| )${escaped}`, 'g'));
+        return sum + (matches ? matches.length : 0);
+    }, 0);
+}
+
+function getSangokaiIntentBoost(normalizedChunk, profile) {
     let boost = 0;
+    const normalizedQuery = profile.normalizedQuery;
     const asksCalcium = /\b(ca|calcium|calium|kalzium)\b/.test(normalizedQuery);
     const asksIncrease = /\b(erhoehen|erhoehung|anheben|anhebung|ausgleichen|defizit)\b/.test(normalizedQuery);
     const asksTiming = /\b(schnell|zeit|stunden|tage|langsam|rasch)\b/.test(normalizedQuery);
     const asksDeficit = /\b(defizit|ausgleichen|ausgleich|angleichen)\b/.test(normalizedQuery);
+    const asksCause = profile.intents.some(intent => intent.id === 'cause');
+    const asksCyano = /\b(cyanobakterien|cyanos|cyanobakterie)\b/.test(normalizedQuery);
     if (asksCalcium && normalizedChunk.includes('calcium')) boost += 6;
     if (asksCalcium && normalizedChunk.includes('calciumdefizit')) boost += 14;
     if (asksCalcium && asksDeficit && normalizedChunk.includes('calciumdefizit')) boost += 22;
     if (asksIncrease && /\b(ausgeglichen|ausgleichen|erhoehung|defizit)\b/.test(normalizedChunk)) boost += 8;
     if (asksTiming && /\b(innerhalb|stunden|12 24|einzeldosierungen|pro 2 stunden)\b/.test(normalizedChunk)) boost += 12;
     if (asksCalcium && asksIncrease && asksTiming && /calciumdefizit.*12 24.*einzeldosierungen/.test(normalizedChunk)) boost += 28;
+    if (asksCause && /\b(ursache|hintergrund|entstehen|entsteht|entstehung|hervorrufen|verursachen|fuehren|wachstum|ausbreitung)\b/.test(normalizedChunk)) boost += 10;
+    if (asksCause && asksCyano && /cyanobakterien.*(wachstum|entstehen|hervorrufen|problem|ausbreitung)|(?:wachstum|entstehen|hervorrufen|problem|ausbreitung).*cyanobakterien/.test(normalizedChunk)) boost += 18;
+    profile.intents.forEach(intent => {
+        const hits = intent.terms.filter(term => normalizedChunk.includes(term)).length;
+        boost += hits * 5;
+    });
     return boost;
 }
 
-function scoreSangokaiChunk(chunk, query, terms) {
+function scoreSangokaiChunk(chunk, profile) {
     const normalized = chunk._normalized || (chunk._normalized = normalizeSangokaiText(chunk.t));
-    const exact = normalizeSangokaiText(query);
+    const exact = profile.normalizedQuery;
+    const terms = profile.terms;
     let score = 0;
     if (exact.length > 2 && normalized.includes(exact)) score += 12 + Math.min(18, exact.length / 3);
     terms.forEach(term => {
@@ -7245,21 +8559,50 @@ function scoreSangokaiChunk(chunk, query, terms) {
     });
     const uniqueMatches = terms.filter(term => normalized.includes(term)).length;
     score += uniqueMatches * uniqueMatches;
-    score += getSangokaiIntentBoost(normalized, exact);
+    const subjectHits = profile.subjectMatches.reduce((sum, subject) => {
+        return sum + (subject.aliases.some(alias => normalized.includes(alias)) ? 1 : 0);
+    }, 0);
+    if (profile.subjectMatches.length && !subjectHits) score *= 0.28;
+    if (subjectHits) score += subjectHits * 12;
+    score += getSangokaiIntentBoost(normalized, profile);
     return score;
 }
 
-function searchSangokaiKnowledge(query, limit = 5) {
+function scoreSangokaiSentence(sentence, match, profile, index = 0) {
+    const normalized = normalizeSangokaiText(sentence);
+    const termHits = countSangokaiTermHits(normalized, profile.terms);
+    const uniqueHits = profile.terms.filter(term => normalized.includes(term)).length;
+    const subjectHits = profile.subjectMatches.reduce((sum, subject) => {
+        return sum + (subject.aliases.some(alias => normalized.includes(alias)) ? 1 : 0);
+    }, 0);
+    const intentHits = profile.intents.reduce((sum, intent) => {
+        return sum + intent.terms.filter(term => normalized.includes(term)).length;
+    }, 0);
+    let score = termHits * 3 + uniqueHits * uniqueHits + subjectHits * 12 + intentHits * 5 + (match.score * 0.18);
+    if (/\d/.test(sentence) && profile.intents.some(intent => ['timing', 'dose', 'target'].includes(intent.id))) score += 10;
+    if (/\b(sollte|empfohlen|wichtig|notwendig|kritisch|unproblematisch|defizit|innerhalb)\b/.test(normalized)) score += 5;
+    if (profile.intents.some(intent => intent.id === 'cause')) {
+        if (/\b(durch|dadurch|weil|ursache|hintergrund|entstehen|entsteht|entstehung|hervorrufen|verursachen|fuehrt|fuehren|wachstum|ausbreitung)\b/.test(normalized)) score += 12;
+        if (subjectHits && /\b(wachstum|entstehen|hervorrufen|verursachen|fuehren|problematisch|abhaengig)\b/.test(normalized)) score += 10;
+        if (/\b(sollte|empfehlung|verzicht|verzichten|verringert|zurueck genommen)\b/.test(normalized)) score -= 5;
+    }
+    if (index === 0 && subjectHits) score += 2;
+    if (profile.subjectMatches.length && !subjectHits) score *= 0.45;
+    if (sentence.length < 42) score *= 0.55;
+    return score;
+}
+
+function searchSangokaiKnowledge(query, limit = 8) {
     const data = window.SANGOKAI_AZ_DATA;
-    if (!data?.chunks?.length) return { terms: [], matches: [] };
-    const terms = getSangokaiQueryTerms(query);
-    if (!terms.length) return { terms, matches: [] };
+    if (!data?.chunks?.length) return { profile: getSangokaiQuestionProfile(query), terms: [], matches: [] };
+    const profile = getSangokaiQuestionProfile(query);
+    if (!profile.terms.length) return { profile, terms: profile.terms, matches: [] };
     const matches = data.chunks
-        .map(chunk => ({ chunk, score: scoreSangokaiChunk(chunk, query, terms) }))
+        .map(chunk => ({ chunk, score: scoreSangokaiChunk(chunk, profile) }))
         .filter(match => match.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, limit);
-    return { terms, matches };
+    return { profile, terms: profile.terms, matches };
 }
 
 function splitSangokaiSentences(text = '') {
@@ -7270,32 +8613,67 @@ function splitSangokaiSentences(text = '') {
         .filter(Boolean);
 }
 
-function buildSangokaiAnswer(matches, terms) {
-    const picked = [];
+function buildSangokaiAnswer(matches, profile) {
+    const candidates = [];
     const seen = new Set();
-    matches.slice(0, 4).forEach(match => {
-        splitSangokaiSentences(match.chunk.t).forEach(sentence => {
-            if (picked.length >= 4) return;
+    matches.slice(0, 6).forEach(match => {
+        splitSangokaiSentences(match.chunk.t).forEach((sentence, index) => {
             const normalized = normalizeSangokaiText(sentence);
-            const hitCount = terms.filter(term => normalized.includes(term)).length;
             const key = normalized.slice(0, 90);
-            if (hitCount && !seen.has(key) && sentence.length > 45) {
-                seen.add(key);
-                picked.push({ sentence, page: match.chunk.p, hitCount });
-            }
+            if (seen.has(key) || sentence.length <= 35) return;
+            const score = scoreSangokaiSentence(sentence, match, profile, index);
+            if (score < 8) return;
+            seen.add(key);
+            candidates.push({
+                sentence,
+                page: match.chunk.p,
+                score,
+                hitCount: profile.terms.filter(term => normalized.includes(term)).length
+            });
         });
     });
-    return picked.sort((a, b) => b.hitCount - a.hitCount).slice(0, 3);
+    const sorted = candidates.sort((a, b) => b.score - a.score);
+    const wantsTiming = profile.intents.some(intent => intent.id === 'timing');
+    const wantsCause = profile.intents.some(intent => intent.id === 'cause');
+    const focused = sorted.filter(item => {
+        const normalized = normalizeSangokaiText(item.sentence);
+        if (wantsTiming) return /\b(innerhalb|stunden|tage|schnell|schnellstmoeglich|einzeldosierung|einzeldosierungen|pro 2 stunden|defizit)\b/.test(normalized);
+        if (wantsCause) return /\b(durch|dadurch|weil|ursache|hintergrund|entstehen|entsteht|entstehung|hervorrufen|verursachen|fuehrt|fuehren|wachstum|abhaengig)\b/.test(normalized);
+        return true;
+    });
+    return (focused.length ? focused : sorted).slice(0, 4);
 }
 
-function formatSangokaiSnippet(text, terms) {
+function formatSangokaiSnippet(text, profile) {
     const best = splitSangokaiSentences(text)
         .map(sentence => ({
             sentence,
-            hits: terms.filter(term => normalizeSangokaiText(sentence).includes(term)).length
+            hits: scoreSangokaiSentence(sentence, { chunk: { t: text }, score: 0 }, profile)
         }))
         .sort((a, b) => b.hits - a.hits)[0]?.sentence || text;
     return best.length > 320 ? `${best.slice(0, 317).trim()}...` : best;
+}
+
+function getSangokaiConfidence(matches, answerSentences, profile) {
+    const bestScore = matches[0]?.score || 0;
+    const bestAnswer = answerSentences[0]?.score || 0;
+    const hasSubject = !profile.subjectMatches.length || answerSentences.some(item => {
+        const normalized = normalizeSangokaiText(item.sentence);
+        return profile.subjectMatches.some(subject => subject.aliases.some(alias => normalized.includes(alias)));
+    });
+    if (bestScore >= 55 && bestAnswer >= 28 && hasSubject) return 'high';
+    if (bestScore >= 24 && bestAnswer >= 16) return 'medium';
+    return 'low';
+}
+
+function getSangokaiAssistantSummary(profile, confidence) {
+    const subjects = profile.subjectMatches.map(subject => subject.label).slice(0, 3);
+    const intents = profile.intents.map(intent => intent.label).slice(0, 2);
+    if (confidence === 'low') return 'Keine belastbare Antwortstelle gefunden';
+    const parts = [];
+    if (subjects.length) parts.push(subjects.join(', '));
+    if (intents.length) parts.push(intents.join(' + '));
+    return parts.length ? `Erkannt: ${parts.join(' · ')}` : 'Passende Stellen im PDF gefunden';
 }
 
 function renderSangokaiAssistant(force = false) {
@@ -7313,23 +8691,37 @@ function renderSangokaiAssistant(force = false) {
         result.innerHTML = '<p class="hint">Bitte mindestens drei Zeichen eingeben.</p>';
         return;
     }
-    const { terms, matches } = searchSangokaiKnowledge(query, 6);
-    const bestScore = matches[0]?.score || 0;
-    if (bestScore < 8 || !terms.length) {
+    const { profile, matches } = searchSangokaiKnowledge(query, 8);
+    const answerSentences = buildSangokaiAnswer(matches, profile);
+    const confidence = getSangokaiConfidence(matches, answerSentences, profile);
+    if (confidence === 'low' || !profile.terms.length) {
+        const fallbackMatches = matches.slice(0, 3);
         result.innerHTML = `
             <div class="sangokai-answer sangokai-answer-empty">
                 <strong>Nicht belastbar im Dokument gefunden.</strong>
-                <p>Im Sangokai A-Z PDF habe ich zu „${escapeHtml(query)}“ keine ausreichend klare Stelle gefunden. Ich erfinde dazu keine Antwort.</p>
+                <p>Im Sangokai A-Z PDF habe ich zu „${escapeHtml(query)}“ keine ausreichend klare Antwortstelle gefunden. Ich erfinde dazu keine Antwort.</p>
+                ${fallbackMatches.length ? '<small>Ähnliche Treffer sind unten aufgeführt, bitte fachlich prüfen.</small>' : '<small>Versuche einen konkreteren Begriff, z.B. Element, Symptom oder Maßnahme.</small>'}
             </div>
+            ${fallbackMatches.length ? `<div class="sangokai-match-list">
+                ${fallbackMatches.map(match => `
+                    <details class="sangokai-match">
+                        <summary><span>Seite ${match.chunk.p}</span><small>ähnlich</small></summary>
+                        <p>${escapeHtml(formatSangokaiSnippet(match.chunk.t, profile))}</p>
+                    </details>
+                `).join('')}
+            </div>` : ''}
         `;
         return;
     }
-    const answerSentences = buildSangokaiAnswer(matches, terms);
     const answerHtml = answerSentences.length
         ? answerSentences.map(item => `<p>${escapeHtml(item.sentence)} <small>Seite ${item.page}</small></p>`).join('')
         : '<p>Es gibt Treffer im Dokument, aber keine kurze eindeutige Antwortstelle. Bitte prüfe die Treffer unten.</p>';
     result.innerHTML = `
-        <div class="sangokai-answer">
+        <div class="sangokai-answer" data-confidence="${confidence}">
+            <div class="sangokai-answer-kicker">
+                <span>${confidence === 'high' ? 'Sehr passend' : 'Passende Hinweise'}</span>
+                <small>${escapeHtml(getSangokaiAssistantSummary(profile, confidence))}</small>
+            </div>
             <strong>Antwort aus dem Sangokai A-Z PDF</strong>
             ${answerHtml}
         </div>
@@ -7337,7 +8729,7 @@ function renderSangokaiAssistant(force = false) {
             ${matches.slice(0, 4).map(match => `
                 <details class="sangokai-match">
                     <summary><span>Seite ${match.chunk.p}</span><small>Treffer ${Math.round(match.score)}</small></summary>
-                    <p>${escapeHtml(formatSangokaiSnippet(match.chunk.t, terms))}</p>
+                    <p>${escapeHtml(formatSangokaiSnippet(match.chunk.t, profile))}</p>
                 </details>
             `).join('')}
         </div>
@@ -13081,7 +14473,7 @@ let stockModalReturnFocus = null;
 function getDialogFocusableElements(panel) {
     if (!panel) return [];
     return Array.from(panel.querySelectorAll(
-        'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        'button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), a[href], summary, [tabindex]:not([tabindex="-1"])'
     )).filter(element => !element.hidden && element.offsetParent !== null);
 }
 
@@ -13090,7 +14482,7 @@ function closeAppDialog(result = null) {
     if (!dialog || !appDialogState) return;
     const { resolve, returnFocus } = appDialogState;
     appDialogState = null;
-    dialog.classList.remove('is-open', 'is-warning', 'is-danger', 'is-success');
+    dialog.classList.remove('is-open', 'is-warning', 'is-danger', 'is-success', 'is-wide');
     dialog.hidden = true;
     dialog.setAttribute('aria-hidden', 'true');
     releaseBodyScrollLock('app-dialog');
@@ -13135,7 +14527,9 @@ function showAppDialog(options = {}) {
 
     document.getElementById('appDialogEyebrow').textContent = options.eyebrow || (type === 'danger' ? 'Wichtige Aktion' : type === 'warning' ? 'Achtung' : 'Information');
     document.getElementById('appDialogTitle').textContent = title;
-    document.getElementById('appDialogDescription').textContent = String(options.message || '');
+    const description = document.getElementById('appDialogDescription');
+    if (options.html !== undefined && options.html !== null) description.innerHTML = String(options.html);
+    else description.textContent = String(options.message || '');
     const status = document.getElementById('appDialogStatus');
     status.textContent = type === 'success' ? '✓' : type === 'info' ? 'i' : '!';
 
@@ -13195,6 +14589,7 @@ function showAppDialog(options = {}) {
     dialog.classList.toggle('is-warning', type === 'warning');
     dialog.classList.toggle('is-danger', type === 'danger');
     dialog.classList.toggle('is-success', type === 'success');
+    dialog.classList.toggle('is-wide', options.wide === true);
     dialog.hidden = false;
     dialog.setAttribute('aria-hidden', 'false');
     dialog.classList.add('is-open');

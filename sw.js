@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v300-settings-nav';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-trace-lock';
 const ASSETS = [
   './',
   './index.html',

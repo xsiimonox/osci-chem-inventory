@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.0-settings-nav">
+    <link rel="stylesheet" href="style.css?v=3.0.2-trace-lock">
 </head>
 <body>
 
@@ -139,29 +139,145 @@
             <div class="workflow-page-head">
                 <div>
                     <span class="workflow-eyebrow">Trace Mischungen</span>
-                    <h2>Einzelmengen vorbereiten</h2>
-                    <p>Mengen je Element erfassen, Grammwerte prüfen und vollständig auslagern.</p>
+                    <h2>Trace Calculator &amp; Auslagerung</h2>
+                    <p>ICP-Werte auswerten, Kationen und Anionen getrennt berechnen, Verlauf prüfen und die fertige Mischung auslagern.</p>
                 </div>
                 <div class="workflow-context" aria-label="Aktives Lager">
                     <span>Aktives Lager</span>
                     <strong id="traceActiveWarehouseName">Lager</strong>
                 </div>
             </div>
+            <details class="card workflow-card trace-calculator-card trace-workflow-accordion">
+                <summary class="trace-workflow-summary">
+                    <span><strong>Trace Calculator</strong><small>ICP auswerten und neue K+ / A- Mischung berechnen</small></span>
+                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
+                <div id="traceCalculatorLockState" class="trace-lock-card" hidden>
+                    <div class="trace-lock-copy">
+                        <strong>Trace Calculator geschützt</strong>
+                        <small>Zum Öffnen das hinterlegte Passwort eingeben.</small>
+                    </div>
+                    <div class="password-field trace-lock-field">
+                        <input type="password" id="traceCalculatorPasswordInput" placeholder="Passwort eingeben" onkeydown="if(event.key==='Enter') unlockTraceCalculator()">
+                        <button type="button" class="btn-primary" onclick="unlockTraceCalculator()">Entsperren</button>
+                    </div>
+                </div>
+                <div id="traceCalculatorProtectedContent" class="trace-calculator-body">
+                    <div class="workflow-message workflow-message--warning trace-calculator-warning" role="note">
+                        <span class="trace-warning-mark" aria-hidden="true">!</span>
+                        <span class="trace-warning-copy">
+                            <strong>Nicht von OSCI verifiziert</strong>
+                            <small>Eigene Rechenhilfe: vorsichtig verwenden und alle Werte sowie Mischungen vor dem Ansetzen manuell prüfen.</small>
+                        </span>
+                    </div>
+
+                    <section class="trace-workstep trace-config-step" aria-labelledby="traceConfigStepTitle">
+                        <div class="trace-step-head">
+                            <span class="trace-step-number" aria-hidden="true">1</span>
+                            <span class="trace-step-copy"><strong id="traceConfigStepTitle">Mischung planen</strong><small>Becken, Zeitraum und Behälter festlegen</small></span>
+                        </div>
+                        <div class="trace-config-grid">
+                            <div class="input-group">
+                                <label for="traceCalcTankLiters">Aquariumvolumen</label>
+                                <div class="trace-input-with-unit"><input type="number" id="traceCalcTankLiters" min="1" step="0.01" value="500" oninput="renderTraceCalculator()"><span>L</span></div>
+                            </div>
+                            <div class="input-group">
+                                <label for="traceCalcInterval">Analyseintervall</label>
+                                <select id="traceCalcInterval" onchange="renderTraceCalculator()">
+                                    <option value="monthly">4 Wochen oder mehr · max. ±10 %</option>
+                                    <option value="biweekly">2 Wochen · max. ±20 %</option>
+                                    <option value="weekly">1 Woche · max. ±30 %</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="traceCalcStocking">Besatz</label>
+                                <select id="traceCalcStocking" onchange="renderTraceCalculator()">
+                                    <option value="normal">normal</option>
+                                    <option value="weak">schwach</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="traceCalcDays">Laufzeit</label>
+                                <div class="trace-input-with-unit"><input type="number" id="traceCalcDays" min="1" step="1" value="40" oninput="renderTraceCalculator()"><span>Tage</span></div>
+                            </div>
+                            <div class="input-group">
+                                <label for="traceCalcDailyDose">Tagesdosierung je Lösung</label>
+                                <div class="trace-input-with-unit"><input type="number" id="traceCalcDailyDose" min="0.01" step="0.01" value="5" oninput="renderTraceCalculator()"><span>ml</span></div>
+                            </div>
+                            <div class="input-group">
+                                <label for="traceCalcBottleMax">Max. Flaschenvolumen</label>
+                                <div class="trace-input-with-unit"><input type="number" id="traceCalcBottleMax" min="0.01" step="0.01" value="450" oninput="renderTraceCalculator()"><span>ml</span></div>
+                            </div>
+                            <div class="input-group trace-date-field">
+                                <label for="traceCalcMixtureDate">Ansatzdatum</label>
+                                <input type="date" id="traceCalcMixtureDate" onchange="renderTraceCalculator()" required>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="trace-workstep trace-icp-step" aria-labelledby="traceIcpStepTitle">
+                        <div class="trace-step-head">
+                            <span class="trace-step-number" aria-hidden="true">2</span>
+                            <span class="trace-step-copy"><strong id="traceIcpStepTitle">ICP-Werte eintragen</strong><small>Leere Felder übernehmen die letzte Mischung oder das Startrezept</small></span>
+                        </div>
+                        <details class="trace-icp-import">
+                            <summary>
+                                <span><strong>ICP per Copy &amp; Paste einlesen</strong><small>Messwerte automatisch den 11 Spurenelementen zuordnen</small></span>
+                                <span class="trace-icp-import-badge">Copy &amp; Paste</span>
+                            </summary>
+                            <div class="trace-icp-import-body">
+                                <p>Die Werte direkt aus der <strong>ICP-Auswertung im Browser</strong> kopieren, nicht aus der PDF. Den Tabellenbereich von <strong>Fluorid (F)</strong> bis einschließlich <strong>µg/l in der Zink-Zeile</strong> markieren, kopieren und hier einfügen.</p>
+                                <label for="traceCalcIcpPaste">Kopierte ICP-Tabelle</label>
+                                <textarea id="traceCalcIcpPaste" rows="7" placeholder="Fluorid (F) …&#10;Iod (I) …&#10;…&#10;Zink (Zn) …" onpaste="handleTraceCalculatorIcpPaste(event)"></textarea>
+                                <div class="trace-icp-import-actions">
+                                    <button type="button" class="btn-primary" onclick="importTraceCalculatorIcpText()">Werte einlesen</button>
+                                    <button type="button" class="btn-secondary" onclick="clearTraceCalculatorIcpImport()">Textfeld leeren</button>
+                                </div>
+                                <div id="traceCalcIcpImportStatus" class="trace-icp-import-status" role="status" aria-live="polite" hidden></div>
+                            </div>
+                        </details>
+                        <div class="trace-icp-grid" id="traceCalcIcpInputs"></div>
+                    </section>
+
+                    <section class="trace-workstep trace-result-step" aria-labelledby="traceResultStepTitle">
+                        <div class="trace-step-head trace-step-head-with-action">
+                            <span class="trace-step-number" aria-hidden="true">3</span>
+                            <span class="trace-step-copy"><strong id="traceResultStepTitle">Rezept prüfen</strong><small>Kationen und Anionen getrennt kontrollieren</small></span>
+                            <button type="button" class="btn-secondary trace-explain-button" onclick="openTraceCalculationGuide()">Berechnung erklären</button>
+                        </div>
+                        <div id="traceCalculatorResult"></div>
+                    </section>
+
+                    <div class="btn-group calculator-actions trace-calculator-actions">
+                        <button class="btn-secondary btn-animated" type="button" onclick="loadTraceCalculatorFromLast()">Letzte Mischung laden</button>
+                        <button class="btn-secondary btn-animated" type="button" onclick="saveTraceCalculatorMixture()">Speichern</button>
+                        <button class="btn-primary btn-animated booking-action" type="button" onclick="saveAndBookTraceCalculatorMixture()">Speichern &amp; Auslagern</button>
+                        <button class="btn-out btn-animated" type="button" onclick="lockTraceCalculator()">Sperren</button>
+                    </div>
+                </div>
+            </details>
+            <div id="traceCalculatorHistory"></div>
             <div class="trace-mixture-grid">
-            <div class="card workflow-card trace-mixture-card">
-                <h3>Kationen Mischung</h3>
+            <details class="card workflow-card trace-mixture-card trace-workflow-accordion">
+                <summary class="trace-workflow-summary">
+                    <span><strong>Kationen Mischung</strong><small>K+ Einzelmengen prüfen und auslagern</small></span>
+                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
                 <div id="kationen-inputs-container"></div>
                 <div class="workflow-actions">
                     <button class="btn-primary btn-animated booking-action" onclick="auslagernMischung('kationen')">Kationen auslagern</button>
                 </div>
-            </div>
-            <div class="card workflow-card trace-mixture-card">
-                <h3>Anionen Mischung</h3>
+            </details>
+            <details class="card workflow-card trace-mixture-card trace-workflow-accordion">
+                <summary class="trace-workflow-summary">
+                    <span><strong>Anionen Mischung</strong><small>A- Einzelmengen prüfen und auslagern</small></span>
+                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
                 <div id="anionen-inputs-container"></div>
                 <div class="workflow-actions">
                     <button class="btn-primary btn-animated booking-action" onclick="auslagernMischung('anionen')">Anionen auslagern</button>
                 </div>
-            </div>
+            </details>
             </div>
             <details class="reef-manager-import-compact">
                 <summary>
@@ -605,6 +721,41 @@
                     </div>
                 </details>
 
+                <details class="tool-section" data-section-id="sangokai-a-z">
+                    <summary class="tool-section-summary">
+                        <span><strong>Sangokai A-Z</strong><small>Original-PDF und lokaler Test-Assistent</small></span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="tool-card-grid">
+                        <div class="card resource-tools-card sangokai-section-card">
+                            <div class="resource-link-grid">
+                                <a href="https://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
+                                    <strong>Sangokai A-Z PDF</strong>
+                                    <span>Originalquelle mit Empfehlungen und Hintergründen für Meerwasseraquaristik</span>
+                                </a>
+                            </div>
+                            <p class="hint settings-detail-intro">Durchsuche das Sangokai A-Z PDF lokal und nutze das Original-PDF zur fachlichen Gegenprüfung.</p>
+                            <div class="sangokai-search-card" role="search" aria-label="Sangokai A-Z durchsuchen">
+                                <div class="sangokai-search-head">
+                                    <div>
+                                        <strong>Sangokai A-Z Assistent</strong>
+                                        <span>Antwortet nur mit Wissen aus dem lokal eingebauten PDF.</span>
+                                    </div>
+                                    <small id="sangokaiSourceLabel">Quelle: Sangokai Empfehlungen A-Z</small>
+                                </div>
+                                <div class="sangokai-beta-note">
+                                    Testversion: Der Assistent ist noch nicht ausgereift. Antworten bitte immer fachlich prüfen und bei wichtigen Entscheidungen die Originalquelle gegenlesen.
+                                </div>
+                                <div class="sangokai-search-controls">
+                                    <input type="search" id="sangokaiSearchInput" placeholder="Freie Frage, z.B. Wie schnell Calcium erhöhen?" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
+                                    <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
+                                </div>
+                                <div id="sangokaiSearchResult" class="sangokai-search-result" aria-live="polite"></div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
                 <details class="tool-section" data-section-id="community-und-hilfe">
                     <summary class="tool-section-summary">
                         <span><strong>Ressourcen</strong><small>Offizielle OSCI Links und weitere hilfreiche Quellen</small></span>
@@ -628,32 +779,7 @@
                                     <strong>Meerwasser Lexikon</strong>
                                     <span>Großes Nachschlagewerk für Tiere, Korallen, Algen und allgemeine Meerwasser-Themen</span>
                                 </a>
-                                <a href="https://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
-                                    <strong>Sangokai A-Z</strong>
-                                    <span>PDF mit kompakten Empfehlungen und Hintergründen für Meerwasseraquaristik</span>
-                                </a>
                             </div>
-                            <details class="resource-assistant-details">
-                                <summary class="settings-native-summary">
-                                    <h3>Sangokai A-Z Assistent</h3>
-                                    <span class="settings-accordion-hint" aria-hidden="true"></span>
-                                </summary>
-                                <p class="hint settings-detail-intro">Durchsuche das Sangokai A-Z PDF lokal und nutze die Quellenlinks als Ergänzung.</p>
-                                <div class="sangokai-search-card" role="search" aria-label="Sangokai A-Z durchsuchen">
-                                    <div class="sangokai-search-head">
-                                        <div>
-                                            <strong>Sangokai A-Z Assistent</strong>
-                                            <span>Antwortet nur mit Wissen aus dem lokal eingebauten PDF.</span>
-                                        </div>
-                                        <small id="sangokaiSourceLabel">Quelle: Sangokai Empfehlungen A-Z</small>
-                                    </div>
-                                    <div class="sangokai-search-controls">
-                                        <input type="search" id="sangokaiSearchInput" placeholder="Frage oder Stichwort, z.B. Dinoflagellaten, Blauphase, Aktivkohle" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
-                                        <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
-                                    </div>
-                                    <div id="sangokaiSearchResult" class="sangokai-search-result" aria-live="polite"></div>
-                                </div>
-                            </details>
                             <p class="hint resource-subheading"><strong>Buchtipps</strong></p>
                             <div class="resource-link-grid">
                                 <a href="https://www.daehne-aquaristik.de/products/algen?srsltid=AfmBOoqKmGgUCKXVBe3oyi8OLUVeRnyhifAH7BVkkYqbc3VFovAVXY6D" target="_blank" rel="noopener" class="resource-link-card">
@@ -1445,7 +1571,7 @@
                 </div>
             </div>
             <div class="app-dialog-body">
-                <p id="appDialogDescription"></p>
+                <div id="appDialogDescription"></div>
                 <div id="appDialogFields" class="app-dialog-fields"></div>
                 <p id="appDialogError" class="field-message field-message-error" role="alert" hidden></p>
             </div>
@@ -1469,8 +1595,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.0-settings-nav"></script>
-    <script src="app.js?v=3.0.0-settings-nav"></script>
+    <script src="sangokai-data.js?v=3.0.0-sangokai-section"></script>
+    <script src="app.js?v=3.0.2-trace-lock"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
