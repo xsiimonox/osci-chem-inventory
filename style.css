@@ -174,7 +174,9 @@ body {
     padding-bottom: 30px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
     transition: background-color var(--transition-base) var(--ease-standard), color var(--transition-base) var(--ease-standard);
 }
 
@@ -4158,7 +4160,8 @@ body.theme-mint.party-mode .card {
     font-size: 0.8rem;
     line-height: 1.15;
     white-space: normal;
-    word-break: break-word;
+    word-break: normal;
+    overflow-wrap: normal;
     cursor: pointer;
     transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
@@ -6086,12 +6089,13 @@ body.theme-light .nav-links button.active {
 .tool-tile-card.tool-tile-collapsed > h3 {
     grid-area: title;
     width: 100%;
-    font-size: 0.98rem;
+    font-size: clamp(0.82rem, 2.8vw, 0.98rem);
     line-height: 1.14;
     margin: 0;
     min-width: 0;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -6107,10 +6111,11 @@ body.theme-light .nav-links button.active {
     display: block !important;
     margin: 0;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: clamp(0.68rem, 2.25vw, 0.78rem);
     line-height: 1.2;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
     min-width: 0;
     display: -webkit-box !important;
     -webkit-line-clamp: 2;
@@ -13291,7 +13296,7 @@ body.theme-girl .app-footer {
         right: max(10px, env(safe-area-inset-right, 0px)) !important;
         bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
         width: auto !important;
-        min-height: 72px !important;
+        min-height: 62px !important;
         padding: 7px !important;
         gap: 6px !important;
         border: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent) !important;
@@ -13301,20 +13306,99 @@ body.theme-girl .app-footer {
     }
 
     .mobile-bottom-nav button {
-        min-height: 56px !important;
+        min-height: 48px !important;
         padding: 6px 1px !important;
         border-radius: 18px !important;
-        font-size: 0.68rem !important;
     }
 
     .mobile-bottom-nav .mobile-nav-label {
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        display: none !important;
+    }
+
+    .mobile-bottom-nav button .nav-icon {
+        width: 24px !important;
+        height: 24px !important;
     }
 
     body {
-        padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+}
+
+/* Text readability guard: prefer smaller text or clipping over breaking words mid-word. */
+:where(h1, h2, h3, h4, h5, h6, p, span, small, strong, em, label, summary, button, .card, .hint, .subtitle, .nav-links button, .tool-tile-card, .dashboard-card, .resource-link-card) {
+    word-break: normal;
+    overflow-wrap: normal;
+    hyphens: none;
+}
+
+:where(code, pre, .sync-diagnostics-result, .toast-message, .warehouse-meta, .drive-history-list, .backup-import-preview, .raw-data, .url-like, .file-name) {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Mobile dashboard: use readable one-column status rows instead of cramped tiles. */
+@media (max-width: 767px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+
+    .dashboard-tile {
+        min-height: 0 !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "label value"
+            "detail value";
+        align-items: center;
+        column-gap: 14px;
+        row-gap: 2px;
+        padding: 13px 14px !important;
+        border-radius: 16px !important;
+    }
+
+    .dashboard-tile > span {
+        grid-area: label;
+        min-width: 0;
+        font-size: 0.82rem !important;
+        font-weight: 760;
+        line-height: 1.2;
+    }
+
+    .dashboard-tile > strong {
+        grid-area: value;
+        justify-self: end;
+        max-width: 46vw;
+        margin: 0 !important;
+        font-size: clamp(1rem, 5.2vw, 1.32rem) !important;
+        line-height: 1.08 !important;
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .dashboard-tile > small {
+        grid-area: detail;
+        min-width: 0;
+        font-size: 0.76rem !important;
+        line-height: 1.25;
+    }
+
+    .dashboard-tile strong i {
+        font-size: 0.72em;
+    }
+}
+
+@media (max-width: 360px) {
+    .dashboard-tile {
+        column-gap: 10px;
+        padding: 12px !important;
+    }
+
+    .dashboard-tile > strong {
+        max-width: 42vw;
+        font-size: clamp(0.92rem, 4.8vw, 1.14rem) !important;
     }
 }

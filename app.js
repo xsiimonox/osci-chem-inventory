@@ -4205,18 +4205,6 @@ function renderDashboard() {
             <button type="button" class="btn btn-secondary" onclick="selectTab('korallen')" ${isEditing ? 'disabled' : ''}>Korallen</button>
         </section>
 
-        <section class="dashboard-support-card dashboard-widget" aria-label="Projekt unterstützen">
-            <div>
-                <small>Freiwillig</small>
-                <strong>Reeftools.de unterstützen</strong>
-                <span>Hilft bei Hosting, Weiterentwicklung und Tests.</span>
-            </div>
-            <div class="dashboard-support-actions">
-                <a class="btn btn-primary" href="https://www.paypal.com/paypalme/simonasbach" target="_blank" rel="noopener noreferrer">PayPal</a>
-                <a class="btn btn-secondary" href="https://buymeacoffee.com/simonasbaca" target="_blank" rel="noopener noreferrer">Coffee</a>
-            </div>
-        </section>
-
         ${isEditing ? `<section class="dashboard-config dashboard-edit-mode" aria-label="Dashboard bearbeiten">
             <div class="dashboard-config-card">
                 <div class="dashboard-edit-banner">

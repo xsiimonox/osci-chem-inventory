@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v310-round-chart-points';
+const CACHE_NAME = 'reef-storage-tools-cache-v310-dashboard-support-removed';
 const ASSETS = [
   './',
   './index.html',
