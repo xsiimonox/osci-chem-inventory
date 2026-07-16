@@ -1982,7 +1982,13 @@ function createWarehouseData(source = {}) {
         statsStarted: source.statsStarted || Date.now(),
         theme: source.theme || (db && db.theme) || 'default',
         thresholds: source.thresholds || {},
-        settings: source.settings || { forecastWeeks: 4 },
+        settings: {
+            forecastWeeks: 4,
+            cursorStyle: 'apple',
+            cursorEmoji: '🪸',
+            localDevices: [],
+            ...(source.settings || {})
+        },
         notifications: source.notifications || { enabled: false, lastAlertSignature: '', lastSentAt: 0 },
         alerts: source.alerts || { dismissed: {}, disabled: {} },
         customProducts: source.customProducts || [],
@@ -2154,6 +2160,9 @@ function overlayActiveAquariumData() {
 function normalizeWarehouseData(data) {
     db = createWarehouseData(data || {});
     if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
+    if (!db.settings.cursorStyle) db.settings.cursorStyle = 'apple';
+    if (!db.settings.cursorEmoji) db.settings.cursorEmoji = '🪸';
+    if (!Array.isArray(db.settings.localDevices)) db.settings.localDevices = [];
     if (!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
     if (db.notifications.enabled === undefined) db.notifications.enabled = false;
     if (!db.notifications.lastAlertSignature) db.notifications.lastAlertSignature = '';
@@ -3808,8 +3817,10 @@ function renderCurrentWarehouseViews() {
     renderWarehouseEventLog();
     renderProductPresets();
     renderShopLinkSettings();
+    renderLocalDeviceSettings();
     renderNachbestellen();
     renderSupabaseSyncSettings();
+    applyCursorSettings();
     renderAquariumWorkspacePanels();
     renderLogBook();
     renderCoralCatalog();
@@ -5059,6 +5070,7 @@ function showTab(tabId) {
         renderProductPresets();
         renderSupabaseSyncSettings();
         renderMenuOrderSettings();
+        renderLocalDeviceSettings();
     }
 }
 
@@ -5191,6 +5203,208 @@ function applyTheme(themeName, shouldSave = true) {
     // Dropdown-Auswahl im Menü synchronisieren, falls geladen
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) themeSelect.value = themeName;
+}
+
+const cursorStyleOptions = new Set(['apple', 'glow', 'dot', 'crosshair', 'emoji', 'system']);
+
+function getCursorSettings() {
+    if (!db.settings) db.settings = {};
+    const style = cursorStyleOptions.has(db.settings.cursorStyle) ? db.settings.cursorStyle : 'apple';
+    const emoji = String(db.settings.cursorEmoji || '🪸').trim().slice(0, 4) || '🪸';
+    return { style, emoji };
+}
+
+function applyCursorSettings() {
+    const cursor = document.getElementById('customCursor');
+    const dot = document.getElementById('customCursorDot');
+    const select = document.getElementById('cursorStyleSelect');
+    const emojiInput = document.getElementById('cursorEmojiInput');
+    const preview = document.getElementById('cursorSettingsPreview');
+    if (!cursor || !dot) return;
+
+    const { style, emoji } = getCursorSettings();
+    document.body.classList.remove('cursor-style-apple', 'cursor-style-glow', 'cursor-style-dot', 'cursor-style-crosshair', 'cursor-style-emoji', 'cursor-style-system');
+    document.body.classList.add(`cursor-style-${style}`);
+    document.body.classList.toggle('custom-cursor-enabled', style !== 'system');
+    cursor.textContent = style === 'emoji' ? emoji : '';
+    dot.textContent = '';
+    if (select) select.value = style;
+    if (emojiInput) {
+        emojiInput.value = emoji;
+        emojiInput.disabled = style !== 'emoji';
+    }
+    if (preview) {
+        preview.dataset.style = style;
+        preview.textContent = style === 'emoji' ? emoji : style === 'crosshair' ? '⌖' : style === 'dot' ? '•' : '';
+    }
+}
+
+function updateCursorSettings() {
+    if (!db.settings) db.settings = {};
+    const style = document.getElementById('cursorStyleSelect')?.value || 'apple';
+    const emoji = document.getElementById('cursorEmojiInput')?.value || '🪸';
+    db.settings.cursorStyle = cursorStyleOptions.has(style) ? style : 'apple';
+    db.settings.cursorEmoji = String(emoji).trim().slice(0, 4) || '🪸';
+    applyCursorSettings();
+    saveDB(false);
+}
+
+let localDeviceSettingsUnlocked = false;
+let activeLocalDeviceId = '';
+
+function getLocalDeviceSettings() {
+    if (!db.settings) db.settings = {};
+    if (!Array.isArray(db.settings.localDevices)) db.settings.localDevices = [];
+    return db.settings.localDevices;
+}
+
+function normalizeLocalDeviceUrl(rawValue) {
+    let value = String(rawValue || '').trim();
+    if (!value) return '';
+    if (!/^https?:\/\//i.test(value)) value = `http://${value}`;
+    try {
+        const url = new URL(value);
+        if (!['http:', 'https:'].includes(url.protocol)) return '';
+        return url.href;
+    } catch (error) {
+        return '';
+    }
+}
+
+function isAllowedLocalDeviceUrl(urlValue) {
+    try {
+        const url = new URL(urlValue);
+        const host = url.hostname.toLowerCase();
+        if (host === 'localhost' || host.endsWith('.local')) return true;
+        const parts = host.split('.').map(part => Number(part));
+        if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+        if (parts[0] === 10) return true;
+        if (parts[0] === 127) return true;
+        if (parts[0] === 169 && parts[1] === 254) return true;
+        if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+        if (parts[0] === 192 && parts[1] === 168) return true;
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
+function renderLocalDeviceSettings(activeId = '') {
+    const container = document.getElementById('localDeviceSettings');
+    if (!container) return;
+    const devices = getLocalDeviceSettings();
+    if (!localDeviceSettingsUnlocked) {
+        container.innerHTML = `
+            <div class="dev-lock-card">
+                <p class="hint">Dieser Bereich ist für lokale Entwicklungsgeräte geschützt.</p>
+                <div class="local-device-unlock-row">
+                    <input type="password" id="localDevicePassword" placeholder="Passwort" autocomplete="off" onkeydown="if(event.key==='Enter') unlockLocalDeviceSettings()">
+                    <button type="button" class="btn-secondary btn-animated" onclick="unlockLocalDeviceSettings()">Entsperren</button>
+                </div>
+                <p class="hint">Hinweis: Das schützt nur vor versehentlichem Öffnen in der App. Es ist keine echte Zugriffskontrolle für dein Netzwerkgerät.</p>
+            </div>
+        `;
+        return;
+    }
+
+    if (activeId) activeLocalDeviceId = activeId;
+    const activeDevice = devices.find(device => device.id === activeLocalDeviceId) || devices[0] || null;
+    if (activeDevice) activeLocalDeviceId = activeDevice.id;
+    container.innerHTML = `
+        <div class="local-device-settings">
+            <div class="sync-maintenance-banner local-device-warning">
+                <strong>Nur lokale Geräte</strong>
+                <span>Erlaubt sind private IPs wie 192.168.x.x, 10.x.x.x, 172.16-31.x.x, localhost oder .local-Adressen. Externe Webseiten werden blockiert.</span>
+            </div>
+            <div class="local-device-form">
+                <div class="input-group">
+                    <label for="localDeviceName">Name:</label>
+                    <input type="text" id="localDeviceName" placeholder="z.B. Home Assistant oder ESP32 Pumpe">
+                </div>
+                <div class="input-group">
+                    <label for="localDeviceUrl">Lokale URL oder IP:</label>
+                    <input type="text" id="localDeviceUrl" placeholder="z.B. 192.168.178.50:8123 oder http://esp32-pumpe.local">
+                </div>
+                <button type="button" class="btn-primary btn-animated" onclick="addLocalDevice()">Gerät speichern</button>
+            </div>
+            <div class="local-device-list">
+                ${devices.length ? devices.map(device => `
+                    <article class="local-device-row ${activeDevice && activeDevice.id === device.id ? 'is-active' : ''}">
+                        <span>
+                            <strong>${escapeHtml(device.name)}</strong>
+                            <small>${escapeHtml(device.url)}</small>
+                        </span>
+                        <div class="settings-row-actions">
+                            <button type="button" class="btn-secondary" onclick='renderLocalDeviceSettings(${jsArg(device.id)})'>Anzeigen</button>
+                            <a class="btn-secondary" href="${escapeHtml(device.url)}" target="_blank" rel="noopener noreferrer">Extern öffnen</a>
+                            <button type="button" class="btn-out" onclick='deleteLocalDevice(${jsArg(device.id)})'>Löschen</button>
+                        </div>
+                    </article>
+                `).join('') : '<p class="hint settings-empty-state">Noch kein lokales Gerät hinterlegt.</p>'}
+            </div>
+            <div class="local-device-viewer">
+                ${activeDevice ? `
+                    <div class="local-device-viewer-head">
+                        <span><strong>${escapeHtml(activeDevice.name)}</strong><small>${escapeHtml(activeDevice.url)}</small></span>
+                        <a href="${escapeHtml(activeDevice.url)}" target="_blank" rel="noopener noreferrer" class="btn-secondary">In neuem Tab öffnen</a>
+                    </div>
+                    <iframe src="${escapeHtml(activeDevice.url)}" title="${escapeHtml(activeDevice.name)}" loading="lazy" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
+                    <p class="hint">Wenn der Bereich leer bleibt, blockiert das Zielgerät wahrscheinlich die Einbettung per Sicherheitsheader. Dann bitte „In neuem Tab öffnen“ nutzen oder das ESP32-Webinterface später iframe-freundlich ausliefern.</p>
+                ` : ''}
+            </div>
+        </div>
+    `;
+}
+
+function unlockLocalDeviceSettings() {
+    const input = document.getElementById('localDevicePassword');
+    if ((input?.value || '').trim() !== 'DEV') {
+        showToast('Falsches DEV-Passwort', 'warning');
+        return;
+    }
+    localDeviceSettingsUnlocked = true;
+    renderLocalDeviceSettings();
+}
+
+function addLocalDevice() {
+    const nameInput = document.getElementById('localDeviceName');
+    const urlInput = document.getElementById('localDeviceUrl');
+    const name = String(nameInput?.value || '').trim() || 'Lokales Gerät';
+    const url = normalizeLocalDeviceUrl(urlInput?.value || '');
+    if (!url || !isAllowedLocalDeviceUrl(url)) {
+        appAlert('Bitte trage eine gültige lokale Adresse ein, zum Beispiel 192.168.178.50:8123, http://10.0.0.20 oder esp32-pumpe.local.', { title: 'Lokale Adresse prüfen', type: 'warning' });
+        return;
+    }
+    const devices = getLocalDeviceSettings();
+    const existing = devices.find(device => device.url === url);
+    if (existing) {
+        existing.name = name;
+        existing.updatedAt = new Date().toISOString();
+    } else {
+        devices.push({
+            id: 'device-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7),
+            name,
+            url,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
+    }
+    saveDB();
+    renderLocalDeviceSettings(existing ? existing.id : devices[devices.length - 1].id);
+    showToast('Lokales Gerät gespeichert', 'success');
+}
+
+async function deleteLocalDevice(id) {
+    const devices = getLocalDeviceSettings();
+    const device = devices.find(entry => entry.id === id);
+    if (!device) return;
+    const confirmed = await appConfirm(`Lokales Gerät „${device.name}“ entfernen?`, { title: 'Gerät löschen', type: 'warning' });
+    if (!confirmed) return;
+    db.settings.localDevices = devices.filter(entry => entry.id !== id);
+    if (activeLocalDeviceId === id) activeLocalDeviceId = '';
+    saveDB();
+    renderLocalDeviceSettings();
+    showToast('Lokales Gerät gelöscht', 'success');
 }
 
 // --- AUTOMATISCHES CACHE LEEREN & FORCE UPDATE ---
@@ -5476,7 +5690,7 @@ function initCustomCursor() {
     const dot = document.getElementById('customCursorDot');
     if (!finePointer || !cursor || !dot) return;
 
-    document.body.classList.add('custom-cursor-enabled');
+    applyCursorSettings();
     let targetX = window.innerWidth / 2;
     let targetY = window.innerHeight / 2;
     let cursorX = targetX;
@@ -6761,16 +6975,67 @@ function parseReefManagerExport(text) {
     return rows;
 }
 
+function parseReefManagerExportMeta(text) {
+    const source = String(text || '');
+    const readDecimal = pattern => {
+        const match = source.match(pattern);
+        return match ? traceCalcNumber(match[1], null) : null;
+    };
+    const rawDate = source.match(/Datum:\s*([0-9]{1,2})[.\-/]([0-9]{1,2})[.\-/]([0-9]{2,4})/i);
+    const mixtureDate = rawDate
+        ? `${String(rawDate[3]).padStart(4, '20')}-${String(rawDate[2]).padStart(2, '0')}-${String(rawDate[1]).padStart(2, '0')}`
+        : getTodayDateInputValue();
+    const weeks = readDecimal(/Laufzeit:\s*([0-9]+(?:[,.][0-9]+)?)\s*Wochen?/i);
+    const days = readDecimal(/Laufzeit:\s*([0-9]+(?:[,.][0-9]+)?)\s*Tage?/i);
+    return {
+        mixtureDate,
+        runtimeDays: days !== null ? Math.max(1, Math.round(days)) : (weeks !== null ? Math.max(1, Math.round(weeks * 7)) : null),
+        dailyDoseMl: readDecimal(/Tägl\.\s*Dosierung:\s*([0-9]+(?:[,.][0-9]+)?)/i),
+        totalMl: readDecimal(/Gesamtmenge:\s*([0-9]+(?:[,.][0-9]+)?)/i),
+        elementMl: readDecimal(/Elementanteil:\s*([0-9]+(?:[,.][0-9]+)?)/i),
+        osmoseMl: readDecimal(/Osmosewasser:\s*([0-9]+(?:[,.][0-9]+)?)/i)
+    };
+}
+
+function getStoredReefManagerTraceImport() {
+    const stored = db.reefManagerTraceImport;
+    if (!stored || !Array.isArray(stored.rows) || !stored.rows.length) return null;
+    return stored;
+}
+
 function previewReefManagerImport(text = '') {
     const preview = document.getElementById('reef-manager-import-preview');
     if (!preview) return;
     const rows = parseReefManagerExport(text);
+    const meta = parseReefManagerExportMeta(text);
     if (rows.length === 0) {
-        preview.innerHTML = 'Noch kein gültiger Reef Manager Export importiert.';
+        const stored = getStoredReefManagerTraceImport();
+        if (!stored) {
+            preview.innerHTML = 'Noch kein gültiger Reef Manager Export importiert.';
+            return;
+        }
+        if (stored.text) {
+            previewReefManagerImport(stored.text);
+            return;
+        }
+        preview.innerHTML = `
+            <div class="tool-result">
+                ${stored.rows.map(row => `
+                    <div class="tool-row">
+                        <span><strong>${escapeHtml(row.item)}</strong><small>${row.type === 'kation' ? 'Kation' : 'Anion'} · ${escapeHtml(row.symbol)}</small></span>
+                        <span>${traceCalcFormatMl(row.amount)}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
         return;
     }
     preview.innerHTML = `
         <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Importdaten</strong><small>${formatTraceDateInput(meta.mixtureDate)} · ${meta.runtimeDays || '-'} Tage · ${meta.dailyDoseMl !== null ? traceCalcFormatMl(meta.dailyDoseMl) + ' täglich' : 'Tagesdosierung offen'}</small></span>
+                <span>${meta.totalMl !== null ? traceCalcFormatMl(meta.totalMl) : `${rows.length} Werte`}</span>
+            </div>
             ${rows.map(row => `
                 <div class="tool-row">
                     <span><strong>${escapeHtml(row.item)}</strong><small>${row.type === 'kation' ? 'Kation' : 'Anion'} · ${escapeHtml(row.symbol)}</small></span>
@@ -6784,10 +7049,17 @@ function previewReefManagerImport(text = '') {
 function importReefManagerTraceText(text) {
     const rows = parseReefManagerExport(text);
     if (rows.length === 0) return alert('Keine gültigen Anionen/Kationen-Mengen erkannt.');
+    const meta = parseReefManagerExportMeta(text);
     if (!db.traceDraft) db.traceDraft = {};
     rows.forEach(row => {
         db.traceDraft[row.item] = String(row.amount.toFixed(2));
     });
+    db.reefManagerTraceImport = {
+        text: String(text || ''),
+        rows: rows.map(row => ({ ...row })),
+        meta,
+        importedAt: Date.now()
+    };
     saveDB(false);
     renderTraceExportInputs();
     rows.forEach(row => calcTraceGrams(getTraceInputId(row.type === 'kation' ? 'kat' : 'an', row.item), row.item));
@@ -6814,9 +7086,66 @@ async function importReefManagerTraceFromClipboard() {
 function clearReefManagerImport() {
     if (!confirm('Importierte Trace-Werte zurücksetzen?')) return;
     db.traceDraft = {};
+    delete db.reefManagerTraceImport;
     saveDB(false);
     renderTraceExportInputs();
     previewReefManagerImport('');
+}
+
+function addReefManagerImportToTraceHistory() {
+    const stored = getStoredReefManagerTraceImport();
+    if (!stored) {
+        alert('Bitte zuerst einen Reef Manager Export importieren.');
+        return;
+    }
+    const state = ensureTraceCalculatorState();
+    const currentConfig = getTraceCalculatorConfigFromUi();
+    const meta = stored.meta || parseReefManagerExportMeta(stored.text || '');
+    const tankLitersInput = document.getElementById('reefManagerAquariumLiters');
+    const tankLiters = traceCalcNumber(tankLitersInput?.value, null);
+    if (tankLiters === null || tankLiters <= 0) {
+        alert('Bitte gib das Aquariumvolumen für diesen Reef-Manager-Import in Litern an. Der Export enthält diese Angabe nicht.');
+        tankLitersInput?.focus();
+        return;
+    }
+    const config = {
+        ...currentConfig,
+        tankLiters,
+        days: meta.runtimeDays || currentConfig.days,
+        dailyDoseMl: meta.dailyDoseMl || currentConfig.dailyDoseMl
+    };
+    const amounts = stored.rows.reduce((acc, row) => {
+        acc[row.item] = traceCalcRound(row.amount);
+        return acc;
+    }, {});
+    const grams = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)]));
+    const entry = normalizeTraceCalculatorHistoryEntry({
+        id: createWarehouseId(),
+        source: 'reefManager',
+        includeInCalculation: true,
+        createdAt: Date.now(),
+        mixtureDate: meta.mixtureDate || getTodayDateInputValue(),
+        config,
+        icp: {},
+        amounts,
+        grams,
+        totals: getTraceTotalsFromAmounts(amounts, config),
+        reefManagerMeta: meta
+    });
+    state.history.push(entry);
+    if (state.history.length > 60) state.history = state.history.slice(-60);
+    state.config = config;
+    state.currentMixtureDate = entry.mixtureDate;
+    db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
+    saveDB();
+    document.querySelectorAll('[id^="traceCalc"]').forEach(el => {
+        if (el && el.dataset) delete el.dataset.traceCalcSynced;
+    });
+    const icpContainer = document.getElementById('traceCalcIcpInputs');
+    if (icpContainer) delete icpContainer.dataset.traceCalcReady;
+    renderTraceExportInputs();
+    renderTraceCalculator();
+    showToast('Reef Manager Import zur Historie hinzugefügt', 'success');
 }
 
 function ensureTraceCalculatorState() {
@@ -6930,6 +7259,52 @@ function getTraceHistoryTotalGrams(entry, group) {
     return traceCalcRound(elementsG + Math.max(0, volumeMl - elementsMl));
 }
 
+function normalizeTraceCalculatorHistoryEntry(entry) {
+    if (!entry || typeof entry !== 'object') return entry;
+    if (!entry.id) entry.id = createWarehouseId();
+    if (!entry.createdAt) entry.createdAt = Date.now();
+    if (entry.includeInCalculation === undefined) entry.includeInCalculation = true;
+    if (!entry.amounts || typeof entry.amounts !== 'object') entry.amounts = {};
+    if (!entry.grams || typeof entry.grams !== 'object') entry.grams = {};
+    if (!entry.config || typeof entry.config !== 'object') entry.config = {};
+    if (!entry.totals || typeof entry.totals !== 'object') {
+        entry.totals = getTraceTotalsFromAmounts(entry.amounts, entry.config);
+    }
+    return entry;
+}
+
+function getTraceCalculatorHistoryEntries({ calculationOnly = false } = {}) {
+    const state = ensureTraceCalculatorState();
+    state.history.forEach(normalizeTraceCalculatorHistoryEntry);
+    return state.history.filter(entry => !calculationOnly || entry.includeInCalculation !== false);
+}
+
+function getTraceTotalsFromAmounts(amounts = {}, config = {}) {
+    const plannedVolume = traceCalcRound(
+        traceCalcNumber(config.dailyDoseMl, traceCalculatorBase.dailyDoseMl)
+        * traceCalcNumber(config.days, traceCalculatorBase.days)
+    );
+    return ['kationen', 'anionen'].reduce((acc, group) => {
+        const groupItems = traceCalculatorElements.filter(element => element.group === group).map(element => element.item);
+        const elementsMl = groupItems.reduce((sum, item) => sum + traceCalcNumber(amounts[item], 0), 0);
+        const elementsG = groupItems.reduce((sum, item) => sum + traceCalcElementGrams(item, traceCalcNumber(amounts[item], 0)), 0);
+        acc[group] = {
+            elementsMl: traceCalcRound(elementsMl),
+            elementsG: traceCalcRound(elementsG),
+            osmoseMl: traceCalcRound(Math.max(0, plannedVolume - elementsMl)),
+            osmoseG: traceCalcRound(Math.max(0, plannedVolume - elementsMl)),
+            volumeMl: traceCalcRound(plannedVolume),
+            volumeG: traceCalcRound(elementsG + Math.max(0, plannedVolume - elementsMl))
+        };
+        return acc;
+    }, {});
+}
+
+function getTraceHistoryEntrySummary(entry) {
+    if (entry?.source === 'reefManager') return 'Reef Manager Import';
+    return entry?.inventoryBooking ? 'Gespeichert & ausgelagert' : 'Manuell gespeichert';
+}
+
 function getTraceCalculatorConfigFromUi() {
     const state = ensureTraceCalculatorState();
     const saved = state.config;
@@ -6988,8 +7363,8 @@ function getTraceCalculatorBaseRecipe(config) {
 }
 
 function getTraceCalculatorLatestHistory() {
-    const state = ensureTraceCalculatorState();
-    return state.history.length ? state.history[state.history.length - 1] : null;
+    const history = getTraceCalculatorHistoryEntries({ calculationOnly: true });
+    return history.length ? history[history.length - 1] : null;
 }
 
 function getTraceCalculatorStartingRecipe(config) {
@@ -7691,7 +8066,8 @@ function renderTraceCalculatorHistory() {
     const container = document.getElementById('traceCalculatorHistory');
     if (!container) return;
     const state = ensureTraceCalculatorState();
-    const history = state.history;
+    const history = getTraceCalculatorHistoryEntries();
+    const activeHistory = getTraceCalculatorHistoryEntries({ calculationOnly: true });
     if (!history.length) {
         container.innerHTML = `
             <div class="card workflow-card trace-history-block trace-history-empty">
@@ -7705,29 +8081,249 @@ function renderTraceCalculatorHistory() {
         return;
     }
     const recent = history.slice(-5).reverse();
+    const latestRelevant = activeHistory[activeHistory.length - 1] || null;
     container.innerHTML = `
         <div class="card workflow-card trace-history-block">
             <div class="trace-history-head">
-                <span><strong>Historie &amp; Analyse</strong><small>Letzter Ansatz ${formatTraceMixtureDate(history[history.length - 1])}</small></span>
-                <span class="trace-history-count">${history.length} Mischung${history.length === 1 ? '' : 'en'}</span>
+                <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Letzter aktiver Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
+                <span class="trace-history-count">${activeHistory.length}/${history.length} aktiv</span>
             </div>
             <div class="trace-history-content">
-                ${renderTraceCalculatorHistoryAnalysis(history)}
-                ${renderTraceCalculatorHistoryChart(history)}
+                ${activeHistory.length ? renderTraceCalculatorHistoryAnalysis(activeHistory) : '<p class="hint">Alle Historien-Einträge sind für die Berechnung deaktiviert. Der Rechner nutzt wieder das Basisrezept.</p>'}
+                ${renderTraceCalculatorHistoryChart(activeHistory)}
                 <div class="trace-history-list">
-                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Die letzten ${recent.length}</small></div>
+                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Die letzten ${recent.length} · Bearbeiten steuert, ob ein Eintrag einfließt</small></div>
                     ${recent.map(entry => `
-                        <div class="trace-history-row">
-                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage</small></span>
+                        <div class="trace-history-row ${entry.includeInCalculation === false ? 'trace-history-row-inactive' : ''}">
+                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small></span>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
-                            <button type="button" class="btn-secondary" onclick='loadTraceCalculatorHistoryEntry(${jsArg(entry.id)})'>Laden</button>
+                            <div class="trace-history-actions">
+                                <button type="button" class="btn-secondary" onclick='editTraceHistoryEntry(${jsArg(entry.id)})'>Bearbeiten</button>
+                                <button type="button" class="btn-out" onclick='deleteTraceHistoryEntry(${jsArg(entry.id)})'>Löschen</button>
+                            </div>
                         </div>
                     `).join('')}
                 </div>
             </div>
         </div>
     `;
+}
+
+function recalculateTraceHistoryEntryTotals(entry) {
+    entry.grams = Object.fromEntries(Object.entries(entry.amounts || {}).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)]));
+    entry.totals = getTraceTotalsFromAmounts(entry.amounts || {}, entry.config || {});
+    return entry;
+}
+
+function toggleTraceHistoryCalculation(id) {
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => item.id === id);
+    if (!entry) return;
+    normalizeTraceCalculatorHistoryEntry(entry);
+    entry.includeInCalculation = entry.includeInCalculation === false;
+    entry.updatedAt = Date.now();
+    saveDB();
+    renderTraceCalculator();
+    showToast(entry.includeInCalculation ? 'Historien-Eintrag fließt wieder in die Trace-Berechnung ein' : 'Historien-Eintrag wird für die Trace-Berechnung ignoriert', 'info');
+}
+
+function getTraceHistoryAmountsText(entry, group = '') {
+    return traceCalculatorElements
+        .filter(element => !group || element.group === group)
+        .filter(element => traceCalcNumber(entry.amounts?.[element.item], null) !== null)
+        .map(element => `${element.symbol} ${traceCalcFormatRawMl(entry.amounts[element.item]).replace(' ml', '')}`)
+        .join('\n');
+}
+
+function parseTraceHistoryAmountsText(text, group = '') {
+    const amounts = {};
+    String(text || '').split(/\r?\n/).forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+        const match = trimmed.match(/^([A-Za-z]+)\s*[:=]?\s*([0-9]+(?:[,.][0-9]+)?)/);
+        if (!match) return;
+        const symbol = match[1].trim().toUpperCase();
+        const element = traceCalculatorElements.find(item => item.symbol.toUpperCase() === symbol);
+        if (!element || (group && element.group !== group)) return;
+        const amount = traceCalcNumber(match[2], null);
+        if (amount !== null) amounts[element.item] = traceCalcRound(amount);
+    });
+    return amounts;
+}
+
+function getTraceHistoryGroupTotalValue(entry, group, key) {
+    return traceCalcNumber(entry?.totals?.[group]?.[key], null);
+}
+
+async function editTraceHistoryEntry(id) {
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => item.id === id);
+    if (!entry) return;
+    normalizeTraceCalculatorHistoryEntry(entry);
+    const values = await showAppDialog({
+        kind: 'prompt',
+        type: 'info',
+        title: 'Trace-Historie bearbeiten',
+        eyebrow: 'Historie & Analyse',
+        message: 'Passe den Historien-Eintrag an. Nur Einträge mit „Ja“ fließen in die nächste Trace-Berechnung ein.',
+        wide: true,
+        confirmText: 'Speichern',
+        cancelText: 'Abbrechen',
+        fields: [
+            {
+                name: 'includeInCalculation',
+                label: 'In weitere Trace-Berechnung einfließen lassen?',
+                value: entry.includeInCalculation === false ? 'no' : 'yes',
+                options: [
+                    { value: 'yes', label: 'Ja, einbeziehen' },
+                    { value: 'no', label: 'Nein, ignorieren' }
+                ]
+            },
+            {
+                name: 'mixtureDate',
+                label: 'Ansatzdatum',
+                type: 'date',
+                value: entry.mixtureDate || getTodayDateInputValue(),
+                required: true
+            },
+            {
+                name: 'tankLiters',
+                label: 'Aquariumvolumen in Litern',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(entry.config?.tankLiters || state.config?.tankLiters || 500),
+                required: true
+            },
+            {
+                name: 'days',
+                label: 'Laufzeit in Tagen',
+                type: 'number',
+                inputMode: 'numeric',
+                value: String(entry.config?.days || state.config?.days || 40),
+                required: true
+            },
+            {
+                name: 'dailyDoseMl',
+                label: 'Tagesdosierung je Lösung in ml',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(entry.config?.dailyDoseMl || state.config?.dailyDoseMl || 5),
+                required: true
+            },
+            {
+                name: 'kationenVolumeMl',
+                label: 'Kationen Gesamtvolumen K+ (ml)',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'volumeMl') ?? ''),
+                required: true
+            },
+            {
+                name: 'kationenOsmoseMl',
+                label: 'Kationen Osmoseanteil K+ (ml)',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'osmoseMl') ?? ''),
+                required: true
+            },
+            {
+                name: 'anionenVolumeMl',
+                label: 'Anionen Gesamtvolumen A- (ml)',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'volumeMl') ?? ''),
+                required: true
+            },
+            {
+                name: 'anionenOsmoseMl',
+                label: 'Anionen Osmoseanteil A- (ml)',
+                type: 'number',
+                inputMode: 'decimal',
+                value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'osmoseMl') ?? ''),
+                required: true
+            },
+            {
+                name: 'kationenAmounts',
+                label: 'Kationen K+ Elementmengen',
+                value: getTraceHistoryAmountsText(entry, 'kationen'),
+                multiline: true,
+                required: true,
+                description: 'Eine Zeile pro Kation, z.B. Co 33,01'
+            },
+            {
+                name: 'anionenAmounts',
+                label: 'Anionen A- Elementmengen',
+                value: getTraceHistoryAmountsText(entry, 'anionen'),
+                multiline: true,
+                required: true,
+                description: 'Eine Zeile pro Anion, z.B. F 32,18'
+            }
+        ]
+    });
+    if (!values) return;
+    const parsedAmounts = {
+        ...parseTraceHistoryAmountsText(values.kationenAmounts, 'kationen'),
+        ...parseTraceHistoryAmountsText(values.anionenAmounts, 'anionen')
+    };
+    if (!Object.keys(parsedAmounts).length) {
+        await appAlert('Keine gültigen Elementmengen erkannt. Änderungen wurden nicht gespeichert.', { title: 'Bitte prüfen', type: 'warning' });
+        return;
+    }
+    entry.includeInCalculation = values.includeInCalculation !== 'no';
+    entry.mixtureDate = String(values.mixtureDate || '').trim() || entry.mixtureDate || getTodayDateInputValue();
+    entry.config = {
+        ...(entry.config || {}),
+        tankLiters: Math.max(1, traceCalcNumber(values.tankLiters, entry.config?.tankLiters || 500)),
+        days: Math.max(1, Math.round(traceCalcNumber(values.days, entry.config?.days || 40))),
+        dailyDoseMl: Math.max(0.01, traceCalcNumber(values.dailyDoseMl, entry.config?.dailyDoseMl || 5))
+    };
+    entry.amounts = parsedAmounts;
+    entry.updatedAt = Date.now();
+    recalculateTraceHistoryEntryTotals(entry);
+    const kationenVolumeMl = Math.max(0, traceCalcNumber(values.kationenVolumeMl, entry.totals?.kationen?.volumeMl || 0));
+    const kationenOsmoseMl = Math.max(0, traceCalcNumber(values.kationenOsmoseMl, entry.totals?.kationen?.osmoseMl || 0));
+    const anionenVolumeMl = Math.max(0, traceCalcNumber(values.anionenVolumeMl, entry.totals?.anionen?.volumeMl || 0));
+    const anionenOsmoseMl = Math.max(0, traceCalcNumber(values.anionenOsmoseMl, entry.totals?.anionen?.osmoseMl || 0));
+    const kationenItems = traceCalculatorElements.filter(element => element.group === 'kationen').map(element => element.item);
+    const anionenItems = traceCalculatorElements.filter(element => element.group === 'anionen').map(element => element.item);
+    const kationenElementsMl = kationenItems.reduce((sum, item) => sum + traceCalcNumber(entry.amounts[item], 0), 0);
+    const anionenElementsMl = anionenItems.reduce((sum, item) => sum + traceCalcNumber(entry.amounts[item], 0), 0);
+    const kationenElementsG = kationenItems.reduce((sum, item) => sum + traceCalcElementGrams(item, traceCalcNumber(entry.amounts[item], 0)), 0);
+    const anionenElementsG = anionenItems.reduce((sum, item) => sum + traceCalcElementGrams(item, traceCalcNumber(entry.amounts[item], 0)), 0);
+    entry.totals.kationen = {
+        ...entry.totals.kationen,
+        elementsMl: traceCalcRound(kationenElementsMl),
+        elementsG: traceCalcRound(kationenElementsG),
+        osmoseMl: traceCalcRound(kationenOsmoseMl),
+        osmoseG: traceCalcRound(kationenOsmoseMl),
+        volumeMl: traceCalcRound(kationenVolumeMl),
+        volumeG: traceCalcRound(kationenElementsG + kationenOsmoseMl)
+    };
+    entry.totals.anionen = {
+        ...entry.totals.anionen,
+        elementsMl: traceCalcRound(anionenElementsMl),
+        elementsG: traceCalcRound(anionenElementsG),
+        osmoseMl: traceCalcRound(anionenOsmoseMl),
+        osmoseG: traceCalcRound(anionenOsmoseMl),
+        volumeMl: traceCalcRound(anionenVolumeMl),
+        volumeG: traceCalcRound(anionenElementsG + anionenOsmoseMl)
+    };
+    saveDB();
+    renderTraceExportInputs();
+    renderTraceCalculator();
+    showToast('Historien-Eintrag aktualisiert', 'success');
+}
+
+function deleteTraceHistoryEntry(id) {
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => item.id === id);
+    if (!entry) return;
+    if (!confirm(`Historien-Eintrag vom ${formatTraceMixtureDate(entry)} löschen?`)) return;
+    state.history = state.history.filter(item => item.id !== id);
+    saveDB();
+    renderTraceCalculator();
+    showToast('Historien-Eintrag gelöscht', 'success');
 }
 
 function getTraceCalculatorConfigWarnings(config) {
@@ -8005,6 +8601,8 @@ function createTraceCalculatorMixturePayload() {
     }, {});
     const entry = {
         id: createWarehouseId(),
+        source: 'traceCalculator',
+        includeInCalculation: true,
         createdAt: Date.now(),
         mixtureDate,
         config: { ...recipe.config },
@@ -8020,7 +8618,7 @@ function createTraceCalculatorMixturePayload() {
 function commitTraceCalculatorMixture(payload) {
     if (!payload) return null;
     const { state, amounts, entry } = payload;
-    state.history.push(entry);
+    state.history.push(normalizeTraceCalculatorHistoryEntry(entry));
     if (state.history.length > 60) state.history = state.history.slice(-60);
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
     return entry;
@@ -8111,6 +8709,10 @@ window.loadTraceCalculatorHistoryEntry = loadTraceCalculatorHistoryEntry;
 window.saveTraceCalculatorMixture = saveTraceCalculatorMixture;
 window.saveAndBookTraceCalculatorMixture = saveAndBookTraceCalculatorMixture;
 window.openTraceCalculationGuide = openTraceCalculationGuide;
+window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
+window.toggleTraceHistoryCalculation = toggleTraceHistoryCalculation;
+window.editTraceHistoryEntry = editTraceHistoryEntry;
+window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
 
 function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
@@ -12654,6 +13256,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if(themeSelect && db.theme) themeSelect.value = db.theme;
     const forecastSelect = document.getElementById('forecastWeeks');
     if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
+    applyCursorSettings();
+    renderLocalDeviceSettings();
     syncCRPreferredUnitUI();
     toggleCustomProductUnitFields();
     initBulkProductSelect();

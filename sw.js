@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v310-osci-system-note';
+const CACHE_NAME = 'reef-storage-tools-cache-v313-local-device-actions';
 const ASSETS = [
   './',
   './index.html',

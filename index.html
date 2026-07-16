@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.10-osci-system-note">
+    <link rel="stylesheet" href="style.css?v=3.0.13-local-device-actions">
 </head>
 <body>
 
@@ -277,8 +277,16 @@
                     <span>Reef Manager Import</span>
                     <span class="settings-accordion-hint" aria-hidden="true"></span>
                 </summary>
+                <div class="reef-manager-history-config">
+                    <div class="input-group">
+                        <label for="reefManagerAquariumLiters">Aquariumvolumen für diesen Import (L):</label>
+                        <input type="number" id="reefManagerAquariumLiters" min="1" step="0.1" placeholder="z.B. 770" inputmode="decimal">
+                        <small class="hint">Pflichtangabe, da der Reef-Manager-Export kein Aquariumvolumen enthält.</small>
+                    </div>
+                </div>
                 <div class="btn-group calculator-actions">
                     <button class="btn-secondary btn-animated" onclick="importReefManagerTraceFromClipboard()">Aus Zwischenablage importieren</button>
+                    <button class="btn-primary btn-animated" onclick="addReefManagerImportToTraceHistory()">Zur Historie hinzufügen</button>
                     <button class="btn-out btn-animated" onclick="clearReefManagerImport()">Import zurücksetzen</button>
                 </div>
                 <div id="reef-manager-import-preview" class="hint">Noch kein Reef Manager Export importiert.</div>
@@ -1267,6 +1275,12 @@
                 </label>
             </div>
 
+            <div class="card settings-card settings-card-local-devices">
+                <h3>Lokale Geräte einbinden</h3>
+                <p class="hint">DEV-Bereich für Tests mit ESP32, Home Assistant oder anderen Webinterfaces im eigenen Netzwerk.</p>
+                <div id="localDeviceSettings"></div>
+            </div>
+
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">App-Updates</h3>
                 <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
@@ -1415,6 +1429,23 @@
                         <option value="mint">Ocean Mint 🌊</option>
                         <option value="badman">BADMAN Shark 🦈</option>
                     </select>
+                </div>
+
+                <div class="input-group cursor-design-settings">
+                    <label for="cursorStyleSelect">Maus-Cursor Design:</label>
+                    <select id="cursorStyleSelect" onchange="updateCursorSettings()">
+                        <option value="apple">Apple Light Ring</option>
+                        <option value="glow">Glow Pointer</option>
+                        <option value="dot">Minimal Dot</option>
+                        <option value="crosshair">Präzision</option>
+                        <option value="emoji">Emoji frei wählen</option>
+                        <option value="system">System-Cursor</option>
+                    </select>
+                    <div class="cursor-emoji-row">
+                        <input type="text" id="cursorEmojiInput" maxlength="4" value="🪸" aria-label="Eigenes Cursor Emoji" oninput="updateCursorSettings()" placeholder="🪸">
+                        <span class="cursor-preview" id="cursorSettingsPreview" aria-hidden="true"></span>
+                    </div>
+                    <p class="hint">Auf Handy und Tablet bleibt automatisch der normale Touch-Bedienmodus aktiv.</p>
                 </div>
             </div>
 
@@ -1588,8 +1619,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.10-osci-system-note"></script>
-    <script src="app.js?v=3.0.10-osci-system-note"></script>
+    <script src="sangokai-data.js?v=3.0.13-local-device-actions"></script>
+    <script src="app.js?v=3.0.13-local-device-actions"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
