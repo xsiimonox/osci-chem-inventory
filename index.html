@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.13-local-device-actions">
+    <link rel="stylesheet" href="style.css?v=3.0.15-cursor-palette">
 </head>
 <body>
 
@@ -1445,6 +1445,20 @@
                         <input type="text" id="cursorEmojiInput" maxlength="4" value="🪸" aria-label="Eigenes Cursor Emoji" oninput="updateCursorSettings()" placeholder="🪸">
                         <span class="cursor-preview" id="cursorSettingsPreview" aria-hidden="true"></span>
                     </div>
+                    <div class="cursor-emoji-palette" id="cursorEmojiPalette" hidden aria-label="Emoji Cursor Auswahl">
+                        <button type="button" onclick="selectCursorEmoji('🪸')" aria-label="Koralle">🪸</button>
+                        <button type="button" onclick="selectCursorEmoji('🐠')" aria-label="Fisch">🐠</button>
+                        <button type="button" onclick="selectCursorEmoji('🦈')" aria-label="Hai">🦈</button>
+                        <button type="button" onclick="selectCursorEmoji('💧')" aria-label="Wasser">💧</button>
+                        <button type="button" onclick="selectCursorEmoji('🌊')" aria-label="Welle">🌊</button>
+                        <button type="button" onclick="selectCursorEmoji('🧪')" aria-label="Chemie">🧪</button>
+                        <button type="button" onclick="selectCursorEmoji('⚗️')" aria-label="Labor">⚗️</button>
+                        <button type="button" onclick="selectCursorEmoji('✨')" aria-label="Glanz">✨</button>
+                        <button type="button" onclick="selectCursorEmoji('🔥')" aria-label="Feuer">🔥</button>
+                        <button type="button" onclick="selectCursorEmoji('🎯')" aria-label="Ziel">🎯</button>
+                        <button type="button" onclick="selectCursorEmoji('🖱️')" aria-label="Maus">🖱️</button>
+                        <button type="button" onclick="selectCursorEmoji('💜')" aria-label="Herz">💜</button>
+                    </div>
                     <p class="hint">Auf Handy und Tablet bleibt automatisch der normale Touch-Bedienmodus aktiv.</p>
                 </div>
             </div>
@@ -1619,8 +1633,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.13-local-device-actions"></script>
-    <script src="app.js?v=3.0.13-local-device-actions"></script>
+    <script src="sangokai-data.js?v=3.0.15-cursor-palette"></script>
+    <script src="app.js?v=3.0.15-cursor-palette"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

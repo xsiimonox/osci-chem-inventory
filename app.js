@@ -5219,6 +5219,7 @@ function applyCursorSettings() {
     const dot = document.getElementById('customCursorDot');
     const select = document.getElementById('cursorStyleSelect');
     const emojiInput = document.getElementById('cursorEmojiInput');
+    const emojiPalette = document.getElementById('cursorEmojiPalette');
     const preview = document.getElementById('cursorSettingsPreview');
     if (!cursor || !dot) return;
 
@@ -5233,6 +5234,14 @@ function applyCursorSettings() {
         emojiInput.value = emoji;
         emojiInput.disabled = style !== 'emoji';
     }
+    if (emojiPalette) {
+        emojiPalette.hidden = style !== 'emoji';
+        emojiPalette.querySelectorAll('button').forEach(button => {
+            const active = button.textContent.trim() === emoji;
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-pressed', active ? 'true' : 'false');
+        });
+    }
     if (preview) {
         preview.dataset.style = style;
         preview.textContent = style === 'emoji' ? emoji : style === 'crosshair' ? '⌖' : style === 'dot' ? '•' : '';
@@ -5245,6 +5254,16 @@ function updateCursorSettings() {
     const emoji = document.getElementById('cursorEmojiInput')?.value || '🪸';
     db.settings.cursorStyle = cursorStyleOptions.has(style) ? style : 'apple';
     db.settings.cursorEmoji = String(emoji).trim().slice(0, 4) || '🪸';
+    applyCursorSettings();
+    saveDB(false);
+}
+
+function selectCursorEmoji(emoji) {
+    const input = document.getElementById('cursorEmojiInput');
+    if (input) input.value = emoji;
+    if (!db.settings) db.settings = {};
+    db.settings.cursorStyle = 'emoji';
+    db.settings.cursorEmoji = String(emoji || '🪸').trim().slice(0, 4) || '🪸';
     applyCursorSettings();
     saveDB(false);
 }
@@ -5287,6 +5306,42 @@ function isAllowedLocalDeviceUrl(urlValue) {
     } catch (error) {
         return false;
     }
+}
+
+function getLocalDeviceEmbedHint(device) {
+    if (!device) return '';
+    try {
+        const pageProtocol = window.location.protocol;
+        const deviceProtocol = new URL(device.url).protocol;
+        if (pageProtocol === 'https:' && deviceProtocol === 'http:') {
+            return 'Diese App läuft über HTTPS, dein lokales Gerät aber über HTTP. Viele Browser blockieren diese Mischung. Teste lokal über HTTP oder gib dem Gerät HTTPS.';
+        }
+    } catch (error) {}
+    return 'Wenn nach dem Laden nichts sichtbar ist, blockiert das Zielgerät wahrscheinlich iframe-Einbettung. Home Assistant macht das standardmäßig oft aus Sicherheitsgründen.';
+}
+
+function markLocalDeviceFrameLoaded(id) {
+    if (id && id !== activeLocalDeviceId) return;
+    const status = document.getElementById('localDeviceFrameStatus');
+    if (!status) return;
+    status.innerHTML = `
+        <strong>Live-Ansicht geladen</strong>
+        <span>Wenn der Bereich trotzdem leer bleibt, blockiert das Gerät die Darstellung innerhalb anderer Webseiten.</span>
+    `;
+    status.dataset.state = 'loaded';
+}
+
+function scheduleLocalDeviceFrameCheck(id) {
+    window.setTimeout(() => {
+        if (id && id !== activeLocalDeviceId) return;
+        const status = document.getElementById('localDeviceFrameStatus');
+        if (!status || status.dataset.state === 'loaded') return;
+        status.innerHTML = `
+            <strong>Live-Ansicht braucht ungewöhnlich lange</strong>
+            <span>Externes Öffnen funktioniert dann meist trotzdem. Für Home Assistant ggf. X-Frame-Options deaktivieren; für ESP32 später keine Frame-Blocker senden.</span>
+        `;
+        status.dataset.state = 'warn';
+    }, 4500);
 }
 
 function renderLocalDeviceSettings(activeId = '') {
@@ -5348,12 +5403,17 @@ function renderLocalDeviceSettings(activeId = '') {
                         <span><strong>${escapeHtml(activeDevice.name)}</strong><small>${escapeHtml(activeDevice.url)}</small></span>
                         <a href="${escapeHtml(activeDevice.url)}" target="_blank" rel="noopener noreferrer" class="btn-secondary">In neuem Tab öffnen</a>
                     </div>
-                    <iframe src="${escapeHtml(activeDevice.url)}" title="${escapeHtml(activeDevice.name)}" loading="lazy" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>
-                    <p class="hint">Wenn der Bereich leer bleibt, blockiert das Zielgerät wahrscheinlich die Einbettung per Sicherheitsheader. Dann bitte „In neuem Tab öffnen“ nutzen oder das ESP32-Webinterface später iframe-freundlich ausliefern.</p>
+                    <div class="local-device-frame-status" id="localDeviceFrameStatus" data-state="loading">
+                        <strong>Live-Ansicht wird geladen</strong>
+                        <span>${escapeHtml(getLocalDeviceEmbedHint(activeDevice))}</span>
+                    </div>
+                    <iframe id="localDeviceFrame" src="${escapeHtml(activeDevice.url)}" title="${escapeHtml(activeDevice.name)}" loading="eager" referrerpolicy="no-referrer" allow="fullscreen; clipboard-read; clipboard-write" onload='markLocalDeviceFrameLoaded(${jsArg(activeDevice.id)})'></iframe>
+                    <p class="hint">Für ESP32-Webinterfaces später wichtig: keine Header wie <code>X-Frame-Options: DENY</code>, <code>X-Frame-Options: SAMEORIGIN</code> oder strenge <code>frame-ancestors</code> senden.</p>
                 ` : ''}
             </div>
         </div>
     `;
+    if (activeDevice) scheduleLocalDeviceFrameCheck(activeDevice.id);
 }
 
 function unlockLocalDeviceSettings() {
