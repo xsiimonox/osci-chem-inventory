@@ -9011,11 +9011,10 @@ function setupToolSections() {
         const title = section.querySelector('.tool-section-summary strong')?.textContent?.trim() || `section-${index}`;
         const sectionId = section.dataset.sectionId || slugifyToolTitle(title);
         section.dataset.sectionId = sectionId;
-        const visibleCount = section.querySelectorAll('.tool-compact-card').length;
         const summaryText = section.querySelector('.tool-section-summary small');
         if (summaryText) {
             summaryText.dataset.baseText = summaryText.dataset.baseText || summaryText.textContent.trim();
-            summaryText.textContent = `${summaryText.dataset.baseText} · ${visibleCount} Tools`;
+            summaryText.textContent = summaryText.dataset.baseText;
         }
         if (section.dataset.sectionReady !== 'true') {
             section.dataset.sectionReady = 'true';
