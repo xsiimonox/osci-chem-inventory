@@ -11839,6 +11839,163 @@ label:has(> input[type="radio"]) {
 .app-dialog.is-danger .app-dialog-status { color: var(--status-danger); }
 .app-dialog.is-success .app-dialog-status { color: var(--status-success); }
 
+.legal-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 5200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100dvh;
+    padding: max(var(--space-4), var(--safe-top)) var(--space-4) max(var(--space-4), var(--safe-bottom));
+    background: var(--overlay-bg);
+    backdrop-filter: blur(14px) saturate(0.86);
+    -webkit-backdrop-filter: blur(14px) saturate(0.86);
+}
+
+.legal-modal.is-open {
+    display: flex;
+}
+
+.legal-modal-panel {
+    display: flex;
+    width: min(980px, calc(100vw - 32px));
+    height: min(88dvh, 860px);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    background: var(--surface-card);
+    color: var(--text-primary);
+    box-shadow: var(--shadow-overlay);
+    animation: dialogEnter var(--transition-base) var(--ease-standard) both;
+}
+
+.legal-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-5);
+    border-bottom: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface-raised) 56%, var(--surface-card));
+}
+
+.legal-modal-eyebrow {
+    margin: 0 0 2px;
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.legal-modal-header h2 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: clamp(1.15rem, 2vw, 1.42rem);
+}
+
+.legal-modal-close {
+    --close-size: 34px;
+    width: var(--close-size);
+    height: var(--close-size);
+    min-width: var(--close-size);
+    min-height: var(--close-size);
+    max-width: var(--close-size);
+    max-height: var(--close-size);
+    flex: 0 0 var(--close-size);
+    padding: 0 !important;
+    border-radius: 50%;
+    color: var(--text-secondary);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, white 10%, transparent), transparent),
+        color-mix(in srgb, var(--surface-raised) 78%, transparent);
+    border-color: color-mix(in srgb, var(--border-color) 82%, transparent);
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, white 12%, transparent),
+        0 10px 24px rgba(0, 0, 0, 0.18);
+    line-height: 1;
+    backdrop-filter: blur(14px) saturate(1.12);
+    -webkit-backdrop-filter: blur(14px) saturate(1.12);
+    aspect-ratio: 1 / 1;
+}
+
+.legal-modal-close span,
+.legal-modal-close span::before,
+.legal-modal-close span::after {
+    display: block;
+    position: absolute;
+    inset: 0;
+    margin: auto;
+}
+
+.legal-modal-close span {
+    width: 13px;
+    height: 13px;
+}
+
+.legal-modal-close span::before,
+.legal-modal-close span::after {
+    content: "";
+    width: 14px;
+    height: 2px;
+    border-radius: 999px;
+    background: currentColor;
+    transform-origin: center;
+}
+
+.legal-modal-close span::before {
+    transform: rotate(45deg);
+}
+
+.legal-modal-close span::after {
+    transform: rotate(-45deg);
+}
+
+.legal-modal-close:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--border-color));
+    background:
+        linear-gradient(180deg, color-mix(in srgb, white 14%, transparent), transparent),
+        color-mix(in srgb, var(--accent) 13%, var(--surface-raised));
+    box-shadow:
+        inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+        0 14px 30px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.legal-modal-close:active {
+    transform: scale(0.94);
+}
+
+.legal-modal-close:focus-visible {
+    outline: 3px solid color-mix(in srgb, var(--accent) 36%, transparent);
+    outline-offset: 3px;
+}
+
+.legal-modal-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    background: var(--app-bg);
+}
+
+html.legal-embedded,
+html.legal-embedded body.legal-page {
+    background: transparent !important;
+}
+
+html.legal-embedded body.legal-page {
+    min-height: auto;
+}
+
+html.legal-embedded .legal-shell {
+    width: min(920px, calc(100vw - 24px));
+    margin: 14px auto 28px !important;
+}
+
 @keyframes dialogEnter {
     from { opacity: 0; transform: translateY(12px) scale(0.98); }
     to { opacity: 1; transform: translateY(0) scale(1); }
@@ -11862,6 +12019,18 @@ label:has(> input[type="radio"]) {
         width: 100%;
         max-height: calc(100dvh - max(24px, var(--safe-top)) - max(12px, var(--safe-bottom)));
         border-radius: var(--radius-lg);
+    }
+    .legal-modal {
+        align-items: flex-end;
+        padding: var(--space-3) var(--space-3) max(var(--space-3), var(--safe-bottom));
+    }
+    .legal-modal-panel {
+        width: 100%;
+        height: min(90dvh, 820px);
+        border-radius: var(--radius-lg);
+    }
+    .legal-modal-header {
+        padding: var(--space-3) var(--space-4);
     }
     .app-dialog-header { padding: var(--space-4) var(--space-4) var(--space-3); }
     .app-dialog-body { padding: 0 var(--space-4) var(--space-3); }
@@ -14109,4 +14278,9 @@ body.legal-page {
 body.legal-page .legal-shell {
     width: min(920px, calc(100vw - 28px));
     margin-inline: auto !important;
+}
+
+html.legal-embedded body.legal-page .legal-shell {
+    width: min(920px, calc(100vw - 24px));
+    margin: 14px auto 28px !important;
 }

@@ -5298,6 +5298,46 @@ function applyTheme(themeName, shouldSave = true) {
     if (themeSelect) themeSelect.value = themeName;
 }
 
+function getLegalModalThemeParam() {
+    return encodeURIComponent(db.theme || 'default');
+}
+
+function openLegalModal(page = 'impressum') {
+    const modal = document.getElementById('legalModal');
+    const frame = document.getElementById('legalModalFrame');
+    const title = document.getElementById('legalModalTitle');
+    if (!modal || !frame || !title) return;
+
+    const normalized = page === 'privacy' ? 'privacy' : 'impressum';
+    const pageFile = normalized === 'privacy' ? 'privacy.html' : 'impressum.html';
+    title.textContent = normalized === 'privacy' ? 'Datenschutzerklärung' : 'Impressum';
+    frame.src = `${pageFile}?theme=${getLegalModalThemeParam()}&embed=app-modal`;
+    modal.hidden = false;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    acquireBodyScrollLock('legal-modal');
+    window.setTimeout(() => modal.querySelector('.legal-modal-close')?.focus(), 0);
+}
+
+function closeLegalModal() {
+    const modal = document.getElementById('legalModal');
+    const frame = document.getElementById('legalModalFrame');
+    if (!modal) return;
+
+    modal.classList.remove('is-open');
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    if (frame) frame.src = 'about:blank';
+    releaseBodyScrollLock('legal-modal');
+}
+
+document.addEventListener('click', event => {
+    const legalLink = event.target?.closest?.('[data-legal-page]');
+    if (!legalLink) return;
+    event.preventDefault();
+    openLegalModal(legalLink.dataset.legalPage);
+});
+
 const cursorStyleOptions = new Set(['apple', 'glow', 'dot', 'crosshair', 'emoji', 'system']);
 
 function getCursorSettings() {
@@ -15699,12 +15739,18 @@ function appPrompt(message, defaultValue = '', options = {}) {
 document.addEventListener('keydown', event => {
     const appDialog = document.getElementById('appDialog');
     const stockModal = document.getElementById('modal');
-    const activeDialog = appDialogState ? appDialog : (stockModal?.style.display === 'flex' ? stockModal : null);
+    const legalModal = document.getElementById('legalModal');
+    const activeDialog = appDialogState
+        ? appDialog
+        : (legalModal?.classList.contains('is-open') ? legalModal : (stockModal?.style.display === 'flex' ? stockModal : null));
     if (!activeDialog) return;
     if (event.key === 'Escape') {
         if (appDialogState && appDialogState.allowEscape) {
             event.preventDefault();
             closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+        } else if (legalModal?.classList.contains('is-open')) {
+            event.preventDefault();
+            closeLegalModal();
         } else if (!appDialogState && stockModal?.style.display === 'flex') {
             event.preventDefault();
             closeModal();
@@ -15712,7 +15758,7 @@ document.addEventListener('keydown', event => {
         return;
     }
     if (event.key !== 'Tab') return;
-    const panel = activeDialog.querySelector('.app-dialog-panel, .modal-content');
+    const panel = activeDialog.querySelector('.app-dialog-panel, .modal-content, .legal-modal-panel');
     const focusable = getDialogFocusableElements(panel);
     if (!focusable.length) {
         event.preventDefault();
@@ -15733,6 +15779,9 @@ document.addEventListener('keydown', event => {
 document.addEventListener('click', event => {
     if (event.target?.id === 'appDialog' && appDialogState?.closeOnBackdrop) {
         closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+    }
+    if (event.target?.id === 'legalModal') {
+        closeLegalModal();
     }
 });
 
@@ -15774,7 +15823,7 @@ function setFieldError(fieldId, message = '') {
     }
 }
 
-Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, setFieldError, enhanceFormAccessibility });
+Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, closeLegalModal, openLegalModal, setFieldError, enhanceFormAccessibility });
 enhanceFormAccessibility(document);
 document.addEventListener('DOMContentLoaded', () => enhanceFormAccessibility(document));
 window.setTimeout(() => enhanceFormAccessibility(document), 500);

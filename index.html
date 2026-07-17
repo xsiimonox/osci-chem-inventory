@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.1-textfit">
+    <link rel="stylesheet" href="style.css?v=3.0.1-legalmodal-close-sm">
 </head>
 <body>
 
@@ -1623,7 +1623,7 @@
     </main>
 
     <footer class="app-footer">
-    <p>© 2026 xsiimonox • <a href="impressum.html">Impressum</a> • <a href="privacy.html">Datenschutzerklärung</a></p>
+    <p>© 2026 xsiimonox • <a href="impressum.html" data-legal-page="impressum">Impressum</a> • <a href="privacy.html" data-legal-page="privacy">Datenschutzerklärung</a></p>
     </footer>
 
     <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
@@ -1655,6 +1655,21 @@
         </div>
     </div>
 
+    <div id="legalModal" class="legal-modal" role="dialog" aria-modal="true" aria-labelledby="legalModalTitle" aria-hidden="true" hidden>
+        <div class="legal-modal-panel" tabindex="-1">
+            <div class="legal-modal-header">
+                <div>
+                    <p class="legal-modal-eyebrow">Reeftools.de</p>
+                    <h2 id="legalModalTitle">Rechtliches</h2>
+                </div>
+                <button type="button" class="legal-modal-close" onclick="closeLegalModal()" aria-label="Fenster schließen">
+                    <span aria-hidden="true"></span>
+                </button>
+            </div>
+            <iframe id="legalModalFrame" class="legal-modal-frame" title="Rechtlicher Inhalt"></iframe>
+        </div>
+    </div>
+
     <div class="toast-container" aria-label="Mitteilungen" aria-live="polite" aria-relevant="additions" aria-atomic="false"></div>
 
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
@@ -1668,8 +1683,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.1-textfit"></script>
-    <script src="app.js?v=3.0.1-textfit"></script>
+    <script src="sangokai-data.js?v=3.0.1-legalmodal-close-sm"></script>
+    <script src="app.js?v=3.0.1-legalmodal-close-sm"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

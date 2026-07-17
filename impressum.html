@@ -8,17 +8,21 @@
         try {
             const supportedThemes = new Set(['default', 'light', 'girl', 'mint', 'badman']);
             const requestedTheme = new URLSearchParams(location.search).get('theme');
+            const embedded = new URLSearchParams(location.search).get('embed') === 'app-modal';
             const storedTheme = localStorage.getItem('reeftools_theme_v1');
             const theme = supportedThemes.has(requestedTheme) ? requestedTheme : storedTheme;
             if (theme && theme !== 'default') document.documentElement.classList.add(`theme-${theme}`);
             window.addEventListener('DOMContentLoaded', () => {
+                if (embedded) {
+                    document.documentElement.classList.add('legal-embedded');
+                }
                 document.querySelectorAll('.legal-links a[href="privacy.html"]').forEach(link => {
-                    link.href = `privacy.html?theme=${encodeURIComponent(theme || 'default')}`;
+                    link.href = `privacy.html?theme=${encodeURIComponent(theme || 'default')}${embedded ? '&embed=app-modal' : ''}`;
                 });
             });
         } catch (error) {}
     </script>
-    <link rel="stylesheet" href="style.css?v=3.0.1-textfit">
+    <link rel="stylesheet" href="style.css?v=3.0.1-legalmodal-close-sm">
 </head>
 <body class="legal-page">
     <main class="legal-shell">
@@ -30,7 +34,6 @@
                     <p class="legal-lead">Anbieterkennzeichnung für Reeftools.de.</p>
                 </div>
                 <div class="legal-links">
-                    <a class="btn-secondary" href="https://reeftools.de/#uebersicht">Zur App</a>
                     <a class="btn-out" href="privacy.html">Datenschutz</a>
                 </div>
             </div>
