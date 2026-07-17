@@ -8793,7 +8793,7 @@ function setupPriority4CalculatorUI() {
     [
         'majorCorrectionResult', 'consumptionResult', 'testCorrectionResult', 'nutritionResult',
         'salinityResult', 'simpleSalinityResult', 'specificGravityResult', 'saltCorrectionResult',
-        'waterChangeResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
+        'waterChangeResult', 'adsorberFlowResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
         , 'traceCalculatorResult', 'traceCalculatorHistory'
     ].forEach(id => {
         const result = document.getElementById(id);
@@ -8847,6 +8847,7 @@ function initTools() {
     populateSalifertSyringeSelect();
     renderSalifertConverter();
     renderWaterChangeCalculator();
+    renderAdsorberFlowCalculator();
     renderSaltCorrectionCalculator();
     renderFeedNutrientLog();
     renderFlowCalculator();
@@ -8935,6 +8936,7 @@ function getToolTileVisual(toolId, title = '') {
         'salzgehalt-rechner': { icon: 'PS', subtitle: 'PSU und Dichte pruefen' },
         'salz-korrektur': { icon: 'SG', subtitle: 'Salz angleichen' },
         'wasserwechsel-effekt': { icon: 'WW', subtitle: 'Wasserwechsel planen' },
+        'adsorber-durchfluss': { icon: 'AD', subtitle: 'Adsorber langsam fahren' },
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
         'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
         'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
@@ -10013,6 +10015,154 @@ function renderWaterChangeCalculator() {
             <div class="tool-row">
                 <span><strong>Änderung</strong><small>Von ${current} auf ${after.toFixed(3)}</small></span>
                 <span>${(after - current).toFixed(3)}</span>
+            </div>
+        </div>
+    `;
+}
+
+function getAdsorberAdvice(target) {
+    const advice = {
+        po4: {
+            targetLabel: 'Phosphat (PO4) senken',
+            primary: 'Adsorber auf Eisenbasis',
+            type: 'Eisenhydroxid, Eisenoxidhydrat oder GFO',
+            suitability: 'Sehr gut geeignet und meist die Standardwahl zur Phosphatreduktion.',
+            alternatives: 'Aluminiumbasis kann ebenfalls PO4 binden, eher gezielt und zeitlich begrenzt einsetzen.',
+            notes: [
+                'Zunächst unterdosiert starten und PO4 regelmäßig kontrollieren.',
+                'PO4 nicht zu schnell oder zu stark absenken.',
+                'Material ruhig halten und nicht verwirbeln, damit möglichst wenig Abrieb entsteht.'
+            ]
+        },
+        silicate: {
+            targetLabel: 'Silikat / Kieselsäure senken',
+            primary: 'Adsorber auf Eisenbasis',
+            type: 'Eisenhydroxid, Eisenoxidhydrat oder GFO',
+            suitability: 'Gut geeignet, bindet aber bevorzugt auch Phosphat. Daher langsam und kontrolliert fahren.',
+            alternatives: 'Aluminiumbasis kann Silikat ebenfalls binden, sollte aber wegen möglichem Aluminium-Eintrag eher kurzzeitig genutzt werden.',
+            notes: [
+                'Durchfluss bewusst langsam einstellen, damit der Adsorber nicht unnötig mit anderen Stoffen belegt wird.',
+                'PO4 parallel messen, weil es oft schneller sinkt als Silikat.',
+                'Eintrag von Silikat möglichst an der Quelle stoppen, sonst läuft der Adsorber nur hinterher.'
+            ]
+        },
+        yellowing: {
+            targetLabel: 'Gelbstoffe oder Gerüche entfernen',
+            primary: 'Aktivkohle',
+            type: 'Kokos-, Holz- oder Steinkohle',
+            suitability: 'Sehr gut geeignet für klareres Wasser, Gerüche und gelbliche Verfärbung.',
+            alternatives: 'Eisen- und Aluminiumadsorber sind dafür nicht die richtige Hauptwahl.',
+            notes: [
+                'Kohle vor dem Einsatz gründlich spülen, damit kein Kohlenstaub ins Aquarium gelangt.',
+                'Nicht abrupt zu viel einsetzen, weil klareres Wasser die Lichtintensität für Korallen erhöht.',
+                'Nach Medikamenteneinsatz Aktivkohle gezielt und zeitlich begrenzt verwenden.'
+            ]
+        },
+        organics: {
+            targetLabel: 'Organische Belastung / Korallengifte reduzieren',
+            primary: 'Aktivkohle',
+            type: 'Kokos-, Holz- oder Steinkohle',
+            suitability: 'Geeignet für organische Verbindungen, Korallengifte und allgemeine Wasserklärung.',
+            alternatives: 'Adsorber auf Eisen- oder Aluminiumbasis sind primär für Phosphat/Silikat gedacht.',
+            notes: [
+                'Langsam starten, besonders bei empfindlichen Korallen.',
+                'Kohlenstaub vermeiden und Material vor dem Einsatz spülen.',
+                'Lichtanpassung beachten, weil das Wasser nach Einsatz deutlich klarer werden kann.'
+            ]
+        },
+        medication: {
+            targetLabel: 'Medikamentenreste entfernen',
+            primary: 'Aktivkohle',
+            type: 'Kokos-, Holz- oder Steinkohle',
+            suitability: 'Gezielt nach Behandlungen geeignet, um Medikamentenreste und organische Rückstände zu entfernen.',
+            alternatives: 'PO4-/Silikatadsorber sind dafür nicht als Hauptmittel gedacht.',
+            notes: [
+                'Erst einsetzen, wenn die Behandlung beendet ist.',
+                'Kohle danach wieder entfernen oder wechseln.',
+                'Herstellerhinweise des Medikaments beachten.'
+            ]
+        }
+    };
+    return advice[target] || advice.po4;
+}
+
+function renderAdsorberAdvice(advice) {
+    return `
+        <div class="adsorber-advice">
+            <div class="adsorber-advice-head">
+                <span><small>Ziel</small><strong>${escapeHtml(advice.targetLabel)}</strong></span>
+                <span><small>Empfehlung</small><strong>${escapeHtml(advice.primary)}</strong></span>
+            </div>
+            <div class="adsorber-advice-grid">
+                <div>
+                    <strong>Typ</strong>
+                    <p>${escapeHtml(advice.type)}</p>
+                </div>
+                <div>
+                    <strong>Eignung</strong>
+                    <p>${escapeHtml(advice.suitability)}</p>
+                </div>
+                <div>
+                    <strong>Alternative</strong>
+                    <p>${escapeHtml(advice.alternatives)}</p>
+                </div>
+            </div>
+            <ul>
+                ${advice.notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}
+            </ul>
+        </div>
+    `;
+}
+
+function renderAdsorberFlowCalculator() {
+    const result = document.getElementById('adsorberFlowResult');
+    if (!result) return;
+    const targetSubstance = document.getElementById('adsorberTargetSubstance')?.value || 'po4';
+    const advice = getAdsorberAdvice(targetSubstance);
+    const tank = Math.max(0, parseFloat(document.getElementById('adsorberTankLiters')?.value) || 0);
+    const hours = Math.max(1, parseFloat(document.getElementById('adsorberTargetHours')?.value) || 48);
+    const primeMinutes = Math.max(1, parseFloat(document.getElementById('adsorberPrimeMinutes')?.value) || 1);
+    if (!tank) {
+        result.innerHTML = '<p class="hint">Bitte Aquariumvolumen eintragen.</p>';
+        return;
+    }
+
+    const litersPerHour = tank / hours;
+    const mlPerMinute = litersPerHour * 1000 / 60;
+    const controlVolumeMl = mlPerMinute * primeMinutes;
+    const days = hours / 24;
+    const reductionLabel = hours === 48
+        ? 'theoretisch etwa 50 % alle 2 Tage'
+        : `theoretisch etwa 50 % alle ${hours.toFixed(0)} Stunden`;
+
+    result.innerHTML = `
+        <div class="tool-result adsorber-flow-result">
+            ${renderAdsorberAdvice(advice)}
+            <div class="tool-row">
+                <span><strong>Empfohlener Durchsatz</strong><small>${tank.toFixed(1)} L in ${hours.toFixed(0)} h durch den Adsorber</small></span>
+                <span>${litersPerHour.toFixed(2)} L/h</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Feineinstellung</strong><small>Praktischer Wert zum Einstellen am Schlauch / Ablauf</small></span>
+                <span>${mlPerMinute.toFixed(0)} ml/min</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Theoretische Reduktion</strong><small>Bei gestopptem Eintrag und idealer Durchmischung</small></span>
+                <span>${reductionLabel}</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Kontrollmessung</strong><small>Auffangmenge in ${primeMinutes.toFixed(0)} min bei dieser Einstellung</small></span>
+                <span>${controlVolumeMl.toFixed(0)} ml</span>
+            </div>
+            <div class="adsorber-guidance">
+                <strong>Empfohlene Nutzung</strong>
+                <ul>
+                    <li><strong>Durchströmung:</strong> von oben nach unten, damit das Material ruhig im Filterbett liegt.</li>
+                    <li><strong>Kein Wirbelbett:</strong> Bewegung kann Abrieb erzeugen und gebundene Stoffe wieder ins Aquarium bringen.</li>
+                    <li><strong>Langsamer Durchfluss:</strong> Ziel ist ein komplettes Aquariumvolumen in etwa ${hours.toFixed(0)} Stunden.</li>
+                    <li><strong>Kontrolle:</strong> Ablaufwasser ${primeMinutes.toFixed(0)} min auffangen und mit dem berechneten Kontrollwert vergleichen.</li>
+                    <li><strong>Hinweis:</strong> Zu hoher Durchfluss kann den Adsorber mit Stoffen belasten, die du nicht gezielt entfernen möchtest.</li>
+                </ul>
             </div>
         </div>
     `;

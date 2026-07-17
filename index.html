@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.15-cursor-palette">
+    <link rel="stylesheet" href="style.css?v=3.0.1">
 </head>
 <body>
 
@@ -25,7 +25,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.0.0</span>
+                    <span class="version-badge">v3.0.1</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -360,9 +360,14 @@
                     </div>
                 </div>
 
+                <div class="tool-global-disclaimer" role="note">
+                    <strong>Wichtiger Hinweis</strong>
+                    <span>Alle Rechner und Empfehlungen dienen nur als Hilfestellung. Bitte Werte, Dosierungen und Maßnahmen immer selbst prüfen. Für die Richtigkeit der Ergebnisse und daraus entstehende Folgen wird keine Haftung übernommen.</span>
+                </div>
+
                 <details class="tool-section" data-section-id="dosieren-und-messwerte">
                     <summary class="tool-section-summary">
-                        <span><strong>Dosierung &amp; Analyse</strong><small>Korrektur, Verbrauch, Testabgleich und gezielte Nährstoffzugabe</small></span>
+                        <span><strong>Wasserwerte &amp; Dosierung</strong><small>Korrekturen, Verbrauch, Testabgleich und gezielte Nährstoffzugabe</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -542,7 +547,7 @@
 
                 <details class="tool-section" data-section-id="salinitaet-und-wasserwechsel">
                     <summary class="tool-section-summary">
-                        <span><strong>Salinität &amp; Wasserwechsel</strong><small>PSU, Dichte, Salzkorrektur und rechnerischer Wechsel-Effekt</small></span>
+                        <span><strong>Salz, Wasserwechsel &amp; Adsorber</strong><small>PSU, Dichte, Salzkorrektur, Wasserwechsel-Effekt und Adsorber-Durchfluss</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -653,12 +658,42 @@
                             </div>
                             <div id="waterChangeResult"></div>
                         </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>Adsorber Durchfluss <button type="button" class="tool-inline-fav" data-tool-id="adsorber-durchfluss">☆ Fav</button></h3>
+                            <p class="hint">Berechnet den langsamen Durchfluss für Adsorber wie Silicarbon. Ziel: Aquariumvolumen kontrolliert über 48 Stunden durchströmen.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label>Was möchtest du entfernen?</label>
+                                    <select id="adsorberTargetSubstance" onchange="renderAdsorberFlowCalculator()">
+                                        <option value="po4">Phosphat (PO4) senken</option>
+                                        <option value="silicate">Silikat / Kieselsäure senken</option>
+                                        <option value="yellowing">Gelbstoffe oder Gerüche entfernen</option>
+                                        <option value="organics">Organische Belastung / Korallengifte reduzieren</option>
+                                        <option value="medication">Medikamentenreste entfernen</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Aquariumvolumen (L):</label>
+                                    <input type="number" id="adsorberTankLiters" min="1" step="1" value="400" oninput="renderAdsorberFlowCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Zielzeit für 1 Beckenvolumen (h):</label>
+                                    <input type="number" id="adsorberTargetHours" min="1" step="1" value="48" oninput="renderAdsorberFlowCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Kontrollmessung (min):</label>
+                                    <input type="number" id="adsorberPrimeMinutes" min="1" step="1" value="1" oninput="renderAdsorberFlowCalculator()">
+                                </div>
+                            </div>
+                            <div id="adsorberFlowResult"></div>
+                        </div>
                     </div>
                 </details>
 
                 <details class="tool-section" data-section-id="c-und-r-und-mischen">
                     <summary class="tool-section-summary">
-                        <span><strong>C&amp;R &amp; Mischrezepte</strong><small>Ausgleich planen, Meerwasser ansetzen und Lösungen mischen</small></span>
+                        <span><strong>Mischen &amp; Lösungen</strong><small>Meerwasser, C&amp;R-Lösungen, Natriumchlorid und Makro-Elemente ansetzen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -724,7 +759,7 @@
 
                 <details class="tool-section" data-section-id="sangokai-a-z">
                     <summary class="tool-section-summary">
-                        <span><strong>Sangokai A-Z</strong><small>Original-PDF und lokaler Test-Assistent</small></span>
+                        <span><strong>Sangokai A-Z Assistent</strong><small>Original-PDF durchsuchen und Antworten fachlich gegenprüfen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -759,7 +794,7 @@
 
                 <details class="tool-section" data-section-id="community-und-hilfe">
                     <summary class="tool-section-summary">
-                        <span><strong>Ressourcen</strong><small>Offizielle OSCI Links und weitere hilfreiche Quellen</small></span>
+                        <span><strong>Links &amp; Nachschlagen</strong><small>OSCI Motion, Meerwasser-Lexikon, Sangokai A-Z und Buchtipps</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -1633,8 +1668,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.15-cursor-palette"></script>
-    <script src="app.js?v=3.0.15-cursor-palette"></script>
+    <script src="sangokai-data.js?v=3.0.1"></script>
+    <script src="app.js?v=3.0.1"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
