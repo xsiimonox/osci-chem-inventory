@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reeftools Wave Demo</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071013;
+      --panel: #10191d;
+      --panel-2: #152126;
+      --panel-3: #0c171b;
+      --text: #eef7f8;
+      --muted: #9fb2b8;
+      --line: #26383e;
+      --a: #4fd8c9;
+      --b: #7fa8ff;
+      --danger: #ff6868;
+      --warn: #f2c76b;
+      --ok: #66e39e;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { min-width: 0; overflow-x: hidden; }
+    body { margin: 0; background: radial-gradient(circle at 20% 0, rgba(79, 216, 201, .12), transparent 32%), var(--bg); color: var(--text); overflow-x: hidden; }
+    main { width: min(1500px, calc(100% - 28px)); margin: 0 auto; padding: 20px 0 70px; }
+    header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 16px; }
+    h1 { margin: 0; font-size: clamp(1.35rem, 2vw, 2rem); font-weight: 760; letter-spacing: 0; }
+    h2 { margin: 0 0 12px; font-size: 1rem; font-weight: 740; }
+    h3 { margin: 0; font-size: .95rem; font-weight: 720; }
+    p { margin: 0; }
+    .sub { margin-top: 6px; color: var(--muted); line-height: 1.45; max-width: 72ch; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 9px 13px; border: 1px solid var(--line); border-radius: 999px; background: rgba(16, 25, 29, .86); color: var(--muted); white-space: nowrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--a); box-shadow: 0 0 14px rgba(79, 216, 201, .75); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, .72fr); gap: 16px; align-items: start; }
+    .stack { display: grid; gap: 16px; min-width: 0; }
+    .surface { border: 1px solid var(--line); border-radius: 13px; background: rgba(16, 25, 29, .92); min-width: 0; box-shadow: 0 18px 45px rgba(0, 0, 0, .18); }
+    .panel { padding: 15px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .metric { border: 1px solid var(--line); background: var(--panel-2); border-radius: 12px; padding: 11px; min-width: 0; }
+    .metric span { display: block; color: var(--muted); font-size: .76rem; margin-bottom: 7px; }
+    .metric strong { display: block; font-size: clamp(1rem, 1.35vw, 1.35rem); font-weight: 760; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar { height: 10px; border-radius: 999px; background: #0a1114; overflow: hidden; margin-top: 10px; border: 1px solid var(--line); }
+    .fill { height: 100%; width: 0%; background: var(--a); transition: width .18s linear; }
+    .fill.b { background: var(--b); }
+    .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    button, .button {
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+      font-weight: 680;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 9px 12px;
+      transition: transform .18s ease, border-color .18s ease, background .18s ease;
+    }
+    button:hover, .button:hover { transform: translateY(-1px); border-color: rgba(79, 216, 201, .42); }
+    button[aria-pressed="true"], button.primary { border-color: rgba(79, 216, 201, .68); background: #12302f; }
+    button.danger { border-color: rgba(255, 104, 104, .62); background: #37181b; color: #ffe3e3; }
+    button.ghost { background: transparent; }
+    input, select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: var(--panel-3);
+      color: var(--text);
+      padding: 0 10px;
+      font: inherit;
+      min-width: 0;
+    }
+    input[type="range"] { padding: 0; accent-color: var(--a); }
+    input[type="file"] { display: none; }
+    .label-line { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: .88rem; margin-bottom: 7px; }
+    output { color: var(--text); font-variant-numeric: tabular-nums; }
+    .field label { display: block; color: var(--muted); font-size: .78rem; margin-bottom: 6px; }
+    .actions { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+    .tools { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pump-card, .preset-row, .schedule-row { border: 1px solid var(--line); background: var(--panel-2); border-radius: 12px; padding: 12px; min-width: 0; }
+    .pump-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; margin-bottom: 12px; }
+    .pump-select { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .preset-row { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .schedule-row { display: grid; grid-template-columns: 72px 72px 1fr 74px auto; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .notice { display: none; margin-top: 12px; padding: 11px; border-radius: 11px; border: 1px solid rgba(255, 104, 104, .55); background: #37181b; color: #ffe3e3; }
+    .notice.active { display: block; }
+    .hint-box { padding: 11px; border: 1px solid rgba(242, 199, 107, .36); background: rgba(242, 199, 107, .09); border-radius: 11px; color: #f8df9d; line-height: 1.45; }
+    .wave-canvas { position: relative; height: 212px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: linear-gradient(180deg, #09171b, #050b0d); margin-top: 12px; }
+    .wave-canvas::before { content: ""; position: absolute; inset: auto -12% 0; height: 70%; background: radial-gradient(circle at 20% 55%, rgba(79, 216, 201, .22), transparent 32%), radial-gradient(circle at 82% 42%, rgba(127, 168, 255, .2), transparent 34%); filter: blur(12px); }
+    .wave-canvas::after { content: ""; position: absolute; inset: 18px; border: 1px dashed rgba(159, 178, 184, .2); border-radius: 18px; pointer-events: none; }
+    .stream { position: absolute; left: var(--x); top: var(--y); width: var(--w); height: 4px; border-radius: 999px; opacity: .86; transform: translate(-2px, -50%) rotate(var(--angle)); transform-origin: left center; background: linear-gradient(90deg, var(--color), rgba(79, 216, 201, .2), transparent); box-shadow: 0 0 18px color-mix(in srgb, var(--color), transparent 34%); transition: width .18s linear, left .2s ease, top .2s ease, transform .2s ease; }
+    .pump-dot { position: absolute; left: var(--x); top: var(--y); width: 22px; height: 22px; border: 2px solid var(--color); border-radius: 50%; transform: translate(-50%, -50%); box-shadow: 0 0 22px var(--color); background: rgba(7, 16, 19, .86); transition: left .2s ease, top .2s ease, opacity .2s ease; }
+    .pump-dot::after { content: attr(data-label); position: absolute; left: 50%; top: calc(100% + 6px); transform: translateX(-50%); color: var(--muted); font-size: .68rem; white-space: nowrap; max-width: 80px; overflow: hidden; text-overflow: ellipsis; }
+    .badge { display: inline-flex; padding: 4px 8px; border-radius: 999px; color: var(--muted); border: 1px solid var(--line); font-size: .72rem; white-space: nowrap; }
+    .muted { color: var(--muted); font-size: .82rem; line-height: 1.35; }
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 20;
+      transform: translate(-50%, 16px);
+      opacity: 0;
+      pointer-events: none;
+      border: 1px solid rgba(79, 216, 201, .4);
+      background: rgba(12, 23, 27, .96);
+      border-radius: 999px;
+      padding: 10px 14px;
+      color: var(--text);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.active { opacity: 1; transform: translate(-50%, 0); }
+    @media (max-width: 1100px) {
+      .layout { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      main { width: min(100% - 20px, 620px); padding-top: 12px; }
+      header { flex-direction: column; }
+      .grid2, .grid3, .actions, .schedule-row, .preset-row { grid-template-columns: 1fr; }
+      .modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .tools { display: grid; grid-template-columns: 1fr 1fr; }
+      .tools button, .tools .button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Reef Flow Control</h1>
+        <div class="sub">Voll nutzbare Demo der ESP32-Strömungspumpensteuerung. Änderungen werden lokal im Browser gespeichert. Es wird keine echte Hardware geschaltet.</div>
+      </div>
+      <div class="pill"><span class="dot"></span><span id="saveState">Gespeichert</span></div>
+    </header>
+
+    <section class="layout">
+      <div class="stack">
+        <section class="surface panel">
+          <h2>Live-Steuerung</h2>
+          <div class="metrics">
+            <div class="metric"><span>Aktiver Modus</span><strong id="liveMode">Reef Crest</strong></div>
+            <div class="metric"><span>Zeitplan</span><strong id="liveSchedule">Aktiv</strong></div>
+            <div class="metric"><span>Pumpe A</span><strong id="liveA">0 %</strong><div class="bar"><div class="fill" id="barA"></div></div></div>
+            <div class="metric"><span>Pumpe B</span><strong id="liveB">0 %</strong><div class="bar"><div class="fill b" id="barB"></div></div></div>
+          </div>
+          <div class="wave-canvas" id="waveCanvas" aria-label="Strömungsvorschau"></div>
+          <div class="actions">
+            <button class="primary" type="button" data-quick-preset="nutrient">Detritus Lift</button>
+            <button type="button" data-quick-preset="night">Fütterung</button>
+            <button type="button" data-quick-preset="pause">Stop</button>
+            <button class="danger" id="estop" type="button">Not-Aus</button>
+          </div>
+          <div class="notice" id="alarm">Not-Aus aktiv. Alle virtuellen Ausgänge sind auf 0 % begrenzt.</div>
+        </section>
+
+        <section class="surface panel">
+          <h2>Modus wählen</h2>
+          <div class="modes" id="modeButtons"></div>
+        </section>
+
+        <section class="surface panel">
+          <h2>Modusparameter</h2>
+          <div class="grid3">
+            <div><div class="label-line"><span>Minimum</span><output id="minOut">24 %</output></div><input id="min" type="range" min="0" max="100"></div>
+            <div><div class="label-line"><span>Maximum</span><output id="maxOut">70 %</output></div><input id="max" type="range" min="0" max="100"></div>
+            <div><div class="label-line"><span>Intensität</span><output id="intensityOut">82 %</output></div><input id="intensity" type="range" min="0" max="100"></div>
+            <div><div class="label-line"><span>Frequenz</span><output id="frequencyOut">0.100 Hz</output></div><input id="frequency" type="range" min="0.004" max="0.42" step="0.002"></div>
+            <div><div class="label-line"><span>Phase</span><output id="phaseOut">115°</output></div><input id="phase" type="range" min="0" max="360"></div>
+            <div><div class="label-line"><span>Zufall</span><output id="randomOut">38 %</output></div><input id="randomness" type="range" min="0" max="100"></div>
+          </div>
+        </section>
+
+        <section class="surface panel">
+          <div class="pump-head">
+            <h2>Pumpen</h2>
+            <button type="button" id="addPump">Pumpe hinzufügen</button>
+          </div>
+          <div class="pump-select" id="pumpSelect"></div>
+          <div class="pump-card">
+            <div class="pump-head">
+              <h3 id="pumpTitle">Pumpe A</h3>
+              <div class="tools">
+                <button type="button" id="pumpEnabled" aria-pressed="true">Aktiv</button>
+                <button type="button" class="danger" id="removePump">Entfernen</button>
+              </div>
+            </div>
+            <div class="grid2">
+              <div class="field"><label>Name</label><input id="pumpName" type="text" maxlength="28"></div>
+              <div><div class="label-line"><span>Manuell</span><output id="manualOut">35 %</output></div><input id="manualPercent" type="range" min="0" max="100"></div>
+              <div><div class="label-line"><span>Mindestleistung</span><output id="pumpMinOut">5 %</output></div><input id="pumpMin" type="range" min="0" max="100"></div>
+              <div><div class="label-line"><span>Maximalleistung</span><output id="pumpMaxOut">70 %</output></div><input id="pumpMax" type="range" min="0" max="100"></div>
+              <div><div class="label-line"><span>Rampe hoch</span><output id="rampUpOut">18 %/s</output></div><input id="rampUp" type="range" min="1" max="100"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div class="stack">
+        <section class="surface panel">
+          <h2>System</h2>
+          <div class="grid2">
+            <div class="field"><label>Automatik</label><select id="scheduleEnabled"><option value="true">Zeitplan aktiv</option><option value="false">Manuell</option></select></div>
+            <div class="field"><label>Strategie</label><select id="groupStrategy"><option value="antiSync">Gegenläufig</option><option value="sync">Synchron</option><option value="softSync">Weich synchron</option><option value="cross">Kreuzströmung</option><option value="gyre">Gyre</option><option value="independent">Unabhängig</option></select></div>
+            <div><div class="label-line"><span>Gruppenlimit</span><output id="groupMaxOut">70 %</output></div><input id="groupMax" type="range" min="0" max="100"></div>
+            <div><div class="label-line"><span>Balance</span><output id="balanceOut">0 %</output></div><input id="balance" type="range" min="-50" max="50"></div>
+            <div><div class="label-line"><span>Slave Faktor</span><output id="slaveOut">0.78</output></div><input id="slaveRatio" type="range" min="0" max="1.5" step="0.01"></div>
+          </div>
+        </section>
+
+        <section class="surface panel">
+          <div class="pump-head">
+            <h2>Presets</h2>
+            <button type="button" id="savePreset">Aktuellen Stand speichern</button>
+          </div>
+          <div id="presetList"></div>
+        </section>
+
+        <section class="surface panel">
+          <div class="pump-head">
+            <h2>Zeitplan</h2>
+            <button type="button" id="addSchedule">Eintrag hinzufügen</button>
+          </div>
+          <div id="scheduleList"></div>
+          <p class="muted">Die Demo wählt bei aktivem Zeitplan automatisch den passenden Eintrag zur aktuellen Uhrzeit.</p>
+        </section>
+
+        <section class="surface panel">
+          <h2>Demo-Daten</h2>
+          <div class="tools">
+            <button type="button" id="exportConfig">Exportieren</button>
+            <button type="button" id="importConfig">Importieren</button>
+            <button type="button" class="danger" id="resetConfig">Zurücksetzen</button>
+          </div>
+          <input id="importFile" type="file" accept="application/json,.json">
+          <div class="hint-box" style="margin-top: 12px;">Diese Demo speichert nur lokal auf diesem Gerät. Später kann dieselbe Struktur als Grundlage für ESP32-Profile, Backup und echte Gerätekommunikation dienen.</div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const STORAGE_KEY = "reeftools_wave_demo_v2";
+    const modes = {
+      constant: { label: "Konstant", min: 25, max: 45, intensity: 55, frequency: 0.03, phase: 0, randomness: 0 },
+      pulse: { label: "Puls", min: 8, max: 68, intensity: 82, frequency: 0.22, phase: 180, randomness: 0 },
+      standingWave: { label: "Stehende Welle", min: 10, max: 64, intensity: 80, frequency: 0.18, phase: 180, randomness: 0 },
+      sine: { label: "Sinuswelle", min: 16, max: 62, intensity: 74, frequency: 0.11, phase: 180, randomness: 0 },
+      reefCrest: { label: "Reef Crest", min: 24, max: 70, intensity: 82, frequency: 0.1, phase: 115, randomness: 38 },
+      lagoon: { label: "Lagune", min: 14, max: 42, intensity: 58, frequency: 0.025, phase: 70, randomness: 10 },
+      gyre: { label: "Gyre", min: 10, max: 66, intensity: 82, frequency: 0.025, phase: 180, randomness: 0 },
+      nutrient: { label: "Detritus Lift", min: 22, max: 70, intensity: 88, frequency: 0.16, phase: 145, randomness: 24 },
+      night: { label: "Nacht", min: 6, max: 26, intensity: 45, frequency: 0.018, phase: 160, randomness: 4 },
+      pause: { label: "Pause", min: 0, max: 0, intensity: 0, frequency: 0.05, phase: 0, randomness: 0 }
+    };
+    const defaultState = {
+      mode: "reefCrest",
+      config: { ...modes.reefCrest },
+      emergency: false,
+      selectedPump: 0,
+      scheduleEnabled: true,
+      group: { strategy: "antiSync", max: 70, balance: 0, slave: 0.78 },
+      pumps: [
+        { name: "Pumpe A", side: "left", enabled: true, output: 0, target: 0, manual: 35, min: 5, max: 70, rampUp: 18 },
+        { name: "Pumpe B", side: "right", enabled: true, output: 0, target: 0, manual: 35, min: 5, max: 70, rampUp: 18 }
+      ],
+      presets: [
+        { id: "gentle-lagoon", name: "Sanfte Lagune", mode: "lagoon", strategy: "softSync", config: { ...modes.lagoon } },
+        { id: "mixed-reef", name: "Gemischtes Riff", mode: "reefCrest", strategy: "antiSync", config: { ...modes.reefCrest } },
+        { id: "sps-crest", name: "SPS Reef Crest", mode: "reefCrest", strategy: "cross", config: { ...modes.reefCrest, max: 82 } },
+        { id: "night-calm", name: "Nachtströmung", mode: "night", strategy: "softSync", config: { ...modes.night } },
+        { id: "detritus-lift", name: "Detritus Lift", mode: "nutrient", strategy: "cross", config: { ...modes.nutrient } },
+        { id: "pause", name: "Pause", mode: "pause", strategy: "independent", config: { ...modes.pause } }
+      ],
+      schedule: [
+        { start: "08:00", end: "10:00", presetId: "gentle-lagoon", limit: 55 },
+        { start: "10:00", end: "18:00", presetId: "mixed-reef", limit: 82 },
+        { start: "18:00", end: "21:00", presetId: "sps-crest", limit: 78 },
+        { start: "21:00", end: "08:00", presetId: "night-calm", limit: 38 }
+      ]
+    };
+    const $ = id => document.getElementById(id);
+    const clone = value => JSON.parse(JSON.stringify(value));
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, Number(v) || 0));
+    const sine01 = phase => Math.sin(phase * Math.PI * 2) * 0.5 + 0.5;
+    let state = loadState();
+    let toastTimer = null;
+    let lastScheduleKey = "";
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+        if (!saved || typeof saved !== "object") return clone(defaultState);
+        const merged = { ...clone(defaultState), ...saved };
+        merged.config = { ...modes[merged.mode] || modes.reefCrest, ...(saved.config || {}) };
+        merged.group = { ...defaultState.group, ...(saved.group || {}) };
+        merged.pumps = Array.isArray(saved.pumps) && saved.pumps.length ? saved.pumps.map(normalizePump) : clone(defaultState.pumps);
+        merged.presets = Array.isArray(saved.presets) && saved.presets.length ? saved.presets : clone(defaultState.presets);
+        merged.schedule = Array.isArray(saved.schedule) ? saved.schedule : clone(defaultState.schedule);
+        merged.selectedPump = clamp(saved.selectedPump || 0, 0, merged.pumps.length - 1);
+        return merged;
+      } catch {
+        return clone(defaultState);
+      }
+    }
+
+    function normalizePump(pump, index = 0) {
+      return {
+        name: pump.name || `Pumpe ${String.fromCharCode(65 + index)}`,
+        side: index % 2 ? "right" : "left",
+        enabled: pump.enabled !== false,
+        output: Number(pump.output) || 0,
+        target: Number(pump.target) || 0,
+        manual: clamp(pump.manual ?? 35, 0, 100),
+        min: clamp(pump.min ?? 5, 0, 100),
+        max: clamp(pump.max ?? 70, 0, 100),
+        rampUp: clamp(pump.rampUp ?? 18, 1, 100)
+      };
+    }
+
+    function persist(message = "Gespeichert") {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      $("saveState").textContent = message;
+      window.clearTimeout(persist._timer);
+      persist._timer = window.setTimeout(() => $("saveState").textContent = "Gespeichert", 1200);
+    }
+
+    function toast(message) {
+      const el = $("toast");
+      el.textContent = message;
+      el.classList.add("active");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => el.classList.remove("active"), 2200);
+    }
+
+    function wave(mode, phase) {
+      if (mode === "constant") return 0.55;
+      if (mode === "pulse" || mode === "standingWave") return sine01(phase) > 0.55 ? 1 : 0.18;
+      if (mode === "reefCrest") return clamp(sine01(phase * .6) * .45 + sine01(phase * 5.2) * .32 + Math.max(0, Math.sin(phase * Math.PI * 17.3)) ** 4 * .34, 0, 1);
+      if (mode === "lagoon" || mode === "night") return clamp(.48 + Math.sin(phase * Math.PI * 2) * .2, 0, 1);
+      if (mode === "nutrient") return clamp(.22 + (sine01(phase * 1.6) > .55 ? .68 : 0) + sine01(phase * 3.5) * .12, 0, 1);
+      if (mode === "gyre") return Math.abs(Math.sin(phase * Math.PI * 2));
+      return sine01(phase);
+    }
+
+    function setMode(mode, options = {}) {
+      if (!modes[mode]) return;
+      if (!options.fromSchedule) {
+        state.scheduleEnabled = false;
+        lastScheduleKey = "manual";
+      }
+      state.mode = mode;
+      state.config = options.keepConfig ? { ...state.config } : { ...modes[mode], ...(options.config || {}) };
+      if (mode === "pause") state.group.strategy = "independent";
+      persist();
+      renderStatic();
+    }
+
+    function applyPreset(id, fromSchedule = false) {
+      const preset = state.presets.find(item => item.id === id);
+      if (!preset) return;
+      if (!fromSchedule) {
+        state.scheduleEnabled = false;
+        lastScheduleKey = "manual";
+      }
+      state.group.strategy = preset.strategy || state.group.strategy;
+      state.group.max = clamp(preset.limit ?? state.group.max, 0, 100);
+      state.mode = preset.mode;
+      state.config = { ...modes[preset.mode], ...(preset.config || {}) };
+      persist(fromSchedule ? "Zeitplan aktiv" : "Preset geladen");
+      renderStatic();
+    }
+
+    function minutes(value) {
+      const [h, m] = String(value || "00:00").split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    }
+
+    function activeScheduleEntry() {
+      if (!state.scheduleEnabled || state.emergency) return null;
+      const now = new Date();
+      const current = now.getHours() * 60 + now.getMinutes();
+      return state.schedule.find(row => {
+        const start = minutes(row.start);
+        const end = minutes(row.end);
+        return start <= end ? current >= start && current < end : current >= start || current < end;
+      }) || null;
+    }
+
+    function maybeApplySchedule() {
+      const row = activeScheduleEntry();
+      const key = row ? `${row.start}-${row.end}-${row.presetId}-${row.limit}` : "manual";
+      $("liveSchedule").textContent = row ? `${row.start}-${row.end}` : (state.scheduleEnabled ? "Kein Eintrag" : "Manuell");
+      if (!row || key === lastScheduleKey) return;
+      lastScheduleKey = key;
+      const preset = state.presets.find(item => item.id === row.presetId);
+      if (!preset) return;
+      state.group.max = clamp(row.limit, 0, 100);
+      applyPreset(row.presetId, true);
+    }
+
+    function renderStatic() {
+      $("modeButtons").innerHTML = Object.entries(modes).map(([id, mode]) => `<button type="button" data-mode="${id}" aria-pressed="${id === state.mode}">${mode.label}</button>`).join("");
+      document.querySelectorAll("[data-mode]").forEach(btn => btn.onclick = () => setMode(btn.dataset.mode));
+      renderPresets();
+      renderSchedule();
+      renderPumpSelect();
+      ["min", "max", "intensity", "frequency", "phase", "randomness"].forEach(id => {
+        $(id).value = state.config[id];
+        $(id).oninput = () => {
+          state.config[id] = Number($(id).value);
+          if (id === "min" && state.config.min > state.config.max) state.config.max = state.config.min;
+          if (id === "max" && state.config.max < state.config.min) state.config.min = state.config.max;
+          updateLabels();
+          persist();
+        };
+      });
+      $("scheduleEnabled").value = String(Boolean(state.scheduleEnabled));
+      $("scheduleEnabled").onchange = () => { state.scheduleEnabled = $("scheduleEnabled").value === "true"; lastScheduleKey = ""; persist(); updateLabels(); };
+      $("groupStrategy").value = state.group.strategy;
+      $("groupStrategy").oninput = () => { state.group.strategy = $("groupStrategy").value; persist(); };
+      $("groupMax").value = state.group.max;
+      $("groupMax").oninput = () => { state.group.max = Number($("groupMax").value); updateLabels(); persist(); };
+      $("balance").value = state.group.balance;
+      $("balance").oninput = () => { state.group.balance = Number($("balance").value); updateLabels(); persist(); };
+      $("slaveRatio").value = state.group.slave;
+      $("slaveRatio").oninput = () => { state.group.slave = Number($("slaveRatio").value); updateLabels(); persist(); };
+      document.querySelectorAll("[data-quick-preset]").forEach(btn => btn.onclick = () => setMode(btn.dataset.quickPreset || state.mode));
+      $("estop").onclick = () => {
+        state.emergency = !state.emergency;
+        lastScheduleKey = "";
+        persist(state.emergency ? "Not-Aus" : "Aktiv");
+        updateLabels();
+      };
+      $("addPump").onclick = addPump;
+      $("removePump").onclick = removePump;
+      $("savePreset").onclick = saveCurrentPreset;
+      $("addSchedule").onclick = addScheduleRow;
+      $("exportConfig").onclick = exportConfig;
+      $("importConfig").onclick = () => $("importFile").click();
+      $("importFile").onchange = importConfig;
+      $("resetConfig").onclick = resetConfig;
+      renderPump();
+      updateLabels();
+    }
+
+    function renderPumpSelect() {
+      $("pumpSelect").innerHTML = state.pumps.map((pump, index) => `<button type="button" data-pump-select="${index}" aria-pressed="${index === state.selectedPump}">${pump.name}<br><span id="pumpSelect${index}">${pump.output.toFixed(1)} %</span></button>`).join("");
+      document.querySelectorAll("[data-pump-select]").forEach(btn => btn.onclick = () => {
+        state.selectedPump = Number(btn.dataset.pumpSelect);
+        persist();
+        renderStatic();
+      });
+    }
+
+    function renderPump() {
+      if (!state.pumps[state.selectedPump]) state.selectedPump = 0;
+      const pump = state.pumps[state.selectedPump];
+      $("pumpTitle").textContent = pump.name;
+      $("pumpName").value = pump.name;
+      $("pumpName").oninput = () => {
+        pump.name = $("pumpName").value.trim() || `Pumpe ${state.selectedPump + 1}`;
+        renderPumpSelect();
+        $("pumpTitle").textContent = pump.name;
+        persist();
+      };
+      $("pumpEnabled").textContent = pump.enabled ? "Aktiv" : "Aus";
+      $("pumpEnabled").setAttribute("aria-pressed", String(pump.enabled));
+      $("pumpEnabled").onclick = () => { pump.enabled = !pump.enabled; persist(); renderPump(); };
+      $("removePump").disabled = state.pumps.length <= 1;
+      [["manualPercent", "manual"], ["pumpMin", "min"], ["pumpMax", "max"], ["rampUp", "rampUp"]].forEach(([id, key]) => {
+        $(id).value = pump[key];
+        $(id).oninput = () => {
+          pump[key] = Number($(id).value);
+          if (key === "min" && pump.min > pump.max) pump.max = pump.min;
+          if (key === "max" && pump.max < pump.min) pump.min = pump.max;
+          updateLabels();
+          persist();
+        };
+      });
+      updateLabels();
+    }
+
+    function addPump() {
+      const index = state.pumps.length;
+      state.pumps.push(normalizePump({ name: `Pumpe ${String.fromCharCode(65 + index)}`, side: index % 2 ? "right" : "left" }, index));
+      state.selectedPump = index;
+      persist("Pumpe hinzugefügt");
+      renderStatic();
+    }
+
+    function removePump() {
+      if (state.pumps.length <= 1) return;
+      if (!confirm("Diese Demo-Pumpe entfernen?")) return;
+      state.pumps.splice(state.selectedPump, 1);
+      state.selectedPump = clamp(state.selectedPump, 0, state.pumps.length - 1);
+      persist("Pumpe entfernt");
+      renderStatic();
+    }
+
+    function renderPresets() {
+      $("presetList").innerHTML = state.presets.map(preset => `
+        <div class="preset-row">
+          <div><strong>${escapeHtml(preset.name)}</strong><br><span class="badge">${modes[preset.mode]?.label || preset.mode} · ${preset.strategy || "-"}</span></div>
+          <button type="button" data-preset="${preset.id}">Laden</button>
+          <button type="button" class="danger" data-delete-preset="${preset.id}">Löschen</button>
+        </div>
+      `).join("");
+      document.querySelectorAll("[data-preset]").forEach(btn => btn.onclick = () => applyPreset(btn.dataset.preset));
+      document.querySelectorAll("[data-delete-preset]").forEach(btn => btn.onclick = () => deletePreset(btn.dataset.deletePreset));
+    }
+
+    function saveCurrentPreset() {
+      const name = prompt("Name für dieses Preset:", `${modes[state.mode].label} Kopie`);
+      if (!name) return;
+      const id = `preset-${Date.now()}`;
+      state.presets.push({
+        id,
+        name: name.trim(),
+        mode: state.mode,
+        strategy: state.group.strategy,
+        limit: state.group.max,
+        config: { ...state.config }
+      });
+      persist("Preset gespeichert");
+      renderStatic();
+    }
+
+    function deletePreset(id) {
+      if (state.presets.length <= 1) return toast("Mindestens ein Preset bleibt erhalten.");
+      if (!confirm("Preset löschen? Zeitplaneinträge mit diesem Preset werden ebenfalls entfernt.")) return;
+      state.presets = state.presets.filter(item => item.id !== id);
+      state.schedule = state.schedule.filter(item => item.presetId !== id);
+      persist("Preset gelöscht");
+      renderStatic();
+    }
+
+    function renderSchedule() {
+      const options = state.presets.map(preset => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`).join("");
+      $("scheduleList").innerHTML = state.schedule.map((row, index) => `
+        <div class="schedule-row" data-schedule-index="${index}">
+          <input type="time" value="${row.start || "00:00"}" data-schedule-field="start">
+          <input type="time" value="${row.end || "00:00"}" data-schedule-field="end">
+          <select data-schedule-field="presetId">${options}</select>
+          <input type="number" min="0" max="100" step="1" value="${clamp(row.limit, 0, 100)}" data-schedule-field="limit">
+          <button type="button" class="danger" data-delete-schedule="${index}">Löschen</button>
+        </div>
+      `).join("");
+      document.querySelectorAll(".schedule-row").forEach(rowEl => {
+        const index = Number(rowEl.dataset.scheduleIndex);
+        rowEl.querySelector("[data-schedule-field='presetId']").value = state.schedule[index].presetId;
+        rowEl.querySelectorAll("[data-schedule-field]").forEach(input => {
+          input.onchange = () => {
+            const field = input.dataset.scheduleField;
+            state.schedule[index][field] = field === "limit" ? clamp(input.value, 0, 100) : input.value;
+            lastScheduleKey = "";
+            persist("Zeitplan gespeichert");
+          };
+        });
+      });
+      document.querySelectorAll("[data-delete-schedule]").forEach(btn => btn.onclick = () => {
+        state.schedule.splice(Number(btn.dataset.deleteSchedule), 1);
+        lastScheduleKey = "";
+        persist("Zeitplan gespeichert");
+        renderStatic();
+      });
+    }
+
+    function addScheduleRow() {
+      state.schedule.push({ start: "12:00", end: "13:00", presetId: state.presets[0]?.id || "mixed-reef", limit: state.group.max });
+      persist("Zeitplan gespeichert");
+      renderStatic();
+    }
+
+    function updateLabels() {
+      $("minOut").textContent = state.config.min.toFixed(0) + " %";
+      $("maxOut").textContent = state.config.max.toFixed(0) + " %";
+      $("intensityOut").textContent = state.config.intensity.toFixed(0) + " %";
+      $("frequencyOut").textContent = state.config.frequency.toFixed(3) + " Hz";
+      $("phaseOut").textContent = state.config.phase.toFixed(0) + "°";
+      $("randomOut").textContent = state.config.randomness.toFixed(0) + " %";
+      $("groupMaxOut").textContent = state.group.max.toFixed(0) + " %";
+      $("balanceOut").textContent = state.group.balance.toFixed(0) + " %";
+      $("slaveOut").textContent = Number(state.group.slave).toFixed(2);
+      const pump = state.pumps[state.selectedPump];
+      $("manualOut").textContent = pump.manual.toFixed(0) + " %";
+      $("pumpMinOut").textContent = pump.min.toFixed(0) + " %";
+      $("pumpMaxOut").textContent = pump.max.toFixed(0) + " %";
+      $("rampUpOut").textContent = pump.rampUp.toFixed(0) + " %/s";
+      $("alarm").classList.toggle("active", state.emergency);
+      $("estop").textContent = state.emergency ? "Reset" : "Not-Aus";
+      $("liveMode").textContent = modes[state.mode]?.label || state.mode;
+    }
+
+    function exportConfig() {
+      const blob = new Blob([JSON.stringify({ type: "reeftools-wave-demo", version: 2, exportedAt: new Date().toISOString(), state }, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reeftools-wave-demo-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast("Demo-Konfiguration exportiert.");
+    }
+
+    function importConfig(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(String(reader.result || "{}"));
+          const next = data.state || data;
+          if (!next || !Array.isArray(next.pumps)) throw new Error("Ungültige Datei");
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+          state = loadState();
+          lastScheduleKey = "";
+          renderStatic();
+          toast("Demo-Konfiguration importiert.");
+        } catch {
+          toast("Import fehlgeschlagen.");
+        } finally {
+          event.target.value = "";
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetConfig() {
+      if (!confirm("Wave Demo wirklich auf Werkseinstellungen zurücksetzen?")) return;
+      state = clone(defaultState);
+      localStorage.removeItem(STORAGE_KEY);
+      lastScheduleKey = "";
+      persist("Zurückgesetzt");
+      renderStatic();
+    }
+
+    function tick() {
+      maybeApplySchedule();
+      const t = performance.now() / 1000;
+      const cfg = state.config;
+      const balance = Number(state.group.balance) || 0;
+      state.pumps.forEach((pump, i) => {
+        const phaseOffset = i % 2 ? cfg.phase / 360 : 0;
+        const base = cfg.min + (cfg.max - cfg.min) * (cfg.intensity / 100) * wave(state.mode, t * cfg.frequency + phaseOffset + i * 0.08);
+        let target = base;
+        if (state.group.strategy === "sync" || state.group.strategy === "softSync") target = base;
+        if (state.group.strategy === "antiSync" || state.group.strategy === "cross") target = i % 2 ? cfg.min + (cfg.max - base) : base;
+        const position = getPumpVisualPosition(i);
+        if (state.group.strategy === "gyre") target = Math.sin(t * cfg.frequency * Math.PI * 2) > 0 === (position.balance >= 0) ? cfg.max : cfg.min;
+        if (state.group.strategy === "independent") target = pump.manual;
+        target += balance * position.balance;
+        if (i > 0) target *= Number(state.group.slave) || 1;
+        pump.target = state.emergency || !pump.enabled ? 0 : clamp(target, pump.min, Math.min(pump.max, state.group.max));
+        const delta = pump.target - pump.output;
+        pump.output += Math.sign(delta) * Math.min(Math.abs(delta), pump.rampUp / 12);
+      });
+      paintLive();
+      requestAnimationFrame(tick);
+    }
+
+    function paintLive() {
+      const a = state.pumps[0] || { output: 0 };
+      const b = state.pumps[1] || { output: 0 };
+      $("liveA").textContent = a.output.toFixed(1) + " %";
+      $("liveB").textContent = b.output.toFixed(1) + " %";
+      $("barA").style.width = clamp(a.output, 0, 100) + "%";
+      $("barB").style.width = clamp(b.output, 0, 100) + "%";
+      renderWaveCanvas();
+      state.pumps.forEach((pump, index) => {
+        const el = $(`pumpSelect${index}`);
+        if (el) el.textContent = pump.output.toFixed(1) + " %";
+      });
+    }
+
+    function renderWaveCanvas() {
+      const canvas = $("waveCanvas");
+      if (!canvas) return;
+      canvas.innerHTML = state.pumps.map((pump, index) => {
+        const position = getPumpVisualPosition(index);
+        const color = index % 2 ? "var(--b)" : "var(--a)";
+        const output = clamp(pump.output, 0, 100);
+        const length = 20 + output * .56;
+        const opacity = pump.enabled && output > 0 ? 1 : .34;
+        return `
+          <span class="stream" style="--x:${position.x}%;--y:${position.y}%;--w:${length}%;--angle:${position.angle}deg;--color:${color};opacity:${opacity};"></span>
+          <span class="pump-dot" data-label="${escapeHtml(pump.name)}" style="--x:${position.x}%;--y:${position.y}%;--color:${color};opacity:${pump.enabled ? 1 : .38};"></span>
+        `;
+      }).join("");
+    }
+
+    function getPumpVisualPosition(index) {
+      const leftSide = index % 2 === 0;
+      const row = Math.floor(index / 2);
+      const y = clamp(34 + row * 22, 18, 82);
+      return {
+        x: leftSide ? 10 : 90,
+        y,
+        angle: leftSide ? 0 : 180,
+        balance: leftSide ? 1 : -1
+      };
+    }
+
+    function escapeHtml(value) {
+      return String(value || "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[char]));
+    }
+
+    renderStatic();
+    tick();
+  </script>
+</body>
+</html>
