@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v301-wave-demo-no-position';
+const CACHE_NAME = 'reef-storage-tools-cache-v301-nutrition-carbon-range';
 const ASSETS = [
   './',
   './index.html',

@@ -217,6 +217,19 @@ const nutritionDoseRules = {
         mlPer100L: 1,
         primaryChange: 0.1,
         product: 'Lanthan (La)'
+    },
+    Kohlenstoff: {
+        action: 'unterstützt die biologische Nährstoffreduktion',
+        targetLabel: 'Startdosierung (ml pro 100 L):',
+        primary: 'Kohlenstoffversorgung',
+        mlPer100L: 1,
+        primaryChange: 1,
+        product: 'Kohlenstoff (C)',
+        isDirectDose: true,
+        recommendedMin: 0.2,
+        recommendedMax: 2.0,
+        startMin: 0.1,
+        startMax: 0.25
     }
 };
 
@@ -10771,18 +10784,46 @@ function checkDosingContainerReminders(trigger = 'auto') {
 function renderNutritionCalculator() {
     const result = document.getElementById('nutritionResult');
     if (!result) return;
+    const adviceResult = document.getElementById('nutritionAdviceResult');
     const element = document.getElementById('nutritionElement')?.value || 'Nitrat';
     const rule = nutritionDoseRules[element] || nutritionDoseRules.Nitrat;
     const label = document.getElementById('nutritionTargetLabel');
-    if (label) label.innerText = rule.targetLabel;
+    if (label) label.innerText = rule.isDirectDose ? 'Startdosierung' : rule.targetLabel.replace(':', '');
+    const unit = document.getElementById('nutritionTargetUnit');
+    if (unit) unit.innerText = rule.isDirectDose ? '0,2-2,0 ml/100 L/Tag' : 'mg/l';
+    const no3Status = document.getElementById('nutritionNo3Status')?.value || 'high';
+    const po4Status = document.getElementById('nutritionPo4Status')?.value || 'high';
+    const advice = getNutritionAdvice(no3Status, po4Status);
+    if (adviceResult) adviceResult.innerHTML = renderNutritionAdvice(advice);
+    const targetInput = document.getElementById('nutritionIncrease');
+    if (targetInput) {
+        targetInput.disabled = false;
+        targetInput.readOnly = false;
+        targetInput.closest('.input-group')?.classList.toggle('nutrition-carbon-dose', Boolean(rule.isDirectDose));
+        if (rule.isDirectDose) {
+            targetInput.min = String(rule.recommendedMin);
+            targetInput.max = String(rule.recommendedMax);
+            targetInput.step = '0.1';
+            const current = parseFloat(targetInput.value);
+            targetInput.value = clampNutritionCarbonDose(Number.isFinite(current) ? current : getNutritionCarbonStartDose(no3Status, po4Status)).toFixed(1);
+        } else {
+            targetInput.min = '0';
+            targetInput.removeAttribute('max');
+            targetInput.step = '0.01';
+        }
+    }
     const liters = Math.max(0, parseFloat(document.getElementById('nutritionTankLiters')?.value) || 0);
     const targetChange = Math.max(0, parseFloat(document.getElementById('nutritionIncrease')?.value) || 0);
     const days = Math.max(1, parseInt(document.getElementById('nutritionPlanDays')?.value, 10) || 1);
     if (!liters || !targetChange) {
-        result.innerHTML = '<p class="hint">Trage Aquariumgröße und gewünschte Zieländerung ein.</p>';
+        result.innerHTML = `
+            <p class="hint">Trage ${rule.isDirectDose ? 'die Aquariumgröße ein und wähle eine Kohlenstoff-Dosierung zwischen 0,2 und 2,0 ml pro 100 L/Tag.' : 'Aquariumgröße und gewünschte Zieländerung ein.'}</p>
+        `;
         return;
     }
-    const totalMl = (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
+    const totalMl = rule.isDirectDose
+        ? (liters / 100) * targetChange
+        : (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
     const dailyMl = totalMl / days;
     const resolved = resolveRecipeItem({ item: rule.product });
     const stock = resolved ? ((db.inventory[resolved.cat] && db.inventory[resolved.cat][resolved.item]) || 0) : null;
@@ -10795,16 +10836,20 @@ function renderNutritionCalculator() {
             <strong>${dailyMl.toFixed(2)} ml</strong>
         </label>
     `).join('');
+    const basisText = rule.isDirectDose
+        ? `Wählbare Dosierung im Herstellerbereich: ${rule.recommendedMin.toFixed(1)}-${rule.recommendedMax.toFixed(1)} ml pro 100 L/Tag · langsam starten mit ${rule.startMin.toFixed(2)}-${rule.startMax.toFixed(2)} ml pro 100 L`
+        : `1 ml pro 100 L ${rule.action} ${rule.primary} um ${rule.primaryChange} mg/l`;
     result.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row${missingClass}">
-                <span><strong>${element}</strong><small>${rule.primary} ${rule.action} um ${targetChange} mg/l · ${stockHint}</small></span>
-                <span>${totalMl.toFixed(2)} ml</span>
+        <div class="tool-result nutrition-dose-result">
+            <div class="tool-row nutrition-total-row${missingClass}">
+                <span><strong>${rule.product}</strong><small>${rule.isDirectDose ? `gewählte Dosierung ${targetChange} ml pro 100 L/Tag` : `${rule.primary} ${rule.action} um ${targetChange} mg/l`} · ${stockHint}</small></span>
+                <span><strong>${totalMl.toFixed(2)} ml</strong><small>gesamt</small></span>
             </div>
             <div class="tool-row">
-                <span><strong>Dosierbasis</strong><small>1 ml pro 100 L ${rule.action} ${rule.primary} um ${rule.primaryChange} mg/l</small></span>
-                <span>${dailyMl.toFixed(2)} ml/Tag</span>
+                <span><strong>Dosierbasis</strong><small>${basisText}</small></span>
+                <span><strong>${dailyMl.toFixed(2)} ml</strong><small>pro Tag</small></span>
             </div>
+            ${renderNutritionSafetyNotes(element)}
             <div class="dose-plan">${planRows}</div>
         </div>
         <div class="tool-action-row calculator-actions">
@@ -10818,12 +10863,95 @@ function bookNutritionDose() {
     const rule = nutritionDoseRules[element] || nutritionDoseRules.Nitrat;
     const liters = Math.max(0, parseFloat(document.getElementById('nutritionTankLiters')?.value) || 0);
     const targetChange = Math.max(0, parseFloat(document.getElementById('nutritionIncrease')?.value) || 0);
-    const totalMl = (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
+    const totalMl = rule.isDirectDose
+        ? (liters / 100) * targetChange
+        : (liters / 100) * (targetChange / rule.primaryChange) * rule.mlPer100L;
     const resolved = resolveRecipeItem({ item: rule.product });
     if (!resolved) return alert(`${rule.product} ist nicht lagergeführt.`);
-    if (!totalMl) return alert('Bitte erst Aquariumgröße und Zieländerung eintragen.');
+    if (!totalMl) return alert(`Bitte erst ${rule.isDirectDose ? 'die Aquariumgröße eintragen.' : 'Aquariumgröße und Zieländerung eintragen.'}`);
     if (!confirm(`${totalMl.toFixed(2)} ml ${rule.product} auslagern?`)) return;
     executeQueueWithConflictHandling([{ ...resolved, amount: totalMl }], 0);
+}
+
+function getNutritionCarbonStartDose(no3Status, po4Status) {
+    if (no3Status === 'ok' && po4Status === 'ok') return 0.2;
+    return 0.2;
+}
+
+function clampNutritionCarbonDose(value) {
+    const min = nutritionDoseRules.Kohlenstoff.recommendedMin;
+    const max = nutritionDoseRules.Kohlenstoff.recommendedMax;
+    return Math.max(min, Math.min(max, Math.round((Number(value) || min) * 10) / 10));
+}
+
+function getNutritionAdvice(no3Status, po4Status) {
+    const highLowKey = `${no3Status}-${po4Status}`;
+    const map = {
+        'high-high': {
+            title: 'Empfehlung: C',
+            products: ['Kohlenstoff (C)'],
+            text: 'Nitrat und Phosphat sind erhöht. Kohlenstoff kann die biologische Nährstoffreduktion unterstützen. Langsam starten und NO3/PO4 regelmäßig messen.'
+        },
+        'low-high': {
+            title: 'Empfehlung: C + N',
+            products: ['Kohlenstoff (C)', 'Stickstoff (N)'],
+            text: 'Nitrat ist niedrig, Phosphat erhöht. Kohlenstoff kann PO4 senken, Stickstoff kann helfen, N nicht weiter zu limitieren.'
+        },
+        'low-low': {
+            title: 'Empfehlung: N + P',
+            products: ['Stickstoff (N)', 'Phosphor (P)'],
+            text: 'Nitrat und Phosphat sind niedrig. N und P vorsichtig anheben, PO4 nicht unter 0,04 mg/l fallen lassen.'
+        },
+        'high-low': {
+            title: 'Empfehlung: C + P',
+            products: ['Kohlenstoff (C)', 'Phosphor (P)'],
+            text: 'Nitrat ist erhöht, Phosphat niedrig. Kohlenstoff kann NO3 langfristig senken; Phosphat kann parallel dosiert werden, um eine PO4-Limitierung zu vermeiden.'
+        }
+    };
+    return map[highLowKey] || {
+        title: 'Ein Wert liegt im Zielbereich',
+        products: [],
+        text: 'Wenn einer der Werte im Zielbereich liegt, vorsichtig vorgehen und die konkrete Entwicklung über mehrere Messungen bewerten.'
+    };
+}
+
+function renderNutritionAdvice(advice) {
+    const products = advice.products.length ? advice.products.join(' + ') : 'Messwerte beobachten';
+    return `
+        <div class="nutrition-advice-card">
+            <span class="nutrition-advice-kicker">Vorschlag</span>
+            <strong>${escapeHtml(advice.title)}</strong>
+            <p>${escapeHtml(advice.text)}</p>
+            <div class="nutrition-advice-products">${escapeHtml(products)}</div>
+        </div>
+    `;
+}
+
+function renderNutritionSafetyNotes(element) {
+    const notes = {
+        Kohlenstoff: [
+            'Langsam beginnen: 0,10-0,25 ml pro 100 L/Tag.',
+            'Bei Bakterienblüte Dosierung reduzieren oder aussetzen.',
+            'Aus Erfahrung kann PO4 zuerst stärker sinken, NO3 oft erst nach längerer Einlaufphase.'
+        ],
+        Lanthan: [
+            'PO4 nicht unter 0,04 mg/l senken.',
+            'Vorzugsweise im Technikbecken mit mechanischem Filter vor dem Abschäumer dosieren.',
+            'Bei Strudelwürmern vorsichtig sein, da absterbende Tiere Giftstoffe freisetzen können.'
+        ],
+        Phosphat: [
+            'PO4 nicht unter 0,04 mg/l fallen lassen.',
+            'Nach Dosierung kontrollieren und lieber in kleinen Schritten arbeiten.'
+        ]
+    };
+    const list = notes[element];
+    if (!list) return '';
+    return `
+        <div class="tool-row">
+            <span><strong>Hinweise</strong><small>${list.map(escapeHtml).join(' · ')}</small></span>
+            <span>prüfen</span>
+        </div>
+    `;
 }
 
 function getCustomCrPlannerState() {
