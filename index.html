@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.1-legalmodal-close-sm">
+    <link rel="stylesheet" href="style.css?v=3.0.1-wave-demo-full">
 </head>
 <body>
 
@@ -1316,6 +1316,12 @@
                 <div id="localDeviceSettings"></div>
             </div>
 
+            <div class="card settings-card settings-card-wave-demo">
+                <h3>Wave Pumpensteuerung Demo</h3>
+                <p class="hint">Geschützter Testbereich für die Vorschau deiner ESP32-Strömungspumpensteuerung.</p>
+                <div id="wavePumpDemoSettings"></div>
+            </div>
+
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">App-Updates</h3>
                 <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
@@ -1683,8 +1689,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.1-legalmodal-close-sm"></script>
-    <script src="app.js?v=3.0.1-legalmodal-close-sm"></script>
+    <script src="sangokai-data.js?v=3.0.1-wave-demo-full"></script>
+    <script src="app.js?v=3.0.1-wave-demo-full"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

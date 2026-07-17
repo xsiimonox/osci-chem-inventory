@@ -5071,6 +5071,7 @@ function showTab(tabId) {
         renderSupabaseSyncSettings();
         renderMenuOrderSettings();
         renderLocalDeviceSettings();
+        renderWavePumpDemoSettings();
     }
     scheduleTextFitPass();
 }
@@ -5217,6 +5218,7 @@ function getSettingsMeta(title) {
     if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Cloud', hint: 'Google Drive und geräteübergreifende Sicherung', keywords: 'google drive sync cloud upload download wiederherstellen' };
     if (/datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Lokale Sicherungen, Import und Export', keywords: 'sicherung backup export import wiederherstellen datei lokal' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
+    if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
     if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
@@ -5246,7 +5248,7 @@ function applySettingsMetadata(card, title) {
 
 function renderSettingsGroupLabels(settings) {
     settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
-    const groupOrder = ['Allgemein', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Cloud', 'Sicherung', 'Zurücksetzen', 'Weitere'];
+    const groupOrder = ['Allgemein', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Cloud', 'Sicherung', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
     const cards = Array.from(settings.querySelectorAll(':scope > .card'));
     cards.sort((a, b) => {
         const aIndex = groupOrder.indexOf(a.dataset.settingsGroup || 'Weitere');
@@ -5403,6 +5405,7 @@ function selectCursorEmoji(emoji) {
 
 let localDeviceSettingsUnlocked = false;
 let activeLocalDeviceId = '';
+let wavePumpDemoUnlocked = false;
 
 function getLocalDeviceSettings() {
     if (!db.settings) db.settings = {};
@@ -5547,6 +5550,56 @@ function renderLocalDeviceSettings(activeId = '') {
         </div>
     `;
     if (activeDevice) scheduleLocalDeviceFrameCheck(activeDevice.id);
+}
+
+function renderWavePumpDemoSettings() {
+    const container = document.getElementById('wavePumpDemoSettings');
+    if (!container) return;
+
+    if (!wavePumpDemoUnlocked) {
+        container.innerHTML = `
+            <div class="dev-lock-card wave-demo-lock-card">
+                <p class="hint">Dieser Demo-Bereich ist geschützt, damit normale Nutzer nicht aus Versehen in die Entwicklungsansicht geraten.</p>
+                <div class="local-device-unlock-row">
+                    <input type="password" id="wavePumpDemoPassword" placeholder="Passwort" autocomplete="off" onkeydown="if(event.key==='Enter') unlockWavePumpDemo()">
+                    <button type="button" class="btn-secondary btn-animated" onclick="unlockWavePumpDemo()">Entsperren</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div class="wave-demo-settings">
+            <div class="sync-maintenance-banner wave-demo-warning">
+                <strong>Demo-Modus</strong>
+                <span>Diese Vorschau läuft nur im Browser und schaltet keine echte Hardware. Sie ist als UI- und Bedienkonzept für die spätere ESP32-Integration gedacht.</span>
+            </div>
+            <div class="wave-demo-actions">
+                <button type="button" class="btn-secondary btn-animated" onclick="lockWavePumpDemo()">Demo sperren</button>
+                <a class="btn-secondary" href="wave/demo.html" target="_blank" rel="noopener noreferrer">In neuem Tab öffnen</a>
+            </div>
+            <div class="wave-demo-frame-wrap">
+                <iframe class="wave-demo-frame" src="wave/demo.html" title="Wave Pumpensteuerung Demo" loading="eager" referrerpolicy="no-referrer"></iframe>
+            </div>
+        </div>
+    `;
+}
+
+function unlockWavePumpDemo() {
+    const input = document.getElementById('wavePumpDemoPassword');
+    if ((input?.value || '').trim() !== 'WAVE') {
+        showToast('Falsches WAVE-Passwort', 'warning');
+        return;
+    }
+    wavePumpDemoUnlocked = true;
+    renderWavePumpDemoSettings();
+    showToast('Wave Demo entsperrt', 'success');
+}
+
+function lockWavePumpDemo() {
+    wavePumpDemoUnlocked = false;
+    renderWavePumpDemoSettings();
 }
 
 function unlockLocalDeviceSettings() {
@@ -15823,7 +15876,7 @@ function setFieldError(fieldId, message = '') {
     }
 }
 
-Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, closeLegalModal, openLegalModal, setFieldError, enhanceFormAccessibility });
+Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, closeLegalModal, openLegalModal, unlockWavePumpDemo, lockWavePumpDemo, renderWavePumpDemoSettings, setFieldError, enhanceFormAccessibility });
 enhanceFormAccessibility(document);
 document.addEventListener('DOMContentLoaded', () => enhanceFormAccessibility(document));
 window.setTimeout(() => enhanceFormAccessibility(document), 500);

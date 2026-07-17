@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v301-legalmodal-close-sm';
+const CACHE_NAME = 'reef-storage-tools-cache-v301-wave-demo-no-position';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,8 @@ const ASSETS = [
   './icon.png',
   './badman.svg',
   './privacy.html',
-  './impressum.html'
+  './impressum.html',
+  './wave/demo.html'
 ];
 
 self.addEventListener('install', (e) => {
