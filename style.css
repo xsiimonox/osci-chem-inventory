@@ -55,7 +55,8 @@
 }
 
 /* --- THEME VARIANTEN --- */
-body.theme-girl {
+body.theme-girl,
+html.theme-girl {
     color-scheme: light;
     --app-bg: #ffeef4;
     --nav-bg: #fff7fa;
@@ -82,7 +83,8 @@ body.theme-girl {
 }
 
 /* 🌊 HIER IST JETZT DEIN SAUBERES MINT/OCEAN MEERES-THEME 🌊 */
-body.theme-mint {
+body.theme-mint,
+html.theme-mint {
     color-scheme: dark;
     --app-bg: #031424;
     --nav-bg: #071f34;
@@ -109,7 +111,8 @@ body.theme-mint {
 }
 
 /* 🦈 BADMAN SHARK EDITION - Schwarz, Grau, Rot 🦈 */
-body.theme-badman {
+body.theme-badman,
+html.theme-badman {
     color-scheme: dark;
     --app-bg: #1a1a1a;
     --nav-bg: #202020;
@@ -9585,9 +9588,14 @@ header {
    ========================================================================== */
 .legal-page {
     min-height: 100vh;
+    background:
+        radial-gradient(circle at 50% 0, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
+        var(--app-bg);
 }
 
 .legal-shell {
+    display: grid;
+    place-items: start center;
     width: min(920px, calc(100vw - 28px));
     margin: 24px auto 56px;
 }
@@ -9595,21 +9603,24 @@ header {
 .legal-card {
     position: relative;
     overflow: hidden;
+    width: 100%;
     padding: clamp(20px, 3vw, 30px);
     border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 82%, transparent);
     border-radius: 28px;
     background:
         radial-gradient(circle at top left, color-mix(in srgb, var(--accent, var(--primary)) 12%, transparent), transparent 34%),
         color-mix(in srgb, var(--surface-card, #1c1c1e) 96%, transparent);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
+    box-shadow: var(--shadow-raised);
 }
 
 .legal-head {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
     gap: 18px;
-    margin-bottom: 18px;
+    margin: 0 auto 26px;
+    text-align: center;
 }
 
 .legal-eyebrow {
@@ -9624,7 +9635,7 @@ header {
 
 .legal-lead {
     max-width: 58ch;
-    margin: 0;
+    margin: 0 auto;
     color: var(--text-secondary, var(--text-muted));
     font-size: 0.95rem;
 }
@@ -9636,6 +9647,7 @@ header {
 
 .legal-links {
     display: flex;
+    justify-content: center;
     gap: 10px;
     flex-wrap: wrap;
 }
@@ -9648,7 +9660,26 @@ header {
     text-decoration: none;
 }
 
+.legal-links .btn-secondary,
+.legal-links .btn-out {
+    width: auto;
+    min-height: 42px;
+    padding: 9px 16px;
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+    background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
+    color: var(--text-primary);
+}
+
+.legal-links .btn-secondary:hover,
+.legal-links .btn-out:hover {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised));
+    color: var(--accent);
+}
+
 .legal-copy {
+    width: min(100%, 760px);
+    margin-inline: auto;
     color: var(--text);
     line-height: 1.62;
 }
@@ -9743,8 +9774,7 @@ header {
     }
 
     .legal-head {
-        flex-direction: column;
-        align-items: stretch;
+        gap: 14px;
     }
 
     .legal-links a {
@@ -10514,7 +10544,8 @@ header {
 /* ==========================================================================
    ☀️ LIGHT MODE TOGGLE
    ========================================================================== */
-body.theme-light {
+body.theme-light,
+html.theme-light {
     color-scheme: light;
     --app-bg: #edf5f7;
     --nav-bg: #f7fbfc;
@@ -11113,7 +11144,9 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     letter-spacing: 0;
     text-align: center;
     text-decoration: none;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
     cursor: pointer;
     isolation: isolate;
     transition:
@@ -13995,4 +14028,70 @@ body.theme-girl .app-footer {
         max-width: 42vw;
         font-size: clamp(0.92rem, 4.8vw, 1.14rem) !important;
     }
+}
+
+/* Global text-fit guard: avoid mid-word breaks; compact UI shrinks before it wraps. */
+:where(
+    button,
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-cancel,
+    .btn-danger,
+    .btn-warning,
+    .btn-ghost,
+    .btn-in,
+    .btn-out,
+    .nav-links button,
+    .mobile-bottom-nav button,
+    .tool-section-summary strong,
+    .tool-section-summary small,
+    .tool-tile-card h3,
+    .tool-compact-card h3,
+    .tool-row > span:first-child,
+    .dashboard-tile > span,
+    .dashboard-tile > strong,
+    .dashboard-list-row strong,
+    .inventory-card h4,
+    .inventory-product-copy strong,
+    .settings-group-nav button,
+    .settings-row-actions button,
+    .coral-card-head strong,
+    .protocol-entry-head strong
+) {
+    --text-fit-scale: 1;
+    font-size: calc(var(--text-fit-base, 1em) * var(--text-fit-scale));
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
+}
+
+:where(
+    button,
+    .btn,
+    .btn-primary,
+    .btn-secondary,
+    .btn-cancel,
+    .btn-danger,
+    .btn-warning,
+    .btn-ghost,
+    .btn-in,
+    .btn-out,
+    .nav-links button,
+    .mobile-bottom-nav button,
+    .tool-section-summary strong,
+    .tool-section-summary small,
+    .tool-tile-card h3,
+    .tool-compact-card h3,
+    .dashboard-tile > strong,
+    .settings-group-nav button,
+    .settings-row-actions button
+) {
+    white-space: nowrap;
+}
+
+:where(.text-fit-overflow, .text-fit-overflow *) {
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
 }

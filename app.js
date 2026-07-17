@@ -5072,6 +5072,90 @@ function showTab(tabId) {
         renderMenuOrderSettings();
         renderLocalDeviceSettings();
     }
+    scheduleTextFitPass();
+}
+
+const TEXT_FIT_SELECTOR = [
+    'button:not(.btn-icon):not(.close-menu)',
+    '.btn',
+    '.btn-primary',
+    '.btn-secondary',
+    '.btn-cancel',
+    '.btn-danger',
+    '.btn-warning',
+    '.btn-ghost',
+    '.btn-in',
+    '.btn-out',
+    '.nav-links button',
+    '.mobile-bottom-nav button',
+    '.tool-section-summary strong',
+    '.tool-section-summary small',
+    '.tool-tile-card h3',
+    '.tool-compact-card h3',
+    '.tool-row > span:first-child',
+    '.dashboard-tile > span',
+    '.dashboard-tile > strong',
+    '.dashboard-list-row strong',
+    '.inventory-card h4',
+    '.inventory-product-copy strong',
+    '.settings-group-nav button',
+    '.settings-row-actions button',
+    '.coral-card-head strong',
+    '.protocol-entry-head strong'
+].join(',');
+
+let textFitFrame = 0;
+let textFitObserver = null;
+
+function getTextFitMinimumScale(element) {
+    if (element.matches('.mobile-bottom-nav button, .nav-links button')) return 0.64;
+    if (element.matches('.tool-tile-card h3, .tool-compact-card h3')) return 0.68;
+    if (element.matches('button, .btn, .btn-primary, .btn-secondary, .btn-cancel, .btn-danger, .btn-warning, .btn-ghost, .btn-in, .btn-out')) return 0.7;
+    return 0.72;
+}
+
+function fitTextElement(element) {
+    if (!element || !element.isConnected) return;
+    const rect = element.getBoundingClientRect();
+    if (rect.width < 12 || rect.height < 8) return;
+
+    element.classList.add('text-fit-overflow');
+    element.style.setProperty('--text-fit-scale', '1');
+
+    const availableWidth = Math.max(1, element.clientWidth - 2);
+    const contentWidth = element.scrollWidth;
+    if (contentWidth <= availableWidth + 1) return;
+
+    const minScale = getTextFitMinimumScale(element);
+    const fittedScale = Math.max(minScale, Math.min(1, availableWidth / contentWidth));
+    element.style.setProperty('--text-fit-scale', fittedScale.toFixed(3));
+}
+
+function runTextFitPass(root = document) {
+    const scope = root instanceof Element || root === document ? root : document;
+    scope.querySelectorAll(TEXT_FIT_SELECTOR).forEach(fitTextElement);
+}
+
+function scheduleTextFitPass(root = document) {
+    if (textFitFrame) cancelAnimationFrame(textFitFrame);
+    textFitFrame = requestAnimationFrame(() => {
+        textFitFrame = 0;
+        runTextFitPass(root);
+    });
+}
+
+function initTextFitGuard() {
+    scheduleTextFitPass();
+    window.addEventListener('resize', () => scheduleTextFitPass(), { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(scheduleTextFitPass, 180), { passive: true });
+    if ('MutationObserver' in window) {
+        textFitObserver = new MutationObserver(() => scheduleTextFitPass());
+        textFitObserver.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
+    }
 }
 
 function setupSettingsAccordions() {
@@ -5198,6 +5282,15 @@ function applyTheme(themeName, shouldSave = true) {
     }
     
     db.theme = themeName;
+    try {
+        localStorage.setItem('reeftools_theme_v1', themeName);
+    } catch (error) {
+        // The app theme still works when browser storage is unavailable.
+    }
+    document.querySelectorAll('.app-footer a[href^="impressum.html"], .app-footer a[href^="privacy.html"]').forEach(link => {
+        const page = link.getAttribute('href').split('?')[0];
+        link.setAttribute('href', `${page}?theme=${encodeURIComponent(themeName)}`);
+    });
     if (shouldSave) saveDB();
     
     // Dropdown-Auswahl im Menü synchronisieren, falls geladen
@@ -15898,6 +15991,7 @@ async function bootstrapApplication() {
         tryRestoreGoogleDriveSession();
     }, 500);
     initCustomCursor();
+    initTextFitGuard();
     initLiveUpdateChecks();
     setTimeout(checkForAppUpdate, 2500);
     setTimeout(() => refreshGoogleDrivePresence(false), 3200);

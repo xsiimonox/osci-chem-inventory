@@ -4,7 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Datenschutzerklärung | Reeftools.de</title>
-    <link rel="stylesheet" href="style.css?v=3.0.1-legal-polish">
+    <script>
+        try {
+            const supportedThemes = new Set(['default', 'light', 'girl', 'mint', 'badman']);
+            const requestedTheme = new URLSearchParams(location.search).get('theme');
+            const storedTheme = localStorage.getItem('reeftools_theme_v1');
+            const theme = supportedThemes.has(requestedTheme) ? requestedTheme : storedTheme;
+            if (theme && theme !== 'default') document.documentElement.classList.add(`theme-${theme}`);
+            window.addEventListener('DOMContentLoaded', () => {
+                document.querySelectorAll('.legal-links a[href="impressum.html"]').forEach(link => {
+                    link.href = `impressum.html?theme=${encodeURIComponent(theme || 'default')}`;
+                });
+            });
+        } catch (error) {}
+    </script>
+    <link rel="stylesheet" href="style.css?v=3.0.1-textfit">
 </head>
 <body class="legal-page">
     <main class="legal-shell">
