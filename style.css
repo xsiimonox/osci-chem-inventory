@@ -14095,3 +14095,18 @@ body.theme-girl .app-footer {
     word-break: normal !important;
     hyphens: none !important;
 }
+
+/* Legal pages are standalone documents, not part of the app shell grid. */
+body.legal-page {
+    display: block !important;
+    grid-template-columns: none !important;
+    width: 100% !important;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: 0 !important;
+}
+
+body.legal-page .legal-shell {
+    width: min(920px, calc(100vw - 28px));
+    margin-inline: auto !important;
+}
