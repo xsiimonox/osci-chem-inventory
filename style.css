@@ -9593,9 +9593,15 @@ header {
 }
 
 .legal-card {
-    padding: 22px 22px 28px;
-    border-radius: 22px;
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    position: relative;
+    overflow: hidden;
+    padding: clamp(20px, 3vw, 30px);
+    border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 82%, transparent);
+    border-radius: 28px;
+    background:
+        radial-gradient(circle at top left, color-mix(in srgb, var(--accent, var(--primary)) 12%, transparent), transparent 34%),
+        color-mix(in srgb, var(--surface-card, #1c1c1e) 96%, transparent);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.24);
 }
 
 .legal-head {
@@ -9614,6 +9620,13 @@ header {
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+.legal-lead {
+    max-width: 58ch;
+    margin: 0;
+    color: var(--text-secondary, var(--text-muted));
+    font-size: 0.95rem;
 }
 
 .legal-head h1 {
@@ -9641,7 +9654,7 @@ header {
 }
 
 .legal-copy h2 {
-    margin: 24px 0 10px;
+    margin: 26px 0 10px;
     font-size: 1.08rem;
 }
 
@@ -9657,6 +9670,56 @@ header {
 
 .legal-copy a {
     color: var(--secondary);
+}
+
+.legal-section {
+    margin-top: 18px;
+    padding-top: 2px;
+}
+
+.legal-section-highlight {
+    margin-top: 0;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--accent, var(--primary)) 18%, var(--border-color, var(--border)));
+    border-radius: 18px;
+    background: color-mix(in srgb, var(--surface-raised, #242426) 72%, transparent);
+}
+
+.legal-section-highlight h2 {
+    margin-top: 0;
+}
+
+.legal-contact-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.72fr);
+    gap: 14px;
+    align-items: stretch;
+    margin: 10px 0 18px;
+}
+
+.legal-contact-grid > div,
+.legal-address-card {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    padding: 14px 15px;
+    border: 1px solid color-mix(in srgb, var(--border-color, var(--border)) 84%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface-card, #1c1c1e) 86%, transparent);
+}
+
+.legal-address-card {
+    color: color-mix(in srgb, var(--text) 82%, var(--text-muted));
+    font-style: normal;
+    font-size: 0.91rem;
+}
+
+.legal-label {
+    color: var(--text-secondary, var(--text-muted));
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
 }
 
 .legal-note {
@@ -9686,6 +9749,10 @@ header {
 
     .legal-links a {
         flex: 1 1 0;
+    }
+
+    .legal-contact-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -12246,6 +12313,11 @@ textarea[readonly] {
     gap: var(--space-3);
 }
 
+.dashboard-measurements-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 360px));
+    justify-content: center;
+}
+
 .dashboard-panel,
 .dashboard-measurement-card {
     margin: 0;
@@ -12304,7 +12376,12 @@ textarea[readonly] {
 .dashboard-progress::-moz-progress-bar { background: var(--accent); border-radius: 999px; }
 
 .dashboard-measurement-card {
+    display: grid;
+    align-items: stretch;
+    gap: var(--space-2);
     width: 100%;
+    max-width: 360px;
+    justify-self: center;
     cursor: pointer;
 }
 .dashboard-measurement-card:disabled { cursor: default; opacity: 0.72; }
@@ -12321,6 +12398,14 @@ textarea[readonly] {
     stroke-linejoin: round;
 }
 .dashboard-chart-focus { fill: color-mix(in srgb, var(--accent) 16%, transparent); }
+
+.dashboard-trend-chart {
+    display: block;
+    width: min(100%, 300px);
+    height: 96px;
+    max-width: 300px;
+    margin-inline: auto;
+}
 
 .dashboard-edit-mode {
     margin: 0;

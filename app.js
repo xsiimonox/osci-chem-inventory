@@ -4084,7 +4084,7 @@ function createDashboardMeasurementChart(summary) {
     const area = `${line} L ${points[points.length - 1].x.toFixed(2)} ${floor} L ${points[0].x.toFixed(2)} ${floor} Z`;
     const latest = points[points.length - 1];
     return `
-        <svg class="dashboard-trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Messwert Verlauf">
+        <svg class="dashboard-trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Messwert Verlauf">
             <path d="${area}" class="dashboard-chart-area"></path>
             <path d="${line}" class="dashboard-chart-line"></path>
             <circle cx="${latest.x}" cy="${latest.y}" r="5.5" fill="var(--primary)"></circle>
