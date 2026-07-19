@@ -271,6 +271,7 @@ const AQUARIUM_FIELD_KEYS = [
     'psuCorrectionOffset',
     'toolSettings',
     'crSeaWaterPresets',
+    'customSeaTracePresets',
     'dashboardSettings',
     'coralCatalog',
     'coralTransfers'
@@ -2010,6 +2011,7 @@ function createWarehouseData(source = {}) {
         shopLinks: source.shopLinks || {},
         productPresets: source.productPresets || {},
         crSeaWaterPresets: source.crSeaWaterPresets || {},
+        customSeaTracePresets: source.customSeaTracePresets || {},
         favoriteProducts: source.favoriteProducts || {},
         implementationLog: source.implementationLog || source.dosePlanArchive || [],
         logBookCategories: source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
@@ -2074,6 +2076,7 @@ function createAquariumData(source = {}) {
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
         toolSettings: cloneSerializable(source.toolSettings || { lastSection: '', favorites: [] }),
         crSeaWaterPresets: cloneSerializable(source.crSeaWaterPresets || {}),
+        customSeaTracePresets: cloneSerializable(source.customSeaTracePresets || {}),
         dashboardSettings: cloneSerializable(source.dashboardSettings || {
             widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
             range: '30',
@@ -2189,6 +2192,7 @@ function normalizeWarehouseData(data) {
     if (!db.shopLinks) db.shopLinks = {};
     if (!db.productPresets) db.productPresets = {};
     if (!db.crSeaWaterPresets) db.crSeaWaterPresets = {};
+    if (!db.customSeaTracePresets) db.customSeaTracePresets = {};
     if (!db.favoriteProducts) db.favoriteProducts = {};
     if (!db.implementationLog) db.implementationLog = db.dosePlanArchive || [];
     if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];

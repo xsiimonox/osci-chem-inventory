@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.1-nutrition-carbon-range">
+    <link rel="stylesheet" href="style.css?v=3.0.1-sea-trace-note-strong">
 </head>
 <body>
 
@@ -751,6 +751,18 @@
                             <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="saveSeaWaterPreset()">Preset speichern</button>
                                 <button class="btn-secondary btn-animated" onclick="deleteSeaWaterPreset()">Preset löschen</button>
+                            </div>
+                            <div class="sea-water-trace-note" role="note" aria-label="Hinweis zu Spurenelementen">
+                                <div class="sea-water-trace-note__marker">!</div>
+                                <div class="sea-water-trace-note__content">
+                                    <strong>Hinweis zu Spurenelementen</strong>
+                                    <p>Das angesetzte, natürliche Meerwasser enthält nahezu keine Spurenelemente.</p>
+                                    <p>Du kannst wie gewohnt deine individuellen Spurenelementlösungen <b>K+</b> und <b>A-</b> hinzugeben.</p>
+                                </div>
+                                <div class="sea-water-trace-note__dose">
+                                    <span>Dosierung</span>
+                                    <strong>1 ml je Lösung / 100 L</strong>
+                                </div>
                             </div>
                             <div id="seaWaterMixResult"></div>
                         </div>
@@ -1727,8 +1739,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.1-nutrition-carbon-range"></script>
-    <script src="app.js?v=3.0.1-nutrition-carbon-range"></script>
+    <script src="sangokai-data.js?v=3.0.1-sea-trace-note-strong"></script>
+    <script src="app.js?v=3.0.1-sea-trace-note-strong"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

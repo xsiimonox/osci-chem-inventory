@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v301-nutrition-carbon-range';
+const CACHE_NAME = 'reef-storage-tools-cache-v301-sea-trace-note-strong';
 const ASSETS = [
   './',
   './index.html',
