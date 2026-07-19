@@ -5398,9 +5398,9 @@ function openLegalModal(page = 'impressum') {
     const title = document.getElementById('legalModalTitle');
     if (!modal || !frame || !title) return;
 
-    const normalized = page === 'privacy' ? 'privacy' : 'impressum';
-    const pageFile = normalized === 'privacy' ? 'privacy.html' : 'impressum.html';
-    title.textContent = normalized === 'privacy' ? 'Datenschutzerklärung' : 'Impressum';
+    const normalized = page === 'privacy' ? 'privacy' : (page === 'guide' ? 'guide' : 'impressum');
+    const pageFile = normalized === 'privacy' ? 'privacy.html' : (normalized === 'guide' ? 'anleitung.html' : 'impressum.html');
+    title.textContent = normalized === 'privacy' ? 'Datenschutzerklärung' : (normalized === 'guide' ? 'Anleitung' : 'Impressum');
     frame.src = `${pageFile}?theme=${getLegalModalThemeParam()}&embed=app-modal`;
     modal.hidden = false;
     modal.classList.add('is-open');
@@ -5423,9 +5423,10 @@ function closeLegalModal() {
 
 document.addEventListener('click', event => {
     const legalLink = event.target?.closest?.('[data-legal-page]');
-    if (!legalLink) return;
+    const helpLink = event.target?.closest?.('[data-help-page]');
+    if (!legalLink && !helpLink) return;
     event.preventDefault();
-    openLegalModal(legalLink.dataset.legalPage);
+    openLegalModal(legalLink ? legalLink.dataset.legalPage : helpLink.dataset.helpPage);
 });
 
 const cursorStyleOptions = new Set(['apple', 'glow', 'dot', 'crosshair', 'emoji', 'system']);
@@ -9335,6 +9336,141 @@ function getToolTileVisual(toolId, title = '') {
     return map[toolId] || { icon: (title || 'T').slice(0, 2).toUpperCase(), subtitle: 'Tool oeffnen' };
 }
 
+const toolInfoTexts = {
+    'kh-ca-korrektur': {
+        summary: 'Berechnet, wie viel eines KH- oder Calciumprodukts dosiert werden muss, um von einem aktuellen Wert auf einen Zielwert zu kommen.',
+        details: 'Du gibst Aquariumvolumen, aktuellen Wert, Zielwert, Produktwirkung und Verteilung auf Tage ein. Die gespeicherten Voreinstellungen helfen, wiederkehrende Produkte schneller zu nutzen.',
+        note: 'Dosierung langsam umsetzen und Messwerte nach der Zugabe kontrollieren.'
+    },
+    'verbrauch-pro-tag': {
+        summary: 'Ermittelt aus zwei Messungen, wie stark ein Wert pro Tag verbraucht oder verändert wurde.',
+        details: 'Geeignet für KH, Calcium, Magnesium, Nitrat und Phosphat. Du trägst Startwert, Endwert und die Tage dazwischen ein.',
+        note: 'Je länger und sauberer der Messzeitraum, desto belastbarer ist die Prognose.'
+    },
+    'test-korrekturfaktor': {
+        summary: 'Speichert Korrekturfaktoren für Heimtests anhand einer ICP oder Referenzlösung.',
+        details: 'Du vergleichst den Heimtest mit einem Referenzwert. Danach kann die App neue Heimtestmessungen korrigiert anzeigen.',
+        note: 'Referenzwerte sollten frisch und zuverlässig sein.'
+    },
+    'hanna-phosphor-zu-phosphat': {
+        summary: 'Rechnet Hanna Phosphor Checker Werte in Phosphat um.',
+        details: 'Der eingegebene Phosphorwert in ppb wird in PO4 mg/l umgerechnet.',
+        note: 'Messfehler, verschmutzte Küvetten und Reagenzien beeinflussen das Ergebnis stark.'
+    },
+    'salifert-umrechner': {
+        summary: 'Rechnet Salifert Spritzen-Restwerte für Calcium und KH in Messwerte um.',
+        details: 'Du wählst Testtyp und Restinhalt der Spritze. Das Tool zeigt den passenden Wert aus der hinterlegten Skala.',
+        note: 'Immer passend zur Anleitung des verwendeten Tests ablesen.'
+    },
+    'nutrition-rechner': {
+        summary: 'Hilft bei Nitrat, Phosphat, Lanthan und Kohlenstoff nach Herstellerangaben.',
+        details: 'Der Berater ordnet NO3/PO4 zu hoch oder zu niedrig ein. Der einfache Rechner berechnet konkrete Dosiermengen, wenn du das gewünschte Produkt schon kennst.',
+        note: 'Nährstoffe langsam verändern und regelmäßig messen.'
+    },
+    'salzgehalt-rechner': {
+        summary: 'Rechnet Dichte, Specific Gravity, Leitwert und PSU mit Temperaturbezug um.',
+        details: 'Nützlich für Spindel, Refraktometer und Leitwertmessung. Ein gespeicherter PSU-Korrekturfaktor kann berücksichtigt werden.',
+        note: 'Messgeräte regelmäßig kalibrieren und Temperatur beachten.'
+    },
+    'salz-korrektur': {
+        summary: 'Berechnet eine grobe Salzgehalt-Korrektur für dein Aquarium.',
+        details: 'Du trägst Beckenvolumen, aktuelle PSU und Ziel-PSU ein. Das Tool gibt eine Orientierung zur nötigen Anpassung.',
+        note: 'Salinität niemals abrupt verändern. Tiere reagieren empfindlich auf schnelle Dichteschwankungen.'
+    },
+    'wasserwechsel-effekt': {
+        summary: 'Zeigt, welcher Wert nach einem Wasserwechsel rechnerisch zu erwarten ist.',
+        details: 'Aus Beckenvolumen, Wechselwassermenge, aktuellem Wert und Wert im Wechselwasser wird der neue Mischwert berechnet.',
+        note: 'Der Rechner ist ideal, um Wasserwechsel realistisch zu planen.'
+    },
+    'adsorber-durchfluss': {
+        summary: 'Berechnet einen langsamen, kontrollierten Durchfluss für Adsorber.',
+        details: 'Zusätzlich gibt der Berater eine Orientierung, ob Eisenbasis, Aluminiumbasis oder Aktivkohle zum gewählten Ziel passt.',
+        note: 'Adsorber nicht stark verwirbeln und Werte eng kontrollieren.'
+    },
+    'meerwasser-aus-c-und-r-anmischen': {
+        summary: 'Skaliert das C&R Meerwasser-Rezept auf deine gewünschte Menge.',
+        details: 'Zeigt Osmosewasser, C&R Produkte, Makro KH-Tag sowie ml- und g-Werte. Presets können gespeichert und Produkte direkt ausgelagert werden.',
+        note: 'Spurenelemente K+ und A- können separat nach Herstellerangabe ergänzt werden.'
+    },
+    'c-und-r-natriumchlorid-aus-nacl-pulver': {
+        summary: 'Berechnet das Ansetzen von flüssigem C&R Natriumchlorid aus NaCl Pulver.',
+        details: 'Aus der Zielmenge werden benötigtes Pulver und Osmosewasser berechnet. Zusätzlich wird die Wirkung der fertigen Lösung auf Na und Cl angezeigt.',
+        note: 'Pulver vollständig lösen und Lösung eindeutig beschriften.'
+    },
+    'makro-elemente-anmischen': {
+        summary: 'Skaliert Rezepte für Makro-Elemente wie KH-Tag, KH-Nacht, Calcium und Magnesium.',
+        details: 'Du wählst Rezept und Zielmenge. Lagergeführte C&R Bestandteile können anschließend direkt ausgelagert werden.',
+        note: 'Beim Anmischen sauber arbeiten und Kanister eindeutig markieren.'
+    }
+};
+
+function getToolInfo(toolId, title = '', card = null) {
+    const known = toolInfoTexts[toolId];
+    if (known) return known;
+    const hint = card?.querySelector('.hint')?.textContent?.trim();
+    return {
+        summary: hint || `${title || 'Dieses Tool'} unterstützt dich bei einer bestimmten Aufgabe im Aquarium.`,
+        details: 'Öffne die Kachel, trage die benötigten Werte ein und prüfe das Ergebnis vor der Anwendung.',
+        note: 'Alle Rechner dienen als Hilfestellung und ersetzen keine fachliche Kontrolle.'
+    };
+}
+
+function ensureToolTitleTextSpan(title) {
+    if (!title || title.querySelector('.tool-title-text')) return;
+    const textNode = Array.from(title.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim());
+    const text = textNode?.textContent?.trim() || title.textContent.trim();
+    const span = document.createElement('span');
+    span.className = 'tool-title-text';
+    span.textContent = text;
+    if (textNode) title.replaceChild(span, textNode);
+    else title.insertBefore(span, title.firstChild);
+}
+
+function ensureToolInfoButton(card, toolId, toolTitle) {
+    const title = card?.querySelector('h3');
+    if (!title || title.querySelector('.tool-info-button')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool-info-button';
+    button.dataset.toolId = toolId;
+    button.setAttribute('aria-label', `Info zu ${toolTitle}`);
+    button.setAttribute('title', `Info zu ${toolTitle}`);
+    button.textContent = 'i';
+    button.addEventListener('pointerdown', event => event.stopPropagation());
+    button.addEventListener('click', event => showToolInfo(event, toolId));
+    title.appendChild(button);
+}
+
+function showToolInfo(event, toolId) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
+    const title = getToolCardTitle(card) || 'Tool';
+    const info = getToolInfo(toolId, title, card);
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modal-title');
+    const body = document.getElementById('modal-body');
+    if (!modal || !modalTitle || !body) return;
+    modalTitle.innerText = title;
+    body.innerHTML = `
+        <div class="tool-info-dialog">
+            <span class="tool-info-dialog-badge">Kurzinfo</span>
+            <p class="tool-info-dialog-summary">${escapeHtml(info.summary)}</p>
+            <div class="tool-info-dialog-block">
+                <strong>Was macht das Tool?</strong>
+                <p>${escapeHtml(info.details)}</p>
+            </div>
+            <div class="tool-info-dialog-note">
+                <strong>Hinweis</strong>
+                <p>${escapeHtml(info.note)}</p>
+            </div>
+        </div>
+    `;
+    modal.style.display = 'flex';
+    modal.setAttribute('aria-hidden', 'false');
+    acquireBodyScrollLock('modal');
+}
+
 function setupToolTiles() {
     const settings = getToolSettings();
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
@@ -9346,6 +9482,8 @@ function setupToolTiles() {
         card.dataset.toolId = toolId;
         card.dataset.toolIcon = visual.icon;
         card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''}`.toLowerCase();
+        ensureToolTitleTextSpan(title);
+        ensureToolInfoButton(card, toolId, toolTitle);
         const hint = card.querySelector('.hint');
         if (hint && !hint.dataset.originalText) {
             hint.dataset.originalText = hint.textContent.trim();
@@ -9498,6 +9636,7 @@ Object.assign(window, {
     removeToolFavorite,
     openToolFavorite,
     openToolSection,
+    showToolInfo,
     filterTools
 });
 
@@ -9949,7 +10088,7 @@ Object.assign(window, {
 });
 
 document.addEventListener('click', event => {
-    if (event.target.closest?.('.tool-inline-fav')) return;
+    if (event.target.closest?.('.tool-inline-fav, .tool-info-button')) return;
     const title = event.target.closest?.('#tools .tool-tile-card > h3');
     const collapsedCard = event.target.closest?.('#tools .tool-tile-card.tool-tile-collapsed');
     const card = title?.closest('.tool-tile-card') || collapsedCard;

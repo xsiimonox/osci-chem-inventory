@@ -1,7 +1,8 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-open-support-menu';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-guide-modal';
 const ASSETS = [
   './',
   './index.html',
+  './anleitung.html',
   './style.css',
   './app.js',
   './sangokai-data.js',
@@ -11,6 +12,17 @@ const ASSETS = [
   './badman.svg',
   './privacy.html',
   './impressum.html',
+  './ANLEITUNG.md',
+  './docs-assets/uebersicht.png',
+  './docs-assets/lager.png',
+  './docs-assets/trace.png',
+  './docs-assets/tools-dosierung.png',
+  './docs-assets/tools-salz-adsorber.png',
+  './docs-assets/tools-mischen.png',
+  './docs-assets/logbuch.png',
+  './docs-assets/korallen.png',
+  './docs-assets/wareneingang.png',
+  './docs-assets/einstellungen-cloud.png',
   './wave/demo.html'
 ];
 

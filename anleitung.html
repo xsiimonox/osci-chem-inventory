@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reeftools.de Anleitung</title>
+    <script>
+        try {
+            const supportedThemes = new Set(['default', 'light', 'girl', 'mint', 'badman']);
+            const params = new URLSearchParams(location.search);
+            const requestedTheme = params.get('theme');
+            const embedded = params.get('embed') === 'app-modal';
+            const storedTheme = localStorage.getItem('reeftools_theme_v1');
+            const theme = supportedThemes.has(requestedTheme) ? requestedTheme : storedTheme;
+            if (theme && theme !== 'default') document.documentElement.classList.add(`theme-${theme}`);
+            window.addEventListener('DOMContentLoaded', () => {
+                if (embedded) document.documentElement.classList.add('legal-embedded', 'guide-embedded');
+            });
+        } catch (error) {}
+    </script>
+    <link rel="stylesheet" href="style.css?v=3.0.2-guide-modal">
+</head>
+<body class="guide-page">
+    <main class="guide-shell">
+        <section class="guide-hero">
+            <div>
+                <span class="section-eyebrow">Reeftools.de</span>
+                <h1>Anleitung</h1>
+                <p>Alle wichtigen Funktionen mit Bildern, kurzen Erklärungen und praxisnahen Abläufen für Lager, C&amp;R, Trace, Tools, Logbuch und Pflege.</p>
+            </div>
+        </section>
+
+        <section class="guide-warning">
+            <strong>Wichtiger Hinweis</strong>
+            <p>Rechner, Importfunktionen und Assistenten können Fehler enthalten. Prüfe Dosierungen, Wasserwerte, PDF-Importe und Handlungsempfehlungen immer fachlich, bevor du sie am Aquarium umsetzt.</p>
+        </section>
+
+        <nav class="guide-toc" aria-label="Inhaltsverzeichnis">
+            <a href="#uebersicht">Übersicht</a>
+            <a href="#lager">Lager</a>
+            <a href="#cr">C&amp;R</a>
+            <a href="#trace">Trace</a>
+            <a href="#tools">Tools</a>
+            <a href="#logbuch">Logbuch</a>
+            <a href="#korallen">Korallen</a>
+            <a href="#sync">Datensicherung</a>
+        </nav>
+
+        <section id="uebersicht" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Startseite</span>
+                <h2>Übersicht</h2>
+                <p>Die Übersicht ist dein schneller Blick auf den aktuellen Zustand. Kacheln zeigen Lagerwarnungen, Messwerte, Aufgaben, Füllstände und wichtige Hinweise. Viele Kacheln sind anklickbar und führen direkt in den passenden Bereich.</p>
+                <ul>
+                    <li><strong>Lager, C&amp;R und Trace</strong> sind klar als Bereiche für das OSCI Versorgungssystem gedacht.</li>
+                    <li><strong>Messwert-Grafiken</strong> zeigen Trends und Entwicklung deiner selbst eingetragenen Werte.</li>
+                    <li><strong>Cloud Status</strong> zeigt, ob Google Drive Sync online, offline oder ungesynct ist.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/uebersicht.png" alt="Screenshot der Reeftools Übersicht">
+                <figcaption>Dashboard mit wichtigen Aquarium- und Lagerinformationen.</figcaption>
+            </figure>
+        </section>
+
+        <section id="lager" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">OSCI Versorgungssystem</span>
+                <h2>Lager</h2>
+                <p>Im Lager verwaltest du deine Bestände. Produkte können eingelagert, ausgelagert, korrigiert, verborgen und für Nachbestellungen überwacht werden.</p>
+                <ul>
+                    <li><strong>Einlagern:</strong> Bestand hinzufügen, optional mit Behältergröße, Tara und Einheit.</li>
+                    <li><strong>Auslagern:</strong> Menge buchen oder neuen Zielbestand eintragen. Danach kannst du entscheiden, ob nur korrigiert oder mit Protokoll ausgelagert wird.</li>
+                    <li><strong>Live-Umrechnung:</strong> Bei ml und g wird anhand der Dichte direkt umgerechnet, wenn die Produktdaten vorhanden sind.</li>
+                    <li><strong>Prognose:</strong> Eine Verbrauchsprognose entsteht erst sinnvoll ab mindestens zwei Entnahmen.</li>
+                    <li><strong>TXT/PDF Export:</strong> Lagerstände können als Datei dokumentiert und später wieder importiert werden.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/lager.png" alt="Screenshot der Lagerverwaltung">
+                <figcaption>Lagerkarte mit Bestand, Status und schnellen Aktionen.</figcaption>
+            </figure>
+        </section>
+
+        <section id="cr" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">OSCI Versorgungssystem</span>
+                <h2>C&amp;R</h2>
+                <p>Der C&amp;R Bereich hilft beim Auslagern von Custom &amp; Repair Produkten für Wasserwechsel und Korrekturen. Nach dem Import oder manuellen Eintragen siehst du benötigte Mengen und ob dein Lagerbestand reicht.</p>
+                <ul>
+                    <li><strong>Bevorzugte Einheit:</strong> Du kannst einstellen, ob ml oder g zuerst und groß angezeigt wird.</li>
+                    <li><strong>Bestandsprüfung:</strong> Jede Position zeigt, wie viel nach der Auslagerung übrig bleibt.</li>
+                    <li><strong>Ausgleichslisten:</strong> Standardmäßig eingeklappt, damit die Seite übersichtlich bleibt.</li>
+                    <li><strong>PDF-Analyse:</strong> Aktuell wegen Wartung deaktiviert, da PDF-Erkennung fehleranfällig sein kann.</li>
+                </ul>
+            </div>
+        </section>
+
+        <section id="trace" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">OSCI Versorgungssystem</span>
+                <h2>Trace</h2>
+                <p>Trace unterstützt Kationen- und Anionen-Mischungen, Reef Manager Importe, Historie und Auslagerung aus dem Lager.</p>
+                <ul>
+                    <li><strong>Reef Manager Import:</strong> Export aus der Reef Manager App einfügen, Aquariumvolumen manuell ergänzen und zur Historie hinzufügen.</li>
+                    <li><strong>ICP Pflicht:</strong> Normale Mischungen und importierte Mischungen werden erst verarbeitet, wenn die passenden ICP-Werte hinterlegt sind.</li>
+                    <li><strong>Startmischung:</strong> Nur die allererste Startmischung darf ohne ICP-Werte gespeichert werden und wird gesondert markiert.</li>
+                    <li><strong>Historie &amp; Analyse:</strong> Einträge können bearbeitet werden. Anionen, Kationen, Osmoseanteil und Gesamtvolumen sind getrennt sichtbar.</li>
+                    <li><strong>Auslagern:</strong> Trace-Mengen können lagergeführt ausgelagert und protokolliert werden.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/trace.png" alt="Screenshot des Trace Rechners">
+                <figcaption>Trace-Rechner mit Historie und Reef Manager Import.</figcaption>
+            </figure>
+        </section>
+
+        <section id="tools" class="guide-card guide-card-wide">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Rechner</span>
+                <h2>Tools</h2>
+                <p>Die Tools sind in thematische Gruppen aufgeteilt und standardmäßig eingeklappt. Öffne nur den Bereich, den du gerade brauchst.</p>
+                <ul>
+                    <li><strong>Dosieren &amp; Messwerte:</strong> Nutrition Rechner, KH/Ca Korrektur, Verbrauch pro Tag, Testkorrekturen und Umrechner.</li>
+                    <li><strong>Salinität &amp; Wasserwechsel:</strong> Salzgehalt korrigieren, Specific Gravity zu PSU, Wasserwechsel-Effekt und C&amp;R Meerwasser anmischen.</li>
+                    <li><strong>Mischen &amp; Lösungen:</strong> NaCl Lösung, Makro-Elemente und C&amp;R Meerwasser Rezepte.</li>
+                    <li><strong>Adsorber &amp; Filter:</strong> Durchflussrechner und Beratung zu Eisenbasis, Aluminiumbasis und Aktivkohle.</li>
+                    <li><strong>Sangokai A-Z Assistent:</strong> Testversion zur lokalen Suche in der eingebauten Wissensbasis. Antworten immer gegenprüfen.</li>
+                </ul>
+            </div>
+            <div class="guide-shot-grid">
+                <figure class="guide-figure">
+                    <img src="docs-assets/tools-dosierung.png" alt="Screenshot Tools Dosierung">
+                    <figcaption>Dosierung, Korrektur und Verbrauch.</figcaption>
+                </figure>
+                <figure class="guide-figure">
+                    <img src="docs-assets/tools-salz-adsorber.png" alt="Screenshot Tools Salinität und Adsorber">
+                    <figcaption>Salinität, Wasserwechsel und Adsorber.</figcaption>
+                </figure>
+                <figure class="guide-figure">
+                    <img src="docs-assets/tools-mischen.png" alt="Screenshot Tools Mischen">
+                    <figcaption>Mischen, Lösungen und C&amp;R Meerwasser.</figcaption>
+                </figure>
+            </div>
+        </section>
+
+        <section id="logbuch" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Aquarium-Verlauf</span>
+                <h2>Logbuch, Messwerte &amp; ToDos</h2>
+                <p>Das Logbuch ist an Aquarien gekoppelt, nicht an Lager. So kannst du mehrere Becken sauber dokumentieren.</p>
+                <ul>
+                    <li><strong>Logs:</strong> Einträge mit Datum, Kategorie und Notizen speichern, bearbeiten, löschen und nach Kategorie filtern.</li>
+                    <li><strong>Messwerte:</strong> KH, Ca, Mg, PO4, NO3 und eigene Werte eintragen. Grafiken zeigen Verlauf, Trend, Prognose und Abweichung.</li>
+                    <li><strong>ToDos:</strong> Wiederkehrende Aufgaben mit Intervall, letzter Ausführung und nächster Fälligkeit verwalten.</li>
+                    <li><strong>Vorratsbehälter &amp; Osmosetank:</strong> Füllstände, Verbrauch und Restlaufzeit überwachen.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/logbuch.png" alt="Screenshot Logbuch">
+                <figcaption>Logbuch mit Aquarienauswahl, Messwerten und Aufgaben.</figcaption>
+            </figure>
+        </section>
+
+        <section id="korallen" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Bestand</span>
+                <h2>Korallen</h2>
+                <p>Die Korallenverwaltung dient als Katalog für deinen Besatz. Du kannst Korallen manuell anlegen, Fotos hinzufügen und später suchen oder filtern.</p>
+                <ul>
+                    <li><strong>Pflichtdaten:</strong> Wissenschaftlicher Name, Gattung, Art, Handelsname, Korallentyp, Wuchsform und Farbe.</li>
+                    <li><strong>Fotos:</strong> Hauptbild und weitere Bilder aus Kamera oder Fotobibliothek zuweisen.</li>
+                    <li><strong>Ableger:</strong> Ableger können einer Mutterkoralle zugeordnet werden.</li>
+                    <li><strong>Abgabe:</strong> Abgegebene Korallen können gelöscht oder in einer separaten Abgabeliste mit Kontakt hinterlegt werden.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/korallen.png" alt="Screenshot Korallenverwaltung">
+                <figcaption>Korallenkatalog mit Such- und Filtermöglichkeiten.</figcaption>
+            </figure>
+        </section>
+
+        <section class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Bestandspflege</span>
+                <h2>Wareneingang, Nachbestellen, Statistik &amp; Protokoll</h2>
+                <p>Diese Bereiche helfen bei wiederkehrender Lagerarbeit und bei der Kontrolle deiner Bestände.</p>
+                <ul>
+                    <li><strong>Wareneingang:</strong> Mehrere Produkte gesammelt einlagern.</li>
+                    <li><strong>Nachbestellen:</strong> Produkte mit niedrigem Bestand sammeln und Bestellbedarf besser planen.</li>
+                    <li><strong>Statistik:</strong> Lagergebundene Auswertungen und Prognosen. Zugriff nur mit Schreibberechtigung.</li>
+                    <li><strong>Protokoll:</strong> Lagergebundene Buchungshistorie. Nur Lesefreigabe erlaubt keine Änderungen.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/wareneingang.png" alt="Screenshot Wareneingang">
+                <figcaption>Wareneingang für schnelle Sammelbuchungen.</figcaption>
+            </figure>
+        </section>
+
+        <section id="sync" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Datensicherung</span>
+                <h2>Google Drive Sync &amp; Backup</h2>
+                <p>Reeftools speichert lokal im Browser und kann zusätzlich verschlüsselte App-Daten in deinem eigenen Google Drive App-Speicher ablegen. Diese Dateien sind in Google Drive normalerweise nicht sichtbar, gehören aber zu deinem Konto.</p>
+                <ul>
+                    <li><strong>Cloud Status:</strong> Grün bedeutet online, rot offline, gelb ungesyncte Änderung.</li>
+                    <li><strong>Upload:</strong> Aktuellen lokalen Stand in Google Drive sichern.</li>
+                    <li><strong>Download:</strong> Gesicherten Stand aus Google Drive laden.</li>
+                    <li><strong>Wiederherstellung:</strong> Je nach Sicherungsstand können ältere Datenstände zurückgeholt werden.</li>
+                    <li><strong>Lokale Backups:</strong> JSON, TXT und PDF-Exporte bleiben wichtig, wenn du komplett unabhängig sichern möchtest.</li>
+                </ul>
+            </div>
+            <figure class="guide-figure">
+                <img src="docs-assets/einstellungen-cloud.png" alt="Screenshot Google Drive Sync Einstellungen">
+                <figcaption>Google Drive Sync und Datensicherheit in den Einstellungen.</figcaption>
+            </figure>
+        </section>
+
+        <section class="guide-card guide-final">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Praxis</span>
+                <h2>Empfohlene Arbeitsweise</h2>
+                <ol>
+                    <li>Lagerbestand regelmäßig pflegen und nach größeren Buchungen prüfen.</li>
+                    <li>Messwerte im Logbuch eintragen, damit Trends belastbarer werden.</li>
+                    <li>C&amp;R, Trace und Nutrition Rechnungen vor der Anwendung gegen Messwerte und Herstellerangaben prüfen.</li>
+                    <li>Nach wichtigen Änderungen einen Google Drive Upload oder lokalen Backup-Export erstellen.</li>
+                    <li>Bei Unsicherheit langsam dosieren, messen und dokumentieren.</li>
+                </ol>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

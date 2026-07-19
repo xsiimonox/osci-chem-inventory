@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.2-open-support-menu">
+    <link rel="stylesheet" href="style.css?v=3.0.2-guide-modal">
 </head>
 <body>
 
@@ -46,6 +46,7 @@
                         </div>
                     </div>
                     <button type="button" class="header-quick-sync-button" onclick="openProjectSupportSettings()" aria-label="Projekt unterstützen öffnen">Projekt unterstützen</button>
+                    <a href="anleitung.html" class="header-quick-sync-button header-help-link" data-help-page="guide" aria-label="Hilfe und Anleitung öffnen">Hilfe</a>
                 </div>
             </div>
             <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen" aria-controls="main-nav" aria-expanded="false">
@@ -850,6 +851,10 @@
                     <div class="tool-card-grid">
                         <div class="card resource-tools-card">
                             <div class="resource-link-grid">
+                                <a href="anleitung.html" class="resource-link-card" data-help-page="guide">
+                                    <strong>Reeftools Anleitung</strong>
+                                    <span>Alle wichtigen Funktionen mit Bildern und Schritt-für-Schritt-Erklärung</span>
+                                </a>
                                 <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Anleitungen</strong>
                                     <span>Bedienungsanleitungen, Rezepte und Produktinformationen</span>
@@ -1298,6 +1303,7 @@
                     <h2 id="settingsPageTitle">Einstellungen</h2>
                     <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
+                <a href="anleitung.html" class="btn-secondary btn-animated settings-help-link" data-help-page="guide">Hilfe &amp; Anleitung öffnen</a>
             </section>
 
             <div class="card sync-disabled-card storage-safety-card">
@@ -1679,7 +1685,7 @@
     </main>
 
     <footer class="app-footer">
-    <p>© 2026 xsiimonox • <a href="impressum.html" data-legal-page="impressum">Impressum</a> • <a href="privacy.html" data-legal-page="privacy">Datenschutzerklärung</a></p>
+    <p>© 2026 xsiimonox • <a href="anleitung.html" data-help-page="guide">Anleitung</a> • <a href="impressum.html" data-legal-page="impressum">Impressum</a> • <a href="privacy.html" data-legal-page="privacy">Datenschutzerklärung</a></p>
     </footer>
 
     <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
@@ -1739,8 +1745,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.2-open-support-menu"></script>
-    <script src="app.js?v=3.0.2-open-support-menu"></script>
+    <script src="sangokai-data.js?v=3.0.2-guide-modal"></script>
+    <script src="app.js?v=3.0.2-guide-modal"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
