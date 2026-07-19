@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-guide-modal';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-info-icon-centered';
 const ASSETS = [
   './',
   './index.html',

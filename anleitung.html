@@ -18,7 +18,7 @@
             });
         } catch (error) {}
     </script>
-    <link rel="stylesheet" href="style.css?v=3.0.2-guide-modal">
+    <link rel="stylesheet" href="style.css?v=3.0.2-info-icon-centered">
 </head>
 <body class="guide-page">
     <main class="guide-shell">
@@ -119,14 +119,71 @@
             <div class="guide-copy">
                 <span class="section-eyebrow">Rechner</span>
                 <h2>Tools</h2>
-                <p>Die Tools sind in thematische Gruppen aufgeteilt und standardmäßig eingeklappt. Öffne nur den Bereich, den du gerade brauchst.</p>
-                <ul>
-                    <li><strong>Dosieren &amp; Messwerte:</strong> Nutrition Rechner, KH/Ca Korrektur, Verbrauch pro Tag, Testkorrekturen und Umrechner.</li>
-                    <li><strong>Salinität &amp; Wasserwechsel:</strong> Salzgehalt korrigieren, Specific Gravity zu PSU, Wasserwechsel-Effekt und C&amp;R Meerwasser anmischen.</li>
-                    <li><strong>Mischen &amp; Lösungen:</strong> NaCl Lösung, Makro-Elemente und C&amp;R Meerwasser Rezepte.</li>
-                    <li><strong>Adsorber &amp; Filter:</strong> Durchflussrechner und Beratung zu Eisenbasis, Aluminiumbasis und Aktivkohle.</li>
-                    <li><strong>Sangokai A-Z Assistent:</strong> Testversion zur lokalen Suche in der eingebauten Wissensbasis. Antworten immer gegenprüfen.</li>
-                </ul>
+                <p>Die Tools sind bewusst in Arbeitsbereiche sortiert. Öffne zuerst die passende Kategorie und danach nur das einzelne Tool, das du wirklich brauchst.</p>
+                <div class="guide-tool-map" aria-label="Toolbereiche in Reeftools">
+                    <article class="guide-tool-card">
+                        <span>01</span>
+                        <strong>Wasserwerte &amp; Dosierung</strong>
+                        <p>KH/Ca Korrektur, Verbrauch pro Tag, Nutrition Rechner, Testkorrekturen und Messwert-Umrechner.</p>
+                    </article>
+                    <article class="guide-tool-card">
+                        <span>02</span>
+                        <strong>Salz &amp; Wasserwechsel</strong>
+                        <p>Salzgehalt, Dichte, Specific Gravity, PSU-Korrektur und rechnerischer Wasserwechsel-Effekt.</p>
+                    </article>
+                    <article class="guide-tool-card">
+                        <span>03</span>
+                        <strong>Mischen &amp; Lösungen</strong>
+                        <p>C&amp;R Meerwasser, NaCl Lösung und Makro-Elemente auf deine gewünschte Zielmenge skalieren.</p>
+                    </article>
+                    <article class="guide-tool-card">
+                        <span>04</span>
+                        <strong>Adsorber &amp; Filter</strong>
+                        <p>Durchfluss langsam planen und eine grobe Orientierung für Eisenbasis, Aluminiumbasis oder Aktivkohle erhalten.</p>
+                    </article>
+                    <article class="guide-tool-card">
+                        <span>05</span>
+                        <strong>Wissen &amp; Quellen</strong>
+                        <p>Sangokai A-Z Assistent, OSCI Links, Meerwasser Lexikon und Buchtipps. Assistentenantworten immer prüfen.</p>
+                    </article>
+                </div>
+                <div class="guide-subtool-groups" aria-label="Einzelne Tools erklärt">
+                    <section class="guide-subtool-group">
+                        <h3>Wasserwerte &amp; Dosierung</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>KH / Ca Korrektur</strong><p>Berechnet die Dosiermenge, um KH oder Calcium von Istwert auf Zielwert zu bringen.</p></article>
+                            <article><strong>Verbrauch pro Tag</strong><p>Berechnet aus zwei Messungen, wie stark ein Wert täglich fällt oder steigt.</p></article>
+                            <article><strong>Test Korrekturfaktor</strong><p>Gleicht Heimtests mit ICP oder Referenzlösung ab und speichert den Faktor.</p></article>
+                            <article><strong>Hanna P → PO4</strong><p>Rechnet Phosphor ppb vom Hanna Checker in Phosphat mg/l um.</p></article>
+                            <article><strong>Salifert Umrechner</strong><p>Wandelt Salifert Spritzen-Restwerte für Calcium oder KH in Messwerte um.</p></article>
+                            <article><strong>Nutrition Rechner</strong><p>Berät zu NO3/PO4 und berechnet Dosierungen für N, P, La und Kohlenstoff.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Salz &amp; Wasserwechsel</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Salzgehalt Rechner</strong><p>Rechnet Dichte, Specific Gravity, Leitwert und PSU mit Temperaturbezug um.</p></article>
+                            <article><strong>Salzgehalt korrigieren</strong><p>Gibt eine Orientierung, wie du eine Abweichung zur Ziel-PSU ausgleichst.</p></article>
+                            <article><strong>Wasserwechsel Effekt</strong><p>Zeigt den rechnerischen Nachher-Wert nach einem Wasserwechsel.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Mischen &amp; Lösungen</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Meerwasser aus C&amp;R</strong><p>Skaliert das C&amp;R Meerwasser-Rezept auf beliebige Zielmengen.</p></article>
+                            <article><strong>C&amp;R NaCl aus Pulver</strong><p>Berechnet NaCl Pulver und Osmosewasser für flüssiges C&amp;R Natriumchlorid.</p></article>
+                            <article><strong>Makro-Elemente</strong><p>Skaliert Rezepte für KH-Tag, KH-Nacht, Calcium und Magnesium.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Adsorber, Wissen &amp; Quellen</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Adsorber Durchfluss</strong><p>Berechnet langsamen Durchfluss und gibt eine grobe Adsorber-Empfehlung.</p></article>
+                            <article><strong>Sangokai A-Z Assistent</strong><p>Durchsucht die lokale Wissensbasis. Testversion, Antworten immer prüfen.</p></article>
+                            <article><strong>Links &amp; Nachschlagen</strong><p>Sammelt Anleitung, OSCI Tools, Meerwasser Lexikon, Sangokai A-Z und Buchtipps.</p></article>
+                        </div>
+                    </section>
+                </div>
             </div>
             <div class="guide-shot-grid">
                 <figure class="guide-figure">

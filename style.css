@@ -6070,34 +6070,80 @@ body.theme-light .nav-links button.active {
 .tool-info-button {
     display: inline-grid;
     place-items: center;
-    flex: 0 0 28px;
-    width: 28px;
-    height: 28px;
-    min-width: 28px;
-    min-height: 28px;
-    margin-left: 2px;
-    border: 1px solid color-mix(in srgb, var(--secondary) 42%, var(--border));
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    min-height: 30px;
+    margin-left: 4px;
+    border: 1px solid color-mix(in srgb, var(--text-primary) 12%, var(--border));
     border-radius: 50%;
-    background: color-mix(in srgb, var(--secondary) 10%, transparent);
-    color: var(--secondary);
-    font-family: ui-serif, Georgia, serif;
-    font-size: 0.95rem;
-    font-style: italic;
-    font-weight: 900;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.13), rgba(255,255,255,0.035)),
+        color-mix(in srgb, var(--surface-raised) 52%, transparent);
+    color: color-mix(in srgb, var(--text-primary) 86%, var(--secondary));
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-size: 0;
+    font-weight: 850;
     line-height: 1;
     cursor: pointer;
     position: relative;
     z-index: 4;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.16),
+        0 8px 18px rgba(0, 0, 0, 0.16);
+    backdrop-filter: blur(14px) saturate(1.25);
+    -webkit-backdrop-filter: blur(14px) saturate(1.25);
+    transition:
+        transform 0.16s ease,
+        border-color 0.16s ease,
+        background 0.16s ease,
+        color 0.16s ease,
+        box-shadow 0.16s ease;
+}
+
+.tool-info-button::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 6px);
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: currentColor;
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
+.tool-info-button::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: calc(50% - 1px);
+    width: 3px;
+    height: 8px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: translateX(-50%);
+    pointer-events: none;
 }
 
 .tool-info-button:hover,
 .tool-info-button:focus-visible {
     transform: translateY(-1px);
-    border-color: var(--secondary);
-    background: color-mix(in srgb, var(--secondary) 18%, transparent);
+    border-color: color-mix(in srgb, var(--secondary) 46%, var(--border));
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.055)),
+        color-mix(in srgb, var(--secondary) 14%, var(--surface-raised));
+    color: var(--secondary);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.2),
+        0 10px 24px color-mix(in srgb, var(--secondary) 18%, transparent);
     outline: none;
+}
+
+.tool-info-button:active {
+    transform: translateY(0) scale(0.96);
 }
 
 .tool-title-text {
@@ -13987,9 +14033,9 @@ progress.mini-progress::-moz-progress-bar {
 
 /* Priority 7: settings workspace */
 .settings-page-head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
     gap: var(--space-4);
     margin-bottom: var(--space-4);
     padding: var(--space-5);
@@ -13998,11 +14044,22 @@ progress.mini-progress::-moz-progress-bar {
     background: var(--surface-card);
 }
 
-.settings-page-head > div { min-width: 0; }
+.settings-page-head > div {
+    min-width: 0;
+}
 .settings-page-head h2 { margin: var(--space-1) 0 var(--space-2); }
-.settings-page-head p { max-width: 66ch; margin: 0; color: var(--text-secondary); }
+.settings-page-head p {
+    max-width: 66ch;
+    margin: 0;
+    color: var(--text-secondary);
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+}
 .settings-help-link {
-    flex: 0 0 auto;
+    justify-self: end;
+    width: auto !important;
+    max-width: max-content;
     text-decoration: none;
     white-space: nowrap;
 }
@@ -14155,8 +14212,17 @@ progress.mini-progress::-moz-progress-bar {
 @keyframes settings-busy-pulse { 50% { opacity: 0.52; } }
 
 @media (max-width: 767px) {
-    .settings-page-head { align-items: flex-start; flex-direction: column; padding: var(--space-4); }
-    .settings-help-link { width: 100%; }
+    .settings-page-head {
+        grid-template-columns: 1fr;
+        align-items: start;
+        gap: var(--space-3);
+        padding: var(--space-4);
+    }
+    .settings-help-link {
+        justify-self: stretch;
+        width: 100% !important;
+        max-width: none;
+    }
     .settings-group-nav { top: max(var(--space-2), env(safe-area-inset-top)); margin-inline: calc(var(--space-2) * -1); border-radius: 0; }
     #einstellungen > .card { padding: var(--space-4); }
     .settings-summary-copy small { display: none; }
@@ -14878,6 +14944,98 @@ body.guide-page {
     color: var(--text-primary);
 }
 
+.guide-tool-map {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.guide-tool-card {
+    display: grid;
+    align-content: start;
+    gap: 7px;
+    min-width: 0;
+    padding: 13px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-tertiary) 64%, transparent);
+}
+
+.guide-tool-card span {
+    display: inline-grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+.guide-tool-card strong {
+    font-size: clamp(0.88rem, 1.5vw, 1rem);
+    line-height: 1.18;
+}
+
+.guide-tool-card p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+
+.guide-subtool-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.guide-subtool-group {
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--bg-secondary) 62%, transparent);
+}
+
+.guide-subtool-group h3 {
+    margin: 0 0 10px;
+    color: var(--text-primary);
+    font-size: clamp(1rem, 2vw, 1.16rem);
+    line-height: 1.15;
+}
+
+.guide-subtool-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.guide-subtool-list article {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-tertiary) 56%, transparent);
+}
+
+.guide-subtool-list strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.84rem;
+    line-height: 1.15;
+}
+
+.guide-subtool-list p {
+    margin: 5px 0 0;
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    line-height: 1.3;
+}
+
 .guide-figure {
     margin: 0;
     min-width: 0;
@@ -14943,6 +15101,43 @@ html.guide-embedded .guide-hero {
 
     .guide-shot-grid {
         grid-template-columns: 1fr;
+    }
+
+    #tools .guide-shot-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    #tools .guide-shot-grid .guide-figure img {
+        max-height: 160px;
+    }
+
+    #tools .guide-shot-grid .guide-figure figcaption {
+        font-size: 0.68rem;
+        line-height: 1.2;
+    }
+
+    .guide-tool-map {
+        grid-template-columns: 1fr;
+    }
+
+    .guide-subtool-groups,
+    .guide-subtool-list {
+        grid-template-columns: 1fr;
+    }
+
+    .guide-subtool-group {
+        padding: 12px;
+    }
+
+    .guide-tool-card {
+        grid-template-columns: 34px minmax(0, 1fr);
+        align-items: start;
+        gap: 4px 10px;
+    }
+
+    .guide-tool-card span {
+        grid-row: span 2;
     }
 
     .guide-figure img {

@@ -6,7 +6,7 @@
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.2-guide-modal">
+    <link rel="stylesheet" href="style.css?v=3.0.2-info-icon-centered">
 </head>
 <body>
 
@@ -1303,7 +1303,7 @@
                     <h2 id="settingsPageTitle">Einstellungen</h2>
                     <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
-                <a href="anleitung.html" class="btn-secondary btn-animated settings-help-link" data-help-page="guide">Hilfe &amp; Anleitung öffnen</a>
+                <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
             </section>
 
             <div class="card sync-disabled-card storage-safety-card">
@@ -1745,8 +1745,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.2-guide-modal"></script>
-    <script src="app.js?v=3.0.2-guide-modal"></script>
+    <script src="sangokai-data.js?v=3.0.2-info-icon-centered"></script>
+    <script src="app.js?v=3.0.2-info-icon-centered"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
