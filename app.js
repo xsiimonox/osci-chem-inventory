@@ -441,6 +441,9 @@ let googleDriveSyncTimer = null;
 let googleDriveRemoteWatchTimer = null;
 const googleDriveMonitorState = {
     checking: false,
+    authInProgress: false,
+    silentAuthPausedUntil: 0,
+    lastAuthErrorAt: null,
     busyAction: '',
     lastCheckedAt: null,
     remoteModifiedAt: null,
@@ -907,18 +910,29 @@ async function ensureGoogleDriveOnline({ interactive = false, showPrompt = false
     const settings = getGoogleDriveSyncSettings();
     if (hasValidGoogleDriveToken()) return true;
     if (!isGoogleDriveConfigured()) return false;
-    if (settings.connectedEmail || settings.autoSync) {
+    if (!interactive && Date.now() < (googleDriveMonitorState.silentAuthPausedUntil || 0)) {
+        if (showPrompt) showGoogleDriveReconnectPrompt(reason || 'Cloud-Sync ist momentan offline. Bitte melde dich erneut an.');
+        return false;
+    }
+    if (!interactive && (settings.connectedEmail || settings.autoSync)) {
         const restored = await tryRestoreGoogleDriveSession();
         if (restored || hasValidGoogleDriveToken()) return true;
     }
     if (interactive) {
         try {
+            googleDriveMonitorState.authInProgress = true;
             await requestGoogleDriveAccessToken(true);
+            googleDriveMonitorState.silentAuthPausedUntil = 0;
+            googleDriveMonitorState.lastAuthErrorAt = null;
             renderGoogleDriveSyncCard('Google Drive Verbindung wiederhergestellt.');
             scheduleGoogleDriveRemoteWatch(2500);
             return true;
         } catch (err) {
+            googleDriveMonitorState.lastAuthErrorAt = Date.now();
+            googleDriveMonitorState.silentAuthPausedUntil = Date.now() + (5 * 60 * 1000);
             renderGoogleDriveSyncCard(`Verbindung fehlgeschlagen: ${err.message}`);
+        } finally {
+            googleDriveMonitorState.authInProgress = false;
         }
     }
     if (showPrompt) {
@@ -1042,6 +1056,12 @@ async function fetchGoogleUserEmail(accessToken) {
 
 async function requestGoogleDriveAccessToken(interactive = true) {
     if (hasValidGoogleDriveToken()) return googleDriveAccessToken;
+    if (googleDriveMonitorState.authInProgress && !interactive) {
+        throw new Error('Google Anmeldung läuft bereits.');
+    }
+    if (!interactive && Date.now() < (googleDriveMonitorState.silentAuthPausedUntil || 0)) {
+        throw new Error('Google Sitzung muss manuell erneuert werden.');
+    }
     const client = await ensureGoogleDriveTokenClient();
     return new Promise((resolve, reject) => {
         client.callback = async response => {
@@ -1051,12 +1071,16 @@ async function requestGoogleDriveAccessToken(interactive = true) {
             }
             googleDriveAccessToken = response.access_token || '';
             googleDriveTokenExpiresAt = Date.now() + ((response.expires_in || 0) * 1000);
+            googleDriveMonitorState.silentAuthPausedUntil = 0;
+            googleDriveMonitorState.lastAuthErrorAt = null;
             const email = await fetchGoogleUserEmail(googleDriveAccessToken);
             if (email) storeGoogleDriveSyncSettings({ connectedEmail: email });
             renderGoogleDriveSyncCard();
             resolve(googleDriveAccessToken);
         };
         client.error_callback = error => {
+            googleDriveMonitorState.lastAuthErrorAt = Date.now();
+            if (!interactive) googleDriveMonitorState.silentAuthPausedUntil = Date.now() + (5 * 60 * 1000);
             reject(new Error(error?.message || 'Google OAuth abgebrochen.'));
         };
         client.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
@@ -1209,7 +1233,7 @@ function scheduleGoogleDriveAutoSync() {
 function scheduleGoogleDriveRemoteWatch(delay = 6000) {
     clearTimeout(googleDriveRemoteWatchTimer);
     const settings = getGoogleDriveSyncSettings();
-    if (!settings.autoSync || (!hasValidGoogleDriveToken() && !settings.connectedEmail)) return;
+    if (!settings.autoSync || !hasValidGoogleDriveToken()) return;
     googleDriveRemoteWatchTimer = setTimeout(() => {
         checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }).catch(() => {});
     }, Math.max(1500, delay));
@@ -1218,6 +1242,11 @@ function scheduleGoogleDriveRemoteWatch(delay = 6000) {
 async function checkGoogleDriveRemoteChanges({ silent = false, autoRestore = false } = {}) {
     const settings = getGoogleDriveSyncSettings();
     if (!isGoogleDriveConfigured() || (!settings.connectedEmail && !hasValidGoogleDriveToken())) return false;
+    if (!hasValidGoogleDriveToken() && silent) {
+        googleDriveMonitorState.message = 'Cloud offline. Bitte manuell einloggen, damit Auto-Sync weiterläuft.';
+        renderGoogleDriveSyncCard();
+        return false;
+    }
     googleDriveMonitorState.checking = true;
     googleDriveMonitorState.message = 'Pruefe Google Drive auf neueren Stand ...';
     renderGoogleDriveSyncCard();
@@ -1265,7 +1294,7 @@ async function checkGoogleDriveRemoteChanges({ silent = false, autoRestore = fal
     } catch (err) {
         googleDriveMonitorState.message = `Cloud-Pruefung pausiert: ${err.message}`;
         renderGoogleDriveSyncCard();
-        scheduleGoogleDriveRemoteWatch(8 * 60 * 1000);
+        if (hasValidGoogleDriveToken()) scheduleGoogleDriveRemoteWatch(8 * 60 * 1000);
         if (!silent) await appAlert('Google Drive Prüfung fehlgeschlagen: ' + err.message, {
             title: 'Cloud-Prüfung nicht möglich',
             type: 'warning'
@@ -1370,14 +1399,22 @@ async function inspectGoogleDriveSyncNow() {
 async function tryRestoreGoogleDriveSession() {
     const settings = getGoogleDriveSyncSettings();
     if (!isGoogleDriveConfigured() || hasValidGoogleDriveToken() || (!settings.connectedEmail && !settings.autoSync)) return false;
+    if (googleDriveMonitorState.authInProgress) return false;
+    if (Date.now() < (googleDriveMonitorState.silentAuthPausedUntil || 0)) return false;
     try {
+        googleDriveMonitorState.authInProgress = true;
         await requestGoogleDriveAccessToken(false);
+        googleDriveMonitorState.silentAuthPausedUntil = 0;
         renderGoogleDriveSyncCard('Google Drive Verbindung für diese Sitzung automatisch erneuert.');
         scheduleGoogleDriveRemoteWatch(3000);
         return true;
     } catch (err) {
+        googleDriveMonitorState.lastAuthErrorAt = Date.now();
+        googleDriveMonitorState.silentAuthPausedUntil = Date.now() + (5 * 60 * 1000);
         renderGoogleDriveSyncCard('Bitte Google Drive Verbindung für diese Sitzung erneut öffnen.');
         return false;
+    } finally {
+        googleDriveMonitorState.authInProgress = false;
     }
 }
 

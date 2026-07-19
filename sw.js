@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-trace-icp-required';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-google-auth-loop-fix';
 const ASSETS = [
   './',
   './index.html',
