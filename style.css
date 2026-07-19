@@ -333,9 +333,14 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     border-color: rgba(48, 209, 88, 0.18);
     background: rgba(48, 209, 88, 0.08);
 }
+.header-sync-indicator.is-unsynced,
 .header-sync-indicator.is-warning {
     border-color: rgba(255, 159, 10, 0.18);
     background: rgba(255, 159, 10, 0.08);
+}
+.header-sync-indicator.is-offline {
+    border-color: rgba(255, 69, 58, 0.22);
+    background: rgba(255, 69, 58, 0.09);
 }
 .header-sync-dot {
     width: 8px;
@@ -349,9 +354,14 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     background: var(--success);
     box-shadow: 0 0 0 4px rgba(48,209,88,0.12);
 }
+.header-sync-indicator.is-unsynced .header-sync-dot,
 .header-sync-indicator.is-warning .header-sync-dot {
     background: #ff9f0a;
     box-shadow: 0 0 0 4px rgba(255,159,10,0.12);
+}
+.header-sync-indicator.is-offline .header-sync-dot {
+    background: #ff453a;
+    box-shadow: 0 0 0 4px rgba(255,69,58,0.14);
 }
 .header-sync-copy {
     display: inline-flex;

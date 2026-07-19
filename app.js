@@ -835,20 +835,26 @@ function renderGoogleDriveHeaderStatus() {
     const connected = hasValidGoogleDriveToken();
     const knownAccount = settings.connectedEmail || '';
     const autoSync = settings.autoSync === true;
+    const hasLocalChanges = connected && hasPendingGoogleDriveLocalChanges();
     let subtitle = knownAccount ? `offline · ${knownAccount}` : 'offline';
-    indicator.classList.remove('is-connected', 'is-warning');
+    indicator.classList.remove('is-connected', 'is-warning', 'is-offline', 'is-unsynced');
     if (connected) {
-        subtitle = autoSync ? 'online · Auto-Sync aktiv' : 'online · manuell';
-        indicator.classList.add('is-connected');
+        subtitle = hasLocalChanges
+            ? 'online · nicht synchronisiert'
+            : (autoSync ? 'online · Auto-Sync aktiv' : 'online · manuell');
+        indicator.classList.add(hasLocalChanges ? 'is-unsynced' : 'is-connected');
     } else if (knownAccount) {
         subtitle = `offline · ${knownAccount}`;
-        indicator.classList.add('is-warning');
+        indicator.classList.add('is-offline');
+    } else {
+        indicator.classList.add('is-offline');
     }
     if (googleDriveMonitorState.newerRemote) {
         subtitle = hasPendingGoogleDriveLocalChanges()
             ? 'online · neuerer Cloud-Stand'
             : 'online · Cloud-Update bereit';
-        indicator.classList.add('is-warning');
+        indicator.classList.remove('is-connected', 'is-offline');
+        indicator.classList.add('is-unsynced');
     }
     indicator.innerHTML = `
         <span class="header-sync-dot" aria-hidden="true"></span>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-google-auth-loop-fix';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-cloud-status-colors';
 const ASSETS = [
   './',
   './index.html',
