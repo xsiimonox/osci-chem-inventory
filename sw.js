@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v301-sea-trace-note-strong';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-trace-icp-required';
 const ASSETS = [
   './',
   './index.html',

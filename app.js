@@ -7371,6 +7371,11 @@ function addReefManagerImportToTraceHistory() {
         tankLitersInput?.focus();
         return;
     }
+    const validation = getTraceCalculatorIcpValidation();
+    if (!validation.valid) {
+        showTraceCalculatorIcpValidationError(validation.invalid);
+        return;
+    }
     const config = {
         ...currentConfig,
         tankLiters,
@@ -7389,14 +7394,14 @@ function addReefManagerImportToTraceHistory() {
         createdAt: Date.now(),
         mixtureDate: meta.mixtureDate || getTodayDateInputValue(),
         config,
-        icp: {},
+        icp: { ...state.icp },
         amounts,
         grams,
         totals: getTraceTotalsFromAmounts(amounts, config),
         reefManagerMeta: meta
     });
     state.history.push(entry);
-    if (state.history.length > 60) state.history = state.history.slice(-60);
+    pruneTraceCalculatorHistory();
     state.config = config;
     state.currentMixtureDate = entry.mixtureDate;
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
@@ -7536,10 +7541,56 @@ function normalizeTraceCalculatorHistoryEntry(entry) {
     return entry;
 }
 
-function getTraceCalculatorHistoryEntries({ calculationOnly = false } = {}) {
+function getTraceHistorySortTime(entry) {
+    if (entry?.mixtureDate) {
+        const mixtureTime = new Date(`${entry.mixtureDate}T00:00:00`).getTime();
+        if (Number.isFinite(mixtureTime)) return mixtureTime;
+    }
+    const createdTime = Number(entry?.createdAt);
+    return Number.isFinite(createdTime) ? createdTime : 0;
+}
+
+function sortTraceHistoryByDate(history, direction = 'asc') {
+    const multiplier = direction === 'desc' ? -1 : 1;
+    return [...(Array.isArray(history) ? history : [])].sort((a, b) => {
+        const dateDiff = getTraceHistorySortTime(a) - getTraceHistorySortTime(b);
+        if (dateDiff !== 0) return dateDiff * multiplier;
+        const createdDiff = (Number(a?.createdAt) || 0) - (Number(b?.createdAt) || 0);
+        return createdDiff * multiplier;
+    });
+}
+
+function isTraceStartMixture(entry) {
+    return entry?.isStartMixture === true || entry?.source === 'traceStartMixture';
+}
+
+function getTraceCalculatorAnalysisHistory(limit = 5) {
+    return getTraceCalculatorHistoryEntries({ calculationOnly: true, sort: 'asc' })
+        .filter(hasTraceCalculatorIcpValues)
+        .slice(-limit);
+}
+
+function getTraceCalculatorRecipeBasisHistory(limit = 5) {
+    return getTraceCalculatorHistoryEntries({ calculationOnly: true, sort: 'asc' })
+        .filter(entry => hasTraceCalculatorIcpValues(entry) || isTraceStartMixture(entry))
+        .slice(-limit);
+}
+
+function getTraceCalculatorCalculationHistory(limit = 5) {
+    return getTraceCalculatorAnalysisHistory(limit);
+}
+
+function pruneTraceCalculatorHistory(maxEntries = 60) {
+    const state = ensureTraceCalculatorState();
+    if (state.history.length <= maxEntries) return;
+    state.history = sortTraceHistoryByDate(state.history, 'asc').slice(-maxEntries);
+}
+
+function getTraceCalculatorHistoryEntries({ calculationOnly = false, sort = 'asc' } = {}) {
     const state = ensureTraceCalculatorState();
     state.history.forEach(normalizeTraceCalculatorHistoryEntry);
-    return state.history.filter(entry => !calculationOnly || entry.includeInCalculation !== false);
+    const entries = state.history.filter(entry => !calculationOnly || entry.includeInCalculation !== false);
+    return sortTraceHistoryByDate(entries, sort);
 }
 
 function getTraceTotalsFromAmounts(amounts = {}, config = {}) {
@@ -7564,8 +7615,22 @@ function getTraceTotalsFromAmounts(amounts = {}, config = {}) {
 }
 
 function getTraceHistoryEntrySummary(entry) {
+    if (isTraceStartMixture(entry)) return 'Startmischung';
     if (entry?.source === 'reefManager') return 'Reef Manager Import';
     return entry?.inventoryBooking ? 'Gespeichert & ausgelagert' : 'Manuell gespeichert';
+}
+
+function getTraceHistoryEntryStatus(entry) {
+    if (entry?.includeInCalculation === false && !isTraceStartMixture(entry)) {
+        return { className: 'ignored', label: 'Ignoriert', note: 'fließt nicht ein' };
+    }
+    if (isTraceStartMixture(entry)) {
+        return { className: 'start', label: 'Startmischung', note: 'ohne ICP-Bewertung' };
+    }
+    if (hasTraceCalculatorIcpValues(entry)) {
+        return { className: 'icp', label: 'Mit ICP', note: 'berechnungsfähig' };
+    }
+    return { className: 'missing', label: 'Ohne ICP', note: 'nicht berechnungsfähig' };
 }
 
 function getTraceCalculatorConfigFromUi() {
@@ -7626,7 +7691,7 @@ function getTraceCalculatorBaseRecipe(config) {
 }
 
 function getTraceCalculatorLatestHistory() {
-    const history = getTraceCalculatorHistoryEntries({ calculationOnly: true });
+    const history = getTraceCalculatorRecipeBasisHistory();
     return history.length ? history[history.length - 1] : null;
 }
 
@@ -7815,9 +7880,38 @@ function getTraceCalculatorIcpValidation() {
     };
 }
 
-function showTraceCalculatorIcpValidationError(invalid) {
+function hasTraceCalculatorIcpValues(entry) {
+    const icp = entry?.icp || {};
+    return traceCalculatorElements.every(element => {
+        const raw = icp[element.item];
+        if (raw === null || raw === undefined || String(raw).trim() === '') return false;
+        const value = traceCalcNumber(raw, null);
+        return value !== null && value >= 0;
+    });
+}
+
+function hasTraceCalculatorStartMixture() {
+    const state = ensureTraceCalculatorState();
+    return state.history.some(entry => {
+        normalizeTraceCalculatorHistoryEntry(entry);
+        return entry.isStartMixture === true || entry.source === 'traceStartMixture';
+    });
+}
+
+function canCreateTraceStartMixtureWithoutIcp() {
+    const state = ensureTraceCalculatorState();
+    return state.history.length === 0 && !hasTraceCalculatorStartMixture();
+}
+
+function showTraceCalculatorIcpValidationError(invalid, { allowStartMixture = false } = {}) {
     const labels = invalid.map(element => element.symbol).join(', ');
-    alert(`Bitte alle Kationen- und Anionen-ICP-Werte logisch ausfüllen.\n\nFehlt oder ungültig: ${labels}`);
+    alert(
+        `Bitte alle Kationen- und Anionen-ICP-Werte logisch ausfüllen.\n\n` +
+        `Fehlt oder ungültig: ${labels}` +
+        (allowStartMixture
+            ? '\n\nAusnahme: Wenn dies deine allererste Trace-Mischung ist, kannst du sie als Startmischung ohne ICP speichern.'
+            : '\n\nNur die allererste Startmischung darf ohne ICP gespeichert werden.')
+    );
     const first = invalid[0];
     const input = first ? document.getElementById(`traceCalcIcp-${first.symbol}`) : null;
     if (input) {
@@ -8043,7 +8137,7 @@ function renderTraceCalculationGuide() {
                     <p><strong>Ohne Historie:</strong> Der Rechner verwendet das Startrezept für normalen oder schwachen Besatz. Diese Basis gilt für ${traceCalculatorBase.liters} L Aquarium und ${traceCalculatorBase.days} Tage Laufzeit.</p>
                     <p><code>Skalierungsfaktor = Aquariumvolumen / ${traceCalculatorBase.liters} × Laufzeit / ${traceCalculatorBase.days}</code></p>
                     <p><code>Ausgangsmenge = Startmenge × Skalierungsfaktor</code></p>
-                    <p><strong>Mit Historie:</strong> Die zuletzt gespeicherte Elementmenge wird zuerst durch ihren alten Skalierungsfaktor geteilt und anschließend mit dem neuen Faktor multipliziert. So wird die vorherige Rezeptur auf das aktuelle Aquarium und die aktuelle Laufzeit übertragen.</p>
+                    <p><strong>Mit Historie:</strong> Die aktuellste aktive Elementmenge nach Ansatzdatum wird zuerst durch ihren alten Skalierungsfaktor geteilt und anschließend mit dem neuen Faktor multipliziert. So wird die vorherige Rezeptur auf das aktuelle Aquarium und die aktuelle Laufzeit übertragen.</p>
                     <p><code>Neue Ausgangsmenge = letzte Menge / alter Faktor × neuer Faktor</code></p>
                     <p>Die Besatz-Auswahl wirkt auf das Startrezept. Sobald für ein Element eine gespeicherte Menge vorhanden ist, hat der Verlauf Vorrang. Jede berechnete Elementmenge wird auf ${traceCalcFormatMl(traceCalculatorRules.roundingMl)} gerundet.</p>
                 </div>
@@ -8094,7 +8188,7 @@ function renderTraceCalculationGuide() {
             <details class="trace-guide-section">
                 <summary><span>5. Historie, Prozententwicklung und Auslagerung</span><small>Wie die Wirkung bewertet wird</small></summary>
                 <div class="trace-guide-section-body">
-                    <p>Die Analyse vergleicht immer die letzten zwei gespeicherten Mischungen. Für jedes Element wird der absolute Abstand zum Optimalwert vor und nach der Anpassung berechnet.</p>
+                    <p>Die Berechnung und Analyse nutzen die 5 aktuellsten aktiven Mischungen nach Ansatzdatum. Für den direkten Vergleich werden daraus die zwei neuesten aktiven Mischungen verwendet. Für jedes Element wird der absolute Abstand zum Optimalwert vor und nach der Anpassung berechnet.</p>
                     <p>Eine Verbesserung wird erst ab mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} kleinerem Abstand gezählt. Mehr als ${traceCalcRulePercent(traceCalculatorRules.historyDistanceTolerance)} größerer Abstand gilt als Verschlechterung; alles dazwischen als stabil.</p>
                     <p><code>ICP-Entwicklung % = (neuer ICP-Wert − alter ICP-Wert) / |alter ICP-Wert| × 100</code><br><code>Mengenentwicklung % = (neue Menge − alte Menge) / |alte Menge| × 100</code></p>
                     <p>Die Verlaufsgrafen nutzen alle gespeicherten ICP-Werte je Element. Die durchgezogene Linie zeigt die Messwerte, die gestrichelte Linie die lineare Trendlinie, die graue Linie den Durchschnitt und die grüne Linie den Optimalwert.</p>
@@ -8329,8 +8423,11 @@ function renderTraceCalculatorHistory() {
     const container = document.getElementById('traceCalculatorHistory');
     if (!container) return;
     const state = ensureTraceCalculatorState();
-    const history = getTraceCalculatorHistoryEntries();
-    const activeHistory = getTraceCalculatorHistoryEntries({ calculationOnly: true });
+    const history = getTraceCalculatorHistoryEntries({ sort: 'desc' });
+    const activeHistoryAll = getTraceCalculatorHistoryEntries({ calculationOnly: true, sort: 'asc' });
+    const calculationHistory = getTraceCalculatorAnalysisHistory();
+    const basisHistory = getTraceCalculatorRecipeBasisHistory();
+    const chartHistory = sortTraceHistoryByDate(history, 'asc');
     if (!history.length) {
         container.innerHTML = `
             <div class="card workflow-card trace-history-block trace-history-empty">
@@ -8343,22 +8440,35 @@ function renderTraceCalculatorHistory() {
         `;
         return;
     }
-    const recent = history.slice(-5).reverse();
-    const latestRelevant = activeHistory[activeHistory.length - 1] || null;
+    const latestRelevant = basisHistory[basisHistory.length - 1] || null;
+    const ignoredCount = history.length - activeHistoryAll.length;
+    const withIcpCount = activeHistoryAll.filter(hasTraceCalculatorIcpValues).length;
+    const startCount = activeHistoryAll.filter(isTraceStartMixture).length;
+    const calculationInfo = calculationHistory.length
+        ? `${calculationHistory.length} aktuellste aktive mit ICP nach Datum`
+        : startCount
+            ? 'Startmischung als Ausgangsbasis, noch keine ICP-Analyse'
+            : 'Keine aktiven Einträge';
+    const analysisHint = startCount
+        ? '<p class="hint">Die Startmischung dient als Ausgangsbasis. Für Analyse und automatische Bewertung braucht der nächste Eintrag vollständige ICP-Werte.</p>'
+        : '<p class="hint">Alle Historien-Einträge sind deaktiviert oder enthalten keine vollständigen ICP-Werte. Der Rechner nutzt wieder das Basisrezept.</p>';
     container.innerHTML = `
         <div class="card workflow-card trace-history-block">
             <div class="trace-history-head">
-                <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Letzter aktiver Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
-                <span class="trace-history-count">${activeHistory.length}/${history.length} aktiv</span>
+                <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Berechnung nutzt ${calculationInfo} · letzter Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
+                <span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span>
             </div>
             <div class="trace-history-content">
-                ${activeHistory.length ? renderTraceCalculatorHistoryAnalysis(activeHistory) : '<p class="hint">Alle Historien-Einträge sind für die Berechnung deaktiviert. Der Rechner nutzt wieder das Basisrezept.</p>'}
-                ${renderTraceCalculatorHistoryChart(activeHistory)}
+                ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
+                ${renderTraceCalculatorHistoryChart(chartHistory)}
                 <div class="trace-history-list">
-                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Die letzten ${recent.length} · Bearbeiten steuert, ob ein Eintrag einfließt</small></div>
-                    ${recent.map(entry => `
+                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Bearbeiten steuert, ob ein Eintrag einfließt</small></div>
+                    ${history.map(entry => {
+                        const status = getTraceHistoryEntryStatus(entry);
+                        return `
                         <div class="trace-history-row ${entry.includeInCalculation === false ? 'trace-history-row-inactive' : ''}">
                             <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small></span>
+                            <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small></span>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
                             <div class="trace-history-actions">
@@ -8366,7 +8476,7 @@ function renderTraceCalculatorHistory() {
                                 <button type="button" class="btn-out" onclick='deleteTraceHistoryEntry(${jsArg(entry.id)})'>Löschen</button>
                             </div>
                         </div>
-                    `).join('')}
+                    `;}).join('')}
                 </div>
             </div>
         </div>
@@ -8388,7 +8498,10 @@ function toggleTraceHistoryCalculation(id) {
     entry.updatedAt = Date.now();
     saveDB();
     renderTraceCalculator();
-    showToast(entry.includeInCalculation ? 'Historien-Eintrag fließt wieder in die Trace-Berechnung ein' : 'Historien-Eintrag wird für die Trace-Berechnung ignoriert', 'info');
+    const status = getTraceHistoryEntryStatus(entry);
+    showToast(entry.includeInCalculation
+        ? `${status.label}: Eintrag ist aktiv. Ohne vollständige ICP-Werte bleibt er von Analyse/Berechnung ausgeschlossen.`
+        : 'Historien-Eintrag wird für die Trace-Berechnung ignoriert', 'info');
 }
 
 function getTraceHistoryAmountsText(entry, group = '') {
@@ -8844,7 +8957,8 @@ function loadTraceCalculatorHistoryEntry(id) {
 function createTraceCalculatorMixturePayload() {
     const state = ensureTraceCalculatorState();
     const validation = getTraceCalculatorIcpValidation();
-    if (!validation.valid) {
+    const canSaveAsStartMixture = !validation.valid && canCreateTraceStartMixtureWithoutIcp();
+    if (!validation.valid && !canSaveAsStartMixture) {
         showTraceCalculatorIcpValidationError(validation.invalid);
         return null;
     }
@@ -8864,12 +8978,13 @@ function createTraceCalculatorMixturePayload() {
     }, {});
     const entry = {
         id: createWarehouseId(),
-        source: 'traceCalculator',
+        source: canSaveAsStartMixture ? 'traceStartMixture' : 'traceCalculator',
         includeInCalculation: true,
+        isStartMixture: canSaveAsStartMixture,
         createdAt: Date.now(),
         mixtureDate,
         config: { ...recipe.config },
-        icp: { ...state.icp },
+        icp: canSaveAsStartMixture ? {} : { ...state.icp },
         amounts,
         grams,
         totals: recipe.totals
@@ -8882,7 +8997,7 @@ function commitTraceCalculatorMixture(payload) {
     if (!payload) return null;
     const { state, amounts, entry } = payload;
     state.history.push(normalizeTraceCalculatorHistoryEntry(entry));
-    if (state.history.length > 60) state.history = state.history.slice(-60);
+    pruneTraceCalculatorHistory();
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
     return entry;
 }

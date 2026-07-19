@@ -8830,7 +8830,7 @@ body.theme-badman.party-mode .card {
 
 .trace-history-row {
     display: grid;
-    grid-template-columns: minmax(120px, 0.8fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, auto);
+    grid-template-columns: minmax(120px, 0.8fr) minmax(100px, 0.55fr) minmax(150px, 1fr) minmax(150px, 1fr) minmax(180px, auto);
     gap: 10px;
     align-items: center;
     min-width: 0;
@@ -8839,10 +8839,46 @@ body.theme-badman.party-mode .card {
 }
 
 .trace-history-date,
+.trace-history-status,
 .trace-history-mixture {
     display: grid;
     gap: 2px;
     min-width: 0;
+}
+
+.trace-history-status {
+    justify-self: start;
+    padding: 6px 9px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+}
+
+.trace-history-status strong {
+    font-size: 0.66rem;
+}
+
+.trace-history-status small {
+    font-size: 0.56rem;
+}
+
+.trace-history-status-icp {
+    border-color: color-mix(in srgb, var(--status-success) 36%, var(--border-color));
+    background: color-mix(in srgb, var(--status-success) 10%, var(--surface));
+}
+
+.trace-history-status-start {
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.trace-history-status-missing {
+    border-color: color-mix(in srgb, var(--status-warning) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--status-warning) 10%, var(--surface));
+}
+
+.trace-history-status-ignored {
+    opacity: 0.76;
 }
 
 .trace-history-row strong {
