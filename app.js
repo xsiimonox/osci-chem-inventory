@@ -808,12 +808,37 @@ function hasPendingGoogleDriveLocalChanges() {
     return getLatestLocalProjectUpdateAt() > lastCloudSync;
 }
 
+function openSettingsCard(card, { fallbackGroup = '', focusSelector = '' } = {}) {
+    if (!card) return;
+    card.hidden = false;
+    card.style.display = '';
+    const group = card.dataset.settingsGroup || fallbackGroup;
+    if (group) {
+        document.querySelectorAll('.settings-group-label').forEach(label => {
+            if (label.dataset.settingsGroupLabel === group) label.hidden = false;
+        });
+    }
+    const details = card.querySelector(':scope > details.settings-accordion, :scope details.settings-accordion');
+    if (details) details.open = true;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (focusSelector) {
+        setTimeout(() => {
+            const target = card.querySelector(focusSelector);
+            if (target) target.focus({ preventScroll: true });
+        }, 180);
+    }
+}
+
 function openGoogleDriveSyncSettings() {
     closeCloudQuickSyncMenu();
     selectTab('einstellungen');
     requestAnimationFrame(() => {
         setTimeout(() => {
-            document.querySelector('.google-drive-sync-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const card = document.querySelector('.google-drive-sync-card');
+            openSettingsCard(card, {
+                fallbackGroup: 'Cloud',
+                focusSelector: hasValidGoogleDriveToken() ? '#googleDriveSyncBtn' : '#googleDriveConnectBtn'
+            });
         }, 120);
     });
 }
@@ -823,7 +848,10 @@ function openProjectSupportSettings() {
     selectTab('einstellungen');
     requestAnimationFrame(() => {
         setTimeout(() => {
-            document.getElementById('projectSupportCard')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            openSettingsCard(document.getElementById('projectSupportCard'), {
+                fallbackGroup: 'Allgemein',
+                focusSelector: '.project-support-actions a'
+            });
         }, 120);
     });
 }

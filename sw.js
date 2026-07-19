@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v302-cloud-status-colors';
+const CACHE_NAME = 'reef-storage-tools-cache-v302-open-support-menu';
 const ASSETS = [
   './',
   './index.html',
