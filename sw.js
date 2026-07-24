@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v310-ux-audit';
+const CACHE_NAME = 'reef-storage-tools-cache-v312-nav-search-removed';
 const ASSETS = [
   './',
   './index.html',

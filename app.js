@@ -473,6 +473,78 @@ const TAB_LABELS = {
     nachbestellen: 'Nachbestellen',
     einstellungen: 'Einstellungen'
 };
+const TOOL_SEARCH_KEYWORDS = {
+    'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
+    'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
+    'tagesdosierung-wirkung': 'wasserwert wasserwerte dosierpumpe dosierung täglich tagesdosis konzentration produktwirkung kh calcium ca',
+    'test-korrekturfaktor': 'wasserwert wasserwerte heimtest referenz icp kalibrieren abgleich messfehler korrektur',
+    'hanna-phosphor-zu-phosphat': 'wasserwert wasserwerte hanna checker phosphor phosphat p po4 ppb umrechnen',
+    'salifert-umrechner': 'wasserwert wasserwerte salifert spritze restwert calcium ca kh alkalinität test messen messung',
+    'nutrition-rechner': 'wasserwert wasserwerte nährstoffe nutrition nitrat no3 phosphat po4 lanthan kohlenstoff stickstoff dosieren',
+    'salzgehalt-rechner': 'wasserwert wasserwerte salinität salz dichte psu specific gravity leitwert temperatur refraktometer spindel messen messung',
+    'salz-korrektur': 'wasserwert wasserwerte salinität salz dichte psu erhöhen senken korrigieren',
+    'wasserwechsel-effekt': 'wasserwert wasserwerte wasserwechsel wechselwasser mischwert nährstoffe wert senken',
+    'adsorber-durchfluss': 'adsorber phosphat po4 aktivkohle eisen aluminium durchfluss filter',
+    'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
+    'c-und-r-natriumchlorid-aus-nacl-pulver': 'nacl natriumchlorid salz pulver lösung ansetzen mischen',
+    'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen',
+    'sangokai-a-z-assistent': 'wissen hilfe ratgeber nachschlagen frage pdf sangokai',
+    'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
+};
+
+function normalizeSearchText(value) {
+    return String(value || '')
+        .toLocaleLowerCase('de')
+        .replace(/ß/g, 'ss')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/&/g, ' und ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+}
+
+function getSearchWords(value) {
+    return normalizeSearchText(value).split(/\s+/).filter(Boolean);
+}
+
+function searchEditDistance(left, right) {
+    if (left === right) return 0;
+    if (!left.length) return right.length;
+    if (!right.length) return left.length;
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i += 1) {
+        let diagonal = previous[0];
+        previous[0] = i;
+        for (let j = 1; j <= right.length; j += 1) {
+            const above = previous[j];
+            previous[j] = Math.min(
+                previous[j] + 1,
+                previous[j - 1] + 1,
+                diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)
+            );
+            diagonal = above;
+        }
+    }
+    return previous[right.length];
+}
+
+function smartSearchMatches(query, searchableText) {
+    const normalizedQuery = normalizeSearchText(query);
+    if (!normalizedQuery) return true;
+    const normalizedText = normalizeSearchText(searchableText);
+    if (normalizedQuery.length >= 3 && normalizedText.includes(normalizedQuery)) return true;
+    const queryWords = getSearchWords(normalizedQuery);
+    const textWords = getSearchWords(normalizedText);
+    return queryWords.every(queryWord => textWords.some(textWord => {
+        if (queryWord === textWord) return true;
+        if (queryWord.length <= 2) return textWord.startsWith(queryWord);
+        if (textWord.startsWith(queryWord) || queryWord.startsWith(textWord)) return true;
+        if (queryWord.length >= 4 && textWord.includes(queryWord)) return true;
+        const tolerance = queryWord.length >= 8 ? 2 : 1;
+        return Math.abs(queryWord.length - textWord.length) <= tolerance
+            && searchEditDistance(queryWord, textWord) <= tolerance;
+    }));
+}
 const TAB_ICONS = {
     uebersicht: '<path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path><path d="M9 21v-7h6v7"></path>',
     lager: '<path d="M4 7.5 12 3l8 4.5-8 4.5-8-4.5Z"></path><path d="M4 7.5V16l8 5 8-5V7.5"></path><path d="M12 12v9"></path>',
@@ -1970,7 +2042,6 @@ function applyMenuOrder() {
             button.hidden = hiddenTabs.includes(tabId);
             if (!button.hidden) nav.appendChild(button);
         });
-        filterNavigation(document.getElementById('navSearchInput')?.value || '');
     }
     renderMobileBottomNav(order);
     const activeTab = getActiveTabId();
@@ -5058,7 +5129,8 @@ function setMenuOpenState(isOpen, restoreFocus = true) {
         backdrop.classList.add('open');
         document.body.classList.add('menu-open');
         acquireBodyScrollLock('menu');
-        window.setTimeout(() => document.getElementById('navSearchInput')?.focus(), 0);
+        const firstNavButton = nav.querySelector('.nav-links button:not([hidden])');
+        if (firstNavButton) window.setTimeout(() => firstNavButton.focus(), 0);
         return;
     }
 
@@ -5105,30 +5177,7 @@ function selectTab(tabId) {
         tabId = getFirstVisibleTab();
     }
     showTab(tabId);
-    const navSearch = document.getElementById('navSearchInput');
-    if (navSearch?.value) {
-        navSearch.value = '';
-        filterNavigation('');
-    }
     setMenuOpenState(false, false);
-}
-
-function filterNavigation(query = '') {
-    const normalized = String(query || '').trim().toLocaleLowerCase('de');
-    let visibleCount = 0;
-    document.querySelectorAll('#main-nav .nav-links button').forEach(button => {
-        const baseHidden = isMenuTabHidden(button.dataset.tab || '');
-        const label = (button.getAttribute('aria-label') || button.textContent || '').toLocaleLowerCase('de');
-        const matches = !normalized || label.includes(normalized);
-        button.hidden = baseHidden || !matches;
-        if (!button.hidden) visibleCount += 1;
-    });
-    const status = document.getElementById('navSearchStatus');
-    if (status) {
-        status.textContent = normalized
-            ? (visibleCount ? `${visibleCount} ${visibleCount === 1 ? 'Bereich' : 'Bereiche'} gefunden` : 'Kein passender Bereich')
-            : '';
-    }
 }
 
 function showTab(tabId) {
@@ -5220,8 +5269,6 @@ function showTab(tabId) {
     }
     scheduleTextFitPass();
 }
-
-Object.assign(window, { filterNavigation });
 
 const TEXT_FIT_SELECTOR = [
     'button:not(.btn-icon):not(.close-menu)',
@@ -9723,13 +9770,15 @@ Object.assign(window, {
 });
 
 function filterTools(query = '') {
-    const normalized = query.trim().toLowerCase();
+    const normalized = normalizeSearchText(query);
     let totalMatches = 0;
     document.querySelectorAll('#tools .tool-section').forEach(section => {
         let matchesInSection = 0;
         section.querySelectorAll('.tool-card-grid > .card').forEach(card => {
-            const searchableText = card.dataset.toolSearch || card.textContent.toLowerCase();
-            const matches = !normalized || searchableText.includes(normalized);
+            const toolId = card.dataset.toolId || '';
+            const sectionText = section.querySelector('.tool-section-summary')?.textContent || '';
+            const searchableText = `${card.dataset.toolSearch || card.textContent} ${sectionText} ${TOOL_SEARCH_KEYWORDS[toolId] || ''}`;
+            const matches = smartSearchMatches(normalized, searchableText);
             card.classList.toggle('tool-card-hidden', !matches);
             if (matches) matchesInSection += 1;
         });

@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.1.0-ux-audit">
+    <link rel="stylesheet" href="style.css?v=3.1.2-nav-search-removed">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.1.0</span>
+                    <span class="version-badge">v3.1.2</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -77,11 +77,6 @@
             <span>Navigation</span>
             <button class="close-menu" onclick="toggleMenu()" aria-label="Navigation schließen">✕</button>
         </div>
-        <label class="nav-search" for="navSearchInput">
-            <span aria-hidden="true">⌕</span>
-            <input type="search" id="navSearchInput" placeholder="Bereich suchen" oninput="filterNavigation(this.value)" autocomplete="off">
-        </label>
-        <div id="navSearchStatus" class="nav-search-status" aria-live="polite"></div>
         <div class="nav-links">
             <button onclick="selectTab('uebersicht')" id="tab-uebersicht">Übersicht</button>
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
@@ -864,7 +859,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card resource-tools-card sangokai-section-card">
+                        <div class="card resource-tools-card sangokai-section-card" data-tool-id="sangokai-a-z-assistent">
                             <div class="resource-link-grid">
                                 <a href="https://www.sangokai.org/fileupload/SANGOKAI_Empfehlungen_A_Z.pdf" target="_blank" rel="noopener" class="resource-link-card">
                                     <strong>Sangokai A-Z PDF</strong>
@@ -900,7 +895,7 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
-                        <div class="card resource-tools-card">
+                        <div class="card resource-tools-card" data-tool-id="hilfreiche-quellen">
                             <div class="resource-link-grid">
                                 <a href="anleitung.html" class="resource-link-card" data-help-page="guide">
                                     <strong>Reeftools Anleitung</strong>
@@ -1796,8 +1791,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.1.0-ux-audit"></script>
-    <script src="app.js?v=3.1.0-ux-audit"></script>
+    <script src="sangokai-data.js?v=3.1.2-nav-search-removed"></script>
+    <script src="app.js?v=3.1.2-nav-search-removed"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
