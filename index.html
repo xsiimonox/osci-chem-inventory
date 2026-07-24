@@ -2,14 +2,15 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reef.Storage&Tools</title>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.8-tools-collapsed">
+    <link rel="stylesheet" href="style.css?v=3.1.0-ux-audit">
 </head>
 <body>
+    <a class="skip-link" href="#app">Zum Inhalt springen</a>
 
     <div id="legacy-domain-banner" class="legacy-domain-banner" hidden>
         <div class="legacy-domain-banner-copy">
@@ -26,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.0.8</span>
+                    <span class="version-badge">v3.1.0</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -56,7 +57,7 @@
                 <div class="bar"></div>
             </button>
         </div>
-        <div class="subtitle"><span>Aktiver Bereich</span><strong id="activePageTitle">Lager</strong></div>
+        <div class="subtitle"><span>Aktiver Bereich</span><strong id="activePageTitle" aria-live="polite">Lager</strong></div>
     </header>
 
     <div id="update-banner" class="update-banner" hidden>
@@ -76,6 +77,11 @@
             <span>Navigation</span>
             <button class="close-menu" onclick="toggleMenu()" aria-label="Navigation schließen">✕</button>
         </div>
+        <label class="nav-search" for="navSearchInput">
+            <span aria-hidden="true">⌕</span>
+            <input type="search" id="navSearchInput" placeholder="Bereich suchen" oninput="filterNavigation(this.value)" autocomplete="off">
+        </label>
+        <div id="navSearchStatus" class="nav-search-status" aria-live="polite"></div>
         <div class="nav-links">
             <button onclick="selectTab('uebersicht')" id="tab-uebersicht">Übersicht</button>
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
@@ -97,7 +103,7 @@
     
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
 
-    <main id="app">
+    <main id="app" tabindex="-1">
         <div id="uebersicht" class="tab-content"></div>
         <div id="lager" class="tab-content active"></div>
 
@@ -356,13 +362,15 @@
                             <span aria-hidden="true">⌕</span>
                             <input type="search" id="toolSearchInput" placeholder="Tool suchen: KH, Calcium, Salifert, C&R ..." oninput="filterTools(this.value)">
                         </label>
+                        <button type="button" id="toolSearchClear" class="tools-search-clear" onclick="clearToolSearch()" aria-label="Tool-Suche leeren" title="Suche leeren" hidden>×</button>
                     </div>
+                    <div id="toolSearchStatus" class="tool-search-status" role="status" aria-live="polite"></div>
                 </div>
 
-                <div class="tool-global-disclaimer" role="note">
-                    <strong>Wichtiger Hinweis</strong>
-                    <span>Alle Rechner und Empfehlungen dienen nur als Hilfestellung. Bitte Werte, Dosierungen und Maßnahmen immer selbst prüfen. Für die Richtigkeit der Ergebnisse und daraus entstehende Folgen wird keine Haftung übernommen.</span>
-                </div>
+                <details class="tool-global-disclaimer">
+                    <summary>Wichtiger Hinweis zu den Rechnern</summary>
+                    <p>Alle Rechner und Empfehlungen dienen nur als Hilfestellung. Bitte Werte, Dosierungen und Maßnahmen immer selbst prüfen. Für die Richtigkeit der Ergebnisse und daraus entstehende Folgen wird keine Haftung übernommen.</p>
+                </details>
 
                 <details class="tool-section" data-section-id="dosieren-und-messwerte">
                     <summary class="tool-section-summary">
@@ -876,6 +884,7 @@
                                     Testversion: Der Assistent ist noch nicht ausgereift. Antworten bitte immer fachlich prüfen und bei wichtigen Entscheidungen die Originalquelle gegenlesen.
                                 </div>
                                 <div class="sangokai-search-controls">
+                                    <label for="sangokaiSearchInput">Frage oder Suchbegriff</label>
                                     <input type="search" id="sangokaiSearchInput" placeholder="Freie Frage, z.B. Wie schnell Calcium erhöhen?" oninput="renderSangokaiAssistant()" onkeydown="handleSangokaiSearchKey(event)">
                                     <button type="button" class="btn-secondary" onclick="renderSangokaiAssistant(true)">Suchen</button>
                                 </div>
@@ -1787,8 +1796,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.8-tools-collapsed"></script>
-    <script src="app.js?v=3.0.8-tools-collapsed"></script>
+    <script src="sangokai-data.js?v=3.1.0-ux-audit"></script>
+    <script src="app.js?v=3.1.0-ux-audit"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

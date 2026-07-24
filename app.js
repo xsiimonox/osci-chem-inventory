@@ -1970,6 +1970,7 @@ function applyMenuOrder() {
             button.hidden = hiddenTabs.includes(tabId);
             if (!button.hidden) nav.appendChild(button);
         });
+        filterNavigation(document.getElementById('navSearchInput')?.value || '');
     }
     renderMobileBottomNav(order);
     const activeTab = getActiveTabId();
@@ -5002,6 +5003,7 @@ function updateTabAccessState() {
 }
 
 let menuScrollLockY = 0;
+let menuReturnFocus = null;
 const activeScrollLocks = new Set();
 
 function syncBodyScrollLock() {
@@ -5040,7 +5042,7 @@ function releaseBodyScrollLock(lockId) {
     syncBodyScrollLock();
 }
 
-function setMenuOpenState(isOpen) {
+function setMenuOpenState(isOpen, restoreFocus = true) {
     const nav = document.getElementById('main-nav');
     const backdrop = document.getElementById('menu-backdrop');
     if (!nav || !backdrop) return;
@@ -5051,10 +5053,12 @@ function setMenuOpenState(isOpen) {
     }
 
     if (isOpen) {
+        menuReturnFocus = document.activeElement;
         nav.classList.add('open');
         backdrop.classList.add('open');
         document.body.classList.add('menu-open');
         acquireBodyScrollLock('menu');
+        window.setTimeout(() => document.getElementById('navSearchInput')?.focus(), 0);
         return;
     }
 
@@ -5062,6 +5066,10 @@ function setMenuOpenState(isOpen) {
     backdrop.classList.remove('open');
     document.body.classList.remove('menu-open');
     releaseBodyScrollLock('menu');
+    if (restoreFocus && menuReturnFocus?.isConnected && typeof menuReturnFocus.focus === 'function') {
+        window.setTimeout(() => menuReturnFocus.focus(), 0);
+    }
+    menuReturnFocus = null;
 }
 
 // --- UI / MENÜ STEUERUNG ---
@@ -5070,12 +5078,57 @@ function toggleMenu() {
     setMenuOpenState(!isOpen);
 }
 
+document.addEventListener('keydown', event => {
+    const nav = document.getElementById('main-nav');
+    if (!nav?.classList.contains('open') || !window.matchMedia('(max-width: 1023px)').matches) return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        setMenuOpenState(false);
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = getDialogFocusableElements(nav);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+});
+
 function selectTab(tabId) {
     if (isMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
     showTab(tabId);
-    setMenuOpenState(false);
+    const navSearch = document.getElementById('navSearchInput');
+    if (navSearch?.value) {
+        navSearch.value = '';
+        filterNavigation('');
+    }
+    setMenuOpenState(false, false);
+}
+
+function filterNavigation(query = '') {
+    const normalized = String(query || '').trim().toLocaleLowerCase('de');
+    let visibleCount = 0;
+    document.querySelectorAll('#main-nav .nav-links button').forEach(button => {
+        const baseHidden = isMenuTabHidden(button.dataset.tab || '');
+        const label = (button.getAttribute('aria-label') || button.textContent || '').toLocaleLowerCase('de');
+        const matches = !normalized || label.includes(normalized);
+        button.hidden = baseHidden || !matches;
+        if (!button.hidden) visibleCount += 1;
+    });
+    const status = document.getElementById('navSearchStatus');
+    if (status) {
+        status.textContent = normalized
+            ? (visibleCount ? `${visibleCount} ${visibleCount === 1 ? 'Bereich' : 'Bereiche'} gefunden` : 'Kein passender Bereich')
+            : '';
+    }
 }
 
 function showTab(tabId) {
@@ -5091,7 +5144,10 @@ function showTab(tabId) {
     const targetBtn = document.getElementById('tab-' + tabId);
     if (!targetTab || !targetBtn) tabId = 'lager';
 
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.remove('active');
+        el.setAttribute('aria-hidden', 'true');
+    });
     document.querySelectorAll('.nav-links button').forEach(el => {
         el.classList.remove('active');
         el.removeAttribute('aria-current');
@@ -5105,6 +5161,7 @@ function showTab(tabId) {
         resolvedTab.offsetHeight; // Force reflow
         resolvedTab.style.animation = '';
         resolvedTab.classList.add('active');
+        resolvedTab.removeAttribute('aria-hidden');
         resolvedBtn.classList.add('active');
         resolvedBtn.setAttribute('aria-current', 'page');
     }
@@ -5163,6 +5220,8 @@ function showTab(tabId) {
     }
     scheduleTextFitPass();
 }
+
+Object.assign(window, { filterNavigation });
 
 const TEXT_FIT_SELECTOR = [
     'button:not(.btn-icon):not(.close-menu)',
@@ -9311,7 +9370,10 @@ function slugifyToolTitle(title) {
 }
 
 function getToolCardTitle(card) {
-    return card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim() || card?.querySelector('h3')?.textContent?.trim() || '';
+    return card?.querySelector('.tool-title-text')?.textContent?.trim()
+        || card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim()
+        || card?.querySelector('h3')?.textContent?.trim()
+        || '';
 }
 
 function getToolTileVisual(toolId, title = '') {
@@ -9432,6 +9494,24 @@ function ensureToolTitleTextSpan(title) {
     else title.insertBefore(span, title.firstChild);
 }
 
+function ensureToolToggleButton(card, title, toolTitle) {
+    if (!title || title.querySelector('.tool-tile-toggle')) return;
+    const titleText = title.querySelector('.tool-title-text');
+    if (!titleText) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool-tile-toggle';
+    button.setAttribute('aria-label', `${toolTitle} öffnen`);
+    button.setAttribute('aria-expanded', 'false');
+    title.insertBefore(button, titleText);
+    button.appendChild(titleText);
+    button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleToolTile(card);
+    });
+}
+
 function ensureToolInfoButton(card, toolId, toolTitle) {
     const title = card?.querySelector('h3');
     if (!title || title.querySelector('.tool-info-button')) return;
@@ -9491,6 +9571,7 @@ function setupToolTiles() {
         const sectionHint = card.closest('.tool-section')?.querySelector('.tool-section-summary small')?.textContent || '';
         card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''} ${sectionTitle} ${sectionHint}`.toLowerCase();
         ensureToolTitleTextSpan(title);
+        ensureToolToggleButton(card, title, toolTitle);
         ensureToolInfoButton(card, toolId, toolTitle);
         const hint = card.querySelector('.hint');
         if (hint && !hint.dataset.originalText) {
@@ -9502,23 +9583,15 @@ function setupToolTiles() {
         if (card.dataset.tileReady !== 'true') {
             card.dataset.tileReady = 'true';
             card.classList.add('tool-tile-card');
-            title.setAttribute('role', 'button');
-            title.setAttribute('tabindex', '0');
             const favButton = title.querySelector('.tool-inline-fav');
             if (favButton) {
                 favButton.addEventListener('click', event => toggleToolFavoriteFromButton(event, favButton.dataset.toolId));
                 favButton.addEventListener('pointerdown', event => event.stopPropagation());
             }
-            title.addEventListener('keydown', event => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    toggleToolTile(card);
-                }
-            });
         }
         applyToolReviewBadge(card, toolTitle);
         card.classList.add('tool-tile-collapsed');
-        title.setAttribute('aria-expanded', 'false');
+        title.querySelector('.tool-tile-toggle')?.setAttribute('aria-expanded', 'false');
     });
 }
 
@@ -9616,11 +9689,10 @@ function openToolFavorite(toolId) {
     const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
     if (!card) return;
     const section = card.closest('.tool-section');
-    if (section) openToolSection(section.dataset.sectionId || '');
-    document.querySelectorAll('#tools .tool-card-hidden').forEach(el => el.classList.remove('tool-card-hidden'));
-    document.querySelectorAll('#tools .tool-section-hidden').forEach(el => el.classList.remove('tool-section-hidden'));
     const search = document.getElementById('toolSearchInput');
     if (search) search.value = '';
+    filterTools('');
+    if (section) openToolSection(section.dataset.sectionId || '');
     if (card.classList.contains('tool-tile-collapsed')) toggleToolTile(card);
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -9633,6 +9705,7 @@ function openToolSection(sectionId) {
     document.querySelectorAll('#tools .tool-section-hidden').forEach(el => el.classList.remove('tool-section-hidden'));
     const search = document.getElementById('toolSearchInput');
     if (search) search.value = '';
+    filterTools('');
     section.open = true;
     getToolSettings().lastSection = section.dataset.sectionId || '';
     saveDB(false);
@@ -9645,21 +9718,43 @@ Object.assign(window, {
     openToolFavorite,
     openToolSection,
     showToolInfo,
-    filterTools
+    filterTools,
+    clearToolSearch
 });
 
 function filterTools(query = '') {
     const normalized = query.trim().toLowerCase();
+    let totalMatches = 0;
     document.querySelectorAll('#tools .tool-section').forEach(section => {
         let matchesInSection = 0;
-        section.querySelectorAll('.tool-compact-card').forEach(card => {
-            const matches = !normalized || (card.dataset.toolSearch || '').includes(normalized);
+        section.querySelectorAll('.tool-card-grid > .card').forEach(card => {
+            const searchableText = card.dataset.toolSearch || card.textContent.toLowerCase();
+            const matches = !normalized || searchableText.includes(normalized);
             card.classList.toggle('tool-card-hidden', !matches);
             if (matches) matchesInSection += 1;
         });
+        totalMatches += matchesInSection;
         section.classList.toggle('tool-section-hidden', normalized && matchesInSection === 0);
         if (normalized && matchesInSection > 0) section.open = true;
+        if (!normalized) section.open = false;
     });
+    const clearButton = document.getElementById('toolSearchClear');
+    if (clearButton) clearButton.hidden = !normalized;
+    const status = document.getElementById('toolSearchStatus');
+    if (status) {
+        status.textContent = normalized
+            ? (totalMatches ? `${totalMatches} ${totalMatches === 1 ? 'Tool' : 'Tools'} gefunden` : 'Kein passendes Tool gefunden')
+            : '';
+    }
+}
+
+function clearToolSearch() {
+    const search = document.getElementById('toolSearchInput');
+    if (search) {
+        search.value = '';
+        search.focus();
+    }
+    filterTools('');
 }
 
 function toggleToolTile(card) {
@@ -9668,11 +9763,13 @@ function toggleToolTile(card) {
     section?.querySelectorAll('.tool-tile-card').forEach(other => {
         if (other !== card) {
             other.classList.add('tool-tile-collapsed');
-            other.querySelector('h3')?.setAttribute('aria-expanded', 'false');
+            other.querySelector('.tool-tile-toggle')?.setAttribute('aria-expanded', 'false');
         }
     });
     card.classList.toggle('tool-tile-collapsed', !willOpen);
-    card.querySelector('h3')?.setAttribute('aria-expanded', String(willOpen));
+    const toggle = card.querySelector('.tool-tile-toggle');
+    toggle?.setAttribute('aria-expanded', String(willOpen));
+    toggle?.setAttribute('aria-label', `${getToolCardTitle(card)} ${willOpen ? 'schließen' : 'öffnen'}`);
 }
 
 const SANGOKAI_SEARCH_STOPWORDS = new Set([
@@ -10096,7 +10193,7 @@ Object.assign(window, {
 });
 
 document.addEventListener('click', event => {
-    if (event.target.closest?.('.tool-inline-fav, .tool-info-button')) return;
+    if (event.target.closest?.('.tool-inline-fav, .tool-info-button, .tool-tile-toggle')) return;
     const title = event.target.closest?.('#tools .tool-tile-card > h3');
     const collapsedCard = event.target.closest?.('#tools .tool-tile-card.tool-tile-collapsed');
     const card = title?.closest('.tool-tile-card') || collapsedCard;
