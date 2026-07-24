@@ -9229,8 +9229,8 @@ function initTools() {
         renderSavedCustomCrPlans();
     }
     renderNaclSolutionCalculator();
-    syncMajorCorrectionInputsFromSettings(true);
-    renderMajorCorrectionCalculator();
+    initDoseImpactCalculator();
+    initMajorCorrectionCalculator();
     renderConsumptionCalculator();
     renderTestCorrectionTool();
     renderHannaPhosphorusConverter();
@@ -9318,6 +9318,7 @@ function getToolTileVisual(toolId, title = '') {
     const map = {
         'kh-ca-korrektur': { icon: 'KH', subtitle: 'Zielwerte anpassen' },
         'verbrauch-pro-tag': { icon: '24', subtitle: 'Tagesverbrauch rechnen' },
+        'tagesdosierung-wirkung': { icon: 'ml', subtitle: 'Dosierwirkung sehen' },
         'test-korrekturfaktor': { icon: 'IC', subtitle: 'Tests abgleichen' },
         'hanna-phosphor-zu-phosphat': { icon: 'PO', subtitle: 'P zu PO4 rechnen' },
         'salifert-umrechner': { icon: 'Sa', subtitle: 'Spritzenwert waehlen' },
@@ -9346,6 +9347,11 @@ const toolInfoTexts = {
         summary: 'Ermittelt aus zwei Messungen, wie stark ein Wert pro Tag verbraucht oder verändert wurde.',
         details: 'Geeignet für KH, Calcium, Magnesium, Nitrat und Phosphat. Du trägst Startwert, Endwert und die Tage dazwischen ein.',
         note: 'Je länger und sauberer der Messzeitraum, desto belastbarer ist die Prognose.'
+    },
+    'tagesdosierung-wirkung': {
+        summary: 'Berechnet, wie stark deine tägliche Dosiermenge KH oder Calcium im Aquarium rechnerisch anhebt.',
+        details: 'Du wählst ein Produktpreset oder speicherst eine eigene Konzentration, trägst Aquariumvolumen und Tagesdosierung ein und bekommst die Erhöhung pro Tag und Woche.',
+        note: 'Das ist die dosierte Zufuhr, nicht automatisch der echte Verbrauch. Für den echten Verbrauch weiter mit Messwerten gegenprüfen.'
     },
     'test-korrekturfaktor': {
         summary: 'Speichert Korrekturfaktoren für Heimtests anhand einer ICP oder Referenzlösung.',
@@ -9481,7 +9487,9 @@ function setupToolTiles() {
         const visual = getToolTileVisual(toolId, toolTitle);
         card.dataset.toolId = toolId;
         card.dataset.toolIcon = visual.icon;
-        card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''}`.toLowerCase();
+        const sectionTitle = card.closest('.tool-section')?.querySelector('.tool-section-summary strong')?.textContent || '';
+        const sectionHint = card.closest('.tool-section')?.querySelector('.tool-section-summary small')?.textContent || '';
+        card.dataset.toolSearch = `${toolTitle} ${card.querySelector('.hint')?.textContent || ''} ${sectionTitle} ${sectionHint}`.toLowerCase();
         ensureToolTitleTextSpan(title);
         ensureToolInfoButton(card, toolId, toolTitle);
         const hint = card.querySelector('.hint');
@@ -9534,7 +9542,7 @@ function applyToolReviewBadge(card, title) {
 }
 
 function setupToolSections() {
-    document.querySelectorAll('#tools .tool-section').forEach(section => {
+    document.querySelectorAll('#tools .tool-section').forEach((section, index) => {
         const title = section.querySelector('.tool-section-summary strong')?.textContent?.trim() || `section-${index}`;
         const sectionId = section.dataset.sectionId || slugifyToolTitle(title);
         section.dataset.sectionId = sectionId;
@@ -10107,7 +10115,7 @@ document.addEventListener('keydown', event => {
     if (event.key === 'Escape') closeSalifertDropdowns();
 });
 
-const majorCorrectionDefaultSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
+const majorCorrectionDefaultSettings = { tankLiters: 100, selectedPresetId: 'osci-kh-tag' };
 
 function clampTestSyringeValue(value) {
     if (!Number.isFinite(value)) return null;
@@ -10321,69 +10329,108 @@ function getMajorCorrectionUnit(element) {
 
 function getMajorCorrectionSettings() {
     if (!db.majorCorrectionSettings) db.majorCorrectionSettings = JSON.parse(JSON.stringify(majorCorrectionDefaultSettings));
-    if (!db.majorCorrectionSettings.strengths) db.majorCorrectionSettings.strengths = {};
-    ['KH', 'Ca'].forEach(element => {
-        if (db.majorCorrectionSettings.strengths[element] === undefined) {
-            db.majorCorrectionSettings.strengths[element] = majorCorrectionDefaultSettings.strengths[element];
-        }
-    });
     if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = majorCorrectionDefaultSettings.tankLiters;
+    if (!db.majorCorrectionSettings.selectedPresetId) {
+        const legacyStrengths = db.majorCorrectionSettings.strengths || {};
+        if (legacyStrengths.Ca === 1 && legacyStrengths.KH !== 0.1) db.majorCorrectionSettings.selectedPresetId = 'osci-calcium';
+        else db.majorCorrectionSettings.selectedPresetId = majorCorrectionDefaultSettings.selectedPresetId;
+    }
     return db.majorCorrectionSettings;
+}
+
+function getMajorCorrectionPreset() {
+    const settings = getMajorCorrectionSettings();
+    const presets = getDoseImpactPresets();
+    return presets.find(preset => preset.id === settings.selectedPresetId) || presets[0];
+}
+
+function getMajorCorrectionStrengthFromPreset(preset) {
+    if (!preset || !preset.referenceMl || !preset.referenceLiters) return 0;
+    return (preset.increase / preset.referenceMl) * (preset.referenceLiters / 100);
+}
+
+function getMajorCorrectionElementLabel(element) {
+    return element === 'KH' ? 'KH (dKH)' : 'Calcium (mg/l)';
+}
+
+function populateMajorCorrectionPresetSelect() {
+    const select = document.getElementById('majorCorrectionPreset');
+    if (!select) return;
+    const settings = getMajorCorrectionSettings();
+    const presets = getDoseImpactPresets();
+    select.innerHTML = presets
+        .filter(preset => preset.element === 'KH' || preset.element === 'Ca')
+        .map(preset => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`)
+        .join('');
+    if (!presets.some(preset => preset.id === settings.selectedPresetId)) {
+        settings.selectedPresetId = 'osci-kh-tag';
+    }
+    select.value = settings.selectedPresetId;
 }
 
 function syncMajorCorrectionInputsFromSettings(force = false) {
     const settings = getMajorCorrectionSettings();
-    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
+    const preset = getMajorCorrectionPreset();
     const litersEl = document.getElementById('majorCorrectionLiters');
-    const strengthEl = document.getElementById('majorCorrectionStrength');
+    const elementDisplay = document.getElementById('majorCorrectionElementDisplay');
     if (litersEl && (force || !litersEl.value)) {
         litersEl.value = settings.tankLiters;
     }
-    if (strengthEl && (force || !strengthEl.value)) {
-        strengthEl.value = settings.strengths[element];
-    }
+    if (elementDisplay) elementDisplay.value = getMajorCorrectionElementLabel(preset?.element || 'KH');
+}
+
+function initMajorCorrectionCalculator() {
+    populateMajorCorrectionPresetSelect();
+    syncMajorCorrectionInputsFromSettings(true);
+    renderMajorCorrectionCalculator();
+}
+
+function selectMajorCorrectionPreset() {
+    const settings = getMajorCorrectionSettings();
+    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || 'osci-kh-tag';
+    syncMajorCorrectionInputsFromSettings(true);
+    saveDB(false);
+    renderMajorCorrectionCalculator();
 }
 
 function selectMajorCorrectionElement() {
-    syncMajorCorrectionInputsFromSettings(true);
     renderMajorCorrectionCalculator();
 }
 
 function saveMajorCorrectionDefaults() {
-    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
     const tankLiters = Math.max(1, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || majorCorrectionDefaultSettings.tankLiters);
-    const strength = Math.max(0.0001, parseFloat(document.getElementById('majorCorrectionStrength')?.value) || majorCorrectionDefaultSettings.strengths[element]);
     const settings = getMajorCorrectionSettings();
     settings.tankLiters = tankLiters;
-    settings.strengths[element] = strength;
+    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || settings.selectedPresetId;
     saveDB();
     renderMajorCorrectionCalculator();
-    showToast('Korrektur-Voreinstellung gespeichert', 'success');
+    showToast('Korrektur-Auswahl gespeichert', 'success');
 }
 
 function resetMajorCorrectionDefaults() {
-    if (!confirm('KH/CA Korrektur-Voreinstellungen zurücksetzen?')) return;
+    if (!confirm('KH/CA Korrektur-Auswahl zurücksetzen?')) return;
     db.majorCorrectionSettings = JSON.parse(JSON.stringify(majorCorrectionDefaultSettings));
     saveDB();
-    syncMajorCorrectionInputsFromSettings(true);
-    renderMajorCorrectionCalculator();
+    initMajorCorrectionCalculator();
 }
 
 function renderMajorCorrectionCalculator() {
     const result = document.getElementById('majorCorrectionResult');
     if (!result) return;
     syncMajorCorrectionInputsFromSettings();
-    const element = document.getElementById('majorCorrectionElement')?.value || 'KH';
+    const settings = getMajorCorrectionSettings();
+    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || settings.selectedPresetId;
+    const preset = getMajorCorrectionPreset();
+    const element = preset?.element || 'KH';
     const liters = Math.max(0, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || 0);
     const current = parseFloat(document.getElementById('majorCorrectionCurrent')?.value);
     const target = parseFloat(document.getElementById('majorCorrectionTarget')?.value);
-    const strength = Math.max(0, parseFloat(document.getElementById('majorCorrectionStrength')?.value) || 0);
+    const strength = getMajorCorrectionStrengthFromPreset(preset);
     const days = Math.max(1, parseInt(document.getElementById('majorCorrectionDays')?.value, 10) || 1);
     const unit = getMajorCorrectionUnit(element);
-    const label = document.getElementById('majorCorrectionStrengthLabel');
-    if (label) label.innerText = `Produktwirkung pro 1 ml / 100 L (${unit}):`;
+    settings.tankLiters = liters || settings.tankLiters;
     if (!liters || Number.isNaN(current) || Number.isNaN(target) || !strength) {
-        result.innerHTML = '<p class="hint">Bitte Beckenvolumen, Werte und Produktwirkung eintragen.</p>';
+        result.innerHTML = '<p class="hint">Bitte Beckenvolumen, Werte und ein Produktpreset eintragen.</p>';
         return;
     }
     const diff = target - current;
@@ -10396,7 +10443,7 @@ function renderMajorCorrectionCalculator() {
                 <span>${diff >= 0 ? '+' : ''}${diff.toFixed(2)} ${unit}</span>
             </div>
             <div class="tool-row ${diff <= 0 ? 'missing' : ''}">
-                <span><strong>Dosiermenge</strong><small>Produktwirkung: ${strength} ${unit} pro 1 ml / 100 L</small></span>
+                <span><strong>Dosiermenge</strong><small>${escapeHtml(preset.name)}: ${strength.toFixed(element === 'KH' ? 4 : 3)} ${unit} pro 1 ml / 100 L</small></span>
                 <span>${diff > 0 ? totalMl.toFixed(2) + ' ml' : 'keine Erhöhung nötig'}</span>
             </div>
             <div class="tool-row">
@@ -10434,6 +10481,182 @@ function renderConsumptionCalculator() {
             </div>
         </div>
     `;
+}
+
+const doseImpactBuiltInPresets = [
+    { id: 'osci-kh-tag', name: 'OSCI KH Tag', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, locked: true },
+    { id: 'osci-kh-nacht', name: 'OSCI KH Nacht', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 1, locked: true },
+    { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, locked: true }
+];
+
+function getDoseImpactUnit(element) {
+    return element === 'KH' ? 'dKH' : 'mg/l';
+}
+
+function getDoseImpactSettings() {
+    if (!db.doseImpactSettings) {
+        db.doseImpactSettings = { selectedPresetId: 'osci-kh-tag', tankLiters: 100, dailyMl: 10, customPresets: [] };
+    }
+    if (!Array.isArray(db.doseImpactSettings.customPresets)) db.doseImpactSettings.customPresets = [];
+    if (!db.doseImpactSettings.selectedPresetId) db.doseImpactSettings.selectedPresetId = 'osci-kh-tag';
+    if (!db.doseImpactSettings.tankLiters) db.doseImpactSettings.tankLiters = 100;
+    if (db.doseImpactSettings.dailyMl === undefined) db.doseImpactSettings.dailyMl = 10;
+    return db.doseImpactSettings;
+}
+
+function getDoseImpactPresets() {
+    const settings = getDoseImpactSettings();
+    return doseImpactBuiltInPresets.concat(settings.customPresets);
+}
+
+function getSelectedDoseImpactPreset() {
+    const settings = getDoseImpactSettings();
+    const presets = getDoseImpactPresets();
+    return presets.find(preset => preset.id === settings.selectedPresetId) || presets[0];
+}
+
+function populateDoseImpactPresetSelect() {
+    const select = document.getElementById('doseImpactPreset');
+    if (!select) return;
+    const settings = getDoseImpactSettings();
+    const presets = getDoseImpactPresets();
+    select.innerHTML = presets
+        .map(preset => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`)
+        .join('');
+    if (!presets.some(preset => preset.id === settings.selectedPresetId)) {
+        settings.selectedPresetId = presets[0]?.id || 'osci-kh-tag';
+    }
+    select.value = settings.selectedPresetId;
+}
+
+function applyDoseImpactPresetToInputs(preset) {
+    if (!preset) return;
+    const settings = getDoseImpactSettings();
+    const fields = {
+        doseImpactElement: preset.element,
+        doseImpactPresetName: preset.name,
+        doseImpactTankLiters: settings.tankLiters,
+        doseImpactDailyMl: settings.dailyMl,
+        doseImpactReferenceMl: preset.referenceMl,
+        doseImpactReferenceLiters: preset.referenceLiters,
+        doseImpactIncrease: preset.increase
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    });
+}
+
+function initDoseImpactCalculator() {
+    populateDoseImpactPresetSelect();
+    applyDoseImpactPresetToInputs(getSelectedDoseImpactPreset());
+    renderDoseImpactCalculator();
+}
+
+function selectDoseImpactPreset() {
+    const settings = getDoseImpactSettings();
+    settings.selectedPresetId = document.getElementById('doseImpactPreset')?.value || 'osci-kh-tag';
+    applyDoseImpactPresetToInputs(getSelectedDoseImpactPreset());
+    saveDB();
+    renderDoseImpactCalculator();
+}
+
+function readDoseImpactForm() {
+    const element = document.getElementById('doseImpactElement')?.value || 'KH';
+    return {
+        element,
+        name: (document.getElementById('doseImpactPresetName')?.value || 'Eigenes Preset').trim() || 'Eigenes Preset',
+        tankLiters: Math.max(0, parseFloat(document.getElementById('doseImpactTankLiters')?.value) || 0),
+        dailyMl: Math.max(0, parseFloat(document.getElementById('doseImpactDailyMl')?.value) || 0),
+        referenceMl: Math.max(0, parseFloat(document.getElementById('doseImpactReferenceMl')?.value) || 0),
+        referenceLiters: Math.max(0, parseFloat(document.getElementById('doseImpactReferenceLiters')?.value) || 0),
+        increase: Math.max(0, parseFloat(document.getElementById('doseImpactIncrease')?.value) || 0),
+        unit: getDoseImpactUnit(element)
+    };
+}
+
+function renderDoseImpactCalculator() {
+    const result = document.getElementById('doseImpactResult');
+    if (!result) return;
+    const settings = getDoseImpactSettings();
+    const form = readDoseImpactForm();
+    settings.tankLiters = form.tankLiters || settings.tankLiters;
+    settings.dailyMl = form.dailyMl;
+    const label = document.getElementById('doseImpactIncreaseLabel');
+    if (label) label.innerText = `Erhöhung (${form.unit}):`;
+    if (!form.tankLiters || !form.referenceMl || !form.referenceLiters || !form.increase) {
+        result.innerHTML = '<p class="hint">Bitte Aquariumvolumen, Tagesdosierung und Produktwirkung eintragen.</p>';
+        return;
+    }
+    const increasePerMlPer100L = form.increase / form.referenceMl * (form.referenceLiters / 100);
+    const dailyIncrease = form.dailyMl * increasePerMlPer100L * (100 / form.tankLiters);
+    const weeklyIncrease = dailyIncrease * 7;
+    const mlForOneUnit = increasePerMlPer100L ? (1 / increasePerMlPer100L) * (form.tankLiters / 100) : 0;
+    const preset = getSelectedDoseImpactPreset();
+    const presetNote = preset?.locked ? 'OSCI Standardpreset' : 'Eigenes gespeichertes Preset';
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>${form.element} Zufuhr pro Tag</strong><small>${form.dailyMl.toFixed(2)} ml/Tag auf ${form.tankLiters.toFixed(0)} L</small></span>
+                <span>+${dailyIncrease.toFixed(form.element === 'KH' ? 3 : 2)} ${form.unit}/Tag</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Wöchentliche Zufuhr</strong><small>Nur rechnerische Zugabe, Verbrauch noch nicht abgezogen.</small></span>
+                <span>+${weeklyIncrease.toFixed(form.element === 'KH' ? 3 : 2)} ${form.unit}/Woche</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Produktwirkung</strong><small>${form.referenceMl.toFixed(2)} ml auf ${form.referenceLiters.toFixed(0)} L = +${form.increase} ${form.unit}</small></span>
+                <span>${increasePerMlPer100L.toFixed(form.element === 'KH' ? 4 : 3)} ${form.unit} je 1 ml/100 L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Dosierung für +1 ${form.unit}</strong><small>${presetNote}</small></span>
+                <span>${mlForOneUnit.toFixed(2)} ml</span>
+            </div>
+        </div>
+    `;
+}
+
+function saveDoseImpactPreset() {
+    const form = readDoseImpactForm();
+    if (!form.referenceMl || !form.referenceLiters || !form.increase) {
+        showToast('Bitte gültige Produktwirkung eintragen', 'warning');
+        return;
+    }
+    const settings = getDoseImpactSettings();
+    const selectedId = document.getElementById('doseImpactPreset')?.value || '';
+    const existingCustom = settings.customPresets.find(preset => preset.id === selectedId);
+    const id = existingCustom?.id || `custom-${Date.now()}`;
+    const preset = {
+        id,
+        name: form.name,
+        element: form.element,
+        referenceMl: form.referenceMl,
+        referenceLiters: form.referenceLiters,
+        increase: form.increase
+    };
+    if (existingCustom) {
+        Object.assign(existingCustom, preset);
+    } else {
+        settings.customPresets.push(preset);
+    }
+    settings.selectedPresetId = id;
+    settings.tankLiters = form.tankLiters || settings.tankLiters;
+    settings.dailyMl = form.dailyMl;
+    saveDB();
+    populateDoseImpactPresetSelect();
+    populateMajorCorrectionPresetSelect();
+    renderDoseImpactCalculator();
+    renderMajorCorrectionCalculator();
+    showToast('Dosierwirkungs-Preset gespeichert', 'success');
+}
+
+function resetDoseImpactPresets() {
+    if (!confirm('Eigene Dosierwirkungs-Presets zurücksetzen?')) return;
+    db.doseImpactSettings = { selectedPresetId: 'osci-kh-tag', tankLiters: 100, dailyMl: 10, customPresets: [] };
+    saveDB();
+    initDoseImpactCalculator();
+    initMajorCorrectionCalculator();
+    showToast('Eigene Presets zurückgesetzt', 'success');
 }
 
 const testCorrectionMeta = {

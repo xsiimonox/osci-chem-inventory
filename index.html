@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.0.2-info-icon-centered">
+    <link rel="stylesheet" href="style.css?v=3.0.8-tools-collapsed">
 </head>
 <body>
 
@@ -26,7 +26,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.0.2</span>
+                    <span class="version-badge">v3.0.8</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -348,17 +348,14 @@
                     <div class="tools-hub-head">
                         <div>
                             <h3>Tools</h3>
-                            <p class="hint">Öffne den passenden Arbeitsbereich darunter oder nutze deine Favoriten für den Schnellzugriff.</p>
+                            <p class="hint">Suche nach einem Rechner oder öffne unten den passenden Bereich.</p>
                         </div>
                     </div>
                     <div class="tools-command-bar">
-                        <div class="tool-favorites-panel">
-                            <div class="tool-favorites-head">
-                                <strong>Favoriten</strong>
-                                <small>Deine persönliche Schnellauswahl für häufig genutzte Tools.</small>
-                            </div>
-                            <div class="tool-favorites-list" id="toolFavoritesList"></div>
-                        </div>
+                        <label class="tools-search-wrap" for="toolSearchInput">
+                            <span aria-hidden="true">⌕</span>
+                            <input type="search" id="toolSearchInput" placeholder="Tool suchen: KH, Calcium, Salifert, C&R ..." oninput="filterTools(this.value)">
+                        </label>
                     </div>
                 </div>
 
@@ -369,7 +366,7 @@
 
                 <details class="tool-section" data-section-id="dosieren-und-messwerte">
                     <summary class="tool-section-summary">
-                        <span><strong>Wasserwerte &amp; Dosierung</strong><small>Korrekturen, Verbrauch, Testabgleich und gezielte Nährstoffzugabe</small></span>
+                        <span><strong>Dosierung, Verbrauch &amp; Messen</strong><small>KH/Ca, Tagesdosierung, Verbrauch, Testabgleich und Nährstoffzugabe</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -378,11 +375,12 @@
                             <p class="hint">Aktuellen Wert, Zielwert und Produktwirkung eintragen. So bleibt der Rechner mit jedem Produkt nutzbar.</p>
                             <div class="tool-grid">
                                 <div class="input-group">
+                                    <label>Produktpreset:</label>
+                                    <select id="majorCorrectionPreset" onchange="selectMajorCorrectionPreset()"></select>
+                                </div>
+                                <div class="input-group">
                                     <label>Parameter:</label>
-                                    <select id="majorCorrectionElement" onchange="selectMajorCorrectionElement()">
-                                        <option value="KH">KH (dKH)</option>
-                                        <option value="Ca">Calcium (mg/l)</option>
-                                    </select>
+                                    <input type="text" id="majorCorrectionElementDisplay" value="KH (dKH)" readonly>
                                 </div>
                                 <div class="input-group">
                                     <label>Aquariumgröße (L):</label>
@@ -397,17 +395,13 @@
                                     <input type="number" id="majorCorrectionTarget" step="0.1" value="8.0" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                                 <div class="input-group">
-                                    <label id="majorCorrectionStrengthLabel">Produktwirkung pro 1 ml / 100 L:</label>
-                                    <input type="number" id="majorCorrectionStrength" min="0.0001" step="0.01" value="0.05" oninput="renderMajorCorrectionCalculator()">
-                                </div>
-                                <div class="input-group">
                                     <label>Aufteilen auf Tage:</label>
                                     <input type="number" id="majorCorrectionDays" min="1" step="1" value="3" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                             </div>
                             <div class="btn-group calculator-actions">
-                                <button class="btn-secondary btn-animated" onclick="saveMajorCorrectionDefaults()">Voreinstellungen speichern</button>
-                                <button class="btn-out btn-animated" onclick="resetMajorCorrectionDefaults()">Voreinstellungen zurücksetzen</button>
+                                <button class="btn-secondary btn-animated" onclick="saveMajorCorrectionDefaults()">Auswahl speichern</button>
+                                <button class="btn-out btn-animated" onclick="openToolFavorite('tagesdosierung-wirkung')">Presets bearbeiten</button>
                             </div>
                             <div id="majorCorrectionResult"></div>
                         </div>
@@ -440,6 +434,53 @@
                                 </div>
                             </div>
                             <div id="consumptionResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>Tagesdosierung Wirkung <button type="button" class="tool-inline-fav" data-tool-id="tagesdosierung-wirkung">☆ Fav</button></h3>
+                            <p class="hint">Berechnet, wie stark deine aktuelle tägliche KH- oder Calciumdosierung den Wert im Becken anhebt.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label>Produktpreset:</label>
+                                    <select id="doseImpactPreset" onchange="selectDoseImpactPreset()"></select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Parameter:</label>
+                                    <select id="doseImpactElement" onchange="renderDoseImpactCalculator()">
+                                        <option value="KH">KH (dKH)</option>
+                                        <option value="Ca">Calcium (mg/l)</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label>Preset Name:</label>
+                                    <input type="text" id="doseImpactPresetName" value="Eigenes Preset" oninput="renderDoseImpactCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Aquariumvolumen (L):</label>
+                                    <input type="number" id="doseImpactTankLiters" min="1" step="1" value="100" oninput="renderDoseImpactCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Tagesdosierung (ml/Tag):</label>
+                                    <input type="number" id="doseImpactDailyMl" min="0" step="0.1" value="10" oninput="renderDoseImpactCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Referenzdosierung (ml):</label>
+                                    <input type="number" id="doseImpactReferenceMl" min="0.0001" step="0.1" value="10" oninput="renderDoseImpactCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Referenzvolumen (L):</label>
+                                    <input type="number" id="doseImpactReferenceLiters" min="1" step="1" value="100" oninput="renderDoseImpactCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label id="doseImpactIncreaseLabel">Erhöhung:</label>
+                                    <input type="number" id="doseImpactIncrease" min="0.0001" step="0.01" value="0.5" oninput="renderDoseImpactCalculator()">
+                                </div>
+                            </div>
+                            <div class="btn-group calculator-actions">
+                                <button class="btn-secondary btn-animated" onclick="saveDoseImpactPreset()">Preset speichern</button>
+                                <button class="btn-out btn-animated" onclick="resetDoseImpactPresets()">Eigene Presets zurücksetzen</button>
+                            </div>
+                            <div id="doseImpactResult"></div>
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
@@ -587,7 +628,7 @@
 
                 <details class="tool-section" data-section-id="salinitaet-und-wasserwechsel">
                     <summary class="tool-section-summary">
-                        <span><strong>Salz, Wasserwechsel &amp; Adsorber</strong><small>PSU, Dichte, Salzkorrektur, Wasserwechsel-Effekt und Adsorber-Durchfluss</small></span>
+                        <span><strong>Wasserwechsel &amp; Salinität</strong><small>PSU, Dichte, Salzkorrektur, Wasserwechsel-Effekt und Adsorber-Durchfluss</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -733,7 +774,7 @@
 
                 <details class="tool-section" data-section-id="c-und-r-und-mischen">
                     <summary class="tool-section-summary">
-                        <span><strong>Mischen &amp; Lösungen</strong><small>Meerwasser, C&amp;R-Lösungen, Natriumchlorid und Makro-Elemente ansetzen</small></span>
+                        <span><strong>Mischen &amp; Rezepte</strong><small>Meerwasser, C&amp;R-Lösungen, Natriumchlorid und Makro-Elemente ansetzen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -811,7 +852,7 @@
 
                 <details class="tool-section" data-section-id="sangokai-a-z">
                     <summary class="tool-section-summary">
-                        <span><strong>Sangokai A-Z Assistent</strong><small>Original-PDF durchsuchen und Antworten fachlich gegenprüfen</small></span>
+                        <span><strong>Wissen &amp; Nachschlagen</strong><small>Sangokai A-Z durchsuchen und Antworten fachlich gegenprüfen</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -846,7 +887,7 @@
 
                 <details class="tool-section" data-section-id="community-und-hilfe">
                     <summary class="tool-section-summary">
-                        <span><strong>Links &amp; Nachschlagen</strong><small>OSCI Motion, Meerwasser-Lexikon, Sangokai A-Z und Buchtipps</small></span>
+                        <span><strong>Hilfe &amp; Quellen</strong><small>OSCI Motion, Meerwasser-Lexikon, Anleitung und Buchtipps</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -1746,8 +1787,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.0.2-info-icon-centered"></script>
-    <script src="app.js?v=3.0.2-info-icon-centered"></script>
+    <script src="sangokai-data.js?v=3.0.8-tools-collapsed"></script>
+    <script src="app.js?v=3.0.8-tools-collapsed"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
