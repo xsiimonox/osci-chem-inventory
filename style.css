@@ -3538,19 +3538,29 @@ body.theme-mint.party-mode .card {
 
 .logbook-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
-    gap: 14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+        "measurement measurement"
+        "document document"
+        "category todo"
+        "dosing osmose";
+    gap: 16px;
     align-items: start;
 }
 
 .logbook-card {
+    min-width: 0;
+    width: 100%;
     padding: 16px;
     margin-bottom: 0;
 }
 
-.logbook-document-card {
-    grid-row: span 2;
-}
+.measurement-card { grid-area: measurement; }
+.logbook-document-card { grid-area: document; }
+.logbook-category-card { grid-area: category; }
+.logbook-todo-card { grid-area: todo; }
+.logbook-dosing-card { grid-area: dosing; }
+.logbook-osmose-card { grid-area: osmose; }
 
 .logbook-section-title {
     display: flex;
@@ -4229,6 +4239,16 @@ body.theme-mint.party-mode .card {
     .logbook-hero,
     .logbook-layout {
         grid-template-columns: 1fr;
+    }
+
+    .logbook-layout {
+        grid-template-areas:
+            "measurement"
+            "document"
+            "todo"
+            "category"
+            "dosing"
+            "osmose";
     }
 
     .logbook-hero {
