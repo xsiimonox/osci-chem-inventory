@@ -276,6 +276,7 @@ const AQUARIUM_FIELD_KEYS = [
     'coralCatalog',
     'coralTransfers'
 ];
+const AQUARIUM_FIELD_KEY_SET = new Set(AQUARIUM_FIELD_KEYS);
 const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen']);
 
 // --- OSCI SHOP BUILT-IN PRODUCT PRESET ---
@@ -404,7 +405,7 @@ const APP_STORAGE_STATE_STORE = 'state';
 const APP_STORAGE_SNAPSHOT_STORE = 'snapshots';
 const APP_STORAGE_STATE_KEY = 'app_state';
 const APP_STORAGE_META_KEY = 'app_meta';
-const APP_STORAGE_MAX_SNAPSHOTS = 18;
+const APP_STORAGE_MAX_SNAPSHOTS = 5;
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -718,12 +719,25 @@ async function loadPersistedAppState() {
 
 async function trimStoredSnapshots() {
     const snapshots = await idbGetAllSnapshots();
-    if (snapshots.length <= APP_STORAGE_MAX_SNAPSHOTS) return;
-    const sorted = snapshots.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const autoSnapshots = snapshots.filter(entry => !shouldKeepLocalSnapshot(entry));
+    for (const entry of autoSnapshots) {
+        await idbDelete(APP_STORAGE_SNAPSHOT_STORE, entry.id);
+    }
+    const keepers = snapshots.filter(shouldKeepLocalSnapshot);
+    if (keepers.length <= APP_STORAGE_MAX_SNAPSHOTS) return;
+    const sorted = keepers.slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
     const toDelete = sorted.slice(APP_STORAGE_MAX_SNAPSHOTS);
     for (const entry of toDelete) {
         await idbDelete(APP_STORAGE_SNAPSHOT_STORE, entry.id);
     }
+}
+
+function shouldKeepLocalSnapshot(snapshot = {}) {
+    const reason = String(snapshot.reason || '').toLowerCase();
+    if (!reason) return true;
+    if (reason.startsWith('save')) return false;
+    if (reason === 'init-load' || reason === 'init-empty') return false;
+    return true;
 }
 
 async function getAppStorageMeta() {
@@ -742,8 +756,6 @@ function getSnapshotReasonLabel(reason = '') {
     if (value === 'restore-snapshot') return 'Nach Wiederherstellung';
     if (value === 'google-drive-restore') return 'Cloud geladen';
     if (value === 'import-project') return 'Projekt importiert';
-    if (value === 'init-load') return 'Beim Laden gespeichert';
-    if (value.startsWith('save')) return 'Automatische Sicherung';
     if (value === 'init-empty') return 'Erststart';
     return reason ? reason : 'Sicherungspunkt';
 }
@@ -768,7 +780,7 @@ function getSnapshotWarehouseLabel(snapshot) {
 
 async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     if (!appState) return false;
-    const payload = deepClone(appState);
+    const payload = prepareAppStateForStorage(appState);
     const savedAt = new Date().toISOString();
     latestPersistAt = savedAt;
     const stateRecord = {
@@ -1213,13 +1225,13 @@ function buildProjectBackupPayload() {
     return {
         type: 'osci_project_backup',
         version: 2,
-        app: 'OSCI Motion',
+        app: 'ReefTools',
         schema: APP_STORAGE_DB_VERSION,
         activeWarehouseId,
         activeAquariumId,
         warehouseName: warehouse ? warehouse.name : 'Lager',
         exportedAt,
-        data: deepClone(appState)
+        data: prepareAppStateForStorage(appState)
     };
 }
 
@@ -1720,7 +1732,7 @@ async function restoreLocalSnapshot(snapshotId, ask = true) {
     const active = getActiveWarehouse();
     if (active) db = normalizeWarehouseData(active.data);
     overlayActiveAquariumData();
-    await persistAppStateNow('restore-snapshot', true);
+    await persistAppStateNow('restore-snapshot', false);
     applyTheme(db.theme || 'default', false);
     renderCurrentWarehouseViews();
     renderStorageSecurityStatus();
@@ -1849,7 +1861,7 @@ async function renderStorageSecurityStatus() {
         : `
             <div class="storage-snapshot-empty">
                 <strong>Noch keine Wiederherstellungspunkte</strong>
-                <span>Erstelle einen manuellen Sicherungspunkt oder arbeite weiter, damit automatische Punkte entstehen.</span>
+                <span>Erstelle bei Bedarf einen manuellen Sicherungspunkt. Normale Änderungen werden weiterhin automatisch gespeichert.</span>
             </div>
         `;
     mount.innerHTML = `
@@ -1875,7 +1887,7 @@ async function renderStorageSecurityStatus() {
                 <div class="storage-safety-status-card">
                     <small>Sicherungspunkte</small>
                     <strong>${snapshots.length}</strong>
-                    <span>Letzter Punkt: ${escapeHtml(snapshotText)}</span>
+                    <span>Maximal 5 manuelle oder wichtige Import-/Cloud-Punkte. Letzter Punkt: ${escapeHtml(snapshotText)}</span>
                 </div>
             </div>
             ${snapshotTimeline}
@@ -2192,6 +2204,129 @@ function cloneSerializable(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function sanitizeCoralEntryForStorage(entry = {}) {
+    const coral = cloneSerializable(entry || {});
+    const gallery = Array.isArray(coral.photoGallery)
+        ? coral.photoGallery.filter(Boolean)
+        : [];
+    if (gallery.length) {
+        coral.photoGallery = gallery;
+        if (coral.photoDataUrl && coral.photoDataUrl === gallery[0]) {
+            delete coral.photoDataUrl;
+        }
+    } else if (!coral.photoDataUrl) {
+        delete coral.photoGallery;
+    }
+    return coral;
+}
+
+function sanitizeAquariumDataForStorage(data = {}) {
+    const sanitized = cloneSerializable(data || {});
+    if (Array.isArray(sanitized.coralCatalog)) {
+        sanitized.coralCatalog = sanitized.coralCatalog.map(sanitizeCoralEntryForStorage);
+    }
+    if (Array.isArray(sanitized.coralTransfers)) {
+        sanitized.coralTransfers = sanitized.coralTransfers.map(entry => {
+            const transfer = cloneSerializable(entry || {});
+            if (transfer.coralSnapshot) transfer.coralSnapshot = sanitizeCoralEntryForStorage(transfer.coralSnapshot);
+            return transfer;
+        });
+    }
+    return sanitized;
+}
+
+function createPersistableWarehouseData(data = {}) {
+    const sanitized = cloneSerializable(data || {});
+    AQUARIUM_FIELD_KEYS.forEach(key => {
+        delete sanitized[key];
+    });
+    return sanitized;
+}
+
+function prepareAppStateForStorage(state = appState) {
+    const sanitized = cloneSerializable(state || {});
+    if (sanitized.warehouses && typeof sanitized.warehouses === 'object') {
+        Object.values(sanitized.warehouses).forEach(warehouse => {
+            if (warehouse && warehouse.data) warehouse.data = createPersistableWarehouseData(warehouse.data);
+        });
+    }
+    if (sanitized.aquariums && typeof sanitized.aquariums === 'object') {
+        Object.values(sanitized.aquariums).forEach(aquarium => {
+            if (aquarium && aquarium.data) aquarium.data = sanitizeAquariumDataForStorage(aquarium.data);
+        });
+    }
+    return sanitized;
+}
+
+function shouldOptimizeStoredImageDataUrl(dataUrl = '') {
+    return typeof dataUrl === 'string'
+        && /^data:image\//i.test(dataUrl)
+        && dataUrl.length > 420000;
+}
+
+async function optimizeImageDataUrlForBackup(dataUrl = '') {
+    if (!shouldOptimizeStoredImageDataUrl(dataUrl) || typeof Image === 'undefined' || typeof document === 'undefined') return dataUrl;
+    const image = await loadImageFromDataUrl(dataUrl);
+    if (!image || !image.naturalWidth || !image.naturalHeight) return dataUrl;
+    const maxEdge = 960;
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) return dataUrl;
+    context.drawImage(image, 0, 0, width, height);
+    try {
+        const optimized = canvas.toDataURL('image/jpeg', 0.76);
+        return optimized && optimized.length < dataUrl.length ? optimized : dataUrl;
+    } catch (err) {
+        return dataUrl;
+    } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+    }
+}
+
+async function optimizeCoralEntryImagesForBackup(entry = {}) {
+    const coral = sanitizeCoralEntryForStorage(entry);
+    if (Array.isArray(coral.photoGallery) && coral.photoGallery.length) {
+        coral.photoGallery = await Promise.all(coral.photoGallery.map(optimizeImageDataUrlForBackup));
+    }
+    if (coral.photoDataUrl) {
+        coral.photoDataUrl = await optimizeImageDataUrlForBackup(coral.photoDataUrl);
+        if (Array.isArray(coral.photoGallery) && coral.photoGallery[0] === coral.photoDataUrl) delete coral.photoDataUrl;
+    }
+    return coral;
+}
+
+async function optimizeAquariumDataImagesForBackup(data = {}) {
+    if (!data || typeof data !== 'object') return data;
+    if (Array.isArray(data.coralCatalog)) {
+        data.coralCatalog = await Promise.all(data.coralCatalog.map(optimizeCoralEntryImagesForBackup));
+    }
+    if (Array.isArray(data.coralTransfers)) {
+        data.coralTransfers = await Promise.all(data.coralTransfers.map(async entry => {
+            const transfer = cloneSerializable(entry || {});
+            if (transfer.coralSnapshot) transfer.coralSnapshot = await optimizeCoralEntryImagesForBackup(transfer.coralSnapshot);
+            return transfer;
+        }));
+    }
+    return data;
+}
+
+async function optimizeProjectBackupPayload(payload = {}) {
+    const optimized = cloneSerializable(payload || {});
+    const aquariums = optimized.data?.aquariums;
+    if (aquariums && typeof aquariums === 'object') {
+        for (const aquarium of Object.values(aquariums)) {
+            if (aquarium?.data) aquarium.data = await optimizeAquariumDataImagesForBackup(aquarium.data);
+        }
+    }
+    return optimized;
+}
+
 function createAquariumId() {
     return 'aquarium-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
@@ -2444,13 +2579,15 @@ async function initDB() {
     appState.activeAquariumId = activeAquariumId;
 
     const warehouse = getActiveWarehouse();
-    warehouse.data = normalizeWarehouseData(warehouse.data);
+    normalizeWarehouseData(warehouse.data);
     overlayActiveAquariumData();
+    warehouse.data = createPersistableWarehouseData(db);
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
     appBootstrapComplete = true;
-    await persistAppStateNow(parsed ? 'init-load' : 'init-empty', true);
+    await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
+    await trimStoredSnapshots();
     await removeLegacyLocalDbCopies();
     updateWarehouseUI();
 }
@@ -2462,13 +2599,13 @@ function saveDB(markDirty = true) {
         const warehouse = getActiveWarehouse();
         if (warehouse) {
             if (markDirty) db.localUpdatedAt = new Date().toISOString();
-            warehouse.data = db;
+            warehouse.data = createPersistableWarehouseData(db);
             warehouse.localUpdatedAt = db.localUpdatedAt;
         }
         appState.activeWarehouseId = activeWarehouseId;
         appState.activeAquariumId = activeAquariumId;
         updateWarehouseUI();
-        queuePersistAppState(markDirty ? 'save' : 'save-passive', markDirty);
+        queuePersistAppState(markDirty ? 'save' : 'save-passive', false);
         scheduleGoogleDriveAutoSync();
         scheduleSupabaseAutoSync();
     } catch(e) {}
@@ -2961,7 +3098,7 @@ function getWarehouseSyncPayload(warehouse) {
     return {
         id: warehouse.remoteId || null,
         name: warehouse.name || 'Lager',
-        data: warehouse.data || createWarehouseData(),
+        data: createPersistableWarehouseData(warehouse.data || createWarehouseData()),
         updated_at: new Date().toISOString()
     };
 }
@@ -3032,7 +3169,7 @@ async function syncPushAllWarehouses(showAlert = true) {
                 skippedReadOnly++;
                 continue;
             }
-            if (warehouse.id === activeWarehouseId) warehouse.data = db;
+            if (warehouse.id === activeWarehouseId) warehouse.data = createPersistableWarehouseData(db);
             const payload = getWarehouseSyncPayload(warehouse);
             const { data: savedId, error } = await client.rpc('upsert_warehouse_data', {
                 target_warehouse_id: payload.id,
@@ -3965,30 +4102,34 @@ function updateWarehouseUI() {
 }
 
 function renderCurrentWarehouseViews() {
-    renderDashboard();
-    renderLager();
-    renderStats();
-    renderLogs();
-    renderCustomProductSettings();
-    renderCustomContainers();
-    renderProductVisibilitySettings();
-    renderSharedOwnerVisibilitySettings();
-    renderCloudShareOverview();
-    renderWarehouseEventLog();
-    renderProductPresets();
-    renderShopLinkSettings();
-    renderLocalDeviceSettings();
-    renderNachbestellen();
-    renderSupabaseSyncSettings();
-    applyCursorSettings();
-    renderAquariumWorkspacePanels();
-    renderLogBook();
-    renderCoralCatalog();
-    renderDosingContainers();
-    initBulkProductSelect();
-    updateNotificationStatus();
-    updateTabAccessState();
-    clearCRPdfImport();
+    const safeRender = (label, fn) => {
+        try { fn(); }
+        catch (err) { console.error(`Render failed: ${label}`, err); }
+    };
+    safeRender('Dashboard', renderDashboard);
+    safeRender('Lager', renderLager);
+    safeRender('Statistik', renderStats);
+    safeRender('Protokoll', renderLogs);
+    safeRender('Eigene Produkte', renderCustomProductSettings);
+    safeRender('Behälter', renderCustomContainers);
+    safeRender('Produktsichtbarkeit', renderProductVisibilitySettings);
+    safeRender('Geteilte Lager', renderSharedOwnerVisibilitySettings);
+    safeRender('Cloud-Freigaben', renderCloudShareOverview);
+    safeRender('Lagerereignisse', renderWarehouseEventLog);
+    safeRender('Produktpresets', renderProductPresets);
+    safeRender('Shoplinks', renderShopLinkSettings);
+    safeRender('Geräte', renderLocalDeviceSettings);
+    safeRender('Nachbestellen', renderNachbestellen);
+    safeRender('Supabase', renderSupabaseSyncSettings);
+    safeRender('Cursor', applyCursorSettings);
+    safeRender('Aquarium-Auswahl', renderAquariumWorkspacePanels);
+    safeRender('Logbuch', renderLogBook);
+    safeRender('Korallen', renderCoralCatalog);
+    safeRender('Vorratsbehälter', renderDosingContainers);
+    safeRender('Wareneingang', initBulkProductSelect);
+    safeRender('Benachrichtigungen', updateNotificationStatus);
+    safeRender('Tab-Rechte', updateTabAccessState);
+    safeRender('C&R Import', clearCRPdfImport);
 }
 
 function getDashboardNextTodo() {
@@ -4635,19 +4776,58 @@ function renderCoralPhotoPreview(dataUrl = '') {
         : '<span>Noch kein Foto gewählt</span>';
 }
 
-function handleCoralPhotoSelection(event) {
-    const files = Array.from(event?.target?.files || []).filter(Boolean);
-    if (!files.length) return;
-    Promise.all(files.map(file => new Promise(resolve => {
+function readFileAsDataUrl(file) {
+    return new Promise(resolve => {
         const reader = new FileReader();
         reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
         reader.onerror = () => resolve('');
         reader.readAsDataURL(file);
-    }))).then(results => {
+    });
+}
+
+function loadImageFromDataUrl(dataUrl) {
+    return new Promise(resolve => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(null);
+        image.src = dataUrl;
+    });
+}
+
+async function prepareCoralPhotoForStorage(file) {
+    const dataUrl = await readFileAsDataUrl(file);
+    if (!dataUrl || !/^data:image\//i.test(dataUrl)) return dataUrl;
+    const image = await loadImageFromDataUrl(dataUrl);
+    if (!image || !image.naturalWidth || !image.naturalHeight) return dataUrl;
+    const maxEdge = 1280;
+    const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+    const width = Math.max(1, Math.round(image.naturalWidth * scale));
+    const height = Math.max(1, Math.round(image.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    if (!context) return dataUrl;
+    context.drawImage(image, 0, 0, width, height);
+    try {
+        return canvas.toDataURL('image/jpeg', 0.82);
+    } catch (err) {
+        return dataUrl;
+    } finally {
+        canvas.width = 0;
+        canvas.height = 0;
+    }
+}
+
+function handleCoralPhotoSelection(event) {
+    const files = Array.from(event?.target?.files || []).filter(Boolean);
+    if (!files.length) return;
+    Promise.all(files.map(prepareCoralPhotoForStorage)).then(results => {
         const newPhotos = results.filter(Boolean);
         if (newPhotos.length) coralUiState.photosCleared = false;
         coralUiState.pendingPhotos = [...coralUiState.pendingPhotos, ...newPhotos];
         renderCoralPhotoPreview(coralUiState.pendingPhotos);
+        if (newPhotos.length) showToast('Foto für die App optimiert', 'success', 1600);
     });
 }
 
@@ -5232,42 +5412,75 @@ function showTab(tabId) {
         if (window.location.hash !== nextHash) history.replaceState(null, '', nextHash);
     } catch(e) {}
     saveDB(false);
-    
-    if(tabId === 'uebersicht') renderDashboard();
-    if(tabId === 'lager') renderLager();
-    if(tabId === 'cr-export') {
-        syncCRPreferredUnitUI();
-        setupPriority4CalculatorUI();
-    }
-    if(tabId === 'statistik') renderStats();
-    if(tabId === 'trace-export') {
-        renderTraceExportInputs();
-        renderTraceCalculator();
-        setupPriority4CalculatorUI();
-    }
-    if(tabId === 'log') renderLogs();
-    if(tabId === 'masseneingang') {
-        initBulkProductSelect();
-        renderBulkCart();
-    }
-    if(tabId === 'nachbestellen') renderNachbestellen();
-    if(tabId === 'tools') initTools();
-    if(tabId === 'logbuch') renderLogBook();
-    if(tabId === 'korallen') renderCoralCatalog();
-    if(tabId === 'einstellungen') {
-        setupSettingsAccordions();
-        updateNotificationStatus();
-        renderCustomProductSettings();
-        renderCustomContainers();
-        renderProductVisibilitySettings();
-        renderShopLinkSettings();
-        renderProductPresets();
-        renderSupabaseSyncSettings();
-        renderMenuOrderSettings();
-        renderLocalDeviceSettings();
-        renderWavePumpDemoSettings();
-    }
+    renderActiveTabContent(tabId);
     scheduleTextFitPass();
+}
+
+function renderActiveTabContent(tabId) {
+    try {
+        if(tabId === 'uebersicht') renderDashboard();
+        if(tabId === 'lager') renderLager();
+        if(tabId === 'cr-export') {
+            syncCRPreferredUnitUI();
+            setupPriority4CalculatorUI();
+        }
+        if(tabId === 'statistik') renderStats();
+        if(tabId === 'trace-export') {
+            renderTraceExportInputs();
+            renderTraceCalculator();
+            setupPriority4CalculatorUI();
+        }
+        if(tabId === 'log') renderLogs();
+        if(tabId === 'masseneingang') {
+            initBulkProductSelect();
+            renderBulkCart();
+        }
+        if(tabId === 'nachbestellen') renderNachbestellen();
+        if(tabId === 'tools') initTools();
+        if(tabId === 'logbuch') renderLogBook();
+        if(tabId === 'korallen') renderCoralCatalog();
+        if(tabId === 'einstellungen') {
+            setupSettingsAccordions();
+            updateNotificationStatus();
+            renderCustomProductSettings();
+            renderCustomContainers();
+            renderProductVisibilitySettings();
+            renderShopLinkSettings();
+            renderProductPresets();
+            renderSupabaseSyncSettings();
+            renderMenuOrderSettings();
+            renderLocalDeviceSettings();
+            renderWavePumpDemoSettings();
+        }
+    } catch (err) {
+        console.error(`Render failed for tab ${tabId}:`, err);
+        renderTabErrorFallback(tabId, err);
+    }
+}
+
+function renderTabErrorFallback(tabId, err) {
+    const container = document.getElementById(tabId);
+    if (!container) return;
+    const message = err && err.message ? err.message : 'Unbekannter Fehler';
+    container.innerHTML = `
+        <section class="card render-error-card" role="alert">
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow">Anzeigeproblem</p>
+                    <h2>${escapeHtml(TAB_LABELS[tabId] || 'Bereich')} konnte nicht geladen werden</h2>
+                    <p class="hint">Deine Daten bleiben gespeichert. Lade die Ansicht neu oder exportiere ein Backup, falls der Fehler wiederholt auftritt.</p>
+                </div>
+            </div>
+            <div class="workflow-message workflow-message--error">
+                <strong>Technische Meldung</strong>
+                <span>${escapeHtml(message)}</span>
+            </div>
+            <div class="button-row">
+                <button type="button" class="btn-primary btn-animated" onclick="renderActiveTabContent('${tabId}')">Ansicht neu laden</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="exportData()">Backup exportieren</button>
+            </div>
+        </section>
+    `;
 }
 
 const TEXT_FIT_SELECTOR = [
@@ -15435,14 +15648,22 @@ function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in 
 function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLogs(); updateNotificationStatus(); alert("Protokoll gelöscht."); } }
 function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLager(); updateNotificationStatus(); alert("Lager ist leer."); } }
 
-function exportData() {
-    const payload = buildProjectBackupPayload();
+function formatBackupFileTimestamp(value = new Date().toISOString()) {
+    const date = new Date(value);
+    const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+    const pad = number => String(number).padStart(2, '0');
+    return `${safeDate.getFullYear()}-${pad(safeDate.getMonth() + 1)}-${pad(safeDate.getDate())}_${pad(safeDate.getHours())}-${pad(safeDate.getMinutes())}`;
+}
+
+async function exportData() {
+    showToast('Backup wird vorbereitet ...', 'info', 1800);
+    const payload = await optimizeProjectBackupPayload(buildProjectBackupPayload());
     saveDB();
 
     let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_Backup_${payload.exportedAt.split('T')[0]}.json`;
+    a.download = `ReefTools_Backup_${formatBackupFileTimestamp(payload.exportedAt)}.json`;
     a.click();
     showToast('Projekt-Backup exportiert', 'success', 2200);
 }
@@ -15651,7 +15872,7 @@ function importLegacyWarehouseInventoryText(text, sourceName = 'TXT-Bestand') {
         db.inventory[entry.cat][entry.item] = entry.amount;
     });
 
-    warehouse.data = db;
+    warehouse.data = createPersistableWarehouseData(db);
     warehouse.lastImportAt = new Date().toISOString();
     saveDB();
     renderCurrentWarehouseViews();
@@ -15696,7 +15917,7 @@ function importData() {
                 const warehouse = getActiveWarehouse();
                 if (!confirm(`Backup "${sourceName}" in das aktuell ausgewählte Lager "${warehouse.name}" importieren? Dieses Lager wird dadurch ersetzt.`)) return;
                 db = normalizeWarehouseData(importPayload);
-                warehouse.data = db;
+                warehouse.data = createPersistableWarehouseData(db);
                 warehouse.lastImportAt = new Date().toISOString();
                 saveDB();
                 applyTheme(db.theme || 'default', false);
