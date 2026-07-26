@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v320-nettovolumen';
+const CACHE_NAME = 'reef-storage-tools-cache-v321-messwerte';
 const ASSETS = [
   './',
   './index.html',
