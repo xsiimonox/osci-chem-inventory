@@ -13664,9 +13664,53 @@ textarea[readonly] {
 .measurement-chart-scroll .measurement-chart { min-width: 620px; }
 .measurement-chart-scroll .measurement-chart.compact { min-width: 420px; }
 
+.measurement-card {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.measurement-card .logbook-card-body,
+.measurement-card #measurementTracker,
+.measurement-panel,
+.measurement-stats,
+.measurement-list {
+    min-width: 0;
+    max-width: 100%;
+}
+
 .measurement-chart-card {
     min-width: 0;
+    max-width: 100%;
     overflow: hidden;
+}
+
+.measurement-stats > div {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.measurement-stats strong,
+.measurement-detail-value,
+.measurement-list-button strong {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.measurement-stats span,
+.measurement-chart-head small,
+.measurement-chart-meta span,
+.measurement-detail-card small,
+.measurement-detail-card p,
+.measurement-list-button small {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .measurement-chart-head > div,
@@ -13678,6 +13722,7 @@ textarea[readonly] {
 
 .measurement-type-actions,
 .measurement-detail-actions {
+    min-width: 0;
     max-width: 100%;
 }
 
@@ -13685,6 +13730,19 @@ textarea[readonly] {
 .measurement-type-actions .btn-out,
 .measurement-type-actions button,
 .measurement-detail-actions button {
+    width: auto;
+    max-width: 100%;
+    flex: 0 1 auto;
+    white-space: nowrap;
+}
+
+.measurement-list-row .logbook-actions {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+}
+
+.measurement-list-row .logbook-actions button {
     width: auto;
     max-width: 100%;
     flex: 0 1 auto;
