@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="icon.png">
     <link rel="apple-touch-icon" href="icon.png">
-    <link rel="stylesheet" href="style.css?v=3.1.2-snapshot-lite">
+    <link rel="stylesheet" href="style.css?v=3.2.0-nettovolumen">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.1.2</span>
+                    <span class="version-badge">v3.2.0</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -717,6 +717,30 @@
                                 </div>
                             </div>
                             <div id="saltCorrectionResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
+                            <h3>Nettovolumen Berechnen <button type="button" class="tool-inline-fav" data-tool-id="nettovolumen-berechnen">☆ Fav</button></h3>
+                            <p class="hint">Berechnet aus geplanter und tatsächlich gemessener PSU-Erhöhung, wie viel reales Wasservolumen dein System ungefähr hat.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label>Geschätztes Volumen (L):</label>
+                                    <input type="number" id="salinityVolumeEstimatedLiters" min="1" step="1" value="2000" oninput="renderSalinityVolumeEstimator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>PSU vorher:</label>
+                                    <input type="number" id="salinityVolumeBeforePsu" min="0" step="0.1" value="34.0" oninput="renderSalinityVolumeEstimator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Geplante Ziel-PSU:</label>
+                                    <input type="number" id="salinityVolumeTargetPsu" min="0" step="0.1" value="34.5" oninput="renderSalinityVolumeEstimator()">
+                                </div>
+                                <div class="input-group">
+                                    <label>Gemessene PSU danach:</label>
+                                    <input type="number" id="salinityVolumeMeasuredPsu" min="0" step="0.1" value="34.7" oninput="renderSalinityVolumeEstimator()">
+                                </div>
+                            </div>
+                            <div id="salinityVolumeEstimatorResult"></div>
                         </div>
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
@@ -1791,8 +1815,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="sangokai-data.js?v=3.1.2-snapshot-lite"></script>
-    <script src="app.js?v=3.1.2-snapshot-lite"></script>
+    <script src="sangokai-data.js?v=3.2.0-nettovolumen"></script>
+    <script src="app.js?v=3.2.0-nettovolumen"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

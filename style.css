@@ -12944,6 +12944,8 @@ textarea[readonly] {
     min-height: 118px;
     padding: var(--space-4);
     text-align: left;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .dashboard-tile strong {
@@ -12951,12 +12953,15 @@ textarea[readonly] {
     align-items: baseline;
     gap: 5px;
     min-width: 0;
+    max-width: 100%;
     margin: var(--space-2) 0 3px;
     color: var(--text-primary);
-    font-size: clamp(1.25rem, 2.5vw, 1.65rem);
+    font-size: clamp(1.05rem, 1.8vw, 1.42rem);
     font-variant-numeric: tabular-nums;
     line-height: 1.15;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .dashboard-tile strong b { font: inherit; }
@@ -12965,6 +12970,39 @@ textarea[readonly] {
     font-size: 0.72em;
     font-style: normal;
     font-weight: 700;
+}
+
+.dashboard-tile > span,
+.dashboard-tile > small {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dashboard-date-value {
+    display: inline-flex !important;
+    flex-direction: column;
+    align-items: flex-start !important;
+    gap: 0 !important;
+    white-space: nowrap;
+}
+
+.dashboard-date-value b {
+    display: block;
+    max-width: 100%;
+    font-size: clamp(1rem, 1.55vw, 1.26rem);
+    line-height: 1.05;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-date-value i {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.72rem !important;
+    line-height: 1.15;
 }
 
 .dashboard-tile.warn,

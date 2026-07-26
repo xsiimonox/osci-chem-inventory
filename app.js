@@ -484,6 +484,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'nutrition-rechner': 'wasserwert wasserwerte nährstoffe nutrition nitrat no3 phosphat po4 lanthan kohlenstoff stickstoff dosieren',
     'salzgehalt-rechner': 'wasserwert wasserwerte salinität salz dichte psu specific gravity leitwert temperatur refraktometer spindel messen messung',
     'salz-korrektur': 'wasserwert wasserwerte salinität salz dichte psu erhöhen senken korrigieren',
+    'nettovolumen-berechnen': 'wasserwert wasserwerte nettovolumen wasservolumen volumen aufsalzen salzgehalt psu echte liter berechnen',
     'wasserwechsel-effekt': 'wasserwert wasserwerte wasserwechsel wechselwasser mischwert nährstoffe wert senken',
     'adsorber-durchfluss': 'adsorber phosphat po4 aktivkohle eisen aluminium durchfluss filter',
     'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
@@ -4408,6 +4409,7 @@ function renderDashboard() {
     const lastLog = (db.logs || []).slice().reverse()[0];
     const recentLogBookEntry = getRecentLogBookEntry();
     const lastMeasurementAt = getLastMeasurementAt();
+    const lastMeasurementDateParts = formatDashboardDateParts(lastMeasurementAt);
     const coralCount = (db.coralCatalog || []).length;
     const osmose = db.osmoseTank || { currentLiters: 0, capacityLiters: 0 };
     const dosingCritical = (db.dosingContainers || []).filter(entry => {
@@ -4496,7 +4498,7 @@ function renderDashboard() {
                 <span>ToDos</span><strong><b>${dueTodos.length}</b></strong><small>${dueTodos.length ? 'Fällig' : 'Nichts fällig'}</small>
             </button>
             <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--status" onclick="openDashboardDestination('measurement')" ${isEditing ? 'disabled' : ''}>
-                <span>Wassertest</span><strong>${lastMeasurementAt ? formatWarehouseDate(lastMeasurementAt) : 'offen'}</strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
+                <span>Wassertest</span><strong class="dashboard-date-value"><b>${escapeHtml(lastMeasurementDateParts.date)}</b><i>${escapeHtml(lastMeasurementDateParts.time)}</i></strong><small>${lastMeasurementAt ? 'zuletzt erfasst' : 'noch kein Eintrag'}</small>
             </button>
             <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('corals')" ${isEditing ? 'disabled' : ''}>
                 <span>Korallen</span><strong>${coralCount}</strong><small>Bestand dokumentiert</small>
@@ -4625,6 +4627,16 @@ function finishOnboarding() {
     db.onboardingDone = true;
     saveDB();
     renderDashboard();
+}
+
+function formatDashboardDateParts(value) {
+    if (!value) return { date: 'offen', time: 'noch kein Eintrag' };
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return { date: 'offen', time: 'Datum prüfen' };
+    return {
+        date: date.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' }),
+        time: date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    };
 }
 
 function getCoralCatalog() {
@@ -9558,6 +9570,7 @@ function initTools() {
     renderWaterChangeCalculator();
     renderAdsorberFlowCalculator();
     renderSaltCorrectionCalculator();
+    renderSalinityVolumeEstimator();
     renderFeedNutrientLog();
     renderFlowCalculator();
     renderOsmoseTank();
@@ -9648,6 +9661,7 @@ function getToolTileVisual(toolId, title = '') {
         'trace-calculator': { icon: 'Tr', subtitle: 'ICP Rezept planen' },
         'salzgehalt-rechner': { icon: 'PS', subtitle: 'PSU und Dichte pruefen' },
         'salz-korrektur': { icon: 'SG', subtitle: 'Salz angleichen' },
+        'nettovolumen-berechnen': { icon: 'L', subtitle: 'echte Liter ableiten' },
         'wasserwechsel-effekt': { icon: 'WW', subtitle: 'Wasserwechsel planen' },
         'adsorber-durchfluss': { icon: 'AD', subtitle: 'Adsorber langsam fahren' },
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
@@ -9704,6 +9718,11 @@ const toolInfoTexts = {
         summary: 'Berechnet eine grobe Salzgehalt-Korrektur für dein Aquarium.',
         details: 'Du trägst Beckenvolumen, aktuelle PSU und Ziel-PSU ein. Das Tool gibt eine Orientierung zur nötigen Anpassung.',
         note: 'Salinität niemals abrupt verändern. Tiere reagieren empfindlich auf schnelle Dichteschwankungen.'
+    },
+    'nettovolumen-berechnen': {
+        summary: 'Berechnet das ungefähre Nettovolumen deines Aquariums aus Ziel- und gemessenem Salzgehalt.',
+        details: 'Du gibst dein geschätztes Volumen, den Ziel-Salzgehalt und den danach gemessenen Salzgehalt ein. Daraus wird das Nettovolumen über den Verhältniswert Ziel/Gemessen abgeleitet.',
+        note: 'Nur sinnvoll, wenn die Salzzugabe vollständig gelöst und gut durchmischt ist. Messungenauigkeiten wirken direkt auf das Ergebnis.'
     },
     'wasserwechsel-effekt': {
         summary: 'Zeigt, welcher Wert nach einem Wasserwechsel rechnerisch zu erwarten ist.',
@@ -11314,6 +11333,59 @@ function renderSaltCorrectionCalculator() {
                 <span>${diff >= 0 ? '+' : ''}${diff.toFixed(1)} PSU</span>
             </div>
             ${action}
+        </div>
+    `;
+}
+
+function renderSalinityVolumeEstimator() {
+    const result = document.getElementById('salinityVolumeEstimatorResult');
+    if (!result) return;
+    const estimatedLiters = Math.max(0, parseFloat(document.getElementById('salinityVolumeEstimatedLiters')?.value) || 0);
+    const beforePsu = Math.max(0, parseFloat(document.getElementById('salinityVolumeBeforePsu')?.value) || 0);
+    const targetPsu = Math.max(0, parseFloat(document.getElementById('salinityVolumeTargetPsu')?.value) || 0);
+    const measuredPsu = Math.max(0, parseFloat(document.getElementById('salinityVolumeMeasuredPsu')?.value) || 0);
+
+    if (!estimatedLiters || !beforePsu || !targetPsu || !measuredPsu) {
+        result.innerHTML = '<p class="hint">Bitte geschätztes Volumen, PSU vorher, geplante Ziel-PSU und spätere Messung eintragen.</p>';
+        return;
+    }
+    if (targetPsu <= 0 || measuredPsu <= 0) {
+        result.innerHTML = '<div class="workflow-message workflow-message--error"><strong>Eingabe prüfen</strong><span>Ziel-PSU und gemessene PSU müssen größer als 0 sein.</span></div>';
+        return;
+    }
+
+    const netLiters = estimatedLiters * (targetPsu / measuredPsu);
+    const differenceLiters = netLiters - estimatedLiters;
+    const differencePercent = estimatedLiters ? (differenceLiters / estimatedLiters) * 100 : 0;
+    const directionText = measuredPsu > targetPsu
+        ? 'Der gemessene Salzgehalt liegt über dem Ziel. Das reale Nettovolumen ist rechnerisch kleiner als geschätzt.'
+        : measuredPsu < targetPsu
+            ? 'Der gemessene Salzgehalt liegt unter dem Ziel. Das reale Nettovolumen ist rechnerisch größer als geschätzt.'
+            : 'Der gemessene Salzgehalt entspricht dem Ziel. Das geschätzte Volumen wirkt plausibel.';
+
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row">
+                <span><strong>Geschätztes Volumen</strong><small>Ausgangspunkt deiner Dosierplanung</small></span>
+                <span>${estimatedLiters.toFixed(0)} L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Ziel-Salzgehalt</strong><small>Ausgehend von ${beforePsu.toFixed(2)} PSU</small></span>
+                <span>${targetPsu.toFixed(2)} PSU</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Gemessener Salzgehalt</strong><small>Messwert nach dem Aufsalzen</small></span>
+                <span>${measuredPsu.toFixed(2)} PSU</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Nettovolumen</strong><small>Formel: geschätztes Volumen × Ziel-Salzgehalt / gemessener Salzgehalt</small></span>
+                <span>${netLiters.toFixed(0)} L</span>
+            </div>
+            <div class="tool-row">
+                <span><strong>Abweichung zur Schätzung</strong><small>${directionText}</small></span>
+                <span>${differenceLiters >= 0 ? '+' : ''}${differenceLiters.toFixed(0)} L · ${differencePercent >= 0 ? '+' : ''}${differencePercent.toFixed(1)}%</span>
+            </div>
+            <p class="hint">Wichtig: erst rechnen, wenn Salz vollständig gelöst und das Aquarium gut durchmischt ist. Kleine Messfehler bei PSU verändern das Ergebnis deutlich.</p>
         </div>
     `;
 }
