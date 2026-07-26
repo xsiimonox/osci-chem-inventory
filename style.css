@@ -13664,6 +13664,33 @@ textarea[readonly] {
 .measurement-chart-scroll .measurement-chart { min-width: 620px; }
 .measurement-chart-scroll .measurement-chart.compact { min-width: 420px; }
 
+.measurement-chart-card {
+    min-width: 0;
+    overflow: hidden;
+}
+
+.measurement-chart-head > div,
+.measurement-detail-card,
+.measurement-list-row,
+.measurement-list-button {
+    min-width: 0;
+}
+
+.measurement-type-actions,
+.measurement-detail-actions {
+    max-width: 100%;
+}
+
+.measurement-type-actions .btn-secondary,
+.measurement-type-actions .btn-out,
+.measurement-type-actions button,
+.measurement-detail-actions button {
+    width: auto;
+    max-width: 100%;
+    flex: 0 1 auto;
+    white-space: nowrap;
+}
+
 .measurement-point-group:focus-visible .measurement-point-halo {
     opacity: 1;
     transform: scale(1.05);
