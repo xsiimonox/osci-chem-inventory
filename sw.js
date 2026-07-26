@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v312-nav-search-removed';
+const CACHE_NAME = 'reef-storage-tools-cache-v312-storage-crash-fix';
 const ASSETS = [
   './',
   './index.html',
