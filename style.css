@@ -2857,6 +2857,40 @@ body.theme-mint.party-mode .card {
     gap: 12px;
 }
 
+.storage-recovery-warning {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    align-items: center;
+    padding: 14px 16px;
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--border));
+    background:
+        linear-gradient(135deg, color-mix(in srgb, var(--warning) 18%, transparent), rgba(255,255,255,0.03));
+}
+
+.storage-recovery-warning strong,
+.storage-recovery-warning span {
+    display: block;
+}
+
+.storage-recovery-warning strong {
+    color: var(--text);
+    font-size: 0.98rem;
+}
+
+.storage-recovery-warning span {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.storage-recovery-warning button {
+    width: auto;
+    white-space: nowrap;
+}
+
 .storage-safety-hero {
     display: flex;
     justify-content: space-between;
@@ -3308,6 +3342,14 @@ body.theme-mint.party-mode .card {
     .storage-safety-hero {
         flex-direction: column;
         align-items: flex-start;
+    }
+
+    .storage-recovery-warning {
+        grid-template-columns: 1fr;
+    }
+
+    .storage-recovery-warning button {
+        width: 100%;
     }
 
     .storage-safety-grid {

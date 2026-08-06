@@ -406,6 +406,7 @@ const APP_STORAGE_SNAPSHOT_STORE = 'snapshots';
 const APP_STORAGE_STATE_KEY = 'app_state';
 const APP_STORAGE_META_KEY = 'app_meta';
 const APP_STORAGE_MAX_SNAPSHOTS = 5;
+const APP_STORAGE_SENTINEL_KEY = 'reeftools_local_storage_sentinel_v1';
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -434,6 +435,14 @@ let persistSequence = Promise.resolve();
 let latestPersistAt = null;
 let latestSnapshotAt = null;
 let appBootstrapComplete = false;
+let startupStorageRecoveryCandidate = null;
+const storagePersistenceState = {
+    supported: false,
+    persisted: false,
+    estimate: null,
+    checkedAt: null,
+    requesting: false
+};
 let googleIdentityScriptPromise = null;
 let googleDriveTokenClient = null;
 let googleDriveAccessToken = '';
@@ -606,6 +615,105 @@ function canUseIndexedDb() {
     return typeof window !== 'undefined' && 'indexedDB' in window;
 }
 
+function canUseStorageManager() {
+    return typeof navigator !== 'undefined' && !!navigator.storage;
+}
+
+function getStorageSentinel() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(APP_STORAGE_SENTINEL_KEY) || 'null');
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (err) {
+        return null;
+    }
+}
+
+function storeStorageSentinel(savedAt, reason = 'autosave') {
+    try {
+        localStorage.setItem(APP_STORAGE_SENTINEL_KEY, JSON.stringify({
+            hadLocalData: true,
+            lastSavedAt: savedAt || new Date().toISOString(),
+            reason,
+            origin: window.location.origin || window.location.href,
+            version: getCurrentAppVersion?.() || '',
+            updatedAt: new Date().toISOString()
+        }));
+    } catch (err) {}
+}
+
+function hasCloudRestoreHint(settings = getGoogleDriveSyncSettings()) {
+    return Boolean(settings.fileId || settings.lastSyncAt || settings.lastRestoreAt || settings.connectedEmail);
+}
+
+async function refreshStoragePersistenceState() {
+    storagePersistenceState.supported = canUseStorageManager();
+    storagePersistenceState.checkedAt = new Date().toISOString();
+    if (!storagePersistenceState.supported) {
+        storagePersistenceState.persisted = false;
+        storagePersistenceState.estimate = null;
+        return storagePersistenceState;
+    }
+    try {
+        if (typeof navigator.storage.persisted === 'function') {
+            storagePersistenceState.persisted = await navigator.storage.persisted();
+        }
+    } catch (err) {
+        storagePersistenceState.persisted = false;
+    }
+    try {
+        if (typeof navigator.storage.estimate === 'function') {
+            storagePersistenceState.estimate = await navigator.storage.estimate();
+        }
+    } catch (err) {
+        storagePersistenceState.estimate = null;
+    }
+    return storagePersistenceState;
+}
+
+function formatBytesForStorage(bytes) {
+    const value = Number(bytes || 0);
+    if (!value) return '-';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let amount = value;
+    let index = 0;
+    while (amount >= 1024 && index < units.length - 1) {
+        amount /= 1024;
+        index++;
+    }
+    return `${amount.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+}
+
+async function requestPersistentAppStorage(showFeedback = true) {
+    if (!canUseStorageManager() || typeof navigator.storage.persist !== 'function') {
+        if (showFeedback) showToast('Dieser Browser bietet keinen Schutzmodus für lokalen Speicher an.', 'warning', 3200);
+        await refreshStoragePersistenceState();
+        renderStorageSecurityStatus();
+        return false;
+    }
+    storagePersistenceState.requesting = true;
+    renderStorageSecurityStatus();
+    try {
+        const granted = await navigator.storage.persist();
+        await refreshStoragePersistenceState();
+        if (showFeedback) {
+            showToast(
+                granted || storagePersistenceState.persisted
+                    ? 'Lokaler Speicher ist jetzt besser geschützt.'
+                    : 'Browser hat den Schutzmodus nicht freigegeben. Cloud-Backup bleibt wichtig.',
+                granted || storagePersistenceState.persisted ? 'success' : 'warning',
+                3600
+            );
+        }
+        return granted || storagePersistenceState.persisted;
+    } catch (err) {
+        if (showFeedback) showToast('Speicherschutz konnte nicht geprüft werden.', 'warning', 3200);
+        return false;
+    } finally {
+        storagePersistenceState.requesting = false;
+        renderStorageSecurityStatus();
+    }
+}
+
 function openAppStorage() {
     if (!canUseIndexedDb()) return Promise.resolve(null);
     if (!appStoragePromise) {
@@ -703,12 +811,21 @@ async function loadPersistedAppState() {
         latestPersistAt = indexedValue.savedAt || indexedValue.updatedAt || null;
         return indexedValue.payload || null;
     }
+    const sentinel = getStorageSentinel();
+    if (sentinel?.hadLocalData || hasCloudRestoreHint()) {
+        startupStorageRecoveryCandidate = {
+            sentinel,
+            settings: getGoogleDriveSyncSettings(),
+            detectedAt: new Date().toISOString()
+        };
+    }
     let parsed = null;
     for (const key of LEGACY_DB_KEYS) {
         try {
             const saved = localStorage.getItem(key);
             if (saved) {
                 parsed = JSON.parse(saved);
+                startupStorageRecoveryCandidate = null;
                 break;
             }
         } catch (e) {
@@ -792,6 +909,7 @@ async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     };
     const ok = await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY, stateRecord);
     if (!ok) return false;
+    storeStorageSentinel(savedAt, reason);
     await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
         key: APP_STORAGE_META_KEY,
         lastSavedAt: savedAt,
@@ -1558,10 +1676,10 @@ async function syncProjectToGoogleDriveNow() {
     }
 }
 
-async function restoreProjectFromGoogleDriveNow() {
+async function restoreProjectFromGoogleDriveNow(ask = true) {
     if (googleDriveMonitorState.busyAction) return;
     try {
-        const confirmed = await appConfirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?', {
+        const confirmed = !ask || await appConfirm('Projektstand aus Google Drive laden und den lokalen Stand dieses Geräts ersetzen?', {
             title: 'Cloud-Stand wiederherstellen',
             type: 'warning',
             confirmText: 'Herunterladen und ersetzen'
@@ -1803,6 +1921,46 @@ async function clearLocalSnapshots() {
     showToast('Wiederherstellungspunkte gelöscht', 'info', 2200);
 }
 
+async function openDataRecoveryHelp() {
+    selectTab('einstellungen');
+    setTimeout(() => {
+        const section = document.getElementById('storageSecurityStatus');
+        section?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 180);
+    const settings = getGoogleDriveSyncSettings();
+    if (hasCloudRestoreHint(settings)) {
+        const confirmed = await appConfirm('Auf diesem Gerät wurden keine lokalen Daten gefunden. Wenn du zuvor Google Drive Sync genutzt hast, kannst du den Cloud-Stand jetzt laden.', {
+            title: 'Daten wiederherstellen',
+            type: 'warning',
+            confirmText: 'Cloud-Stand laden'
+        });
+        if (confirmed) await restoreProjectFromGoogleDriveNow(false);
+    }
+}
+
+async function maybePromptForStorageRecovery() {
+    if (!startupStorageRecoveryCandidate) return;
+    const settings = getGoogleDriveSyncSettings();
+    const sentinel = startupStorageRecoveryCandidate.sentinel;
+    const lastSeen = sentinel?.lastSavedAt ? formatWarehouseDate(sentinel.lastSavedAt) : null;
+    const message = lastSeen
+        ? `Auf diesem Gerät gab es zuletzt am ${lastSeen} lokale Daten. Der Browser hat sie aktuell nicht gefunden.`
+        : 'Auf diesem Gerät wurden Hinweise auf frühere Daten gefunden, aber der lokale Datenspeicher ist aktuell leer.';
+    showToast('Lokale Daten fehlen. Wiederherstellung prüfen.', 'warning', 7000);
+    renderStorageSecurityStatus();
+    if (hasCloudRestoreHint(settings)) {
+        setTimeout(() => {
+            appConfirm(`${message}\n\nWenn du Google Drive Sync genutzt hast, kannst du den letzten Cloud-Stand wiederherstellen.`, {
+                title: 'Lokale Daten fehlen',
+                type: 'warning',
+                confirmText: 'Cloud-Stand laden'
+            }).then(confirmed => {
+                if (confirmed) restoreProjectFromGoogleDriveNow(false);
+            });
+        }, 900);
+    }
+}
+
 async function renderStorageSecurityStatus() {
     const mount = document.getElementById('storageSecurityStatus');
     if (!mount) return;
@@ -1827,6 +1985,7 @@ async function renderStorageSecurityStatus() {
         `;
         return;
     }
+    await refreshStoragePersistenceState();
     const meta = await getAppStorageMeta();
     const snapshots = await idbGetAllSnapshots();
     const latestSnapshot = snapshots.length
@@ -1836,6 +1995,21 @@ async function renderStorageSecurityStatus() {
     const autosaveText = meta?.lastSavedAt ? formatWarehouseDate(meta.lastSavedAt) : (latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'noch nicht');
     const snapshotText = latestSnapshot?.createdAt ? formatWarehouseDate(latestSnapshot.createdAt) : 'noch keiner';
     const autosaveReady = Boolean(meta?.lastSavedAt || latestPersistAt);
+    const estimate = storagePersistenceState.estimate || {};
+    const usageLabel = estimate.usage ? formatBytesForStorage(estimate.usage) : '-';
+    const quotaLabel = estimate.quota ? formatBytesForStorage(estimate.quota) : '-';
+    const persistenceLabel = !storagePersistenceState.supported
+        ? 'nicht prüfbar'
+        : storagePersistenceState.persisted ? 'geschützt' : 'normal';
+    const recoveryWarning = startupStorageRecoveryCandidate ? `
+        <div class="storage-recovery-warning">
+            <div>
+                <strong>Lokale Daten wurden nicht gefunden</strong>
+                <span>Der Browser meldet einen leeren lokalen Speicher, obwohl es Hinweise auf frühere Daten oder Cloud-Sync gibt. Das kann durch Browser-Speicherbereinigung passieren.</span>
+            </div>
+            <button class="btn-secondary btn-animated" onclick="openDataRecoveryHelp()">Wiederherstellung prüfen</button>
+        </div>
+    ` : '';
     const snapshotTimeline = sortedSnapshots.length
         ? `
             <details class="storage-snapshot-details">
@@ -1867,10 +2041,11 @@ async function renderStorageSecurityStatus() {
         `;
     mount.innerHTML = `
         <div class="storage-safety-status-shell">
+            ${recoveryWarning}
             <div class="storage-safety-hero ${autosaveReady ? 'is-ready' : ''}">
                 <div>
                     <strong>${autosaveReady ? 'Deine Daten werden automatisch gespeichert' : 'Die automatische Speicherung wird vorbereitet'}</strong>
-                    <small>${autosaveReady ? 'Änderungen bleiben auf diesem Gerät erhalten.' : 'Sobald du mit der App arbeitest, wird der Speicherstatus hier sichtbar.'}</small>
+                    <small>${autosaveReady ? 'Änderungen bleiben auf diesem Gerät erhalten. Cloud-Backup schützt zusätzlich vor Browser-Speicherbereinigung.' : 'Sobald du mit der App arbeitest, wird der Speicherstatus hier sichtbar.'}</small>
                 </div>
                 <span class="storage-safety-pill ${autosaveReady ? 'is-ready' : ''}">${autosaveReady ? 'Aktiv' : 'Wartet'}</span>
             </div>
@@ -1878,12 +2053,22 @@ async function renderStorageSecurityStatus() {
                 <div class="storage-safety-status-card">
                     <small>Speicherort</small>
                     <strong>Nur dieses Gerät</strong>
-                    <span>Ohne Cloud bleiben deine Daten lokal im Browser.</span>
+                    <span>App-Daten liegen in IndexedDB, nicht in Cookies.</span>
                 </div>
                 <div class="storage-safety-status-card">
                     <small>Letzte automatische Speicherung</small>
                     <strong>${escapeHtml(autosaveText)}</strong>
                     <span>Wird bei Änderungen selbstständig aktualisiert.</span>
+                </div>
+                <div class="storage-safety-status-card">
+                    <small>Browserschutz</small>
+                    <strong>${escapeHtml(persistenceLabel)}</strong>
+                    <span>${storagePersistenceState.persisted ? 'Browser soll diese Daten nicht automatisch räumen.' : 'Kann bei wenig Gerätespeicher vom Browser bereinigt werden.'}</span>
+                </div>
+                <div class="storage-safety-status-card">
+                    <small>Speicherverbrauch</small>
+                    <strong>${escapeHtml(usageLabel)}</strong>
+                    <span>Verfügbar: ${escapeHtml(quotaLabel)}</span>
                 </div>
                 <div class="storage-safety-status-card">
                     <small>Sicherungspunkte</small>
@@ -1901,7 +2086,9 @@ Object.assign(window, {
     restoreLocalSnapshot,
     deleteLocalSnapshot,
     createManualRecoveryPoint,
-    clearLocalSnapshots
+    clearLocalSnapshots,
+    requestPersistentAppStorage,
+    openDataRecoveryHelp
 });
 
 function getMenuOrder() {
@@ -2590,6 +2777,7 @@ async function initDB() {
     await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
     await trimStoredSnapshots();
     await removeLegacyLocalDbCopies();
+    await refreshStoragePersistenceState();
     updateWarehouseUI();
 }
 
@@ -17217,6 +17405,7 @@ async function bootstrapApplication() {
     setTimeout(checkForAppUpdate, 2500);
     setTimeout(() => refreshGoogleDrivePresence(false), 3200);
     setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
+    setTimeout(() => maybePromptForStorageRecovery(), 1300);
     setInterval(checkForAppUpdate, 30 * 60 * 1000);
     setInterval(() => refreshGoogleDrivePresence(false), 10 * 60 * 1000);
     setInterval(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 5 * 60 * 1000);
