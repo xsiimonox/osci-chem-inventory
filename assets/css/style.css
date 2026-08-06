@@ -14994,10 +14994,36 @@ body.theme-girl .app-footer {
 
 /* Mobile navigation final safe-area polish */
 @media (max-width: 767px) {
+    .warehouse-switcher {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+
+    .warehouse-switcher select {
+        grid-column: 1 / -1;
+        min-height: 46px !important;
+        height: 46px !important;
+        padding-inline: 14px 34px !important;
+        font-size: 0.95rem !important;
+        font-weight: 700;
+        text-overflow: ellipsis;
+    }
+
+    .warehouse-switcher button {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .warehouse-meta {
+        white-space: normal;
+        overflow-wrap: normal;
+        word-break: normal;
+    }
+
     .mobile-bottom-nav {
-        left: max(10px, env(safe-area-inset-left, 0px)) !important;
-        right: max(10px, env(safe-area-inset-right, 0px)) !important;
-        bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+        left: calc(max(14px, env(safe-area-inset-left, 0px)) + 4px) !important;
+        right: calc(max(14px, env(safe-area-inset-right, 0px)) + 4px) !important;
+        bottom: calc(max(14px, env(safe-area-inset-bottom, 0px)) + 10px) !important;
         width: auto !important;
         min-height: 62px !important;
         padding: 7px !important;
@@ -15024,7 +15050,7 @@ body.theme-girl .app-footer {
     }
 
     body {
-        padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px)) !important;
     }
 }
 

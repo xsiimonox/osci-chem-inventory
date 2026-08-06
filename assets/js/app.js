@@ -4435,15 +4435,14 @@ function sanitizeFileName(value) {
 function getWarehouseAccessLabel(warehouse) {
     if (!warehouse) return 'Lager';
     const isShared = warehouse.isShared || warehouse.readOnly;
-    if (!isShared) return warehouse.remoteId ? 'Eigenes Lager' : 'Eigenes lokales Lager';
+    if (!isShared) return 'Eigenes Lager';
     const owner = warehouse.ownerEmail ? ` · von ${warehouse.ownerEmail}` : '';
     return `${warehouse.readOnly ? 'Geteiltes Lager · Nur lesen' : 'Geteiltes Lager · Schreibzugriff'}${owner}`;
 }
 
 function getWarehouseOptionLabel(warehouse) {
-    const suffix = warehouse.isShared || warehouse.readOnly
-        ? `${warehouse.readOnly ? 'Nur lesen' : 'Schreiben'}${warehouse.ownerEmail ? ` · ${warehouse.ownerEmail}` : ''}`
-        : (warehouse.remoteId ? 'Eigen' : 'Lokal');
+    if (!(warehouse.isShared || warehouse.readOnly)) return warehouse.name;
+    const suffix = `${warehouse.readOnly ? 'Nur lesen' : 'Schreiben'}${warehouse.ownerEmail ? ` · ${warehouse.ownerEmail}` : ''}`;
     return `${warehouse.name} (${suffix})`;
 }
 
@@ -4477,7 +4476,7 @@ function updateWarehouseUI() {
     if (active) {
         const isShared = active.isShared || active.readOnly;
         const accessLabel = getWarehouseAccessLabel(active);
-        const access = ` · ${accessLabel}`;
+        const access = isShared ? ` · ${accessLabel}` : '';
         const sync = active.remoteId ? ` · Sync: ${formatWarehouseDate(active.lastSyncAt)}` : '';
         const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}${sync}${access}`;
         if (meta) meta.innerText = info;
