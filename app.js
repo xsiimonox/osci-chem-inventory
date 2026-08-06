@@ -407,6 +407,8 @@ const APP_STORAGE_STATE_KEY = 'app_state';
 const APP_STORAGE_META_KEY = 'app_meta';
 const APP_STORAGE_MAX_SNAPSHOTS = 5;
 const APP_STORAGE_SENTINEL_KEY = 'reeftools_local_storage_sentinel_v1';
+const APP_STORAGE_EMERGENCY_KEY = 'reeftools_emergency_state_v1';
+const APP_STORAGE_EMERGENCY_LIMIT = 4_000_000;
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -436,6 +438,8 @@ let latestPersistAt = null;
 let latestSnapshotAt = null;
 let appBootstrapComplete = false;
 let startupStorageRecoveryCandidate = null;
+let lastPersistenceErrorAt = null;
+let lastPersistenceErrorMessage = '';
 const storagePersistenceState = {
     supported: false,
     persisted: false,
@@ -641,6 +645,42 @@ function storeStorageSentinel(savedAt, reason = 'autosave') {
     } catch (err) {}
 }
 
+function markPersistenceFailure(reason = 'autosave', error = null) {
+    lastPersistenceErrorAt = new Date().toISOString();
+    lastPersistenceErrorMessage = error?.message || String(error || 'Unbekannter Speicherfehler');
+    console.error(`ReefTools persistence failed (${reason}):`, error || lastPersistenceErrorMessage);
+}
+
+function clearPersistenceFailure() {
+    lastPersistenceErrorAt = null;
+    lastPersistenceErrorMessage = '';
+}
+
+function tryStoreEmergencyStateFallback(stateRecord) {
+    try {
+        const serialized = JSON.stringify(stateRecord);
+        if (serialized.length > APP_STORAGE_EMERGENCY_LIMIT) return false;
+        localStorage.setItem(APP_STORAGE_EMERGENCY_KEY, serialized);
+        storeStorageSentinel(stateRecord.savedAt, `${stateRecord.reason || 'autosave'}-emergency`);
+        return true;
+    } catch (err) {
+        console.error('Emergency fallback storage failed:', err);
+        return false;
+    }
+}
+
+function getEmergencyStateFallback() {
+    try {
+        const raw = localStorage.getItem(APP_STORAGE_EMERGENCY_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (err) {
+        console.error('Emergency fallback load failed:', err);
+        return null;
+    }
+}
+
 function hasCloudRestoreHint(settings = getGoogleDriveSyncSettings()) {
     return Boolean(settings.fileId || settings.lastSyncAt || settings.lastRestoreAt || settings.connectedEmail);
 }
@@ -811,6 +851,12 @@ async function loadPersistedAppState() {
         latestPersistAt = indexedValue.savedAt || indexedValue.updatedAt || null;
         return indexedValue.payload || null;
     }
+    const emergencyValue = getEmergencyStateFallback();
+    if (emergencyValue?.payload) {
+        latestPersistAt = emergencyValue.savedAt || emergencyValue.updatedAt || null;
+        startupStorageRecoveryCandidate = null;
+        return emergencyValue.payload;
+    }
     const sentinel = getStorageSentinel();
     if (sentinel?.hadLocalData || hasCloudRestoreHint()) {
         startupStorageRecoveryCandidate = {
@@ -900,7 +946,6 @@ async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     if (!appState) return false;
     const payload = prepareAppStateForStorage(appState);
     const savedAt = new Date().toISOString();
-    latestPersistAt = savedAt;
     const stateRecord = {
         key: APP_STORAGE_STATE_KEY,
         savedAt,
@@ -908,8 +953,18 @@ async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
         payload
     };
     const ok = await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY, stateRecord);
-    if (!ok) return false;
+    if (!ok) {
+        const fallbackOk = tryStoreEmergencyStateFallback(stateRecord);
+        markPersistenceFailure(reason, new Error(fallbackOk
+            ? 'IndexedDB konnte nicht schreiben. Ein kleiner Notfallstand wurde im Browser-Fallback gespeichert.'
+            : 'IndexedDB konnte nicht schreiben und der Browser-Fallback war nicht möglich.'));
+        renderStorageSecurityStatus();
+        return false;
+    }
+    latestPersistAt = savedAt;
+    clearPersistenceFailure();
     storeStorageSentinel(savedAt, reason);
+    try { localStorage.removeItem(APP_STORAGE_EMERGENCY_KEY); } catch (err) {}
     await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
         key: APP_STORAGE_META_KEY,
         lastSavedAt: savedAt,
@@ -935,8 +990,13 @@ function queuePersistAppState(reason = 'autosave', createSnapshot = false) {
     if (!appBootstrapComplete) return;
     clearTimeout(pendingPersistTimer);
     pendingPersistTimer = setTimeout(() => {
-        persistSequence = persistSequence.then(() => persistAppStateNow(reason, createSnapshot)).catch(err => {
-            console.error('Persist queue failed:', err);
+        persistSequence = persistSequence.then(async () => {
+            const ok = await persistAppStateNow(reason, createSnapshot);
+            if (!ok && appBootstrapComplete) showToast('Lokales Speichern fehlgeschlagen. Bitte Backup/Cloud prüfen.', 'warning', 4200);
+            return ok;
+        }).catch(err => {
+            markPersistenceFailure(reason, err);
+            if (appBootstrapComplete) showToast('Lokales Speichern fehlgeschlagen. Bitte Backup/Cloud prüfen.', 'warning', 4200);
         });
     }, 220);
 }
@@ -945,7 +1005,7 @@ async function flushPendingPersistence(reason = 'flush', createSnapshot = false)
     clearTimeout(pendingPersistTimer);
     pendingPersistTimer = null;
     await persistSequence.catch(() => {});
-    await persistAppStateNow(reason, createSnapshot);
+    return await persistAppStateNow(reason, createSnapshot);
 }
 
 function getGoogleDriveSyncSettings() {
@@ -1441,7 +1501,8 @@ async function restoreProjectBackupFromGoogleDrive() {
     const active = getActiveWarehouse();
     if (active) db = normalizeWarehouseData(active.data);
     overlayActiveAquariumData();
-    await persistAppStateNow('google-drive-restore', true);
+    const persisted = await persistAppStateNow('google-drive-restore', true);
+    if (!persisted) throw new Error('Cloud-Stand wurde gelesen, konnte aber auf diesem Gerät nicht sicher gespeichert werden.');
     applyTheme(db.theme || 'default', false);
     renderCurrentWarehouseViews();
     const restoredAt = new Date().toISOString();
@@ -1851,7 +1912,14 @@ async function restoreLocalSnapshot(snapshotId, ask = true) {
     const active = getActiveWarehouse();
     if (active) db = normalizeWarehouseData(active.data);
     overlayActiveAquariumData();
-    await persistAppStateNow('restore-snapshot', false);
+    const persisted = await persistAppStateNow('restore-snapshot', false);
+    if (!persisted) {
+        await appAlert('Der Wiederherstellungspunkt wurde geladen, konnte aber lokal nicht sicher gespeichert werden. Bitte erstelle sofort ein Backup oder lade den Stand in die Cloud.', {
+            title: 'Speichern fehlgeschlagen',
+            type: 'warning'
+        });
+        return;
+    }
     applyTheme(db.theme || 'default', false);
     renderCurrentWarehouseViews();
     renderStorageSecurityStatus();
@@ -1872,8 +1940,12 @@ async function restoreLatestLocalSnapshot() {
 
 async function createManualRecoveryPoint() {
     saveDB(false);
-    await persistAppStateNow('manual-snapshot', true);
-    showToast('Wiederherstellungspunkt gespeichert', 'success', 2200);
+    const persisted = await persistAppStateNow('manual-snapshot', true);
+    showToast(
+        persisted ? 'Wiederherstellungspunkt gespeichert' : 'Wiederherstellungspunkt konnte nicht sicher gespeichert werden',
+        persisted ? 'success' : 'warning',
+        persisted ? 2200 : 4200
+    );
 }
 
 async function deleteLocalSnapshot(snapshotId) {
@@ -2010,6 +2082,15 @@ async function renderStorageSecurityStatus() {
             <button class="btn-secondary btn-animated" onclick="openDataRecoveryHelp()">Wiederherstellung prüfen</button>
         </div>
     ` : '';
+    const persistenceWarning = lastPersistenceErrorMessage ? `
+        <div class="storage-recovery-warning">
+            <div>
+                <strong>Speichern konnte nicht sicher bestätigt werden</strong>
+                <span>${escapeHtml(lastPersistenceErrorMessage)}${lastPersistenceErrorAt ? ` · ${escapeHtml(formatWarehouseDate(lastPersistenceErrorAt))}` : ''}</span>
+            </div>
+            <button class="btn-secondary btn-animated" onclick="createManualRecoveryPoint()">Erneut sichern</button>
+        </div>
+    ` : '';
     const snapshotTimeline = sortedSnapshots.length
         ? `
             <details class="storage-snapshot-details">
@@ -2042,6 +2123,7 @@ async function renderStorageSecurityStatus() {
     mount.innerHTML = `
         <div class="storage-safety-status-shell">
             ${recoveryWarning}
+            ${persistenceWarning}
             <div class="storage-safety-hero ${autosaveReady ? 'is-ready' : ''}">
                 <div>
                     <strong>${autosaveReady ? 'Deine Daten werden automatisch gespeichert' : 'Die automatische Speicherung wird vorbereitet'}</strong>
@@ -2774,9 +2856,13 @@ async function initDB() {
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
     appBootstrapComplete = true;
-    await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
+    const initialPersistOk = await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
     await trimStoredSnapshots();
-    await removeLegacyLocalDbCopies();
+    if (initialPersistOk) {
+        await removeLegacyLocalDbCopies();
+    } else {
+        showToast('Lokale Daten konnten nicht sicher migriert werden. Alte Sicherung bleibt erhalten.', 'warning', 5200);
+    }
     await refreshStoragePersistenceState();
     updateWarehouseUI();
 }
@@ -2797,7 +2883,11 @@ function saveDB(markDirty = true) {
         queuePersistAppState(markDirty ? 'save' : 'save-passive', false);
         scheduleGoogleDriveAutoSync();
         scheduleSupabaseAutoSync();
-    } catch(e) {}
+    } catch(e) {
+        markPersistenceFailure('saveDB', e);
+        renderStorageSecurityStatus();
+        showToast('Speichern konnte nicht vorbereitet werden. Bitte Backup prüfen.', 'warning', 4200);
+    }
 }
 
 function addWarehouseEvent(type, text, meta = {}) {
@@ -16111,7 +16201,7 @@ function parseLegacyWarehouseInventoryText(text) {
     return entries;
 }
 
-function importLegacyWarehouseInventoryText(text, sourceName = 'TXT-Bestand') {
+async function importLegacyWarehouseInventoryText(text, sourceName = 'TXT-Bestand') {
     const entries = parseLegacyWarehouseInventoryText(text);
     if (!entries.length) {
         alert('Keine bekannten Lagerartikel im TXT-Format erkannt.');
@@ -16135,6 +16225,14 @@ function importLegacyWarehouseInventoryText(text, sourceName = 'TXT-Bestand') {
     warehouse.data = createPersistableWarehouseData(db);
     warehouse.lastImportAt = new Date().toISOString();
     saveDB();
+    const persisted = await flushPendingPersistence('import-legacy-txt', true);
+    if (!persisted) {
+        await appAlert('Der TXT-Lagerbestand wurde gelesen, konnte aber lokal nicht sicher gespeichert werden. Bitte prüfe Speicherplatz und erstelle danach erneut ein Backup.', {
+            title: 'Import nicht sicher gespeichert',
+            type: 'warning'
+        });
+        return false;
+    }
     renderCurrentWarehouseViews();
     renderStorageSecurityStatus();
     alert(`TXT-Lagerbestand in "${warehouse.name}" geladen!`);
@@ -16147,7 +16245,7 @@ function importData() {
     let file = document.getElementById('importFile').files[0];
     if (!file) return alert("Bitte wähle eine Backup-Datei aus.");
     let reader = new FileReader();
-    reader.onload = e => {
+    reader.onload = async e => {
         const rawText = typeof e.target.result === 'string' ? e.target.result : '';
         try {
             let parsed = JSON.parse(rawText);
@@ -16164,7 +16262,15 @@ function importData() {
                 const active = getActiveWarehouse();
                 if (active) db = normalizeWarehouseData(active.data);
                 overlayActiveAquariumData();
-                persistSequence = persistSequence.then(() => persistAppStateNow('import-project', true));
+                await persistSequence.catch(() => {});
+                const persisted = await persistAppStateNow('import-project', true);
+                if (!persisted) {
+                    await appAlert('Das Projekt-Backup wurde gelesen, konnte aber lokal nicht sicher gespeichert werden. Bitte prüfe Speicherplatz und erstelle danach erneut ein Backup.', {
+                        title: 'Import nicht sicher gespeichert',
+                        type: 'warning'
+                    });
+                    return;
+                }
                 applyTheme(db.theme || 'default', false);
                 renderCurrentWarehouseViews();
                 renderStorageSecurityStatus();
@@ -16180,6 +16286,14 @@ function importData() {
                 warehouse.data = createPersistableWarehouseData(db);
                 warehouse.lastImportAt = new Date().toISOString();
                 saveDB();
+                const persisted = await flushPendingPersistence('import-warehouse', true);
+                if (!persisted) {
+                    await appAlert('Das Backup wurde gelesen, konnte aber lokal nicht sicher gespeichert werden. Bitte prüfe Speicherplatz und erstelle danach erneut ein Backup.', {
+                        title: 'Import nicht sicher gespeichert',
+                        type: 'warning'
+                    });
+                    return;
+                }
                 applyTheme(db.theme || 'default', false);
                 renderCurrentWarehouseViews();
                 renderStorageSecurityStatus();
@@ -16191,7 +16305,7 @@ function importData() {
         } catch(err) {
             const fileName = file.name || 'TXT-Bestand';
             if (/\.(txt)$/i.test(fileName) || /lagerbestand\s*:|^\s*-\s*.+:\s*[-+]?\d+/im.test(rawText)) {
-                if (importLegacyWarehouseInventoryText(rawText, fileName)) return;
+                if (await importLegacyWarehouseInventoryText(rawText, fileName)) return;
             }
             alert("Fehler beim Lesen der Datei.");
         }
