@@ -2846,6 +2846,18 @@ body.theme-mint.party-mode .card {
 .storage-safety-actions {
     margin-top: 14px;
     flex-wrap: wrap;
+    gap: 8px;
+}
+
+.storage-safety-actions .btn,
+.storage-safety-actions button {
+    width: auto;
+    min-width: 0;
+    min-height: 40px;
+    padding-inline: 12px;
+    font-size: 0.86rem;
+    line-height: 1.15;
+    white-space: normal;
 }
 
 .storage-safety-note {
@@ -3058,6 +3070,11 @@ body.theme-mint.party-mode .card {
 .storage-snapshot-actions button {
     width: auto;
     min-width: 120px;
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 0.82rem;
+    line-height: 1.1;
+    white-space: nowrap;
 }
 .storage-snapshot-empty {
     margin-top: 12px;
@@ -3342,36 +3359,102 @@ body.theme-mint.party-mode .card {
     .storage-safety-hero {
         flex-direction: column;
         align-items: flex-start;
+        padding: 12px;
     }
 
     .storage-recovery-warning {
         grid-template-columns: 1fr;
+        padding: 12px;
     }
 
     .storage-recovery-warning button {
         width: 100%;
+        min-height: 38px;
+        font-size: 0.82rem;
     }
 
     .storage-safety-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .storage-safety-status-card {
+        padding: 10px;
+        border-radius: 12px;
+    }
+
+    .storage-safety-status-card small {
+        font-size: 0.64rem;
+    }
+
+    .storage-safety-status-card strong {
+        font-size: 0.84rem;
+    }
+
+    .storage-safety-status-card span {
+        font-size: 0.7rem;
+        line-height: 1.25;
+    }
+
+    .storage-safety-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .storage-safety-actions .btn,
+    .storage-safety-actions button {
+        width: 100%;
+        min-height: 38px;
+        padding: 6px 8px;
+        font-size: clamp(0.68rem, 2.9vw, 0.78rem);
+        line-height: 1.08;
     }
 
     .storage-snapshot-item {
         grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px;
     }
 
     .storage-snapshot-head {
-        align-items: flex-start;
-        flex-direction: column;
+        align-items: center;
+        flex-direction: row;
+        gap: 6px;
+    }
+
+    .storage-snapshot-head strong {
+        font-size: 0.78rem;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .storage-snapshot-head span {
+        padding: 4px 6px;
+        font-size: 0.62rem;
+    }
+
+    .storage-snapshot-copy small {
+        font-size: 0.68rem;
+        line-height: 1.25;
     }
 
     .storage-snapshot-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         justify-content: stretch;
+        gap: 8px;
     }
 
     .storage-snapshot-actions button {
         width: 100%;
         min-width: 0;
+        min-height: 36px;
+        padding: 5px 7px;
+        font-size: clamp(0.66rem, 2.8vw, 0.76rem);
+        white-space: normal;
     }
 
     .google-drive-status-hero {
@@ -13327,7 +13410,7 @@ textarea[readonly] {
 
 #lager-container {
     display: grid;
-    gap: var(--space-5);
+    gap: var(--space-4);
 }
 .inventory-category-section { min-width: 0; }
 .inventory-category-section .category-title {
@@ -13337,16 +13420,16 @@ textarea[readonly] {
 }
 .inventory-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
-    gap: var(--space-3);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 275px), 1fr));
+    gap: var(--space-2);
 }
 .inventory-card {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
+    gap: 8px;
     margin: 0;
-    padding: var(--space-4);
-    border-radius: var(--radius-md);
+    padding: 12px;
+    border-radius: var(--radius-sm);
     background: var(--surface-card);
     box-shadow: none;
 }
@@ -13359,25 +13442,27 @@ textarea[readonly] {
 .inventory-stock-row {
     display: flex;
     justify-content: space-between;
-    gap: var(--space-3);
+    gap: 8px;
     align-items: flex-start;
 }
 .inventory-product-copy { min-width: 0; }
 .inventory-product-copy h3 {
     margin: 3px 0 0;
     color: var(--text-primary);
-    font-size: 1rem;
-    line-height: 1.35;
-    overflow-wrap: anywhere;
+    font-size: clamp(0.86rem, 1.2vw, 0.98rem);
+    line-height: 1.18;
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: auto;
 }
 .inventory-card-tools { display: flex; gap: 4px; flex: 0 0 auto; }
 .inventory-card .threshold-btn {
     display: grid;
     place-items: center;
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 32px;
+    min-height: 32px;
     margin: 0;
-    padding: 0 var(--space-2);
+    padding: 0 8px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     background: var(--surface-raised);
@@ -13391,40 +13476,49 @@ textarea[readonly] {
     padding: 0;
     background: transparent;
     color: var(--text-primary);
-    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    font-size: clamp(1.08rem, 2.1vw, 1.42rem);
     font-weight: 850;
     font-variant-numeric: tabular-nums;
     line-height: 1.15;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
+    word-break: normal;
 }
-.inventory-stock-value small { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.inventory-stock-value small { color: var(--text-secondary); font-size: 0.74rem; font-variant-numeric: tabular-nums; }
 .inventory-status { flex: 0 0 auto; }
 .inventory-facts {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-2);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
     margin: 0;
 }
 .inventory-facts div {
     min-width: 0;
-    padding: var(--space-2);
+    padding: 7px 8px;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
     background: var(--surface-raised);
 }
-.inventory-facts dt { color: var(--text-secondary); font-size: 0.7rem; }
+.inventory-facts dt { color: var(--text-secondary); font-size: 0.66rem; }
 .inventory-facts dd {
-    margin: 3px 0 0;
+    margin: 2px 0 0;
     color: var(--text-primary);
-    font-size: 0.8rem;
+    font-size: 0.74rem;
     font-weight: 750;
     font-variant-numeric: tabular-nums;
-    overflow-wrap: anywhere;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 .inventory-hints { display: grid; gap: 3px; }
-.inventory-hints .item-hint { margin: 0; }
+.inventory-hints .item-hint { margin: 0; font-size: 0.72rem; line-height: 1.22; }
 .inventory-card-actions { margin-top: auto; padding-top: var(--space-1); }
-.inventory-card-actions .btn { min-width: 0; }
+.inventory-card-actions .btn {
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 0.82rem;
+    line-height: 1.1;
+}
 .warehouse-empty-state { margin: 0; }
 
 @media (max-width: 767px) {
@@ -13432,15 +13526,26 @@ textarea[readonly] {
     .warehouse-page-head {
         align-items: stretch;
         flex-direction: column;
-        padding-top: var(--space-2);
+        gap: 8px;
+        padding: 6px 0 10px;
+    }
+    .warehouse-page-head p,
+    .warehouse-page-head .osci-system-note {
+        display: none;
     }
     .dashboard-hero-actions,
     .warehouse-head-actions {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
     }
     .dashboard-hero-actions .btn,
-    .warehouse-head-actions .btn { width: 100%; }
+    .warehouse-head-actions .btn {
+        width: 100%;
+        min-height: 36px;
+        padding: 6px 10px;
+        font-size: 0.82rem;
+    }
     .dashboard-status-line { display: grid; grid-template-columns: 1fr 1fr; }
     .dashboard-status-line strong { grid-column: 1 / -1; }
     .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -13455,15 +13560,117 @@ textarea[readonly] {
     .dashboard-edit-actions { display: grid; grid-template-columns: 1fr 1fr; }
     .dashboard-edit-actions .btn { width: 100%; }
     .dashboard-edit-actions .btn:last-child { grid-column: 1 / -1; }
-    .warehouse-control-head { display: flex; align-items: flex-start; }
+    .warehouse-control-card {
+        padding: 10px;
+    }
+    .warehouse-control-head {
+        display: none;
+    }
     .warehouse-switcher { grid-template-columns: minmax(0, 1fr) 46px 46px 46px; }
-    .lager-toolbar { display: grid; gap: var(--space-3); }
+    .warehouse-switcher select,
+    .warehouse-switcher button {
+        min-height: 36px;
+        height: 36px;
+        font-size: 0.78rem;
+    }
+    .warehouse-meta {
+        margin-top: 6px;
+        font-size: 0.68rem;
+        line-height: 1.25;
+    }
+    .warehouse-filter-panel {
+        padding: 10px;
+    }
+    .lager-toolbar {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+    }
     .toolbar-divider { display: none; }
-    .toolbar-field { width: 100%; grid-template-columns: 1fr; gap: 5px; }
-    .warehouse-filter-foot { align-items: stretch; flex-direction: column; }
+    .toolbar-field { width: 100%; grid-template-columns: 1fr; gap: 0; }
+    .toolbar-field label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+    }
+    .search-input,
+    .filter-select {
+        height: 38px;
+        min-height: 38px;
+        font-size: 0.8rem;
+    }
+    .warehouse-filter-foot {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+    .lager-filter-chips {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+    }
+    .lager-filter-chips button {
+        min-height: 32px;
+        padding: 4px 6px;
+        font-size: 0.72rem;
+    }
     .warehouse-filter-result { justify-content: space-between; white-space: normal; }
+    .warehouse-filter-result,
+    .warehouse-filter-result .btn {
+        font-size: 0.72rem;
+    }
+    .warehouse-filter-result .btn {
+        min-height: 32px;
+        padding: 4px 8px;
+    }
     .inventory-card-grid { grid-template-columns: 1fr; }
-    .inventory-facts { grid-template-columns: 1fr 1fr; }
+    #lager-container { gap: var(--space-3); }
+    .inventory-category-section .category-title {
+        margin-bottom: 8px;
+        font-size: 0.9rem;
+    }
+    .inventory-card-grid { gap: 8px; }
+    .inventory-card {
+        gap: 6px;
+        padding: 9px 10px;
+    }
+    .inventory-product-copy h3 {
+        font-size: 0.88rem;
+        line-height: 1.16;
+    }
+    .inventory-category {
+        font-size: 0.62rem;
+    }
+    .inventory-card .threshold-btn {
+        min-width: 30px;
+        min-height: 30px;
+        font-size: 0.68rem;
+    }
+    .inventory-stock-value .stock {
+        font-size: 1.1rem;
+    }
+    .inventory-status {
+        padding: 4px 7px;
+        font-size: 0.64rem;
+    }
+    .inventory-facts { display: none; }
+    .inventory-hints {
+        display: none;
+    }
+    .product-history { display: none; }
+    .inventory-card-actions {
+        padding-top: 0;
+        gap: 6px;
+    }
+    .inventory-card-actions .btn {
+        min-height: 32px;
+        padding: 4px 8px;
+        font-size: 0.74rem;
+    }
     .inventory-card-actions { display: grid; grid-template-columns: 1fr 1fr; }
     .inventory-card-actions .btn { width: 100%; }
 }
@@ -13476,8 +13683,12 @@ textarea[readonly] {
     .dashboard-tile small { font-size: 0.76rem; }
     .warehouse-control-head { flex-direction: column; }
     .warehouse-switcher { grid-template-columns: minmax(0, 1fr) repeat(3, 42px); gap: 6px; }
-    .inventory-card { padding: var(--space-3); }
-    .inventory-facts { grid-template-columns: 1fr; }
+    .inventory-card { padding: 9px; }
+    .inventory-facts { display: none; }
+    .storage-safety-grid,
+    .storage-safety-actions {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

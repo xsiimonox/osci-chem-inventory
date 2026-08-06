@@ -405,6 +405,7 @@ const APP_STORAGE_STATE_STORE = 'state';
 const APP_STORAGE_SNAPSHOT_STORE = 'snapshots';
 const APP_STORAGE_STATE_KEY = 'app_state';
 const APP_STORAGE_META_KEY = 'app_meta';
+const APP_STORAGE_HEALTHCHECK_KEY = 'storage_healthcheck';
 const APP_STORAGE_MAX_SNAPSHOTS = 5;
 const APP_STORAGE_SENTINEL_KEY = 'reeftools_local_storage_sentinel_v1';
 const APP_STORAGE_EMERGENCY_KEY = 'reeftools_emergency_state_v1';
@@ -440,6 +441,7 @@ let appBootstrapComplete = false;
 let startupStorageRecoveryCandidate = null;
 let lastPersistenceErrorAt = null;
 let lastPersistenceErrorMessage = '';
+let lastStorageHealthCheck = null;
 const storagePersistenceState = {
     supported: false,
     persisted: false,
@@ -822,6 +824,41 @@ async function idbDelete(storeName, key) {
         console.error(err);
         return false;
     });
+}
+
+async function runStorageHealthCheck(showFeedback = true) {
+    const checkedAt = new Date().toISOString();
+    const testPayload = {
+        key: APP_STORAGE_HEALTHCHECK_KEY,
+        checkedAt,
+        random: Math.random().toString(36).slice(2),
+        version: getCurrentAppVersion?.() || ''
+    };
+    const writeOk = await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_HEALTHCHECK_KEY, testPayload);
+    const readBack = writeOk ? await idbGet(APP_STORAGE_STATE_STORE, APP_STORAGE_HEALTHCHECK_KEY) : null;
+    const readOk = Boolean(readBack && readBack.random === testPayload.random && readBack.checkedAt === checkedAt);
+    const deleteOk = readOk ? await idbDelete(APP_STORAGE_STATE_STORE, APP_STORAGE_HEALTHCHECK_KEY) : false;
+    lastStorageHealthCheck = {
+        checkedAt,
+        ok: Boolean(writeOk && readOk && deleteOk),
+        writeOk,
+        readOk,
+        deleteOk
+    };
+    if (!lastStorageHealthCheck.ok) {
+        markPersistenceFailure('storage-healthcheck', new Error('Der Browser-Speichertest war nicht vollständig erfolgreich.'));
+    } else {
+        clearPersistenceFailure();
+    }
+    renderStorageSecurityStatus();
+    if (showFeedback) {
+        showToast(
+            lastStorageHealthCheck.ok ? 'Speichertest erfolgreich' : 'Speichertest fehlgeschlagen. Bitte Backup/Cloud prüfen.',
+            lastStorageHealthCheck.ok ? 'success' : 'warning',
+            lastStorageHealthCheck.ok ? 2400 : 5200
+        );
+    }
+    return lastStorageHealthCheck;
 }
 
 async function idbGetAllSnapshots() {
@@ -1414,6 +1451,76 @@ function buildProjectBackupPayload() {
     };
 }
 
+function validateWarehouseBackupData(data = {}) {
+    const errors = [];
+    const warnings = [];
+    if (!data || typeof data !== 'object') {
+        errors.push('Backup-Daten fehlen oder sind beschädigt.');
+        return { ok: false, errors, warnings };
+    }
+    if (!data.inventory || typeof data.inventory !== 'object' || Array.isArray(data.inventory)) {
+        errors.push('Lagerbestand fehlt.');
+    }
+    if (data.logs !== undefined && !Array.isArray(data.logs)) warnings.push('Protokoll ist nicht als Liste gespeichert.');
+    if (data.stats !== undefined && (typeof data.stats !== 'object' || Array.isArray(data.stats))) warnings.push('Statistikdaten haben ein ungewöhnliches Format.');
+    return { ok: errors.length === 0, errors, warnings };
+}
+
+function validateProjectBackupPayload(payload = {}) {
+    const errors = [];
+    const warnings = [];
+    if (!payload || typeof payload !== 'object') {
+        errors.push('Backup ist kein gültiges Objekt.');
+        return { ok: false, errors, warnings };
+    }
+    const data = payload.type === 'osci_project_backup' ? payload.data : payload;
+    if (!data || typeof data !== 'object') {
+        errors.push('Projektdaten fehlen.');
+        return { ok: false, errors, warnings };
+    }
+    if (!data.warehouses || typeof data.warehouses !== 'object' || Array.isArray(data.warehouses)) {
+        errors.push('Lagerliste fehlt.');
+    }
+    if (!data.aquariums || typeof data.aquariums !== 'object' || Array.isArray(data.aquariums)) {
+        errors.push('Aquarienliste fehlt.');
+    }
+    const warehouses = Object.entries(data.warehouses || {});
+    if (!warehouses.length) errors.push('Es ist kein Lager im Backup enthalten.');
+    warehouses.forEach(([id, warehouse]) => {
+        if (!warehouse || typeof warehouse !== 'object') {
+            errors.push(`Lager "${id}" ist beschädigt.`);
+            return;
+        }
+        const result = validateWarehouseBackupData(warehouse.data || {});
+        if (!result.ok) errors.push(...result.errors.map(error => `Lager "${warehouse.name || id}": ${error}`));
+        warnings.push(...result.warnings.map(warning => `Lager "${warehouse.name || id}": ${warning}`));
+    });
+    const aquariums = Object.entries(data.aquariums || {});
+    if (!aquariums.length) warnings.push('Es ist kein Aquarium im Backup enthalten. Die App kann ein Standard-Aquarium erzeugen.');
+    aquariums.forEach(([id, aquarium]) => {
+        if (!aquarium || typeof aquarium !== 'object') {
+            warnings.push(`Aquarium "${id}" hat ein ungewöhnliches Format.`);
+            return;
+        }
+        const aquariumData = aquarium.data || {};
+        if (aquariumData.measurementEntries !== undefined && !Array.isArray(aquariumData.measurementEntries)) {
+            warnings.push(`Aquarium "${aquarium.name || id}": Messwerte sind nicht als Liste gespeichert.`);
+        }
+        if (aquariumData.logBookEntries !== undefined && !Array.isArray(aquariumData.logBookEntries)) {
+            warnings.push(`Aquarium "${aquarium.name || id}": Logbuch ist nicht als Liste gespeichert.`);
+        }
+    });
+    return { ok: errors.length === 0, errors, warnings };
+}
+
+function formatBackupValidationMessage(validation) {
+    if (!validation) return '';
+    const parts = [];
+    if (validation.errors?.length) parts.push(`Fehler:\n- ${validation.errors.join('\n- ')}`);
+    if (validation.warnings?.length) parts.push(`Hinweise:\n- ${validation.warnings.slice(0, 8).join('\n- ')}${validation.warnings.length > 8 ? '\n- ...' : ''}`);
+    return parts.join('\n\n');
+}
+
 async function findGoogleDriveBackupFileId() {
     const metadata = await fetchGoogleDriveBackupMetadata();
     return metadata?.id || '';
@@ -1492,6 +1599,10 @@ async function restoreProjectBackupFromGoogleDrive() {
     const parsed = await response.json();
     if (!parsed || parsed.type !== 'osci_project_backup' || !parsed.data) {
         throw new Error('Die Google-Backup-Datei hat kein gültiges OSCI Projektformat.');
+    }
+    const validation = validateProjectBackupPayload(parsed);
+    if (!validation.ok) {
+        throw new Error(`Cloud-Backup ist unvollständig oder beschädigt.\n${formatBackupValidationMessage(validation)}`);
     }
     appState = migrateToWarehouseState(parsed.data);
     activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
@@ -2073,6 +2184,12 @@ async function renderStorageSecurityStatus() {
     const persistenceLabel = !storagePersistenceState.supported
         ? 'nicht prüfbar'
         : storagePersistenceState.persisted ? 'geschützt' : 'normal';
+    const healthLabel = !lastStorageHealthCheck
+        ? 'noch nicht geprüft'
+        : lastStorageHealthCheck.ok ? 'bestanden' : 'prüfen';
+    const healthDetail = !lastStorageHealthCheck
+        ? 'Schreib-/Lesetest kann manuell gestartet werden.'
+        : `${formatWarehouseDate(lastStorageHealthCheck.checkedAt)} · Schreiben ${lastStorageHealthCheck.writeOk ? 'OK' : 'Fehler'} · Lesen ${lastStorageHealthCheck.readOk ? 'OK' : 'Fehler'} · Löschen ${lastStorageHealthCheck.deleteOk ? 'OK' : 'Fehler'}`;
     const recoveryWarning = startupStorageRecoveryCandidate ? `
         <div class="storage-recovery-warning">
             <div>
@@ -2153,6 +2270,11 @@ async function renderStorageSecurityStatus() {
                     <span>Verfügbar: ${escapeHtml(quotaLabel)}</span>
                 </div>
                 <div class="storage-safety-status-card">
+                    <small>Speichertest</small>
+                    <strong>${escapeHtml(healthLabel)}</strong>
+                    <span>${escapeHtml(healthDetail)}</span>
+                </div>
+                <div class="storage-safety-status-card">
                     <small>Sicherungspunkte</small>
                     <strong>${snapshots.length}</strong>
                     <span>Maximal 5 manuelle oder wichtige Import-/Cloud-Punkte. Letzter Punkt: ${escapeHtml(snapshotText)}</span>
@@ -2170,6 +2292,7 @@ Object.assign(window, {
     createManualRecoveryPoint,
     clearLocalSnapshots,
     requestPersistentAppStorage,
+    runStorageHealthCheck,
     openDataRecoveryHelp
 });
 
@@ -6590,6 +6713,24 @@ function getActiveTabId() {
     return activeTab ? activeTab.id : 'unbekannt';
 }
 
+function buildSafeDiagnosticSummary() {
+    const settings = getGoogleDriveSyncSettings();
+    const storageEstimate = storagePersistenceState.estimate || {};
+    return [
+        `Speicherstatus: ${lastPersistenceErrorMessage ? 'Fehler' : 'OK'}`,
+        `Letzter Speicherfehler: ${lastPersistenceErrorMessage || '-'}`,
+        `Letzter Speicherfehler-Zeitpunkt: ${lastPersistenceErrorAt ? formatWarehouseDate(lastPersistenceErrorAt) : '-'}`,
+        `Letzter Speichertest: ${lastStorageHealthCheck ? `${lastStorageHealthCheck.ok ? 'OK' : 'Fehler'} am ${formatWarehouseDate(lastStorageHealthCheck.checkedAt)}` : '-'}`,
+        `IndexedDB-Speicherung: ${latestPersistAt ? formatWarehouseDate(latestPersistAt) : '-'}`,
+        `Browserschutz: ${storagePersistenceState.persisted ? 'aktiv' : 'normal/nicht aktiv'}`,
+        `Speicherverbrauch: ${formatBytesForStorage(storageEstimate.usage)} von ${formatBytesForStorage(storageEstimate.quota)}`,
+        `Cloud Status: ${hasValidGoogleDriveToken() ? 'online' : 'offline'}`,
+        `Cloud Auto-Sync: ${settings.autoSync ? 'an' : 'aus'}`,
+        `Cloud letzter Sync: ${settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : '-'}`,
+        `Updateprüfung: ${appUpdateState.latestVersion || '-'} / ${appUpdateState.lastCheckedAt ? formatWarehouseDate(appUpdateState.lastCheckedAt) : '-'}`
+    ];
+}
+
 function sendBugReport() {
     const descriptionEl = document.getElementById('bugReportDescription');
     const stepsEl = document.getElementById('bugReportSteps');
@@ -6604,7 +6745,7 @@ function sendBugReport() {
 
     const appVersion = document.querySelector('.version-badge')?.innerText || 'unbekannt';
     const body = [
-        'Bugmeldung OSCI Lager App',
+        'Bugmeldung ReefTools',
         '',
         'Fehlerbeschreibung:',
         description,
@@ -6620,11 +6761,12 @@ function sendBugReport() {
         `URL: ${window.location.href}`,
         `Zeitpunkt: ${new Date().toLocaleString('de-DE')}`,
         `Browser: ${navigator.userAgent}`,
+        ...buildSafeDiagnosticSummary(),
         '',
         'Hinweis: Diese Meldung enthält keine Lagerbestände oder Backup-Daten.'
     ].join('\n');
 
-    const subject = `Bugmeldung OSCI Lager App ${appVersion}`;
+    const subject = `Bugmeldung ReefTools ${appVersion}`;
     window.location.href = `mailto:simon@asbach.tech?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }
 
@@ -7529,7 +7671,7 @@ function renderProductCard(cat, item) {
     let warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
     let alertsDisabled = db.alerts && db.alerts.disabled && db.alerts.disabled[item];
     let warningClass = (!alertsDisabled && ((stock <= threshold && threshold > 0) || (stock <= 0 && metrics.totalConsumed > 0) || (weeksLeft !== null && weeksLeft <= warningWeeks))) ? 'card-warning' : '';
-    let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Warnschwelle: ${threshold} ${getUnitLabel(getItemUnit(item))}</span>` : '';
+    let thresholdHint = threshold > 0 ? `<span class="item-hint danger-text">Limit: ${formatItemAmount(item, threshold)}</span>` : '';
     let disabledHint = alertsDisabled ? `<span class="item-hint">Warnmeldungen deaktiviert</span>` : '';
     let prognosisHint = `<span class="item-hint">Reichweite: ${reachText}</span>`;
     let favorite = isFavoriteProduct(item);
@@ -7575,9 +7717,8 @@ function renderProductCard(cat, item) {
             ${crossHint}
             <dl class="inventory-facts">
                 <div><dt>Reichweite</dt><dd>${reachText}</dd></div>
-                <div><dt>Warnschwelle</dt><dd>${thresholdText}</dd></div>
-                <div><dt>Lager</dt><dd>${escapeHtml(warehouse?.name || 'Lager')}</dd></div>
-                <div><dt>Letzte Änderung</dt><dd>${latestLog ? formatWarehouseDate(getLogTime(latestLog)) : 'Noch keine Buchung'}</dd></div>
+                <div><dt>Limit</dt><dd>${thresholdText}</dd></div>
+                <div><dt>Letzte Buchung</dt><dd>${latestLog ? formatWarehouseDate(getLogTime(latestLog)) : 'keine'}</dd></div>
             </dl>
             <div class="inventory-hints">${prognosisHint}${thresholdHint}${disabledHint}</div>
             <details class="product-history">
@@ -16005,12 +16146,27 @@ function formatBackupFileTimestamp(value = new Date().toISOString()) {
     return `${safeDate.getFullYear()}-${pad(safeDate.getMonth() + 1)}-${pad(safeDate.getDate())}_${pad(safeDate.getHours())}-${pad(safeDate.getMinutes())}`;
 }
 
+function getSerializedSizeBytes(value) {
+    try {
+        const serialized = JSON.stringify(value);
+        if (typeof Blob !== 'undefined') return new Blob([serialized]).size;
+        return serialized.length;
+    } catch (err) {
+        return 0;
+    }
+}
+
 async function exportData() {
     showToast('Backup wird vorbereitet ...', 'info', 1800);
     const payload = await optimizeProjectBackupPayload(buildProjectBackupPayload());
     saveDB();
 
-    let blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+    const backupJson = JSON.stringify(payload, null, 2);
+    const backupSize = getSerializedSizeBytes(payload);
+    if (backupSize > 8 * 1024 * 1024) {
+        showToast('Backup ist sehr groß. Viele Fotos können Import und Cloud-Sync verlangsamen.', 'warning', 5200);
+    }
+    let blob = new Blob([backupJson], { type: "application/json;charset=utf-8" });
     let a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `ReefTools_Backup_${formatBackupFileTimestamp(payload.exportedAt)}.json`;
@@ -16253,6 +16409,14 @@ function importData() {
             const importPayload = isProjectBackup ? parsed.data : (parsed && parsed.type === 'osci_warehouse_backup' ? parsed.data : parsed);
             const sourceName = parsed && (parsed.warehouseName || parsed.app) ? (parsed.warehouseName || parsed.app) : 'Backup';
             if (isProjectBackup && importPayload && importPayload.warehouses && importPayload.aquariums) {
+                const validation = validateProjectBackupPayload(parsed);
+                if (!validation.ok) {
+                    await appAlert(`Dieses Projekt-Backup kann nicht sicher importiert werden.\n\n${formatBackupValidationMessage(validation)}`, {
+                        title: 'Backup beschädigt',
+                        type: 'warning'
+                    });
+                    return;
+                }
                 if (!confirm(`Projekt-Backup "${sourceName}" komplett wiederherstellen? Der aktuelle Stand dieses Geräts wird dadurch ersetzt.`)) return;
                 appState = migrateToWarehouseState(importPayload);
                 activeWarehouseId = importPayload.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
@@ -16280,6 +16444,14 @@ function importData() {
                 return;
             }
             if(importPayload && importPayload.inventory) {
+                const validation = validateWarehouseBackupData(importPayload);
+                if (!validation.ok) {
+                    await appAlert(`Dieses Lager-Backup kann nicht sicher importiert werden.\n\n${formatBackupValidationMessage(validation)}`, {
+                        title: 'Backup beschädigt',
+                        type: 'warning'
+                    });
+                    return;
+                }
                 const warehouse = getActiveWarehouse();
                 if (!confirm(`Backup "${sourceName}" in das aktuell ausgewählte Lager "${warehouse.name}" importieren? Dieses Lager wird dadurch ersetzt.`)) return;
                 db = normalizeWarehouseData(importPayload);

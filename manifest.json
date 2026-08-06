@@ -1,10 +1,15 @@
 {
   "name": "Reef.Storage&Tools",
   "short_name": "ReefTools",
+  "description": "Lager, C&R, Trace, Wasserwerte, Logbuch und Werkzeuge für Meerwasseraquarien.",
+  "id": "./",
   "start_url": "index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#07151b",
   "theme_color": "#0b2028",
+  "categories": ["utilities", "productivity", "lifestyle"],
   "icons": [
     {
       "src": "icon.png",

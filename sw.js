@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v324-speicherschutz';
+const CACHE_NAME = 'reef-storage-tools-cache-v327-release';
 const ASSETS = [
   './',
   './index.html',
@@ -28,7 +28,9 @@ const ASSETS = [
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
+      ASSETS.map((asset) => cache.add(asset))
+    ))
   );
   self.skipWaiting();
 });
@@ -68,7 +70,10 @@ self.addEventListener('fetch', (e) => {
   }
 
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request))
+    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => {
+      if (e.request.mode === 'navigate') return caches.match('./index.html');
+      return new Response('', { status: 503, statusText: 'Offline' });
+    }))
   );
 });
 
