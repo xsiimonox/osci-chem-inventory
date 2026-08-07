@@ -813,91 +813,6 @@ body.menu-open .mobile-bottom-nav {
     background: rgba(191,90,242,0.14);
     box-shadow: 0 10px 24px rgba(191,90,242,0.14);
 }
-.dashboard-onboarding {
-    display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.6fr) auto;
-    align-items: stretch;
-    gap: 12px;
-    margin-bottom: 14px;
-    padding: 14px;
-    border: 1px solid rgba(100,210,255,0.28);
-    border-radius: 14px;
-    background: rgba(100,210,255,0.07);
-}
-
-.dashboard-onboarding-head {
-    display: grid;
-    align-content: center;
-    gap: 4px;
-    min-width: 0;
-}
-
-.dashboard-onboarding p {
-    margin: 0;
-    color: var(--text-muted);
-    line-height: 1.35;
-}
-
-.dashboard-onboarding-steps {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.dashboard-onboarding button {
-    background: rgba(255,255,255,0.06);
-    color: var(--text);
-    border: 1px solid var(--border);
-}
-
-.dashboard-onboarding-step {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 2px 8px;
-    align-content: center;
-    min-height: 74px;
-    padding: 10px 12px;
-    text-align: left;
-}
-
-.dashboard-onboarding-step span {
-    grid-row: span 2;
-    display: inline-grid;
-    place-items: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 22%, transparent);
-    color: var(--accent);
-    font-size: 0.84rem;
-    font-weight: 900;
-}
-
-.dashboard-onboarding-step strong,
-.dashboard-onboarding-step small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.dashboard-onboarding-step strong {
-    font-size: 0.88rem;
-}
-
-.dashboard-onboarding-step small {
-    color: var(--text-muted);
-    font-size: 0.74rem;
-    line-height: 1.25;
-}
-
-.dashboard-onboarding-actions {
-    display: grid;
-    align-items: stretch;
-}
-
-.dashboard-onboarding-actions .btn {
-    min-width: 112px;
-}
 .dashboard-actions button,
 .dashboard-next button {
     background: rgba(255,255,255,0.06);
@@ -3152,11 +3067,56 @@ body.theme-mint.party-mode .card {
     line-height: 1.45;
 }
 
+.data-safety-card,
 .backup-project-card {
     border: 1px solid rgba(255,255,255,0.08);
     background:
         linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015)),
         rgba(255,255,255,0.015);
+}
+
+.data-safety-card {
+    display: grid;
+    gap: 14px;
+}
+
+.data-safety-sections {
+    display: grid;
+    gap: 12px;
+}
+
+.data-safety-section {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, var(--border-color) 88%, transparent);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--surface-raised) 32%, transparent);
+}
+
+.data-safety-section-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.data-safety-section-head strong,
+.data-safety-section-head small {
+    display: block;
+}
+
+.data-safety-section-head strong {
+    color: var(--text-primary);
+    font-size: 0.98rem;
+}
+
+.data-safety-section-head small {
+    margin-top: 3px;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    line-height: 1.35;
 }
 
 .backup-project-actions {
@@ -3188,9 +3148,8 @@ body.theme-mint.party-mode .card {
     box-shadow: 0 14px 34px rgba(0, 0, 0, 0.12);
 }
 
-.google-drive-sync-title {
+.google-drive-sync-card .data-safety-section-head strong {
     color: var(--success);
-    margin-bottom: 6px;
 }
 
 .google-drive-sync-actions {
@@ -11614,29 +11573,10 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     .dashboard-grid,
     .dashboard-actions,
     .dashboard-panels,
-    .dashboard-onboarding,
     .dashboard-measurements-grid,
     .coral-layout,
     .coral-hero-card {
         grid-template-columns: 1fr;
-    }
-    .dashboard-onboarding {
-        display: grid;
-        grid-template-columns: 1fr;
-        align-items: stretch;
-    }
-
-    .dashboard-onboarding-steps {
-        grid-template-columns: 1fr;
-    }
-
-    .dashboard-onboarding-step {
-        min-height: 64px;
-    }
-
-    .dashboard-onboarding-actions .btn {
-        width: 100%;
-        min-width: 0;
     }
     .dashboard-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));

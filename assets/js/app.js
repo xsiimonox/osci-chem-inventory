@@ -4865,31 +4865,6 @@ function renderDashboard() {
             <span>${escapeHtml(type.label)}</span>
         </label>
     `).join('');
-    const onboardingSteps = [
-        { label: 'Lager prüfen', text: 'Produkte, Warnschwellen und Bestände kontrollieren.', action: "selectTab('lager')" },
-        { label: 'Aquarium festlegen', text: 'Becken für Logbuch, ToDos und Messwerte auswählen.', action: "selectTab('logbuch')" },
-        { label: 'Daten sichern', text: 'Speicherschutz, Backup oder Cloud prüfen.', action: "openDataRecoveryCenter()" }
-    ];
-    const onboarding = db.onboardingDone ? '' : `
-        <section class="dashboard-onboarding dashboard-attention" aria-label="Ersteinrichtung">
-            <div class="dashboard-onboarding-head">
-                <strong>Ersteinrichtung</strong>
-                <p>Richte ReefTools einmal sauber ein, damit Lager, Aquarium und Sicherung später zuverlässig laufen.</p>
-            </div>
-            <div class="dashboard-onboarding-steps">
-                ${onboardingSteps.map((step, index) => `
-                    <button type="button" class="dashboard-onboarding-step" onclick="${step.action}">
-                        <span>${index + 1}</span>
-                        <strong>${escapeHtml(step.label)}</strong>
-                        <small>${escapeHtml(step.text)}</small>
-                    </button>
-                `).join('')}
-            </div>
-            <div class="dashboard-onboarding-actions">
-                <button type="button" class="btn btn-primary" onclick="finishOnboarding()">Erledigt</button>
-            </div>
-        </section>
-    `;
     container.innerHTML = `
         <section class="dashboard-hero dashboard-page-head">
             <div>
@@ -4909,8 +4884,6 @@ function renderDashboard() {
             <span>${alerts.length} Bestandswarnung(en)</span>
             <span>${dueTodos.length} fällige ToDo(s)</span>
         </section>` : ''}
-
-        ${onboarding}
 
         <div class="card aquarium-workspace-panel dashboard-aquarium-panel" id="dashboardAquariumPanel"></div>
 
@@ -5045,12 +5018,6 @@ function renderDashboard() {
         </section>` : ''}
     `;
     renderAquariumWorkspacePanels();
-}
-
-function finishOnboarding() {
-    db.onboardingDone = true;
-    saveDB();
-    renderDashboard();
 }
 
 function formatDashboardDateParts(value) {
@@ -6110,8 +6077,7 @@ function setupSettingsAccordions() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Cloud', hint: 'Google Drive und geräteübergreifende Sicherung', keywords: 'google drive sync cloud upload download wiederherstellen' };
-    if (/datenrettung|datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Speicherstatus, Wiederherstellung, Import und Export', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal' };
+    if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
     if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
     if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
@@ -6143,7 +6109,7 @@ function applySettingsMetadata(card, title) {
 
 function renderSettingsGroupLabels(settings) {
     settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
-    const groupOrder = ['Allgemein', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Cloud', 'Sicherung', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
+    const groupOrder = ['Allgemein', 'Datensicherheit', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
     const cards = Array.from(settings.querySelectorAll(':scope > .card'));
     cards.sort((a, b) => {
         const aIndex = groupOrder.indexOf(a.dataset.settingsGroup || 'Weitere');
