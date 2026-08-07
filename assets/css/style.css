@@ -17012,3 +17012,21 @@ progress.mini-progress::-moz-progress-bar {
         line-height: 1.4;
     }
 }
+
+/* Desktop side navigation: keep labels cleanly left aligned. */
+@media (min-width: 1024px) {
+    #main-nav .nav-links button {
+        display: flex !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        text-align: left !important;
+        gap: 12px;
+        padding-left: 18px !important;
+        padding-right: 14px !important;
+    }
+
+    #main-nav .nav-links button span,
+    #main-nav .nav-links button strong {
+        text-align: left !important;
+    }
+}
