@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.3.5-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.3.6-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.3.5</span>
+                    <span class="version-badge">v3.3.6</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1376,9 +1376,9 @@
                 <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
             </section>
 
-            <div class="card sync-disabled-card storage-safety-card">
-                <h3 class="storage-safety-title">Datenspeicher &amp; Sicherung</h3>
-                <p class="hint">Deine Daten bleiben zuerst auf diesem Gerät. Hier kannst du sehen, ob automatisch gespeichert wird und bei Bedarf einen sicheren Wiederherstellungspunkt anlegen.</p>
+            <div class="card sync-disabled-card storage-safety-card data-recovery-center-card">
+                <h3 class="storage-safety-title">Datenrettungs-Center</h3>
+                <p class="hint">Speicherstatus, Wiederherstellungspunkte und Schutzmodus an einem Ort. Wenn Daten fehlen, ist das der erste Bereich zum Prüfen.</p>
                 <div id="storageSecurityStatus"></div>
                 <div class="btn-group storage-safety-actions">
                     <button onclick="requestPersistentAppStorage()" class="btn-primary btn-animated">Lokalen Speicher schützen</button>
@@ -1817,8 +1817,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.3.5-release"></script>
-    <script src="assets/js/app.js?v=3.3.5-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.3.6-release"></script>
+    <script src="assets/js/app.js?v=3.3.6-release"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

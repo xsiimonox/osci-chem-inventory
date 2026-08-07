@@ -2121,6 +2121,18 @@ async function openDataRecoveryHelp() {
     }
 }
 
+function openDataRecoveryCenter() {
+    selectTab('einstellungen');
+    setTimeout(() => {
+        const card = document.querySelector('.data-recovery-center-card');
+        const details = card?.querySelector('details.settings-accordion');
+        if (details) details.open = true;
+        card?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 180);
+}
+
+Object.assign(window, { openDataRecoveryCenter });
+
 async function maybePromptForStorageRecovery() {
     if (!startupStorageRecoveryCandidate) return;
     const settings = getGoogleDriveSyncSettings();
@@ -4853,15 +4865,27 @@ function renderDashboard() {
             <span>${escapeHtml(type.label)}</span>
         </label>
     `).join('');
+    const onboardingSteps = [
+        { label: 'Lager prüfen', text: 'Produkte, Warnschwellen und Bestände kontrollieren.', action: "selectTab('lager')" },
+        { label: 'Aquarium festlegen', text: 'Becken für Logbuch, ToDos und Messwerte auswählen.', action: "selectTab('logbuch')" },
+        { label: 'Daten sichern', text: 'Speicherschutz, Backup oder Cloud prüfen.', action: "openDataRecoveryCenter()" }
+    ];
     const onboarding = db.onboardingDone ? '' : `
         <section class="dashboard-onboarding dashboard-attention" aria-label="Ersteinrichtung">
-            <div>
+            <div class="dashboard-onboarding-head">
                 <strong>Ersteinrichtung</strong>
-                <p>Prüfe Lagername, Aquariumgröße, sichtbare Produkte, Warnschwellen und sichere deine wichtigsten Bereiche für den Alltag.</p>
+                <p>Richte ReefTools einmal sauber ein, damit Lager, Aquarium und Sicherung später zuverlässig laufen.</p>
             </div>
-            <div>
-                <button type="button" class="btn btn-secondary" onclick="selectTab('lager')">Produkte prüfen</button>
-                <button type="button" class="btn btn-secondary" onclick="selectTab('einstellungen')">Einstellungen</button>
+            <div class="dashboard-onboarding-steps">
+                ${onboardingSteps.map((step, index) => `
+                    <button type="button" class="dashboard-onboarding-step" onclick="${step.action}">
+                        <span>${index + 1}</span>
+                        <strong>${escapeHtml(step.label)}</strong>
+                        <small>${escapeHtml(step.text)}</small>
+                    </button>
+                `).join('')}
+            </div>
+            <div class="dashboard-onboarding-actions">
                 <button type="button" class="btn btn-primary" onclick="finishOnboarding()">Erledigt</button>
             </div>
         </section>
@@ -6087,7 +6111,7 @@ function setupSettingsAccordions() {
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
     if (/google drive|sync|cloud|teilen|freunde/.test(normalized)) return { group: 'Cloud', hint: 'Google Drive und geräteübergreifende Sicherung', keywords: 'google drive sync cloud upload download wiederherstellen' };
-    if (/datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Lokale Sicherungen, Import und Export', keywords: 'sicherung backup export import wiederherstellen datei lokal' };
+    if (/datenrettung|datenspeicher|sicherung|backup|export|import/.test(normalized)) return { group: 'Sicherung', hint: 'Speicherstatus, Wiederherstellung, Import und Export', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
     if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
     if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
@@ -10010,59 +10034,99 @@ function setupPriority4CalculatorUI() {
     });
 }
 
+const initializedToolSections = new Set();
+
+function runToolInit(label, fn) {
+    try { fn(); }
+    catch (err) { console.error(`Tool init failed: ${label}`, err); }
+}
+
+function initToolSection(sectionId, force = false) {
+    if (!sectionId) return;
+    if (!force && initializedToolSections.has(sectionId)) return;
+    initializedToolSections.add(sectionId);
+
+    if (sectionId === 'dosieren-und-messwerte') {
+        runToolInit('Nutrition Rechner', renderNutritionCalculator);
+        runToolInit('Dosierwirkung', initDoseImpactCalculator);
+        runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
+        runToolInit('Verbrauch', renderConsumptionCalculator);
+        runToolInit('Testkorrektur', renderTestCorrectionTool);
+        runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
+        runToolInit('Salifert Auswahl', populateSalifertSyringeSelect);
+        runToolInit('Salifert Rechner', renderSalifertConverter);
+        return;
+    }
+
+    if (sectionId === 'salinitaet-und-wasserwechsel') {
+        runToolInit('Wasserwechsel', renderWaterChangeCalculator);
+        runToolInit('Adsorber Durchfluss', renderAdsorberFlowCalculator);
+        runToolInit('Salzkorrektur', renderSaltCorrectionCalculator);
+        runToolInit('Nettovolumen', renderSalinityVolumeEstimator);
+        runToolInit('Salinität', updateSalinityCalculator);
+        runToolInit('Salinität Umrechner', updateSimpleSalinityConverter);
+        return;
+    }
+
+    if (sectionId === 'c-und-r-und-mischen') {
+        runToolInit('Makro-Rezeptauswahl', () => {
+            const select = document.getElementById('macroRecipeSelect');
+            if (select && select.options.length === 0) {
+                select.innerHTML = Object.keys(macroRecipes)
+                    .map(name => `<option value="${name}">${name}</option>`)
+                    .join('');
+            }
+        });
+        runToolInit('Makro-Rezept', renderMacroRecipe);
+        runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
+        runToolInit('Meerwasser Mischung', renderSeaWaterMix);
+        runToolInit('C&R Sperre', syncCustomCRLockUI);
+        runToolInit('C&R Rechner', () => {
+            if (!isCustomCRUnlocked()) return;
+            renderCustomCrLimitsMatrix();
+            renderCustomCrPlannerMatrix();
+            renderCustomCRPlanner();
+            renderSavedCustomCrPlans();
+        });
+        runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
+        return;
+    }
+
+    if (sectionId === 'sangokai-a-z') {
+        runToolInit('Sangokai Assistent', renderSangokaiAssistant);
+        return;
+    }
+
+    if (sectionId === 'community-und-hilfe') {
+        runToolInit('Futter Nährstoffe', renderFeedNutrientLog);
+        runToolInit('Strömung', renderFlowCalculator);
+        runToolInit('Osmosetank', renderOsmoseTank);
+        runToolInit('Vorratsbehälter', renderDosingContainers);
+        runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
+        runToolInit('Umsetzungsprotokoll', renderImplementationLog);
+        runToolInit('Community Karte', renderCommunityMapCard);
+    }
+}
+
 function initTools() {
+    initializedToolSections.forEach(sectionId => {
+        if (!document.querySelector(`#tools .tool-section[data-section-id="${sectionId}"]`)) {
+            initializedToolSections.delete(sectionId);
+        }
+    });
     const runToolInit = (label, fn) => {
         try { fn(); }
         catch (err) { console.error(`Tool init failed: ${label}`, err); }
     };
 
     runToolInit('Aquarium-Auswahl', renderAquariumWorkspacePanels);
-    runToolInit('Makro-Rezeptauswahl', () => {
-        const select = document.getElementById('macroRecipeSelect');
-        if (select && select.options.length === 0) {
-            select.innerHTML = Object.keys(macroRecipes)
-                .map(name => `<option value="${name}">${name}</option>`)
-                .join('');
-        }
-    });
-    runToolInit('Makro-Rezept', renderMacroRecipe);
-    runToolInit('Nutrition Rechner', renderNutritionCalculator);
-    runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
-    runToolInit('Meerwasser Mischung', renderSeaWaterMix);
-    runToolInit('C&R Sperre', syncCustomCRLockUI);
-    runToolInit('C&R Rechner', () => {
-        if (!isCustomCRUnlocked()) return;
-        renderCustomCrLimitsMatrix();
-        renderCustomCrPlannerMatrix();
-        renderCustomCRPlanner();
-        renderSavedCustomCrPlans();
-    });
-    runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
-    runToolInit('Dosierwirkung', initDoseImpactCalculator);
-    runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
-    runToolInit('Verbrauch', renderConsumptionCalculator);
-    runToolInit('Testkorrektur', renderTestCorrectionTool);
-    runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
-    runToolInit('Salifert Auswahl', populateSalifertSyringeSelect);
-    runToolInit('Salifert Rechner', renderSalifertConverter);
-    runToolInit('Wasserwechsel', renderWaterChangeCalculator);
-    runToolInit('Adsorber Durchfluss', renderAdsorberFlowCalculator);
-    runToolInit('Salzkorrektur', renderSaltCorrectionCalculator);
-    runToolInit('Nettovolumen', renderSalinityVolumeEstimator);
-    runToolInit('Futter Nährstoffe', renderFeedNutrientLog);
-    runToolInit('Strömung', renderFlowCalculator);
-    runToolInit('Osmosetank', renderOsmoseTank);
-    runToolInit('Vorratsbehälter', renderDosingContainers);
-    runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
-    runToolInit('Sangokai Assistent', renderSangokaiAssistant);
-    runToolInit('Umsetzungsprotokoll', renderImplementationLog);
-    runToolInit('Community Karte', renderCommunityMapCard);
-    runToolInit('Salinität', updateSalinityCalculator);
-    runToolInit('Salinität Umrechner', updateSimpleSalinityConverter);
     runToolInit('Tool-Kacheln', setupToolTiles);
     runToolInit('Tool-Kategorien', setupToolSections);
     runToolInit('Tool-Favoriten', renderToolFavorites);
     runToolInit('Rechner UI', setupPriority4CalculatorUI);
+    document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
+        initToolSection(section.dataset.sectionId || '');
+    });
 }
 
 function getToolSettings() {
@@ -10385,6 +10449,7 @@ function setupToolSections() {
             section.dataset.sectionReady = 'true';
             section.addEventListener('toggle', () => {
                 if (section.open) {
+                    initToolSection(sectionId);
                     getToolSettings().lastSection = sectionId;
                     saveDB(false);
                 }
@@ -10464,6 +10529,7 @@ function openToolSection(sectionId) {
     if (search) search.value = '';
     filterTools('');
     section.open = true;
+    initToolSection(section.dataset.sectionId || '');
     getToolSettings().lastSection = section.dataset.sectionId || '';
     saveDB(false);
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -10494,7 +10560,10 @@ function filterTools(query = '') {
         });
         totalMatches += matchesInSection;
         section.classList.toggle('tool-section-hidden', normalized && matchesInSection === 0);
-        if (normalized && matchesInSection > 0) section.open = true;
+        if (normalized && matchesInSection > 0) {
+            section.open = true;
+            initToolSection(section.dataset.sectionId || '');
+        }
         if (!normalized) section.open = false;
     });
     const clearButton = document.getElementById('toolSearchClear');
@@ -10519,6 +10588,7 @@ function clearToolSearch() {
 function toggleToolTile(card) {
     const willOpen = card.classList.contains('tool-tile-collapsed');
     const section = card.closest('.tool-section');
+    if (willOpen && section) initToolSection(section.dataset.sectionId || '');
     section?.querySelectorAll('.tool-tile-card').forEach(other => {
         if (other !== card) {
             other.classList.add('tool-tile-collapsed');
