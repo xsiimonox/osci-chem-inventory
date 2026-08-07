@@ -5116,6 +5116,148 @@ body.theme-light .nav-links button.active {
     }
 }
 
+/* Mobile width safety: every page surface may shrink to the actual device width. */
+:where(
+    .tab-content,
+    .tab-content > *,
+    .tools-shell,
+    .tools-shell > *,
+    .tools-hub-card,
+    .tools-command-bar,
+    .tool-section,
+    .tool-section > *,
+    .tool-card-grid,
+    .tool-tile-card,
+    .aquarium-workspace-panel,
+    .aquarium-workspace-head,
+    .aquarium-workspace-select,
+    .logbook-layout,
+    .settings-sections,
+    .settings-accordion,
+    .settings-accordion-body,
+    .dashboard-panel,
+    .dashboard-list-row,
+    .warehouse-control-card,
+    .warehouse-filter-panel
+) {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 767px) {
+    #tools .aquarium-workspace-panel {
+        width: 100%;
+        padding: 12px;
+        overflow: hidden;
+    }
+
+    #tools .aquarium-workspace-head {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 10px;
+    }
+
+    #tools .aquarium-workspace-head > div:first-child,
+    #tools .aquarium-workspace-select,
+    #tools .aquarium-workspace-select select {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    #tools .aquarium-workspace-actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 7px;
+        width: 100%;
+        min-width: 0;
+    }
+
+    #tools .aquarium-workspace-actions button {
+        width: 100%;
+        min-width: 0;
+        padding: 8px 5px;
+        font-size: clamp(0.68rem, 3vw, 0.78rem);
+    }
+
+    #tools .tool-section-summary > span:first-child {
+        flex: 1 1 auto;
+        width: 0;
+        min-width: 0;
+        max-width: calc(100% - 40px);
+        overflow: hidden;
+    }
+
+    #tools .tool-section-summary > span:first-child > strong,
+    #tools .tool-section-summary > span:first-child > small {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .settings-accordion-body > *,
+    .google-drive-status-shell,
+    .google-drive-diagnostics,
+    .google-drive-diagnostics-body,
+    .google-drive-diagnostics-body > *,
+    .google-drive-diagnostics-actions {
+        width: 100%;
+        min-width: 0;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    .dashboard-list-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: start;
+        gap: 6px 10px;
+    }
+
+    .dashboard-list-row > span,
+    .dashboard-list-row > em {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 390px) {
+    .dashboard-list-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .dashboard-list-row > em {
+        justify-self: start;
+        font-size: 0.78rem;
+    }
+
+    #menu-order-settings .btn,
+    #menu-order-settings button {
+        width: 100%;
+        min-width: 0;
+        padding-inline: 8px;
+        white-space: normal !important;
+        font-size: 0.72rem !important;
+        line-height: 1.25;
+    }
+
+    .google-drive-diagnostics-actions {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .google-drive-diagnostics-actions button {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #coralForm label,
+    .logbook-card label {
+        font-size: 0.76rem;
+        line-height: 1.25;
+        white-space: normal;
+    }
+}
+
 @media (max-width: 600px) {
     .measurement-chart-card,
     .measurement-detail-card,
@@ -15751,12 +15893,18 @@ html.guide-embedded .guide-hero {
 
 #tools .tools-search-wrap {
     min-height: 46px;
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
 }
 
 #tools .tools-search-wrap input {
     color: var(--text-primary);
+}
+
+#tools .tools-search-wrap:focus-within {
+    box-shadow: none;
 }
 
 #tools .tool-section {
@@ -15961,5 +16109,906 @@ html.guide-embedded .guide-hero {
 @media (forced-colors: active) {
     :where(button, a, input, select, textarea, summary):focus-visible {
         outline: 2px solid Highlight;
+    }
+}
+
+/* ========================================================================== 
+   REEFTOOLS DESIGN SYSTEM 3.3
+   A final, shared presentation layer for every app area and color theme.
+   ========================================================================== */
+
+:root {
+    --app-bg: #0a1114;
+    --nav-bg: #0d171a;
+    --surface-card: #121d20;
+    --surface-raised: #19272a;
+    --surface-overlay: #1d2d31;
+    --border-color: #2b3d41;
+    --text-primary: #f4f8f8;
+    --text-secondary: #9eb0b3;
+    --accent: #35c2ca;
+    --accent-strong: #1599a5;
+    --accent-contrast: #041315;
+    --secondary: #82d5dc;
+    --status-success: #38b77b;
+    --status-warning: #e7ad48;
+    --status-danger: #e46565;
+    --status-info: #5cb8e6;
+    --content-max: 1240px;
+    --nav-width: 244px;
+    --radius-card: 10px;
+    --shadow-sm: 0 2px 10px rgba(0, 6, 8, 0.16);
+    --shadow-md: 0 12px 30px rgba(0, 6, 8, 0.2);
+    --shadow-lg: 0 22px 54px rgba(0, 6, 8, 0.3);
+    --shadow-subtle: 0 1px 0 rgba(255, 255, 255, 0.035), 0 6px 20px rgba(0, 6, 8, 0.12);
+    --shadow-raised: 0 14px 34px rgba(0, 6, 8, 0.24);
+    --shadow-overlay: 0 26px 68px rgba(0, 6, 8, 0.46);
+    --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+    --transition-fast: 150ms;
+    --transition-base: 260ms;
+    --bg-primary: var(--app-bg);
+    --bg-secondary: var(--surface-card);
+    --bg-tertiary: var(--surface-raised);
+}
+
+body.theme-girl,
+html.theme-girl {
+    --app-bg: #fff5f8;
+    --nav-bg: #fffafd;
+    --surface-card: #ffffff;
+    --surface-raised: #fff0f5;
+    --surface-overlay: #ffffff;
+    --border-color: #edc9d6;
+    --text-primary: #3c1727;
+    --text-secondary: #805d6b;
+    --accent: #c92f70;
+    --accent-strong: #a91f59;
+    --accent-contrast: #ffffff;
+    --secondary: #a33a76;
+    --status-info: #3976b7;
+}
+
+body.theme-mint,
+html.theme-mint {
+    --app-bg: #07141a;
+    --nav-bg: #091b22;
+    --surface-card: #10252d;
+    --surface-raised: #17343b;
+    --surface-overlay: #1a3b43;
+    --border-color: #2b5058;
+    --text-primary: #f1fbfb;
+    --text-secondary: #a2bec2;
+    --accent: #55d5cc;
+    --accent-strong: #24aaa5;
+    --accent-contrast: #051716;
+    --secondary: #7bd8ed;
+    --status-info: #64b9ee;
+}
+
+body.theme-badman,
+html.theme-badman {
+    --app-bg: #111214;
+    --nav-bg: #17181b;
+    --surface-card: #202124;
+    --surface-raised: #2a2c30;
+    --surface-overlay: #303237;
+    --border-color: #42444a;
+    --text-primary: #f5f5f5;
+    --text-secondary: #aaaeb6;
+    --accent: #ff5f69;
+    --accent-strong: #d63b47;
+    --accent-contrast: #ffffff;
+    --secondary: #c6c9cf;
+    --status-info: #7eb5db;
+}
+
+body.theme-light,
+html.theme-light {
+    --app-bg: #f4f5f7;
+    --nav-bg: #ffffff;
+    --surface-card: #ffffff;
+    --surface-raised: #eef0f3;
+    --surface-overlay: #ffffff;
+    --border-color: #d4d8de;
+    --text-primary: #17191c;
+    --text-secondary: #626870;
+    --accent: #0879e8;
+    --accent-strong: #0061c5;
+    --accent-contrast: #ffffff;
+    --secondary: #4c61c7;
+    --status-info: #0879e8;
+    --shadow-sm: 0 2px 10px rgba(26, 35, 44, 0.07);
+    --shadow-md: 0 12px 30px rgba(26, 35, 44, 0.1);
+    --shadow-lg: 0 22px 54px rgba(26, 35, 44, 0.14);
+}
+
+html {
+    scroll-behavior: smooth;
+    scrollbar-color: color-mix(in srgb, var(--accent) 36%, var(--border-color)) transparent;
+}
+
+body {
+    background: var(--app-bg);
+    color: var(--text-primary);
+}
+
+body::selection,
+body *::selection {
+    background: color-mix(in srgb, var(--accent) 34%, transparent);
+    color: var(--text-primary);
+}
+
+#appHeader {
+    background: color-mix(in srgb, var(--nav-bg) 88%, transparent) !important;
+    border-bottom-color: color-mix(in srgb, var(--border-color) 78%, transparent) !important;
+    box-shadow: 0 8px 28px rgba(0, 6, 8, 0.1) !important;
+    backdrop-filter: blur(24px) saturate(1.18) !important;
+    -webkit-backdrop-filter: blur(24px) saturate(1.18) !important;
+}
+
+#appHeader h1 {
+    font-weight: 780;
+    letter-spacing: 0;
+}
+
+.version-badge {
+    border-radius: 7px;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 12%, transparent);
+}
+
+.header-sync-indicator,
+.header-quick-sync-button,
+.menu-toggle,
+.close-menu {
+    border-color: color-mix(in srgb, var(--border-color) 86%, transparent) !important;
+    background: color-mix(in srgb, var(--surface-raised) 80%, transparent) !important;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 4%, transparent);
+    transition: transform var(--transition-fast) var(--ease-spring), border-color var(--transition-fast) ease, background-color var(--transition-fast) ease !important;
+}
+
+.header-sync-indicator:hover,
+.header-quick-sync-button:hover,
+.menu-toggle:hover,
+.close-menu:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent) 42%, var(--border-color)) !important;
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised)) !important;
+}
+
+#main-nav.nav-menu {
+    background: color-mix(in srgb, var(--nav-bg) 97%, transparent) !important;
+    box-shadow: 16px 0 50px rgba(0, 6, 8, 0.1);
+}
+
+#main-nav .nav-links {
+    gap: 4px;
+    padding-inline: 2px;
+}
+
+#main-nav .nav-links button {
+    position: relative;
+    overflow: hidden;
+    border-radius: 8px !important;
+    transition: color var(--transition-fast) ease, background-color var(--transition-fast) ease, border-color var(--transition-fast) ease, transform var(--transition-fast) var(--ease-spring) !important;
+}
+
+#main-nav .nav-links button:hover {
+    transform: translateX(2px);
+}
+
+#main-nav .nav-links button.active,
+#main-nav .nav-links button[aria-current="page"] {
+    color: var(--text-primary) !important;
+    background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised)) !important;
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border-color)) !important;
+    box-shadow: inset 3px 0 0 var(--accent), inset 0 1px 0 color-mix(in srgb, white 5%, transparent) !important;
+}
+
+.tab-content {
+    gap: 16px;
+    padding: 22px clamp(12px, 2.2vw, 26px) 42px;
+}
+
+.tab-content.active {
+    animation: reefPageEnter 420ms var(--ease-spring) both;
+}
+
+:where(.dashboard-page-head, .warehouse-page-head, .section-page-head, .settings-page-head, .logbook-page-header) {
+    padding-block: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+:where(.dashboard-page-head, .warehouse-page-head, .section-page-head, .settings-page-head, .logbook-page-header) h2 {
+    color: var(--text-primary);
+    font-size: clamp(1.35rem, 2.4vw, 1.9rem);
+    font-weight: 790;
+    line-height: 1.12;
+}
+
+.section-eyebrow,
+.dashboard-page-head small,
+.warehouse-page-head small,
+.settings-page-head .section-eyebrow {
+    color: color-mix(in srgb, var(--accent) 72%, var(--text-secondary));
+    font-size: 0.7rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+}
+
+:where(.card, .dashboard-widget, .dashboard-panel, .dashboard-measurement-card, .warehouse-control-card, .warehouse-filter-panel, .inventory-card, .logbook-card, .measurement-chart-card, .measurement-detail-card, .measurement-empty, .tool-section, .tool-tile-card, .tool-compact-card, .settings-card, .settings-accordion, .stat-block, .protocol-entry, .coral-card, .trace-workstep) {
+    border-color: color-mix(in srgb, var(--border-color) 88%, transparent);
+    border-radius: var(--radius-card);
+    background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+    box-shadow: var(--shadow-subtle);
+}
+
+:where(.card, .dashboard-widget, .inventory-card, .logbook-card, .tool-section, .tool-tile-card, .settings-card, .settings-accordion, .stat-block, .coral-card) {
+    transition: border-color var(--transition-base) ease, background-color var(--transition-base) ease, box-shadow var(--transition-base) ease, transform var(--transition-base) var(--ease-spring);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    :where(.dashboard-widget, .inventory-card, .tool-tile-card, .stat-block, .coral-card):hover {
+        border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color));
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+}
+
+:where(button, .btn, .btn-primary, .btn-secondary, .btn-cancel, .btn-danger, .btn-warning, .btn-ghost, .btn-in, .btn-out) {
+    min-height: 42px;
+    border-radius: 8px !important;
+    font-weight: 760;
+    letter-spacing: 0;
+    box-shadow: none;
+    transition: transform var(--transition-fast) var(--ease-spring), background-color var(--transition-fast) ease, border-color var(--transition-fast) ease, color var(--transition-fast) ease, box-shadow var(--transition-fast) ease !important;
+}
+
+:where(button, .btn, .btn-primary, .btn-secondary, .btn-cancel, .btn-danger, .btn-warning, .btn-ghost, .btn-in, .btn-out):hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+:where(button, .btn, .btn-primary, .btn-secondary, .btn-cancel, .btn-danger, .btn-warning, .btn-ghost, .btn-in, .btn-out):active:not(:disabled) {
+    transform: scale(0.975);
+    transition-duration: 80ms !important;
+}
+
+.btn-primary,
+button[type="submit"]:not(.btn-secondary):not(.btn-danger):not(.btn-out),
+.btn-in {
+    border-color: color-mix(in srgb, var(--accent-strong) 70%, var(--accent)) !important;
+    background: var(--accent) !important;
+    color: var(--accent-contrast) !important;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 24%, transparent), 0 8px 18px color-mix(in srgb, var(--accent) 15%, transparent) !important;
+}
+
+.btn-primary:hover:not(:disabled),
+button[type="submit"]:hover:not(:disabled),
+.btn-in:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent) 86%, white) !important;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 30%, transparent), 0 10px 24px color-mix(in srgb, var(--accent) 22%, transparent) !important;
+}
+
+.btn-secondary,
+.btn-cancel,
+.btn-ghost {
+    border-color: var(--border-color) !important;
+    background: var(--surface-raised) !important;
+    color: var(--text-primary) !important;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-cancel:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 38%, var(--border-color)) !important;
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface-raised)) !important;
+}
+
+.btn-danger,
+.btn-out {
+    border-color: color-mix(in srgb, var(--status-danger) 50%, var(--border-color)) !important;
+    background: color-mix(in srgb, var(--status-danger) 11%, var(--surface-raised)) !important;
+    color: color-mix(in srgb, var(--status-danger) 76%, white) !important;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea) {
+    min-height: 46px;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    background-color: color-mix(in srgb, var(--surface-raised) 70%, var(--surface-card)) !important;
+    color: var(--text-primary) !important;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 3%, transparent);
+    transition: border-color var(--transition-fast) ease, background-color var(--transition-fast) ease, box-shadow var(--transition-fast) ease !important;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--accent) 24%, var(--border-color)) !important;
+}
+
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea):focus {
+    border-color: var(--accent) !important;
+    background-color: var(--surface-raised) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent) !important;
+}
+
+:where(input, select, textarea)::placeholder {
+    color: color-mix(in srgb, var(--text-secondary) 72%, transparent);
+}
+
+label,
+.input-group label,
+.form-group label {
+    color: var(--text-secondary);
+    font-size: 0.79rem;
+    font-weight: 730;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--accent);
+}
+
+input[type="range"] {
+    accent-color: var(--accent);
+}
+
+details > summary {
+    border-radius: 8px;
+    transition: color var(--transition-fast) ease, background-color var(--transition-fast) ease, border-color var(--transition-fast) ease !important;
+}
+
+details > summary:hover {
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+details[open] > summary {
+    color: var(--text-primary);
+}
+
+.status-badge {
+    min-height: 24px;
+    border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+}
+
+.dashboard-grid {
+    gap: 10px;
+}
+
+.dashboard-tile {
+    position: relative;
+    min-height: 112px;
+    overflow: hidden;
+}
+
+.dashboard-tile::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 2px;
+    background: var(--accent);
+    opacity: 0;
+    transform: scaleX(0.25);
+    transform-origin: left;
+    transition: opacity var(--transition-base) ease, transform var(--transition-base) var(--ease-spring);
+}
+
+.dashboard-tile:hover::after {
+    opacity: 0.8;
+    transform: scaleX(1);
+}
+
+.dashboard-tile > span {
+    color: var(--text-secondary);
+    font-weight: 720;
+}
+
+.dashboard-tile > strong {
+    font-weight: 820;
+}
+
+.dashboard-actions {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    background: color-mix(in srgb, var(--surface-card) 94%, transparent);
+    box-shadow: var(--shadow-subtle);
+}
+
+.dashboard-panel,
+.dashboard-measurement-card {
+    min-height: 172px;
+}
+
+.dashboard-widget-head {
+    padding-bottom: 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border-color) 72%, transparent);
+}
+
+.dashboard-list-row {
+    background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
+}
+
+.dashboard-progress {
+    height: 9px;
+    box-shadow: inset 0 1px 3px rgba(0, 6, 8, 0.28);
+}
+
+.dashboard-progress::-webkit-progress-value,
+progress.mini-progress::-webkit-progress-value {
+    background: linear-gradient(90deg, var(--accent-strong), var(--accent), var(--secondary));
+    background-size: 180% 100%;
+    animation: reefProgressFlow 2.8s ease-in-out infinite alternate;
+}
+
+.dashboard-progress::-moz-progress-bar,
+progress.mini-progress::-moz-progress-bar {
+    background: var(--accent);
+}
+
+.dashboard-trend-chart,
+.measurement-chart {
+    overflow: visible;
+}
+
+.dashboard-chart-line,
+.measurement-line {
+    stroke-dasharray: 1000;
+    stroke-dashoffset: 1000;
+    animation: reefChartDraw 950ms var(--ease-spring) 100ms forwards;
+}
+
+.dashboard-chart-area,
+.measurement-area {
+    transform-origin: center bottom;
+    animation: reefChartArea 720ms ease 300ms both;
+}
+
+.dashboard-chart-focus,
+.measurement-point-halo {
+    animation: reefChartPulse 2.4s ease-in-out infinite;
+}
+
+.measurement-point-group {
+    outline: none;
+}
+
+.measurement-point-group .measurement-point,
+.measurement-point-group .measurement-point-ring {
+    animation: reefPointIn 420ms var(--ease-spring) 620ms both;
+}
+
+.measurement-chart-card {
+    padding: clamp(12px, 2vw, 18px);
+    overflow: hidden;
+    background: color-mix(in srgb, var(--surface-card) 96%, transparent);
+}
+
+.measurement-chart-scroll {
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--app-bg) 34%, transparent);
+}
+
+.measurement-stats div {
+    border-color: var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-raised);
+}
+
+.measurement-stats strong {
+    color: var(--accent);
+    font-size: clamp(0.88rem, 1.6vw, 1.02rem);
+}
+
+.measurement-grid-line {
+    stroke: color-mix(in srgb, var(--border-color) 75%, transparent);
+}
+
+.measurement-axis {
+    stroke: color-mix(in srgb, var(--text-secondary) 34%, transparent);
+}
+
+.measurement-label,
+.measurement-y-label {
+    fill: var(--text-secondary);
+}
+
+.warehouse-control-card,
+.warehouse-filter-panel {
+    padding: 14px;
+}
+
+.inventory-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+    gap: 10px;
+}
+
+.inventory-card {
+    position: relative;
+    padding: 13px;
+    overflow: hidden;
+}
+
+.inventory-card::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 3px;
+    background: var(--accent);
+    opacity: 0.46;
+}
+
+.inventory-card.card-warning::before {
+    background: var(--status-warning);
+    opacity: 1;
+}
+
+.inventory-card .stock {
+    color: var(--accent) !important;
+}
+
+.inventory-facts div {
+    background: color-mix(in srgb, var(--surface-raised) 78%, transparent);
+}
+
+#tools .tools-shell,
+#logbuch .logbook-layout,
+#einstellungen .settings-sections {
+    gap: 14px;
+}
+
+#tools .tool-section {
+    overflow: clip;
+    background: var(--surface-card);
+}
+
+#tools .tool-section-summary {
+    min-height: 66px;
+    padding: 14px 16px;
+}
+
+#tools .tool-section[open] {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border-color));
+    box-shadow: var(--shadow-md);
+}
+
+#tools .tool-card-grid {
+    gap: 10px;
+    padding: 12px;
+    border-top-color: var(--border-color);
+}
+
+#tools .tool-tile-card {
+    padding: 13px;
+    background: color-mix(in srgb, var(--surface-raised) 70%, var(--surface-card));
+}
+
+#tools .tool-tile-card.tool-tile-collapsed {
+    min-height: 98px;
+}
+
+#tools .tool-tile-card:not(.tool-tile-collapsed) {
+    background: var(--surface-card);
+    box-shadow: inset 0 3px 0 color-mix(in srgb, var(--accent) 70%, transparent), var(--shadow-md);
+}
+
+#tools .tool-info-button {
+    border-color: color-mix(in srgb, var(--accent) 34%, var(--border-color)) !important;
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)) !important;
+    color: var(--accent) !important;
+}
+
+.logbook-hero,
+.logbook-card {
+    background: var(--surface-card) !important;
+}
+
+.logbook-card-details[open] {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color));
+    box-shadow: var(--shadow-md);
+}
+
+.logbook-summary {
+    min-height: 54px;
+}
+
+.logbook-entry,
+.todo-row,
+.measurement-list-row,
+.protocol-entry {
+    border-color: var(--border-color);
+    background: color-mix(in srgb, var(--surface-raised) 66%, var(--surface-card));
+}
+
+.settings-page-head {
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.settings-accordion {
+    overflow: clip;
+}
+
+.settings-accordion[open] {
+    border-color: color-mix(in srgb, var(--accent) 30%, var(--border-color));
+    box-shadow: var(--shadow-md);
+}
+
+.settings-accordion-summary {
+    min-height: 64px;
+    padding: 13px 15px;
+}
+
+.settings-accordion-body {
+    border-top: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--surface-raised) 24%, transparent);
+}
+
+.modal {
+    background: rgba(2, 8, 10, 0.7);
+    backdrop-filter: blur(12px) saturate(0.8);
+    -webkit-backdrop-filter: blur(12px) saturate(0.8);
+}
+
+.modal-content,
+.quick-preview,
+.header-quick-sync-menu {
+    border-color: color-mix(in srgb, var(--accent) 24%, var(--border-color)) !important;
+    border-radius: 12px !important;
+    background: color-mix(in srgb, var(--surface-overlay) 96%, transparent) !important;
+    box-shadow: var(--shadow-overlay) !important;
+}
+
+.modal[style*="display: flex"] .modal-content,
+.modal.open .modal-content,
+.quick-preview.active {
+    animation: reefModalIn 300ms var(--ease-spring) both;
+}
+
+.toast {
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--surface-overlay) 96%, transparent);
+    box-shadow: var(--shadow-overlay);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+}
+
+.app-footer {
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+    background: color-mix(in srgb, var(--nav-bg) 82%, transparent);
+}
+
+.design-reveal {
+    opacity: 0;
+    transform: translateY(10px);
+}
+
+.design-reveal.design-reveal-visible {
+    animation: reefSurfaceReveal 480ms var(--ease-spring) var(--reveal-delay, 0ms) both;
+}
+
+@keyframes reefPageEnter {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes reefSurfaceReveal {
+    from { opacity: 0; transform: translateY(10px) scale(0.995); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes reefModalIn {
+    from { opacity: 0; transform: translateY(16px) scale(0.975); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes reefChartDraw {
+    to { stroke-dashoffset: 0; }
+}
+
+@keyframes reefChartArea {
+    from { opacity: 0; transform: scaleY(0.82); }
+    to { opacity: 1; transform: scaleY(1); }
+}
+
+@keyframes reefChartPulse {
+    0%, 100% { opacity: 0.22; transform: scale(0.9); }
+    50% { opacity: 0.7; transform: scale(1.08); }
+}
+
+@keyframes reefPointIn {
+    from { opacity: 0; transform: scale(0.3); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes reefProgressFlow {
+    from { background-position: 0 50%; }
+    to { background-position: 100% 50%; }
+}
+
+@media (max-width: 1023px) {
+    .mobile-bottom-nav {
+        left: max(12px, env(safe-area-inset-left, 0px)) !important;
+        right: max(12px, env(safe-area-inset-right, 0px)) !important;
+        bottom: calc(max(10px, env(safe-area-inset-bottom, 0px)) + 2px) !important;
+        width: auto !important;
+        min-height: 64px !important;
+        padding: 6px !important;
+        border: 1px solid color-mix(in srgb, var(--border-color) 84%, transparent) !important;
+        border-radius: 18px !important;
+        background: color-mix(in srgb, var(--nav-bg) 90%, transparent) !important;
+        box-shadow: 0 18px 46px rgba(0, 6, 8, 0.38) !important;
+        backdrop-filter: blur(24px) saturate(1.2) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(1.2) !important;
+    }
+
+    .mobile-bottom-nav button {
+        min-height: 50px !important;
+        border-radius: 12px !important;
+    }
+
+    .mobile-bottom-nav button.active,
+    .mobile-bottom-nav button[aria-current="page"] {
+        color: var(--accent) !important;
+        background: color-mix(in srgb, var(--accent) 13%, var(--surface-raised)) !important;
+        box-shadow: inset 0 -2px 0 var(--accent) !important;
+    }
+
+    body {
+        padding-bottom: calc(86px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+    .tab-content {
+        padding: 14px 12px 30px;
+    }
+
+    :where(.dashboard-page-head, .warehouse-page-head, .section-page-head, .settings-page-head, .logbook-page-header) h2 {
+        font-size: clamp(1.25rem, 6vw, 1.55rem);
+    }
+
+    .modal-content {
+        width: min(100%, 520px);
+        max-width: 520px;
+        max-height: calc(100dvh - 28px);
+        padding: 18px;
+    }
+}
+
+@media (max-width: 767px) {
+    #appHeader {
+        padding-inline: 12px !important;
+    }
+
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .dashboard-tile {
+        min-height: 68px !important;
+        padding: 12px 14px !important;
+    }
+
+    .dashboard-panel,
+    .dashboard-measurement-card {
+        min-height: 0;
+    }
+
+    .dashboard-actions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        padding: 10px;
+    }
+
+    .inventory-card-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #tools .tool-section-summary {
+        min-height: 58px;
+        padding: 12px;
+    }
+
+    #tools .tool-tile-card.tool-tile-collapsed {
+        min-height: 82px !important;
+    }
+
+    .measurement-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .measurement-stats div {
+        padding: 10px;
+    }
+
+    .measurement-chart-head,
+    .measurement-chart-meta {
+        gap: 10px;
+    }
+
+    .measurement-chart-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .measurement-chart-meta span {
+        text-align: center;
+    }
+
+    .settings-accordion-summary {
+        min-height: 58px;
+        padding: 11px 12px;
+    }
+}
+
+@media (max-width: 390px) {
+    .tab-content {
+        padding-inline: 9px;
+    }
+
+    .dashboard-actions,
+    .measurement-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .measurement-chart-meta {
+        grid-template-columns: 1fr;
+    }
+
+    #tools .tool-card-grid {
+        padding: 8px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 1ms !important;
+    }
+
+    .design-reveal {
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+
+/* Tool category descriptions stay complete and wrap at natural word boundaries. */
+#tools .tool-section-summary > span:first-child {
+    min-width: 0;
+}
+
+#tools .tool-section-summary small,
+#tools .tool-section-summary small.text-fit-overflow {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    hyphens: none !important;
+}
+
+@media (max-width: 767px) {
+    #tools .tool-section-summary {
+        min-height: 0;
+        height: auto;
+        align-items: flex-start;
+    }
+
+    #tools .tool-section-summary > span:first-child {
+        overflow: visible;
+    }
+
+    #tools .tool-section-summary small {
+        margin-top: 5px;
+        font-size: clamp(0.76rem, 3.4vw, 0.84rem);
+        line-height: 1.4;
     }
 }

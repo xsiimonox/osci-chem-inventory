@@ -5772,6 +5772,57 @@ function selectTab(tabId) {
     setMenuOpenState(false, false);
 }
 
+let designMotionObserver = null;
+
+function refreshDesignMotionTargets(scope = document.querySelector('.tab-content.active')) {
+    if (!scope) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const targets = scope.querySelectorAll([
+        ':scope > .card',
+        ':scope > details',
+        ':scope > section',
+        ':scope > .tools-shell',
+        ':scope > .warehouse-control-card',
+        '.inventory-category-section',
+        '.dashboard-panel',
+        '.dashboard-measurement-card',
+        '.tool-section',
+        '.logbook-card',
+        '.settings-accordion',
+        '.coral-card'
+    ].join(','));
+
+    if (reduceMotion || !('IntersectionObserver' in window)) {
+        targets.forEach(target => target.classList.add('design-reveal', 'design-reveal-visible'));
+        return;
+    }
+
+    if (!designMotionObserver) {
+        designMotionObserver = new IntersectionObserver(entries => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('design-reveal-visible');
+                designMotionObserver.unobserve(entry.target);
+            });
+        }, { rootMargin: '0px 0px -7% 0px', threshold: 0.06 });
+    }
+
+    let sequenceIndex = 0;
+    targets.forEach(target => {
+        if (target.classList.contains('design-reveal-visible') || target.dataset.designMotionObserved === 'true') return;
+        target.dataset.designMotionObserved = 'true';
+        target.classList.add('design-reveal');
+        target.style.setProperty('--reveal-delay', `${Math.min(sequenceIndex, 5) * 45}ms`);
+        designMotionObserver.observe(target);
+        sequenceIndex += 1;
+    });
+
+    window.setTimeout(() => {
+        if (!scope.classList.contains('active')) return;
+        targets.forEach(target => target.classList.add('design-reveal-visible'));
+    }, 900);
+}
+
 function showTab(tabId) {
     if (isMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
@@ -5826,6 +5877,7 @@ function showTab(tabId) {
     saveDB(false);
     renderActiveTabContent(tabId);
     scheduleTextFitPass();
+    window.requestAnimationFrame(() => refreshDesignMotionTargets(resolvedTab));
 }
 
 function renderActiveTabContent(tabId) {
@@ -9959,50 +10011,58 @@ function setupPriority4CalculatorUI() {
 }
 
 function initTools() {
-    renderAquariumWorkspacePanels();
-    const select = document.getElementById('macroRecipeSelect');
-    if (select && select.options.length === 0) {
-        select.innerHTML = Object.keys(macroRecipes)
-            .map(name => `<option value="${name}">${name}</option>`)
-            .join('');
-    }
-    renderMacroRecipe();
-    renderNutritionCalculator();
-    renderSeaWaterPresetSelect();
-    renderSeaWaterMix();
-    syncCustomCRLockUI();
-    if (isCustomCRUnlocked()) {
+    const runToolInit = (label, fn) => {
+        try { fn(); }
+        catch (err) { console.error(`Tool init failed: ${label}`, err); }
+    };
+
+    runToolInit('Aquarium-Auswahl', renderAquariumWorkspacePanels);
+    runToolInit('Makro-Rezeptauswahl', () => {
+        const select = document.getElementById('macroRecipeSelect');
+        if (select && select.options.length === 0) {
+            select.innerHTML = Object.keys(macroRecipes)
+                .map(name => `<option value="${name}">${name}</option>`)
+                .join('');
+        }
+    });
+    runToolInit('Makro-Rezept', renderMacroRecipe);
+    runToolInit('Nutrition Rechner', renderNutritionCalculator);
+    runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
+    runToolInit('Meerwasser Mischung', renderSeaWaterMix);
+    runToolInit('C&R Sperre', syncCustomCRLockUI);
+    runToolInit('C&R Rechner', () => {
+        if (!isCustomCRUnlocked()) return;
         renderCustomCrLimitsMatrix();
         renderCustomCrPlannerMatrix();
         renderCustomCRPlanner();
         renderSavedCustomCrPlans();
-    }
-    renderNaclSolutionCalculator();
-    initDoseImpactCalculator();
-    initMajorCorrectionCalculator();
-    renderConsumptionCalculator();
-    renderTestCorrectionTool();
-    renderHannaPhosphorusConverter();
-    populateSalifertSyringeSelect();
-    renderSalifertConverter();
-    renderWaterChangeCalculator();
-    renderAdsorberFlowCalculator();
-    renderSaltCorrectionCalculator();
-    renderSalinityVolumeEstimator();
-    renderFeedNutrientLog();
-    renderFlowCalculator();
-    renderOsmoseTank();
-    renderDosingContainers();
-    renderPsuCorrectionSettings();
-    renderSangokaiAssistant();
-    renderImplementationLog();
-    renderCommunityMapCard();
-    updateSalinityCalculator();
-    updateSimpleSalinityConverter();
-    setupToolTiles();
-    setupToolSections();
-    renderToolFavorites();
-    setupPriority4CalculatorUI();
+    });
+    runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
+    runToolInit('Dosierwirkung', initDoseImpactCalculator);
+    runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
+    runToolInit('Verbrauch', renderConsumptionCalculator);
+    runToolInit('Testkorrektur', renderTestCorrectionTool);
+    runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
+    runToolInit('Salifert Auswahl', populateSalifertSyringeSelect);
+    runToolInit('Salifert Rechner', renderSalifertConverter);
+    runToolInit('Wasserwechsel', renderWaterChangeCalculator);
+    runToolInit('Adsorber Durchfluss', renderAdsorberFlowCalculator);
+    runToolInit('Salzkorrektur', renderSaltCorrectionCalculator);
+    runToolInit('Nettovolumen', renderSalinityVolumeEstimator);
+    runToolInit('Futter Nährstoffe', renderFeedNutrientLog);
+    runToolInit('Strömung', renderFlowCalculator);
+    runToolInit('Osmosetank', renderOsmoseTank);
+    runToolInit('Vorratsbehälter', renderDosingContainers);
+    runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
+    runToolInit('Sangokai Assistent', renderSangokaiAssistant);
+    runToolInit('Umsetzungsprotokoll', renderImplementationLog);
+    runToolInit('Community Karte', renderCommunityMapCard);
+    runToolInit('Salinität', updateSalinityCalculator);
+    runToolInit('Salinität Umrechner', updateSimpleSalinityConverter);
+    runToolInit('Tool-Kacheln', setupToolTiles);
+    runToolInit('Tool-Kategorien', setupToolSections);
+    runToolInit('Tool-Favoriten', renderToolFavorites);
+    runToolInit('Rechner UI', setupPriority4CalculatorUI);
 }
 
 function getToolSettings() {
