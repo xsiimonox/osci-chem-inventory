@@ -10080,10 +10080,6 @@ function initTools() {
             initializedToolSections.delete(sectionId);
         }
     });
-    const runToolInit = (label, fn) => {
-        try { fn(); }
-        catch (err) { console.error(`Tool init failed: ${label}`, err); }
-    };
 
     runToolInit('Aquarium-Auswahl', renderAquariumWorkspacePanels);
     runToolInit('Tool-Kacheln', setupToolTiles);
