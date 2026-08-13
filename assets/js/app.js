@@ -14907,15 +14907,22 @@ function renderPsuCorrectionSettings() {
     if (!input && !example) return;
     const saved = parseFloat(db.psuCorrectionOffset) || 0;
     if (input && document.activeElement !== input) input.value = saved.toFixed(1);
-    const current = input ? (parseFloat(input.value) || 0) : saved;
+    const current = input ? parseSignedDecimalInput(input.value, saved) : saved;
     if (example) {
         example.value = current ? `35,0 wird ${(35 + current).toFixed(1).replace('.', ',')} PSU` : 'Keine Korrektur';
     }
 }
 
+function parseSignedDecimalInput(value, fallback = 0) {
+    const normalized = String(value || '').trim().replace(',', '.');
+    if (!normalized || normalized === '-' || normalized === '+') return fallback;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function savePsuCorrectionOffset() {
     const input = document.getElementById('psuCorrectionOffset');
-    const value = parseFloat(input?.value) || 0;
+    const value = parseSignedDecimalInput(input?.value, 0);
     db.psuCorrectionOffset = value;
     saveDB();
     renderPsuCorrectionSettings();

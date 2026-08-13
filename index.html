@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.3.8-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.0-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.3.8</span>
+                    <span class="version-badge">v3.4.0</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -664,7 +664,7 @@
                             <div class="tool-grid">
                                 <div class="input-group">
                                     <label>PSU-Korrekturwert:</label>
-                                    <input type="number" id="psuCorrectionOffset" step="0.1" value="0" oninput="renderPsuCorrectionSettings()">
+                                    <input type="text" id="psuCorrectionOffset" inputmode="decimal" pattern="-?[0-9]+([,.][0-9]+)?" value="0" oninput="renderPsuCorrectionSettings()">
                                 </div>
                                 <div class="input-group">
                                     <label>Beispiel:</label>
@@ -1831,8 +1831,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.3.8-release"></script>
-    <script src="assets/js/app.js?v=3.3.8-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.0-release"></script>
+    <script src="assets/js/app.js?v=3.4.0-release"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
