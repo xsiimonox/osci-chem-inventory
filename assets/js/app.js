@@ -601,6 +601,8 @@ function normalizeMenuOrder(order) {
 }
 
 const ALWAYS_VISIBLE_TABS = new Set(['einstellungen']);
+const BEGINNER_VISIBLE_TABS = new Set(['uebersicht', 'lager', 'tools', 'logbuch', 'masseneingang', 'einstellungen']);
+const BEGINNER_VISIBLE_TOOL_SECTIONS = new Set(['dosieren-und-messwerte', 'salinitaet-und-wasserwechsel', 'community-und-hilfe']);
 const communityUiState = {
     selectedProfileId: null
 };
@@ -2340,7 +2342,88 @@ function getHiddenMenuTabs() {
 
 function isMenuTabHidden(tabId) {
     if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
+    if (isBeginnerMode() && !BEGINNER_VISIBLE_TABS.has(tabId)) return true;
     return getHiddenMenuTabs().includes(tabId);
+}
+
+function isUserMenuTabHidden(tabId) {
+    if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
+    return getHiddenMenuTabs().includes(tabId);
+}
+
+function getExperienceMode() {
+    return db?.settings?.experienceMode === 'expert' ? 'expert' : 'beginner';
+}
+
+function isBeginnerMode() {
+    return getExperienceMode() !== 'expert';
+}
+
+function isPresentationMode() {
+    return Boolean(db?.settings?.presentationMode);
+}
+
+function applyExperienceModeUI() {
+    document.body.classList.toggle('experience-beginner', isBeginnerMode());
+    document.body.classList.toggle('experience-expert', !isBeginnerMode());
+    document.body.classList.toggle('presentation-mode-active', isPresentationMode());
+    document.querySelectorAll('.tool-section').forEach(section => {
+        const sectionId = section.dataset.sectionId || '';
+        const hidden = isBeginnerMode() && !BEGINNER_VISIBLE_TOOL_SECTIONS.has(sectionId);
+        section.classList.toggle('beginner-hidden', hidden);
+        if (hidden) section.open = false;
+    });
+    applyMenuOrder();
+}
+
+function renderExperienceSettings() {
+    const container = document.getElementById('experienceModeSettings');
+    if (!container) return;
+    const mode = getExperienceMode();
+    const presentation = isPresentationMode();
+    container.innerHTML = `
+        <div class="experience-settings">
+            <div class="experience-mode-picker" role="radiogroup" aria-label="App-Modus">
+                <button type="button" class="${mode === 'beginner' ? 'active' : ''}" onclick="setExperienceMode('beginner')" aria-pressed="${mode === 'beginner'}">
+                    <strong>Einsteiger</strong>
+                    <span>Nur die wichtigsten Bereiche sichtbar.</span>
+                </button>
+                <button type="button" class="${mode === 'expert' ? 'active' : ''}" onclick="setExperienceMode('expert')" aria-pressed="${mode === 'expert'}">
+                    <strong>Experte</strong>
+                    <span>Alle Spezialbereiche und Rechner anzeigen.</span>
+                </button>
+            </div>
+            <label class="settings-toggle-row experience-presentation-toggle">
+                <input type="checkbox" ${presentation ? 'checked' : ''} onchange="togglePresentationMode(this.checked)">
+                <span>
+                    <span class="settings-toggle-title">Präsentationsmodus</span>
+                    <small>Zeigt Beispielhinweise und eine ruhige Demo-Ansicht, ohne echte Daten zu überschreiben.</small>
+                </span>
+            </label>
+        </div>
+    `;
+}
+
+function setExperienceMode(mode) {
+    if (!db.settings) db.settings = {};
+    db.settings.experienceMode = mode === 'expert' ? 'expert' : 'beginner';
+    saveDB();
+    applyExperienceModeUI();
+    renderExperienceSettings();
+    if (isMenuTabHidden(getActiveTabId())) selectTab(getFirstVisibleTab());
+    else renderDashboard();
+    if (getActiveTabId() === 'tools') initTools();
+    showToast(db.settings.experienceMode === 'expert' ? 'Expertenmodus aktiviert' : 'Einsteiger-Modus aktiviert', 'success');
+}
+
+function togglePresentationMode(enabled) {
+    if (!db.settings) db.settings = {};
+    db.settings.presentationMode = Boolean(enabled);
+    saveDB();
+    applyExperienceModeUI();
+    renderExperienceSettings();
+    renderDashboard();
+    showToast(enabled ? 'Präsentationsmodus aktiviert' : 'Präsentationsmodus deaktiviert', 'info');
 }
 
 function getVisibleMenuOrder() {
@@ -2446,7 +2529,6 @@ function resetMenuOrder() {
 
 function applyMenuOrder() {
     const order = getMenuOrder();
-    const hiddenTabs = getHiddenMenuTabs();
     const nav = document.querySelector('.nav-links');
     if (nav) {
         order.forEach(tabId => {
@@ -2456,7 +2538,7 @@ function applyMenuOrder() {
             button.innerHTML = `${getTabIconMarkup(tabId)}<span class="nav-label">${escapeHtml(label)}</span>`;
             button.dataset.tab = tabId;
             button.setAttribute('aria-label', label);
-            button.hidden = hiddenTabs.includes(tabId);
+            button.hidden = isMenuTabHidden(tabId);
             if (!button.hidden) nav.appendChild(button);
         });
     }
@@ -2470,8 +2552,10 @@ function applyMenuOrder() {
 function renderMobileBottomNav(order = getMenuOrder()) {
     const nav = document.querySelector('.mobile-bottom-nav');
     if (!nav) return;
-    const quickTabs = getMobileQuickTabs();
-    nav.innerHTML = quickTabs.map(tabId => `
+    const quickTabs = getMobileQuickTabs().filter(tabId => !isMenuTabHidden(tabId)).slice(0, 4);
+    const fallbackTabs = getVisibleMenuOrder().filter(tabId => !quickTabs.includes(tabId)).slice(0, Math.max(0, 4 - quickTabs.length));
+    const visibleQuickTabs = [...quickTabs, ...fallbackTabs];
+    nav.innerHTML = visibleQuickTabs.map(tabId => `
         <button type="button" onclick="selectTab('${tabId}')" data-tab="${tabId}" aria-label="${escapeHtml(TAB_LABELS[tabId] || tabId)}">
             ${getTabIconMarkup(tabId)}<span class="mobile-nav-label">${escapeHtml(TAB_LABELS[tabId] || tabId)}</span>
         </button>
@@ -2861,6 +2945,8 @@ function normalizeWarehouseData(data) {
     if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
     if (!db.settings.cursorStyle) db.settings.cursorStyle = 'apple';
     if (!db.settings.cursorEmoji) db.settings.cursorEmoji = '🪸';
+    if (!db.settings.experienceMode) db.settings.experienceMode = 'beginner';
+    if (db.settings.presentationMode === undefined) db.settings.presentationMode = false;
     if (!Array.isArray(db.settings.localDevices)) db.settings.localDevices = [];
     if (!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
     if (db.notifications.enabled === undefined) db.notifications.enabled = false;
@@ -4870,12 +4956,49 @@ function renderDashboard() {
             <div>
                 <small>Übersicht</small>
                 <h2>${escapeHtml(aquarium?.name || 'Aquarium')}</h2>
-                <p><strong>${escapeHtml(warehouse?.name || 'Lager')}</strong> · ${escapeHtml(getWarehouseAccessLabel(warehouse))}</p>
+                <p><strong>${escapeHtml(warehouse?.name || 'Lager')}</strong> · Reeftools bündelt Lager, Wasserwerte, OSCI C&amp;R/Trace und Pflege an einem Ort.</p>
             </div>
             <div class="dashboard-hero-actions">
                 <button type="button" onclick="triggerRefresh()" class="btn btn-secondary dashboard-refresh">Aktualisieren</button>
                 <button type="button" onclick="startDashboardEdit()" class="btn btn-secondary dashboard-refresh" ${isEditing ? 'disabled' : ''}>Anpassen</button>
             </div>
+        </section>
+
+        <section class="card dashboard-entry-panel" aria-label="Schneller Einstieg">
+            <div>
+                <span class="section-eyebrow">${isPresentationMode() ? 'Präsentation' : 'Schneller Einstieg'}</span>
+                <h3>Was möchtest du machen?</h3>
+                <p class="hint">${isPresentationMode()
+                    ? 'Zeige zuerst die vier einfachen Wege. So versteht der Verein die App, bevor Spezialfunktionen sichtbar werden.'
+                    : 'Starte mit einer Aktion. Spezialbereiche kannst du jederzeit über den Expertenmodus in den Einstellungen einblenden.'}</p>
+            </div>
+            <div class="dashboard-entry-grid">
+                <button type="button" class="dashboard-entry-card" onclick="selectTab('lager')">
+                    <strong>Lager prüfen</strong>
+                    <span>Bestände, Warnungen und Produkte auf einen Blick.</span>
+                </button>
+                <button type="button" class="dashboard-entry-card" onclick="openSmartStockModal('in')">
+                    <strong>Einlagern</strong>
+                    <span>Neue Ware schnell dem aktuellen Lager hinzufügen.</span>
+                </button>
+                <button type="button" class="dashboard-entry-card" onclick="selectTab('logbuch')">
+                    <strong>Werte dokumentieren</strong>
+                    <span>Tests, Pflege und ToDos für das Aquarium erfassen.</span>
+                </button>
+                <button type="button" class="dashboard-entry-card" onclick="selectTab('tools')">
+                    <strong>Rechner öffnen</strong>
+                    <span>Dosierung, Salz, Wasserwechsel und Quellen finden.</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="card dashboard-backup-reminder" aria-label="Backup Hinweis">
+            <div>
+                <span class="section-eyebrow">Datensicherheit</span>
+                <h3>Backup nicht vergessen</h3>
+                <p>Deine Daten bleiben lokal auf deinem Gerät. Erstelle regelmäßig ein Projekt-Backup oder nutze Google Drive Sync.</p>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="exportData()">Backup erstellen</button>
         </section>
 
         ${alerts.length || dueTodos.length ? `
@@ -5756,7 +5879,7 @@ document.addEventListener('keydown', event => {
 });
 
 function selectTab(tabId) {
-    if (isMenuTabHidden(tabId)) {
+    if (isUserMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
     showTab(tabId);
@@ -5815,7 +5938,7 @@ function refreshDesignMotionTargets(scope = document.querySelector('.tab-content
 }
 
 function showTab(tabId) {
-    if (isMenuTabHidden(tabId)) {
+    if (isUserMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
     if (WAREHOUSE_WRITE_TAB_IDS.has(tabId) && isWarehouseReadOnlyView()) {
@@ -5896,6 +6019,7 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'korallen') renderCoralCatalog();
         if(tabId === 'einstellungen') {
             setupSettingsAccordions();
+            renderExperienceSettings();
             updateNotificationStatus();
             renderCustomProductSettings();
             renderCustomContainers();
@@ -6077,6 +6201,7 @@ function setupSettingsAccordions() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
+    if (/start|darstellung|einsteiger|experte|präsentation/.test(normalized)) return { group: 'Allgemein', hint: 'Einsteiger-Modus, Expertenmodus und Präsentation', keywords: 'start darstellung einsteiger experte modus präsentation demo verein' };
     if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
     if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
@@ -10086,6 +10211,7 @@ function initTools() {
     runToolInit('Tool-Kategorien', setupToolSections);
     runToolInit('Tool-Favoriten', renderToolFavorites);
     runToolInit('Rechner UI', setupPriority4CalculatorUI);
+    applyExperienceModeUI();
     document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
         initToolSection(section.dataset.sectionId || '');
     });
@@ -14931,6 +15057,18 @@ function savePsuCorrectionOffset() {
     showToast('PSU-Korrektur gespeichert', 'success');
 }
 
+function setPsuCorrectionSign(sign = 1) {
+    const input = document.getElementById('psuCorrectionOffset');
+    if (!input) return;
+    const value = parseSignedDecimalInput(input.value, 0);
+    const direction = Number(sign) < 0 ? -1 : 1;
+    const next = Math.abs(value || 0.1) * direction;
+    input.value = next.toFixed(1).replace('.', ',');
+    const example = document.getElementById('psuCorrectionExample');
+    if (example) example.value = `35,0 wird ${(35 + next).toFixed(1).replace('.', ',')} PSU`;
+    input.focus();
+}
+
 function deletePsuCorrectionOffset() {
     if (!confirm('PSU-Korrektur löschen?')) return;
     db.psuCorrectionOffset = 0;
@@ -17775,6 +17913,7 @@ async function bootstrapApplication() {
     }
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     showTab(startupTab);
+    applyExperienceModeUI();
     updateNotificationStatus();
     renderStorageSecurityStatus();
     renderAppUpdateStatus();
@@ -17809,7 +17948,7 @@ bootstrapApplication().catch(err => {
 
 window.addEventListener('hashchange', () => {
     const hashTab = decodeURIComponent(window.location.hash.slice(1));
-    if (APP_TAB_IDS.includes(hashTab)) showTab(isMenuTabHidden(hashTab) ? getFirstVisibleTab() : hashTab);
+    if (APP_TAB_IDS.includes(hashTab)) showTab(isUserMenuTabHidden(hashTab) ? getFirstVisibleTab() : hashTab);
 });
 
 window.addEventListener('pagehide', () => {
