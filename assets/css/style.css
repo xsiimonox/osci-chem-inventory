@@ -17036,11 +17036,6 @@ progress.mini-progress::-moz-progress-bar {
     }
 }
 
-/* Einstieg erleichtern: Einsteiger-/Expertenmodus und Präsentation */
-.beginner-hidden {
-    display: none !important;
-}
-
 .settings-card-experience {
     overflow: visible;
 }
@@ -17048,48 +17043,6 @@ progress.mini-progress::-moz-progress-bar {
 .experience-settings {
     display: grid;
     gap: 14px;
-}
-
-.experience-mode-picker {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-}
-
-.experience-mode-picker button {
-    min-height: 94px;
-    align-items: flex-start;
-    justify-content: center;
-    padding: 16px;
-    text-align: left;
-    border: 1px solid var(--border-color);
-    background: color-mix(in srgb, var(--surface-raised) 82%, transparent);
-    color: var(--text-primary);
-    box-shadow: none;
-}
-
-.experience-mode-picker button strong,
-.experience-mode-picker button span {
-    display: block;
-    width: 100%;
-}
-
-.experience-mode-picker button strong {
-    margin-bottom: 6px;
-    font-size: 1rem;
-}
-
-.experience-mode-picker button span {
-    color: var(--text-secondary);
-    font-size: 0.86rem;
-    line-height: 1.35;
-    white-space: normal;
-}
-
-.experience-mode-picker button.active {
-    border-color: color-mix(in srgb, var(--accent) 62%, var(--border-color));
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 24%, var(--surface-raised)), var(--surface-raised));
-    color: var(--text-primary);
 }
 
 .experience-presentation-toggle {
@@ -17189,7 +17142,6 @@ progress.mini-progress::-moz-progress-bar {
 }
 
 @media (max-width: 767px) {
-    .experience-mode-picker,
     .dashboard-entry-grid,
     .dashboard-backup-reminder {
         grid-template-columns: 1fr;

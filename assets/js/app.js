@@ -601,8 +601,6 @@ function normalizeMenuOrder(order) {
 }
 
 const ALWAYS_VISIBLE_TABS = new Set(['einstellungen']);
-const BEGINNER_VISIBLE_TABS = new Set(['uebersicht', 'lager', 'tools', 'logbuch', 'masseneingang', 'einstellungen']);
-const BEGINNER_VISIBLE_TOOL_SECTIONS = new Set(['dosieren-und-messwerte', 'salinitaet-und-wasserwechsel', 'community-und-hilfe']);
 const communityUiState = {
     selectedProfileId: null
 };
@@ -2342,7 +2340,6 @@ function getHiddenMenuTabs() {
 
 function isMenuTabHidden(tabId) {
     if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
-    if (isBeginnerMode() && !BEGINNER_VISIBLE_TABS.has(tabId)) return true;
     return getHiddenMenuTabs().includes(tabId);
 }
 
@@ -2351,48 +2348,21 @@ function isUserMenuTabHidden(tabId) {
     return getHiddenMenuTabs().includes(tabId);
 }
 
-function getExperienceMode() {
-    return db?.settings?.experienceMode === 'expert' ? 'expert' : 'beginner';
-}
-
-function isBeginnerMode() {
-    return getExperienceMode() !== 'expert';
-}
-
 function isPresentationMode() {
     return Boolean(db?.settings?.presentationMode);
 }
 
-function applyExperienceModeUI() {
-    document.body.classList.toggle('experience-beginner', isBeginnerMode());
-    document.body.classList.toggle('experience-expert', !isBeginnerMode());
+function applyPresentationModeUI() {
     document.body.classList.toggle('presentation-mode-active', isPresentationMode());
-    document.querySelectorAll('.tool-section').forEach(section => {
-        const sectionId = section.dataset.sectionId || '';
-        const hidden = isBeginnerMode() && !BEGINNER_VISIBLE_TOOL_SECTIONS.has(sectionId);
-        section.classList.toggle('beginner-hidden', hidden);
-        if (hidden) section.open = false;
-    });
     applyMenuOrder();
 }
 
 function renderExperienceSettings() {
     const container = document.getElementById('experienceModeSettings');
     if (!container) return;
-    const mode = getExperienceMode();
     const presentation = isPresentationMode();
     container.innerHTML = `
         <div class="experience-settings">
-            <div class="experience-mode-picker" role="radiogroup" aria-label="App-Modus">
-                <button type="button" class="${mode === 'beginner' ? 'active' : ''}" onclick="setExperienceMode('beginner')" aria-pressed="${mode === 'beginner'}">
-                    <strong>Einsteiger</strong>
-                    <span>Nur die wichtigsten Bereiche sichtbar.</span>
-                </button>
-                <button type="button" class="${mode === 'expert' ? 'active' : ''}" onclick="setExperienceMode('expert')" aria-pressed="${mode === 'expert'}">
-                    <strong>Experte</strong>
-                    <span>Alle Spezialbereiche und Rechner anzeigen.</span>
-                </button>
-            </div>
             <label class="settings-toggle-row experience-presentation-toggle">
                 <input type="checkbox" ${presentation ? 'checked' : ''} onchange="togglePresentationMode(this.checked)">
                 <span>
@@ -2404,23 +2374,11 @@ function renderExperienceSettings() {
     `;
 }
 
-function setExperienceMode(mode) {
-    if (!db.settings) db.settings = {};
-    db.settings.experienceMode = mode === 'expert' ? 'expert' : 'beginner';
-    saveDB();
-    applyExperienceModeUI();
-    renderExperienceSettings();
-    if (isMenuTabHidden(getActiveTabId())) selectTab(getFirstVisibleTab());
-    else renderDashboard();
-    if (getActiveTabId() === 'tools') initTools();
-    showToast(db.settings.experienceMode === 'expert' ? 'Expertenmodus aktiviert' : 'Einsteiger-Modus aktiviert', 'success');
-}
-
 function togglePresentationMode(enabled) {
     if (!db.settings) db.settings = {};
     db.settings.presentationMode = Boolean(enabled);
     saveDB();
-    applyExperienceModeUI();
+    applyPresentationModeUI();
     renderExperienceSettings();
     renderDashboard();
     showToast(enabled ? 'Präsentationsmodus aktiviert' : 'Präsentationsmodus deaktiviert', 'info');
@@ -2945,7 +2903,6 @@ function normalizeWarehouseData(data) {
     if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
     if (!db.settings.cursorStyle) db.settings.cursorStyle = 'apple';
     if (!db.settings.cursorEmoji) db.settings.cursorEmoji = '🪸';
-    if (!db.settings.experienceMode) db.settings.experienceMode = 'beginner';
     if (db.settings.presentationMode === undefined) db.settings.presentationMode = false;
     if (!Array.isArray(db.settings.localDevices)) db.settings.localDevices = [];
     if (!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
@@ -4970,7 +4927,7 @@ function renderDashboard() {
                 <h3>Was möchtest du machen?</h3>
                 <p class="hint">${isPresentationMode()
                     ? 'Zeige zuerst die vier einfachen Wege. So versteht der Verein die App, bevor Spezialfunktionen sichtbar werden.'
-                    : 'Starte mit einer Aktion. Spezialbereiche kannst du jederzeit über den Expertenmodus in den Einstellungen einblenden.'}</p>
+                    : 'Starte mit einer Aktion. Die wichtigsten Bereiche bleiben direkt erreichbar, ohne lange suchen zu müssen.'}</p>
             </div>
             <div class="dashboard-entry-grid">
                 <button type="button" class="dashboard-entry-card" onclick="selectTab('lager')">
@@ -6201,7 +6158,7 @@ function setupSettingsAccordions() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/start|darstellung|einsteiger|experte|präsentation/.test(normalized)) return { group: 'Allgemein', hint: 'Einsteiger-Modus, Expertenmodus und Präsentation', keywords: 'start darstellung einsteiger experte modus präsentation demo verein' };
+    if (/start|darstellung|präsentation/.test(normalized)) return { group: 'Allgemein', hint: 'Startansicht und Präsentation', keywords: 'start darstellung modus präsentation demo verein' };
     if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
     if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
@@ -10211,7 +10168,7 @@ function initTools() {
     runToolInit('Tool-Kategorien', setupToolSections);
     runToolInit('Tool-Favoriten', renderToolFavorites);
     runToolInit('Rechner UI', setupPriority4CalculatorUI);
-    applyExperienceModeUI();
+    applyPresentationModeUI();
     document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
         initToolSection(section.dataset.sectionId || '');
     });
@@ -17913,7 +17870,7 @@ async function bootstrapApplication() {
     }
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     showTab(startupTab);
-    applyExperienceModeUI();
+    applyPresentationModeUI();
     updateNotificationStatus();
     renderStorageSecurityStatus();
     renderAppUpdateStatus();
