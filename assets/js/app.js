@@ -274,7 +274,8 @@ const AQUARIUM_FIELD_KEYS = [
     'customSeaTracePresets',
     'dashboardSettings',
     'coralCatalog',
-    'coralTransfers'
+    'coralTransfers',
+    'lightingPlanner'
 ];
 const AQUARIUM_FIELD_KEY_SET = new Set(AQUARIUM_FIELD_KEYS);
 const WAREHOUSE_WRITE_TAB_IDS = new Set(['cr-export', 'trace-export', 'statistik', 'log', 'masseneingang', 'nachbestellen']);
@@ -410,6 +411,8 @@ const APP_STORAGE_MAX_SNAPSHOTS = 5;
 const APP_STORAGE_SENTINEL_KEY = 'reeftools_local_storage_sentinel_v1';
 const APP_STORAGE_EMERGENCY_KEY = 'reeftools_emergency_state_v1';
 const APP_STORAGE_EMERGENCY_LIMIT = 4_000_000;
+const DEMO_PROFILE_ACTIVE_KEY = 'reeftools_demo_profile_active_v1';
+const DEMO_PROFILE_RETURN_STATE_KEY = 'demo_profile_return_state';
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -475,6 +478,8 @@ const DEFAULT_MENU_ORDER = ['uebersicht', 'lager', 'cr-export', 'trace-export', 
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
 const HIDDEN_MENU_TABS_KEY = 'osci_hidden_menu_tabs_v1';
+const OVERVIEW_ENABLED_KEY = 'reeftools_overview_enabled_v1';
+const OSCI_FEATURES_ENABLED_KEY = 'reeftools_osci_features_enabled_v1';
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
     lager: 'Lager',
@@ -508,6 +513,27 @@ const TOOL_SEARCH_KEYWORDS = {
     'sangokai-a-z-assistent': 'wissen hilfe ratgeber nachschlagen frage pdf sangokai',
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
+const TOOL_DEFINITIONS = [
+    { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur' },
+    { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag' },
+    { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung' },
+    { id: 'test-korrekturfaktor', label: 'Test Korrekturfaktor' },
+    { id: 'hanna-phosphor-zu-phosphat', label: 'Hanna Phosphor zu Phosphat' },
+    { id: 'salifert-umrechner', label: 'Salifert Umrechner' },
+    { id: 'nutrition-rechner', label: 'Nutrition Rechner', osciOnly: true },
+    { id: 'salzgehalt-rechner', label: 'Salzgehalt Rechner' },
+    { id: 'salz-korrektur', label: 'Salzgehalt Korrigieren' },
+    { id: 'nettovolumen-berechnen', label: 'Nettovolumen Berechnen' },
+    { id: 'wasserwechsel-effekt', label: 'Wasserwechsel Effekt' },
+    { id: 'adsorber-durchfluss', label: 'Adsorber Durchfluss' },
+    { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', osciOnly: true },
+    { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', osciOnly: true },
+    { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', osciOnly: true },
+    { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent' },
+    { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen' }
+];
+const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
+const OSCI_ONLY_TOOL_IDS = new Set(TOOL_DEFINITIONS.filter(tool => tool.osciOnly).map(tool => tool.id));
 
 function normalizeSearchText(value) {
     return String(value || '')
@@ -1451,6 +1477,332 @@ function buildProjectBackupPayload() {
     };
 }
 
+function isDemoProfileActive() {
+    try {
+        return localStorage.getItem(DEMO_PROFILE_ACTIVE_KEY) === 'true';
+    } catch (err) {
+        return false;
+    }
+}
+
+function setDemoProfileActive(active) {
+    try {
+        if (active) localStorage.setItem(DEMO_PROFILE_ACTIVE_KEY, 'true');
+        else localStorage.removeItem(DEMO_PROFILE_ACTIVE_KEY);
+    } catch (err) {}
+    document.body?.classList.toggle('demo-profile-active', Boolean(active));
+}
+
+function demoDate(daysAgo = 0, hour = 10, minute = 0) {
+    const date = new Date();
+    date.setHours(hour, minute, 0, 0);
+    date.setDate(date.getDate() - daysAgo);
+    return date.toISOString();
+}
+
+function demoTimestamp(daysAgo = 0, hour = 10, minute = 0) {
+    return new Date(demoDate(daysAgo, hour, minute)).getTime();
+}
+
+function createDemoLog(id, cat, item, action, amount, daysAgo) {
+    const timestamp = demoTimestamp(daysAgo, 11, 15);
+    return { id, cat, item, action, amount, timestamp, time: timestamp };
+}
+
+function createDemoWarehouseData(name = 'Demo Hauptlager', variant = 'main') {
+    const inventory = {};
+    Object.entries(catalog).forEach(([cat, products]) => {
+        inventory[cat] = {};
+        Object.keys(products).forEach((item, index) => {
+            const base = cat === 'C&R Produkte' ? 1800 : cat === 'Makro Elements' ? 2600 : cat === 'Nutrition Elements' ? 640 : 120;
+            inventory[cat][item] = Math.max(0, Math.round((base + index * 137 + (variant === 'reserve' ? 900 : 0)) * 10) / 10);
+        });
+    });
+
+    if (variant === 'main') {
+        inventory['C&R Produkte']['Strontiumchlorid (SrCl2)'] = 118.4;
+        inventory['C&R Produkte']['Magnesiumsulfat (MgSO4)'] = 740.2;
+        inventory['Nutrition Elements']['Phosphor (P)'] = 86.5;
+        inventory['Anionen']['Iod (I)'] = 24.1;
+    }
+
+    const logs = variant === 'reserve'
+        ? [
+            createDemoLog('demo-reserve-log-001', 'C&R Produkte', 'Natriumchlorid (NaCl)', 'in', 5000, 22),
+            createDemoLog('demo-reserve-log-002', 'Makro Elements', 'Calcium', 'in', 5000, 14),
+            createDemoLog('demo-reserve-log-003', 'Nutrition Elements', 'Kohlenstoff (C)', 'out', 40, 6)
+        ]
+        : [
+            createDemoLog('demo-log-001', 'C&R Produkte', 'Natriumchlorid (NaCl)', 'out', 420, 86),
+            createDemoLog('demo-log-002', 'C&R Produkte', 'Magnesiumsulfat (MgSO4)', 'out', 160, 74),
+            createDemoLog('demo-log-003', 'C&R Produkte', 'Calciumchlorid (CaCl2)', 'out', 92, 68),
+            createDemoLog('demo-log-004', 'Nutrition Elements', 'Stickstoff (N)', 'out', 18, 57),
+            createDemoLog('demo-log-005', 'C&R Produkte', 'Natriumchlorid (NaCl)', 'out', 380, 49),
+            createDemoLog('demo-log-006', 'Makro Elements', 'KH Tag', 'out', 250, 43),
+            createDemoLog('demo-log-007', 'Anionen', 'Iod (I)', 'out', 1.4, 38),
+            createDemoLog('demo-log-008', 'Kationen', 'Eisen (Fe)', 'out', 3.2, 31),
+            createDemoLog('demo-log-009', 'C&R Produkte', 'Magnesiumsulfat (MgSO4)', 'out', 210, 24),
+            createDemoLog('demo-log-010', 'C&R Produkte', 'Strontiumchlorid (SrCl2)', 'out', 18.5, 17),
+            createDemoLog('demo-log-011', 'Nutrition Elements', 'Phosphor (P)', 'out', 12, 9),
+            createDemoLog('demo-log-012', 'Makro Elements', 'KH Tag', 'out', 280, 4)
+        ];
+
+    const stats = {};
+    logs.filter(log => log.action === 'out').forEach(log => {
+        stats[log.item] = (stats[log.item] || 0) + log.amount;
+    });
+    Object.values(catalog).forEach(products => {
+        Object.keys(products).forEach(item => {
+            if (stats[item] === undefined) stats[item] = 0;
+        });
+    });
+
+    return createWarehouseData({
+        inventory,
+        stats,
+        logs,
+        statsStarted: demoTimestamp(120, 8, 0),
+        theme: db?.theme || 'default',
+        thresholds: {
+            'Strontiumchlorid (SrCl2)': 150,
+            'Magnesiumsulfat (MgSO4)': 800,
+            'Iod (I)': 25,
+            'Phosphor (P)': 100
+        },
+        favoriteProducts: {
+            'Natriumchlorid (NaCl)': true,
+            'KH Tag': true,
+            'Iod (I)': true
+        },
+        warehouseEvents: [
+            { id: 'demo-event-001', type: 'lager', text: `${name} für Demo vorbereitet`, at: demoDate(90, 9, 0), meta: {} },
+            { id: 'demo-event-002', type: 'cloud', text: 'Beispiel: Projekt-Backup erstellt', at: demoDate(21, 18, 15), meta: {} },
+            { id: 'demo-event-003', type: 'osmose', text: 'Osmosewasser verbraucht: 18.0 L', at: demoDate(2, 19, 30), meta: {} }
+        ],
+        localUpdatedAt: demoDate(0, 9, 30)
+    });
+}
+
+function createDemoMeasurementEntries() {
+    const points = [];
+    const series = {
+        KH: [7.4, 7.3, 7.1, 7.2, 7.0, 6.9, 7.1, 7.2, 7.3],
+        CA: [430, 428, 425, 424, 421, 423, 425, 426, 424],
+        MG: [1345, 1340, 1332, 1328, 1320, 1325, 1322, 1324, 1320],
+        PO4: [0.08, 0.07, 0.06, 0.05, 0.04, 0.05, 0.06, 0.05, 0.05],
+        NO3: [8.5, 7.8, 7.1, 6.4, 5.9, 5.2, 4.8, 5.1, 5.0]
+    };
+    Object.entries(series).forEach(([typeId, values]) => {
+        values.forEach((value, index) => {
+            const daysAgo = (values.length - 1 - index) * 7;
+            points.push({
+                id: `demo-measure-${typeId}-${index}`,
+                typeId,
+                value,
+                at: demoDate(daysAgo, 20, 0),
+                note: index === values.length - 1 ? 'Aktueller Demo-Messwert' : '',
+                createdAt: demoDate(daysAgo, 20, 2)
+            });
+        });
+    });
+    return points.sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+function createDemoAquariumData() {
+    return createAquariumData({
+        logBookCategories: ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
+        logBookEntries: [
+            { id: 'demo-book-001', category: 'Wasserwechsel', title: '12 % Wasserwechsel', note: 'Salzgehalt nach 60 Minuten kontrolliert, Polypenbild stabil.', at: demoDate(3, 18, 20), createdAt: demoDate(3, 18, 25) },
+            { id: 'demo-book-002', category: 'Nährstoffkontrolle', title: 'PO4 leicht gefallen', note: 'Fütterung minimal erhöht und Adsorberdurchfluss gedrosselt.', at: demoDate(6, 20, 10), createdAt: demoDate(6, 20, 12) },
+            { id: 'demo-book-003', category: 'Wartung', title: 'Abschäumer gereinigt', note: 'Topf gereinigt, Luftansaugung gespült.', at: demoDate(10, 12, 30), createdAt: demoDate(10, 12, 31) },
+            { id: 'demo-book-004', category: 'Korallenbesatz', title: 'Ableger umgesetzt', note: 'Montipora in mittlere Zone gesetzt, Strömung wirkt passend.', at: demoDate(18, 17, 45), createdAt: demoDate(18, 17, 50) }
+        ],
+        aquariumTodos: [
+            { id: 'demo-todo-001', title: 'KH und PO4 messen', category: 'Nährstoffkontrolle', dueAt: demoDate(0, 19, 0), intervalDays: 3, notifyEnabled: true, done: false, remindedAt: null, lastDoneAt: demoDate(3, 19, 0), createdAt: demoDate(60, 10, 0) },
+            { id: 'demo-todo-002', title: 'Osmosetank prüfen', category: 'Wartung', dueAt: demoDate(-1, 9, 0), intervalDays: 7, notifyEnabled: true, done: false, remindedAt: null, lastDoneAt: demoDate(6, 9, 0), createdAt: demoDate(70, 10, 0) },
+            { id: 'demo-todo-003', title: 'Pumpen reinigen', category: 'Technik', dueAt: demoDate(-5, 11, 0), intervalDays: 30, notifyEnabled: false, done: false, remindedAt: null, lastDoneAt: demoDate(25, 11, 0), createdAt: demoDate(100, 10, 0) }
+        ],
+        dosingContainers: [
+            { id: 'demo-dose-001', name: 'KH Tag', capacityMl: 5000, currentMl: 1620, tareG: 180, density: 1.08, usage: 74, usageUnit: 'day', warnHours: 72, lastFilledAt: demoDate(34, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) },
+            { id: 'demo-dose-002', name: 'Calcium', capacityMl: 5000, currentMl: 3180, tareG: 180, density: 1.12, usage: 42, usageUnit: 'day', warnHours: 96, lastFilledAt: demoDate(20, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) },
+            { id: 'demo-dose-003', name: 'A- Trace', capacityMl: 1000, currentMl: 220, tareG: 72, density: 1.01, usage: 5, usageUnit: 'day', warnHours: 120, lastFilledAt: demoDate(75, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) }
+        ],
+        measurementEntries: createDemoMeasurementEntries(),
+        feedNutrientLog: [
+            { id: 'demo-feed-001', type: 'Frostfutter', amount: 2, at: demoDate(1, 18, 0) },
+            { id: 'demo-feed-002', type: 'Staubfutter', amount: 0.5, at: demoDate(4, 18, 0) }
+        ],
+        osmoseTank: {
+            capacityLiters: 80,
+            currentLiters: 31.5,
+            warnDays: 3,
+            usageLog: [
+                { id: 'demo-osmose-001', liters: 18, at: demoDate(2, 19, 30) },
+                { id: 'demo-osmose-002', liters: 12, at: demoDate(5, 19, 30) },
+                { id: 'demo-osmose-003', liters: 16, at: demoDate(9, 19, 30) },
+                { id: 'demo-osmose-004', liters: 14, at: demoDate(13, 19, 30) }
+            ],
+            lastAlertSignature: '',
+            lastAlertAt: 0
+        },
+        traceDraft: {
+            history: [
+                { id: 'demo-trace-001', date: demoDate(70, 8, 0), runtimeDays: 40, dailyDoseMl: 5, totalVolumeMl: 200, elementVolumeMl: 94, osmoseMl: 106, tankLiters: 440, isInitial: true, includeInCalculation: true },
+                { id: 'demo-trace-002', date: demoDate(28, 8, 0), runtimeDays: 40, dailyDoseMl: 5, totalVolumeMl: 200, elementVolumeMl: 98, osmoseMl: 102, tankLiters: 440, includeInCalculation: true }
+            ]
+        },
+        testCorrections: {
+            KH: { home: 7.5, reference: 7.8, factor: 0.3 },
+            CA: { home: 420, reference: 425, factor: 5 }
+        },
+        majorCorrectionSettings: { tankLiters: 440, strengths: { KH: 0.05, Ca: 1 } },
+        psuCorrectionOffset: -0.2,
+        toolSettings: { lastSection: 'wasserwerte-und-dosierung', favorites: ['salzgehalt-rechner', 'nutrition-rechner'], hidden: [] },
+        coralCatalog: [
+            { id: 'demo-coral-001', scientificName: 'Acropora tenuis', genus: 'Acropora', speciesName: 'tenuis', tradeName: 'Blue Tenuis', coralType: 'SPS', growthForm: 'verzweigt', color: 'blau-grün, helle Polypen', status: 'bestand', createdAt: demoDate(80, 14, 0), updatedAt: demoDate(8, 14, 0) },
+            { id: 'demo-coral-002', scientificName: 'Euphyllia glabrescens', genus: 'Euphyllia', speciesName: 'glabrescens', tradeName: 'Torch Gold', coralType: 'LPS', growthForm: 'buschig', color: 'goldene Spitzen, grüne Basis', status: 'bestand', createdAt: demoDate(55, 14, 0), updatedAt: demoDate(5, 14, 0) },
+            { id: 'demo-coral-003', scientificName: 'Montipora capricornis', genus: 'Montipora', speciesName: 'capricornis', tradeName: 'Red Plating', coralType: 'SPS', growthForm: 'plating', color: 'rot/orange', status: 'ableger', motherCoralId: 'demo-coral-001', createdAt: demoDate(16, 14, 0), updatedAt: demoDate(2, 14, 0) }
+        ],
+        coralTransfers: [
+            { id: 'demo-transfer-001', coralId: 'demo-coral-old', recipientName: 'Max Mustermann', recipientContact: 'max@example.de', note: 'Ableger beim Vereinstreffen abgegeben.', transferredAt: demoDate(14, 19, 0), coralSnapshot: { tradeName: 'Green Slimer Ableger', scientificName: 'Acropora yongei', coralType: 'SPS', color: 'grün' } }
+        ],
+        localUpdatedAt: demoDate(0, 9, 30)
+    });
+}
+
+function createDemoAppState() {
+    const mainWarehouse = {
+        id: 'demo-main',
+        name: 'Demo Hauptlager',
+        createdAt: demoDate(120, 8, 0),
+        lastImportAt: demoDate(14, 9, 0),
+        lastExportAt: demoDate(2, 19, 0),
+        data: createDemoWarehouseData('Demo Hauptlager', 'main')
+    };
+    const reserveWarehouse = {
+        id: 'demo-reserve',
+        name: 'Demo Reserve',
+        createdAt: demoDate(90, 8, 0),
+        lastImportAt: demoDate(22, 9, 0),
+        lastExportAt: demoDate(7, 19, 0),
+        data: createDemoWarehouseData('Demo Reserve', 'reserve')
+    };
+    return {
+        version: 1,
+        demoProfile: true,
+        demoCreatedAt: new Date().toISOString(),
+        activeWarehouseId: mainWarehouse.id,
+        activeAquariumId: 'demo-aquarium',
+        pendingDeletedRemoteIds: [],
+        communityMapProfileDraft: {},
+        warehouses: {
+            [mainWarehouse.id]: mainWarehouse,
+            [reserveWarehouse.id]: reserveWarehouse
+        },
+        aquariums: {
+            'demo-aquarium': {
+                id: 'demo-aquarium',
+                name: 'Demo Riff 440',
+                createdAt: demoDate(120, 8, 0),
+                data: createDemoAquariumData()
+            }
+        }
+    };
+}
+
+async function loadDemoProfile() {
+    const alreadyDemo = isDemoProfileActive();
+    if (!alreadyDemo) {
+        const confirmed = await appConfirm('Dein aktuelles Profil wird lokal gesichert. Danach kannst du das vollständig befüllte Demo-Profil testen und jederzeit zurückwechseln.', {
+            title: 'Demo-Profil laden',
+            confirmText: 'Demo laden',
+            cancelText: 'Abbrechen'
+        });
+        if (!confirmed) return;
+        syncActiveAquariumDataFromDb(false);
+        await flushPendingPersistence('before-demo-profile', true);
+        const returnRecord = {
+            key: DEMO_PROFILE_RETURN_STATE_KEY,
+            savedAt: new Date().toISOString(),
+            payload: prepareAppStateForStorage(appState)
+        };
+        const stored = await idbPut(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY, returnRecord);
+        if (!stored) {
+            await appAlert('Dein aktuelles Profil konnte nicht sicher als Rückkehrpunkt gespeichert werden. Demo wurde nicht geladen.', {
+                title: 'Demo nicht geladen',
+                type: 'warning'
+            });
+            return;
+        }
+    }
+
+    appState = createDemoAppState();
+    activeWarehouseId = appState.activeWarehouseId;
+    activeAquariumId = appState.activeAquariumId;
+    db = normalizeWarehouseData(getActiveWarehouse()?.data || {});
+    overlayActiveAquariumData();
+    setDemoProfileActive(true);
+    await persistAppStateNow('demo-profile', false);
+    applyTheme(db.theme || 'default', false);
+    renderCurrentWarehouseViews();
+    renderDemoProfileSettings();
+    showTab('lager');
+    showToast('Demo-Profil geladen. Deine echten Daten sind als Rückkehrpunkt gespeichert.', 'success', 3600);
+}
+
+async function restoreOwnProfileFromDemo() {
+    const returnRecord = await idbGet(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+    if (!returnRecord?.payload) {
+        await appAlert('Es wurde kein gespeichertes eigenes Profil gefunden. Bitte lade dein Backup oder deinen Cloud-Stand.', {
+            title: 'Rückkehr nicht möglich',
+            type: 'warning'
+        });
+        return;
+    }
+    const confirmed = await appConfirm('Zurück zu deinen eigenen Daten wechseln? Änderungen im Demo-Profil werden verworfen.', {
+        title: 'Eigenes Profil wiederherstellen',
+        confirmText: 'Zurück wechseln',
+        cancelText: 'Abbrechen'
+    });
+    if (!confirmed) return;
+    appState = migrateToWarehouseState(returnRecord.payload);
+    activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
+    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+    appState.activeWarehouseId = activeWarehouseId;
+    appState.activeAquariumId = activeAquariumId;
+    db = normalizeWarehouseData(getActiveWarehouse()?.data || {});
+    overlayActiveAquariumData();
+    setDemoProfileActive(false);
+    await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+    await persistAppStateNow('restore-own-profile', false);
+    applyTheme(db.theme || 'default', false);
+    renderCurrentWarehouseViews();
+    renderDemoProfileSettings();
+    showTab('lager');
+    showToast('Eigenes Profil wiederhergestellt.', 'success', 3000);
+}
+
+async function renderDemoProfileSettings() {
+    const container = document.getElementById('demoProfileSettings');
+    if (!container) return;
+    const active = isDemoProfileActive();
+    const returnRecord = await idbGet(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+    container.innerHTML = `
+        <div class="demo-profile-panel ${active ? 'is-active' : ''}">
+            <div>
+                <strong>${active ? 'Demo-Profil aktiv' : 'Demo-Profil testen'}</strong>
+                <small>${active
+                    ? `Deine echten Daten sind ${returnRecord?.savedAt ? `seit ${formatWarehouseDate(returnRecord.savedAt)}` : ''} als Rückkehrpunkt gespeichert. Cloud-Upload ist im Demo-Modus pausiert.`
+                    : 'Lädt ein komplett befülltes Beispielprojekt mit Lager, Logbuch, ToDos, Messwerten, Statistik, Protokoll, Osmose, Vorratsbehältern und Korallen.'}</small>
+            </div>
+            <div class="demo-profile-actions">
+                <button type="button" class="btn-secondary btn-animated" onclick="loadDemoProfile()">${active ? 'Demo neu laden' : 'Demo-Profil laden'}</button>
+                <button type="button" class="btn-primary btn-animated" onclick="restoreOwnProfileFromDemo()" ${active && returnRecord?.payload ? '' : 'disabled'}>Zu meinen Daten</button>
+            </div>
+        </div>
+    `;
+}
+
 function validateWarehouseBackupData(data = {}) {
     const errors = [];
     const warnings = [];
@@ -1560,6 +1912,9 @@ function buildGoogleDriveMultipartBody(metadata, content) {
 }
 
 async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
+    if (isDemoProfileActive()) {
+        throw new Error('Demo-Profil aktiv. Cloud-Upload ist pausiert, damit keine Beispiel-Daten deine echten Backups überschreiben.');
+    }
     if (!isGoogleDriveConfigured()) throw new Error('Google Drive Sync ist noch nicht eingerichtet.');
     const payload = buildProjectBackupPayload();
     const fileId = await findGoogleDriveBackupFileId();
@@ -1605,6 +1960,8 @@ async function restoreProjectBackupFromGoogleDrive() {
         throw new Error(`Cloud-Backup ist unvollständig oder beschädigt.\n${formatBackupValidationMessage(validation)}`);
     }
     appState = migrateToWarehouseState(parsed.data);
+    setDemoProfileActive(false);
+    await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
     activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
     activeAquariumId = parsed.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
     appState.activeWarehouseId = activeWarehouseId;
@@ -1626,6 +1983,7 @@ async function restoreProjectBackupFromGoogleDrive() {
 }
 
 function scheduleGoogleDriveAutoSync() {
+    if (isDemoProfileActive()) return;
     const settings = getGoogleDriveSyncSettings();
     if (!settings.autoSync || !hasValidGoogleDriveToken()) return;
     clearTimeout(googleDriveSyncTimer);
@@ -1880,10 +2238,13 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
     const mount = document.getElementById('googleDriveSyncStatus');
     const settings = getGoogleDriveSyncSettings();
     const configured = isGoogleDriveConfigured();
+    const demoActive = isDemoProfileActive();
     const sessionConnected = hasValidGoogleDriveToken();
     const connected = sessionConnected || !!settings.connectedEmail;
     const accountLabel = settings.connectedEmail || (sessionConnected ? 'verbunden' : '-');
-    const status = statusMessage || getGoogleDriveSyncStatusMessage();
+    const status = statusMessage || (demoActive
+        ? 'Demo-Profil aktiv. Cloud-Upload ist pausiert, damit keine Beispiel-Daten deine echten Backups überschreiben.'
+        : getGoogleDriveSyncStatusMessage());
     const lastSyncLabel = settings.lastSyncAt ? formatWarehouseDate(settings.lastSyncAt) : 'noch nicht';
     const lastRestoreLabel = settings.lastRestoreAt ? formatWarehouseDate(settings.lastRestoreAt) : 'noch nicht';
     const backupKnown = !!settings.fileId;
@@ -1894,10 +2255,10 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
         <div class="google-drive-status-shell" aria-busy="${busy}">
             <div class="google-drive-status-hero ${connected ? 'is-connected' : 'is-idle'}">
                 <div>
-                    <strong>${connected ? 'Google Drive verbunden' : 'Google Drive noch nicht verbunden'}</strong>
-                    <small>${connected ? 'Dein Projekt kann in deinem privaten App-Speicher gesichert werden.' : 'Verbinde dein Google-Konto, um Backups und Wiederherstellung zu nutzen.'}</small>
+                    <strong>${demoActive ? 'Demo-Modus: Cloud-Upload pausiert' : (connected ? 'Google Drive verbunden' : 'Google Drive noch nicht verbunden')}</strong>
+                    <small>${demoActive ? 'Beispiel-Daten werden nicht automatisch in dein Google Drive hochgeladen.' : (connected ? 'Dein Projekt kann in deinem privaten App-Speicher gesichert werden.' : 'Verbinde dein Google-Konto, um Backups und Wiederherstellung zu nutzen.')}</small>
                 </div>
-                <span class="google-drive-status-pill">${busy ? busyLabel : (connected ? 'verbunden' : 'getrennt')}</span>
+                <span class="google-drive-status-pill">${busy ? busyLabel : (demoActive ? 'Demo' : (connected ? 'verbunden' : 'getrennt'))}</span>
             </div>
             <div class="google-drive-status-grid">
                 <div class="google-drive-status-card">
@@ -1970,8 +2331,8 @@ function renderGoogleDriveSyncCard(statusMessage = '') {
         disconnectBtn.disabled = busy;
     }
     if (syncBtn) {
-        syncBtn.disabled = busy || !connected || !configured;
-        syncBtn.classList.toggle('is-disabled-soft', busy || !connected || !configured);
+        syncBtn.disabled = busy || !connected || !configured || demoActive;
+        syncBtn.classList.toggle('is-disabled-soft', busy || !connected || !configured || demoActive);
     }
     if (restoreBtn) {
         restoreBtn.disabled = busy || !connected || !configured;
@@ -2325,7 +2686,7 @@ function getMenuOrder() {
 }
 
 function getDefaultMobileQuickTabs() {
-    return ['uebersicht', 'lager', 'tools', 'logbuch'];
+    return ['lager', 'tools', 'logbuch', 'korallen'];
 }
 
 function getHiddenMenuTabs() {
@@ -2340,48 +2701,51 @@ function getHiddenMenuTabs() {
 
 function isMenuTabHidden(tabId) {
     if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
+    if (tabId === 'uebersicht' && !isOverviewEnabled()) return true;
+    if (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled()) return true;
     return getHiddenMenuTabs().includes(tabId);
 }
 
 function isUserMenuTabHidden(tabId) {
-    if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
-    return getHiddenMenuTabs().includes(tabId);
+    return isMenuTabHidden(tabId);
 }
 
-function isPresentationMode() {
-    return Boolean(db?.settings?.presentationMode);
+function isOverviewEnabled() {
+    try {
+        return localStorage.getItem(OVERVIEW_ENABLED_KEY) === 'true';
+    } catch (err) {
+        return false;
+    }
 }
 
-function applyPresentationModeUI() {
-    document.body.classList.toggle('presentation-mode-active', isPresentationMode());
+function isOsciFeaturesEnabled() {
+    try {
+        return localStorage.getItem(OSCI_FEATURES_ENABLED_KEY) !== 'false';
+    } catch (err) {
+        return true;
+    }
+}
+
+function refreshFeatureVisibility() {
+    document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
     applyMenuOrder();
+    applyToolVisibility();
+    renderFeatureVisibilitySettings();
+    renderToolVisibilitySettings();
+    renderMenuOrderSettings();
+    if (isMenuTabHidden(getActiveTabId())) showTab(getFirstVisibleTab());
 }
 
-function renderExperienceSettings() {
-    const container = document.getElementById('experienceModeSettings');
-    if (!container) return;
-    const presentation = isPresentationMode();
-    container.innerHTML = `
-        <div class="experience-settings">
-            <label class="settings-toggle-row experience-presentation-toggle">
-                <input type="checkbox" ${presentation ? 'checked' : ''} onchange="togglePresentationMode(this.checked)">
-                <span>
-                    <span class="settings-toggle-title">Präsentationsmodus</span>
-                    <small>Zeigt Beispielhinweise und eine ruhige Demo-Ansicht, ohne echte Daten zu überschreiben.</small>
-                </span>
-            </label>
-        </div>
-    `;
+function setOverviewEnabled(enabled) {
+    localStorage.setItem(OVERVIEW_ENABLED_KEY, String(Boolean(enabled)));
+    refreshFeatureVisibility();
+    showToast(enabled ? 'Übersichtsseite eingeblendet' : 'Übersichtsseite ausgeblendet', 'info');
 }
 
-function togglePresentationMode(enabled) {
-    if (!db.settings) db.settings = {};
-    db.settings.presentationMode = Boolean(enabled);
-    saveDB();
-    applyPresentationModeUI();
-    renderExperienceSettings();
-    renderDashboard();
-    showToast(enabled ? 'Präsentationsmodus aktiviert' : 'Präsentationsmodus deaktiviert', 'info');
+function setOsciFeaturesEnabled(enabled) {
+    localStorage.setItem(OSCI_FEATURES_ENABLED_KEY, String(Boolean(enabled)));
+    refreshFeatureVisibility();
+    showToast(enabled ? 'OSCI Motion Funktionen eingeblendet' : 'OSCI Motion Funktionen ausgeblendet', 'info');
 }
 
 function getVisibleMenuOrder() {
@@ -2394,6 +2758,7 @@ function getFirstVisibleTab() {
 
 function toggleMenuTabVisibility(tabId, hidden) {
     if (!DEFAULT_MENU_ORDER.includes(tabId) || ALWAYS_VISIBLE_TABS.has(tabId)) return;
+    if (tabId === 'uebersicht' || (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled())) return;
     const hiddenTabs = getHiddenMenuTabs();
     const next = hidden
         ? [...new Set([...hiddenTabs, tabId])]
@@ -2533,7 +2898,6 @@ function renderMenuOrderSettings() {
     if (!container) return;
     const order = getMenuOrder();
     const quickTabs = getMobileQuickTabs();
-    const hiddenTabs = getHiddenMenuTabs();
     const selectableTabs = DEFAULT_MENU_ORDER.filter(id => !isMenuTabHidden(id));
     container.innerHTML = `
         <div class="mobile-quick-tabs-settings">
@@ -2556,9 +2920,9 @@ function renderMenuOrderSettings() {
         <div class="menu-order-list menu-visibility-list">
             ${DEFAULT_MENU_ORDER.map(tabId => `
                 <label class="menu-order-row">
-                    <span><strong>${TAB_LABELS[tabId] || tabId}</strong><small>${ALWAYS_VISIBLE_TABS.has(tabId) ? 'Immer sichtbar' : (hiddenTabs.includes(tabId) ? 'Ausgeblendet' : 'Sichtbar')}</small></span>
+                    <span><strong>${TAB_LABELS[tabId] || tabId}</strong><small>${getMenuVisibilityLabel(tabId)}</small></span>
                     <div>
-                        <input type="checkbox" ${hiddenTabs.includes(tabId) ? '' : 'checked'} ${ALWAYS_VISIBLE_TABS.has(tabId) ? 'disabled' : ''} onchange="toggleMenuTabVisibility('${tabId}', !this.checked)">
+                        <input type="checkbox" ${isMenuTabHidden(tabId) ? '' : 'checked'} ${isMenuVisibilityControlled(tabId) ? 'disabled' : ''} onchange="toggleMenuTabVisibility('${tabId}', !this.checked)">
                     </div>
                 </label>
             `).join('')}
@@ -2575,6 +2939,67 @@ function renderMenuOrderSettings() {
             `).join('')}
         </div>
         <button type="button" class="btn-secondary btn-animated" onclick="resetMenuOrder()">Standard-Reihenfolge wiederherstellen</button>
+    `;
+}
+
+function isMenuVisibilityControlled(tabId) {
+    return ALWAYS_VISIBLE_TABS.has(tabId)
+        || tabId === 'uebersicht'
+        || (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled());
+}
+
+function getMenuVisibilityLabel(tabId) {
+    if (ALWAYS_VISIBLE_TABS.has(tabId)) return 'Immer sichtbar';
+    if (tabId === 'uebersicht') return isOverviewEnabled() ? 'Über den Übersichts-Schalter aktiviert' : 'In den Einstellungen deaktiviert';
+    if (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled()) return 'Durch OSCI-Schalter ausgeblendet';
+    return isMenuTabHidden(tabId) ? 'Ausgeblendet' : 'Sichtbar';
+}
+
+function renderFeatureVisibilitySettings() {
+    const container = document.getElementById('feature-visibility-settings');
+    if (!container) return;
+    container.innerHTML = `
+        <div class="feature-visibility-settings">
+            <label class="settings-toggle-row">
+                <input type="checkbox" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
+                <span>
+                    <span class="settings-toggle-title">Übersichtsseite anzeigen</span>
+                    <small>Standardmäßig aus. Aktiviert das frei konfigurierbare Dashboard als eigenen Menüpunkt.</small>
+                </span>
+            </label>
+            <label class="settings-toggle-row">
+                <input type="checkbox" ${isOsciFeaturesEnabled() ? 'checked' : ''} onchange="setOsciFeaturesEnabled(this.checked)">
+                <span>
+                    <span class="settings-toggle-title">OSCI Motion Funktionen anzeigen</span>
+                    <small>Blendet C&amp;R, Trace, Nutrition und OSCI-spezifische Mischrechner gemeinsam ein oder aus.</small>
+                </span>
+            </label>
+        </div>
+    `;
+}
+
+function renderToolVisibilitySettings() {
+    const container = document.getElementById('tool-visibility-settings');
+    if (!container) return;
+    const hiddenTools = new Set(getHiddenToolIds());
+    container.innerHTML = `
+        <div class="tool-visibility-settings">
+            <div class="tool-visibility-head">
+                <strong>Einzelne Tools</strong>
+                <small>Deaktivierte Tools verschwinden aus Kategorien, Suche und Favoriten. Die Berechnungen und gespeicherten Daten bleiben erhalten.</small>
+            </div>
+            <div class="tool-visibility-grid">
+                ${TOOL_DEFINITIONS.map(tool => {
+                    const osciDisabled = tool.osciOnly && !isOsciFeaturesEnabled();
+                    return `
+                        <label class="tool-visibility-row ${osciDisabled ? 'is-disabled' : ''}">
+                            <span><strong>${escapeHtml(tool.label)}</strong>${tool.osciOnly ? '<small>OSCI Motion</small>' : ''}</span>
+                            <input type="checkbox" ${hiddenTools.has(tool.id) || osciDisabled ? '' : 'checked'} ${osciDisabled ? 'disabled' : ''} onchange="toggleToolVisibility('${tool.id}', this.checked)">
+                        </label>
+                    `;
+                }).join('')}
+            </div>
+        </div>
     `;
 }
 
@@ -2634,7 +3059,7 @@ function createWarehouseData(source = {}) {
         testCorrections: source.testCorrections || {},
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
-        toolSettings: source.toolSettings || { lastSection: '', favorites: [] },
+        toolSettings: source.toolSettings || { lastSection: '', favorites: [], hidden: [] },
         dashboardSettings: source.dashboardSettings || {
             widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
             range: '30',
@@ -2799,7 +3224,7 @@ function createAquariumData(source = {}) {
         testCorrections: cloneSerializable(source.testCorrections || {}),
         majorCorrectionSettings: cloneSerializable(source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } }),
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
-        toolSettings: cloneSerializable(source.toolSettings || { lastSection: '', favorites: [] }),
+        toolSettings: cloneSerializable(source.toolSettings || { lastSection: '', favorites: [], hidden: [] }),
         crSeaWaterPresets: cloneSerializable(source.crSeaWaterPresets || {}),
         customSeaTracePresets: cloneSerializable(source.customSeaTracePresets || {}),
         dashboardSettings: cloneSerializable(source.dashboardSettings || {
@@ -2809,6 +3234,7 @@ function createAquariumData(source = {}) {
         }),
         coralCatalog: cloneSerializable(source.coralCatalog || []),
         coralTransfers: cloneSerializable(source.coralTransfers || []),
+        lightingPlanner: cloneSerializable(source.lightingPlanner || createDefaultLightingPlanner()),
         localUpdatedAt: source.localUpdatedAt || null
     };
 }
@@ -2903,7 +3329,6 @@ function normalizeWarehouseData(data) {
     if (!db.settings.forecastWeeks) db.settings.forecastWeeks = 4;
     if (!db.settings.cursorStyle) db.settings.cursorStyle = 'apple';
     if (!db.settings.cursorEmoji) db.settings.cursorEmoji = '🪸';
-    if (db.settings.presentationMode === undefined) db.settings.presentationMode = false;
     if (!Array.isArray(db.settings.localDevices)) db.settings.localDevices = [];
     if (!db.notifications) db.notifications = { enabled: false, lastAlertSignature: '', lastSentAt: 0 };
     if (db.notifications.enabled === undefined) db.notifications.enabled = false;
@@ -2950,6 +3375,7 @@ function normalizeWarehouseData(data) {
     if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
     if (!db.coralCatalog) db.coralCatalog = [];
     if (!db.coralTransfers) db.coralTransfers = [];
+    if (!db.lightingPlanner) db.lightingPlanner = createDefaultLightingPlanner();
     if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
     if (!db.warehouseEvents) db.warehouseEvents = [];
     db.productPresets[OSCI_SHOP_PRESET_NAME] = OSCI_SHOP_PRESET_PRODUCTS;
@@ -3033,6 +3459,7 @@ async function initDB() {
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
+    setDemoProfileActive(isDemoProfileActive());
     appBootstrapComplete = true;
     const initialPersistOk = await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
     await trimStoredSnapshots();
@@ -3059,8 +3486,10 @@ function saveDB(markDirty = true) {
         appState.activeAquariumId = activeAquariumId;
         updateWarehouseUI();
         queuePersistAppState(markDirty ? 'save' : 'save-passive', false);
-        scheduleGoogleDriveAutoSync();
-        scheduleSupabaseAutoSync();
+        if (!isDemoProfileActive()) {
+            scheduleGoogleDriveAutoSync();
+            scheduleSupabaseAutoSync();
+        }
     } catch(e) {
         markPersistenceFailure('saveDB', e);
         renderStorageSecurityStatus();
@@ -4538,6 +4967,9 @@ function updateWarehouseUI() {
         if (activeWarehouseName) activeWarehouseName.innerText = active.name;
         if (backupInfo) backupInfo.innerText = `Aktives Lager: ${active.name} · ${info} · Lokales Auto-Save: ${latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'läuft'}`;
         if (accessBadge) {
+            // Eigene Lager brauchen keine zusätzliche Kennzeichnung. Der Hinweis
+            // bleibt nur für tatsächlich geteilte Lager als wichtige Warnung sichtbar.
+            accessBadge.hidden = !isShared;
             accessBadge.innerText = accessLabel;
             accessBadge.dataset.access = !isShared ? 'owner' : (active.readOnly ? 'read' : 'write');
         }
@@ -4577,6 +5009,7 @@ function renderCurrentWarehouseViews() {
     safeRender('Geräte', renderLocalDeviceSettings);
     safeRender('Nachbestellen', renderNachbestellen);
     safeRender('Supabase', renderSupabaseSyncSettings);
+    safeRender('Demo-Profil', renderDemoProfileSettings);
     safeRender('Cursor', applyCursorSettings);
     safeRender('Aquarium-Auswahl', renderAquariumWorkspacePanels);
     safeRender('Logbuch', renderLogBook);
@@ -4918,34 +5351,6 @@ function renderDashboard() {
             <div class="dashboard-hero-actions">
                 <button type="button" onclick="triggerRefresh()" class="btn btn-secondary dashboard-refresh">Aktualisieren</button>
                 <button type="button" onclick="startDashboardEdit()" class="btn btn-secondary dashboard-refresh" ${isEditing ? 'disabled' : ''}>Anpassen</button>
-            </div>
-        </section>
-
-        <section class="card dashboard-entry-panel" aria-label="Schneller Einstieg">
-            <div>
-                <span class="section-eyebrow">${isPresentationMode() ? 'Präsentation' : 'Schneller Einstieg'}</span>
-                <h3>Was möchtest du machen?</h3>
-                <p class="hint">${isPresentationMode()
-                    ? 'Zeige zuerst die vier einfachen Wege. So versteht der Verein die App, bevor Spezialfunktionen sichtbar werden.'
-                    : 'Starte mit einer Aktion. Die wichtigsten Bereiche bleiben direkt erreichbar, ohne lange suchen zu müssen.'}</p>
-            </div>
-            <div class="dashboard-entry-grid">
-                <button type="button" class="dashboard-entry-card" onclick="selectTab('lager')">
-                    <strong>Lager prüfen</strong>
-                    <span>Bestände, Warnungen und Produkte auf einen Blick.</span>
-                </button>
-                <button type="button" class="dashboard-entry-card" onclick="openSmartStockModal('in')">
-                    <strong>Einlagern</strong>
-                    <span>Neue Ware schnell dem aktuellen Lager hinzufügen.</span>
-                </button>
-                <button type="button" class="dashboard-entry-card" onclick="selectTab('logbuch')">
-                    <strong>Werte dokumentieren</strong>
-                    <span>Tests, Pflege und ToDos für das Aquarium erfassen.</span>
-                </button>
-                <button type="button" class="dashboard-entry-card" onclick="selectTab('tools')">
-                    <strong>Rechner öffnen</strong>
-                    <span>Dosierung, Salz, Wasserwechsel und Quellen finden.</span>
-                </button>
             </div>
         </section>
 
@@ -5976,7 +6381,8 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'korallen') renderCoralCatalog();
         if(tabId === 'einstellungen') {
             setupSettingsAccordions();
-            renderExperienceSettings();
+            renderFeatureVisibilitySettings();
+            renderToolVisibilitySettings();
             updateNotificationStatus();
             renderCustomProductSettings();
             renderCustomContainers();
@@ -5984,9 +6390,11 @@ function renderActiveTabContent(tabId) {
             renderShopLinkSettings();
             renderProductPresets();
             renderSupabaseSyncSettings();
+            renderDemoProfileSettings();
             renderMenuOrderSettings();
             renderLocalDeviceSettings();
             renderWavePumpDemoSettings();
+            renderLightingPlannerSettings();
         }
     } catch (err) {
         console.error(`Render failed for tab ${tabId}:`, err);
@@ -6158,10 +6566,9 @@ function setupSettingsAccordions() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/start|darstellung|präsentation/.test(normalized)) return { group: 'Allgemein', hint: 'Startansicht und Präsentation', keywords: 'start darstellung modus präsentation demo verein' };
-    if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download' };
+    if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud|demo-profil/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup, Demo-Profil und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download demo beispieldaten testprofil' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
-    if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und Demo-Bereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal' };
+    if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev|licht|par|simulation/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und geschützte Testbereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal licht par simulation led lampe' };
     if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
@@ -6350,6 +6757,1492 @@ function selectCursorEmoji(emoji) {
 let localDeviceSettingsUnlocked = false;
 let activeLocalDeviceId = '';
 let wavePumpDemoUnlocked = false;
+let lightingPlannerUnlocked = false;
+const lightingDragState = { activeIndex: null };
+
+function createDefaultLightingPlanner() {
+    return {
+        tank: {
+            lengthCm: 120,
+            widthCm: 60,
+            waterHeightCm: 55,
+            absorptionK: 0.006,
+            resolutionCm: 10,
+            sliceDepthCm: 30,
+            optimizerStepCm: 5
+        },
+        lamps: [{
+            name: 'Test LED',
+            lengthCm: 45,
+            widthCm: 22,
+            heightCm: 4,
+            x: 60,
+            y: 30,
+            heightCmAboveWater: 25,
+            heightCm: 25,
+            rotationDeg: 0,
+            tiltXDeg: 0,
+            tiltYDeg: 0,
+            dimPercent: 70,
+            groups: [
+                { label: 'Cluster links', x: -12, y: 0, sourceWidthCm: 7, sourceDepthCm: 7, watt: 45, beamAngleDeg: 90, color: 'mixed', parRef: 260, refDistanceCm: 40, refDimPercent: 100 },
+                { label: 'Cluster rechts', x: 12, y: 0, sourceWidthCm: 7, sourceDepthCm: 7, watt: 45, beamAngleDeg: 90, color: 'mixed', parRef: 260, refDistanceCm: 40, refDimPercent: 100 }
+            ]
+        }],
+        corals: [],
+        presets: {
+            tanks: [],
+            lamps: [],
+            selectedTankId: '',
+            selectedLampId: ''
+        },
+        lastResult: null
+    };
+}
+
+function getLightingPlannerSettings() {
+    if (!db.lightingPlanner) db.lightingPlanner = createDefaultLightingPlanner();
+    const planner = createDefaultLightingPlanner();
+    const source = db.lightingPlanner || {};
+    return {
+        ...planner,
+        ...cloneSerializable(source),
+        tank: { ...planner.tank, ...(source.tank || {}) },
+        lamps: Array.isArray(source.lamps) && source.lamps.length ? cloneSerializable(source.lamps) : cloneSerializable(planner.lamps),
+        corals: Array.isArray(source.corals) ? cloneSerializable(source.corals) : cloneSerializable(planner.corals),
+        presets: {
+            tanks: Array.isArray(source.presets?.tanks) ? cloneSerializable(source.presets.tanks) : [],
+            lamps: Array.isArray(source.presets?.lamps) ? cloneSerializable(source.presets.lamps) : [],
+            selectedTankId: String(source.presets?.selectedTankId || ''),
+            selectedLampId: String(source.presets?.selectedLampId || '')
+        }
+    };
+}
+
+function setLightingPlannerSettings(settings, persist = true) {
+    db.lightingPlanner = cloneSerializable(settings || createDefaultLightingPlanner());
+    if (persist) saveDB();
+}
+
+function createLightingPresetId(prefix) {
+    return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function renderLightingPresetOptions(items = [], placeholder = 'Preset wählen', selectedId = '') {
+    return `<option value="">${escapeHtml(placeholder)}</option>${items.map(item => `<option value="${escapeHtml(item.id)}" ${item.id === selectedId ? 'selected' : ''}>${escapeHtml(item.name)}</option>`).join('')}`;
+}
+
+function saveLightingTankPreset() {
+    const name = document.getElementById('lightingTankPresetName')?.value?.trim();
+    if (!name) {
+        showToast('Bitte einen Namen für das Becken eingeben.', 'warning');
+        return;
+    }
+    const settings = readLightingPlannerForm();
+    if (!settings.presets) settings.presets = { tanks: [], lamps: [] };
+    const existing = settings.presets.tanks.find(item => item.name.toLocaleLowerCase('de-DE') === name.toLocaleLowerCase('de-DE'));
+    const record = {
+        id: existing?.id || createLightingPresetId('tank'),
+        name,
+        tank: cloneSerializable(settings.tank),
+        savedAt: new Date().toISOString()
+    };
+    settings.presets.tanks = [record, ...settings.presets.tanks.filter(item => item.id !== record.id)].slice(0, 30);
+    settings.presets.selectedTankId = record.id;
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast(`Beckenpreset „${name}“ gespeichert`, 'success');
+}
+
+function loadLightingTankPreset(value = null) {
+    const presetId = value || document.getElementById('lightingTankPresetSelect')?.value;
+    if (!presetId) return;
+    const settings = readLightingPlannerForm();
+    const preset = settings.presets?.tanks?.find(item => item.id === presetId);
+    if (!preset?.tank) return;
+    const oldLength = Math.max(1, parseLightingNumber(settings.tank.lengthCm, 120));
+    const oldWidth = Math.max(1, parseLightingNumber(settings.tank.widthCm, 60));
+    settings.tank = { ...settings.tank, ...cloneSerializable(preset.tank) };
+    settings.presets.selectedTankId = preset.id;
+    settings.lamps = settings.lamps.map(lamp => {
+        const moved = {
+            ...lamp,
+            x: parseLightingNumber(lamp.x, oldLength / 2) / oldLength * settings.tank.lengthCm,
+            y: parseLightingNumber(lamp.y, oldWidth / 2) / oldWidth * settings.tank.widthCm
+        };
+        return window.ReefLightingSim?.clampLampInsideTank
+            ? window.ReefLightingSim.clampLampInsideTank(moved, settings.tank)
+            : moved;
+    });
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast(`Beckenpreset „${preset.name}“ geladen`, 'success');
+}
+
+function deleteLightingTankPreset() {
+    const presetId = document.getElementById('lightingTankPresetSelect')?.value;
+    if (!presetId) {
+        showToast('Bitte zuerst ein Beckenpreset wählen.', 'warning');
+        return;
+    }
+    const settings = readLightingPlannerForm();
+    const preset = settings.presets?.tanks?.find(item => item.id === presetId);
+    if (!preset || !window.confirm(`Beckenpreset „${preset.name}“ löschen?`)) return;
+    settings.presets.tanks = settings.presets.tanks.filter(item => item.id !== presetId);
+    settings.presets.selectedTankId = '';
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast('Beckenpreset gelöscht', 'success');
+}
+
+function getLightingLampPresetProfile(lamp = {}) {
+    const profile = cloneSerializable(lamp);
+    delete profile.x;
+    delete profile.y;
+    delete profile.placementInvalid;
+    return profile;
+}
+
+function saveLightingLampPreset() {
+    const name = document.getElementById('lightingLampPresetName')?.value?.trim();
+    if (!name) {
+        showToast('Bitte einen Namen für die Leuchte eingeben.', 'warning');
+        return;
+    }
+    const settings = readLightingPlannerForm();
+    if (!settings.presets) settings.presets = { tanks: [], lamps: [] };
+    const existing = settings.presets.lamps.find(item => item.name.toLocaleLowerCase('de-DE') === name.toLocaleLowerCase('de-DE'));
+    const record = {
+        id: existing?.id || createLightingPresetId('lamp'),
+        name,
+        lamp: getLightingLampPresetProfile(settings.lamps[0]),
+        savedAt: new Date().toISOString()
+    };
+    settings.presets.lamps = [record, ...settings.presets.lamps.filter(item => item.id !== record.id)].slice(0, 30);
+    settings.presets.selectedLampId = record.id;
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast(`Lampenpreset „${name}“ gespeichert`, 'success');
+}
+
+function loadLightingLampPreset(value = null) {
+    const presetId = value || document.getElementById('lightingLampPresetSelect')?.value;
+    if (!presetId) return;
+    const settings = readLightingPlannerForm();
+    const preset = settings.presets?.lamps?.find(item => item.id === presetId);
+    if (!preset?.lamp) return;
+    settings.mixedLampProfiles = false;
+    settings.presets.selectedLampId = preset.id;
+    settings.lamps = settings.lamps.map((lamp, index) => ({
+        ...cloneSerializable(preset.lamp),
+        name: index === 0 ? (preset.lamp.name || preset.name) : `${preset.lamp.name || preset.name} ${index + 1}`,
+        x: lamp.x,
+        y: lamp.y
+    }));
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast(`Lampenpreset „${preset.name}“ geladen`, 'success');
+}
+
+function deleteLightingLampPreset() {
+    const presetId = document.getElementById('lightingLampPresetSelect')?.value;
+    if (!presetId) {
+        showToast('Bitte zuerst ein Lampenpreset wählen.', 'warning');
+        return;
+    }
+    const settings = readLightingPlannerForm();
+    const preset = settings.presets?.lamps?.find(item => item.id === presetId);
+    if (!preset || !window.confirm(`Lampenpreset „${preset.name}“ löschen?`)) return;
+    settings.presets.lamps = settings.presets.lamps.filter(item => item.id !== presetId);
+    settings.presets.selectedLampId = '';
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast('Lampenpreset gelöscht', 'success');
+}
+
+function parseLightingNumber(value, fallback = 0) {
+    const parsed = Number(String(value ?? '').replace(',', '.'));
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function cloneLightingLamp(baseLamp, index, x = null, y = null) {
+    const tank = getLightingPlannerSettings().tank || {};
+    const length = Math.max(10, parseLightingNumber(tank.lengthCm, 120));
+    const width = Math.max(10, parseLightingNumber(tank.widthCm, 60));
+    const countName = index === 0 ? (baseLamp.name || 'Test LED') : `${baseLamp.name || 'Test LED'} ${index + 1}`;
+    return {
+        ...cloneSerializable(baseLamp),
+        name: countName,
+        x: x === null ? length * ((index + 1) / 2) : x,
+        y: y === null ? width / 2 : y,
+        groups: cloneSerializable(baseLamp.groups || [])
+    };
+}
+
+function ensureLightingLampCount(settings, count) {
+    const targetCount = Math.max(1, Math.min(8, Math.round(parseLightingNumber(count, 1))));
+    const baseLamp = (settings.lamps && settings.lamps[0]) || createDefaultLightingPlanner().lamps[0];
+    const tank = settings.tank || {};
+    const length = Math.max(10, parseLightingNumber(tank.lengthCm, 120));
+    const width = Math.max(10, parseLightingNumber(tank.widthCm, 60));
+    const lamps = [];
+    for (let index = 0; index < targetCount; index += 1) {
+        if (settings.lamps && settings.lamps[index]) {
+            lamps.push({
+                ...cloneSerializable(settings.lamps[index]),
+                groups: cloneSerializable(settings.lamps[index].groups || baseLamp.groups || [])
+            });
+            continue;
+        }
+        const x = Number((length * (index + 1) / (targetCount + 1)).toFixed(1));
+        const y = Number((width / 2).toFixed(1));
+        lamps.push(cloneLightingLamp(baseLamp, index, x, y));
+    }
+    settings.lamps = lamps.slice(0, targetCount);
+    settings.lampCount = targetCount;
+    return settings;
+}
+
+function formatLightingNumber(value, digits = 0) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return '-';
+    return parsed.toLocaleString('de-DE', { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}
+
+function getLightingSourceWidth(group = {}) {
+    return Math.max(0.5, parseLightingNumber(group.sourceWidthCm ?? group.sourceDiameterCm ?? 6, 6));
+}
+
+function getLightingSourceDepth(group = {}) {
+    return Math.max(0.5, parseLightingNumber(group.sourceDepthCm ?? group.sourceDiameterCm ?? group.sourceWidthCm ?? 6, 6));
+}
+
+function lightingGroupsToText(groups = []) {
+    return groups.map(group => [
+        group.label || 'LED',
+        group.x ?? 0,
+        group.y ?? 0,
+        group.sourceWidthCm ?? group.sourceDiameterCm ?? 6,
+        group.sourceDepthCm ?? group.sourceDiameterCm ?? group.sourceWidthCm ?? 6,
+        group.watt ?? 0,
+        group.beamAngleDeg ?? 90,
+        group.parRef ?? 0,
+        group.refDistanceCm ?? 40,
+        group.refDimPercent ?? 100
+    ].join('; ')).join('\n');
+}
+
+function parseLightingGroupsText(text) {
+    return String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean).map((line, index) => {
+        const parts = line.split(/[;\t]/).map(part => part.trim());
+        const hasSourceArea = parts.length >= 10;
+        const hasLegacySourceSize = parts.length === 9;
+        const wattIndex = hasSourceArea ? 5 : hasLegacySourceSize ? 4 : 3;
+        return {
+            label: parts[0] || `LED ${index + 1}`,
+            x: parseLightingNumber(parts[1], 0),
+            y: parseLightingNumber(parts[2], 0),
+            sourceWidthCm: Math.max(0.5, parseLightingNumber((hasSourceArea || hasLegacySourceSize) ? parts[3] : 6, 6)),
+            sourceDepthCm: Math.max(0.5, parseLightingNumber(hasSourceArea ? parts[4] : (hasLegacySourceSize ? parts[3] : 6), 6)),
+            watt: Math.max(0, parseLightingNumber(parts[wattIndex], 0)),
+            beamAngleDeg: Math.max(1, parseLightingNumber(parts[wattIndex + 1], 90)),
+            parRef: Math.max(0, parseLightingNumber(parts[wattIndex + 2], 0)),
+            refDistanceCm: Math.max(1, parseLightingNumber(parts[wattIndex + 3], 40)),
+            refDimPercent: Math.max(1, parseLightingNumber(parts[wattIndex + 4], 100))
+        };
+    });
+}
+
+function parseOptionalLightingNumber(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return null;
+    const parsed = parseLightingNumber(raw, NaN);
+    return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getLightingGroupEditorValues() {
+    const rows = document.querySelectorAll('#lightingLedGroupEditor .lighting-editor-row');
+    if (!rows.length) return null;
+    return Array.from(rows).map((row, index) => ({
+        label: row.querySelector('[data-field="label"]')?.value?.trim() || `LED ${index + 1}`,
+        color: row.querySelector('[data-field="color"]')?.value || 'mixed',
+        x: parseLightingNumber(row.querySelector('[data-field="x"]')?.value, 0),
+        y: parseLightingNumber(row.querySelector('[data-field="y"]')?.value, 0),
+        sourceWidthCm: Math.max(0.5, parseLightingNumber(row.querySelector('[data-field="sourceWidthCm"]')?.value, 6)),
+        sourceDepthCm: Math.max(0.5, parseLightingNumber(row.querySelector('[data-field="sourceDepthCm"]')?.value, row.querySelector('[data-field="sourceWidthCm"]')?.value || 6)),
+        watt: Math.max(0, parseLightingNumber(row.querySelector('[data-field="watt"]')?.value, 0)),
+        beamAngleDeg: Math.max(1, parseLightingNumber(row.querySelector('[data-field="beamAngleDeg"]')?.value, 90)),
+        parRef: (() => {
+            const value = parseOptionalLightingNumber(row.querySelector('[data-field="parRef"]')?.value);
+            return value === null ? null : Math.max(0, value);
+        })(),
+        refDistanceCm: (() => {
+            const value = parseOptionalLightingNumber(row.querySelector('[data-field="refDistanceCm"]')?.value);
+            return value === null ? null : Math.max(1, value);
+        })(),
+        refDimPercent: (() => {
+            const value = parseOptionalLightingNumber(row.querySelector('[data-field="refDimPercent"]')?.value);
+            return value === null ? null : Math.max(1, value);
+        })()
+    }));
+}
+
+function getLightingLampProfileEditorValues() {
+    const rows = document.querySelectorAll('#lightingLampProfileEditor .lighting-editor-row');
+    if (!rows.length) return null;
+    return Array.from(rows).map((row, index) => ({
+        name: row.querySelector('[data-field="name"]')?.value?.trim() || `Lampe ${index + 1}`,
+        lengthCm: Math.max(1, parseLightingNumber(row.querySelector('[data-field="lengthCm"]')?.value, 45)),
+        widthCm: Math.max(1, parseLightingNumber(row.querySelector('[data-field="widthCm"]')?.value, 22)),
+        heightCmAboveWater: Math.max(0, parseLightingNumber(row.querySelector('[data-field="heightCmAboveWater"]')?.value, 25)),
+        heightCm: Math.max(0, parseLightingNumber(row.querySelector('[data-field="heightCmAboveWater"]')?.value, 25)),
+        rotationDeg: parseLightingNumber(row.querySelector('[data-field="rotationDeg"]')?.value, 0),
+        tiltXDeg: parseLightingNumber(row.querySelector('[data-field="tiltXDeg"]')?.value, 0),
+        tiltYDeg: parseLightingNumber(row.querySelector('[data-field="tiltYDeg"]')?.value, 0),
+        dimPercent: Math.max(0, parseLightingNumber(row.querySelector('[data-field="dimPercent"]')?.value, 70)),
+        clusterMode: row.querySelector('[data-field="clusterMode"]')?.value || 'multiple',
+        groups: parseLightingGroupsText(row.querySelector('[data-field="groupsText"]')?.value)
+    }));
+}
+
+function renderLightingLampProfileRows(lamps = []) {
+    const safeLamps = lamps.length ? lamps : createDefaultLightingPlanner().lamps;
+    return safeLamps.map((lamp, index) => `
+        <details class="lighting-editor-row lighting-lamp-profile-row" ${index === 0 ? 'open' : ''}>
+            <summary class="lighting-editor-row-head">
+                <span>
+                    <strong>${escapeHtml(lamp.name || `Lampe ${index + 1}`)}</strong>
+                    <small>${formatLightingNumber(lamp.lengthCm, 1)} × ${formatLightingNumber(lamp.widthCm, 1)} cm · ${formatLightingNumber(lamp.dimPercent, 0)} % · ${(lamp.groups || []).length || 0} Cluster</small>
+                </span>
+                <span class="lighting-editor-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="lighting-editor-grid lighting-editor-row-body">
+                <label>Modellname<input type="text" data-field="name" value="${escapeHtml(lamp.name || `Lampe ${index + 1}`)}"><small>So erkennst du die Lampenart im Plan.</small></label>
+                <label>Gehäuselänge cm<input type="number" inputmode="decimal" data-field="lengthCm" value="${escapeHtml(lamp.lengthCm ?? 45)}"><small>Länge dieser einzelnen Lampe.</small></label>
+                <label>Gehäusebreite cm<input type="number" inputmode="decimal" data-field="widthCm" value="${escapeHtml(lamp.widthCm ?? 22)}"><small>Breite dieser einzelnen Lampe.</small></label>
+                <label>Höhe über Wasser cm<input type="number" inputmode="decimal" data-field="heightCmAboveWater" value="${escapeHtml(lamp.heightCmAboveWater || lamp.heightCm || 25)}"><small>Abstand zur Wasseroberfläche.</small></label>
+                <label>Drehung °<input type="number" inputmode="decimal" data-field="rotationDeg" value="${escapeHtml(lamp.rotationDeg || 0)}"><small>Rotation nur für diese Lampe.</small></label>
+                <label>Dimmung %<input type="number" inputmode="decimal" data-field="dimPercent" value="${escapeHtml(lamp.dimPercent ?? 70)}"><small>Leistung dieser Lampenart.</small></label>
+                <label>Neigung X °<input type="number" inputmode="decimal" data-field="tiltXDeg" value="${escapeHtml(lamp.tiltXDeg || 0)}"><small>Kippt links/rechts.</small></label>
+                <label>Neigung Y °<input type="number" inputmode="decimal" data-field="tiltYDeg" value="${escapeHtml(lamp.tiltYDeg || 0)}"><small>Kippt vorne/hinten.</small></label>
+                <label>Clusterart
+                    <select data-field="clusterMode">
+                        <option value="single" ${String(lamp.clusterMode || 'multiple') === 'single' ? 'selected' : ''}>Einzelcluster</option>
+                        <option value="multiple" ${String(lamp.clusterMode || 'multiple') !== 'single' ? 'selected' : ''}>Mehrere Cluster</option>
+                    </select>
+                    <small>Nur Beschreibung für dieses Lampenprofil.</small>
+                </label>
+            </div>
+            <label class="lighting-lamp-groups-text">Cluster dieser Lampe
+                <textarea data-field="groupsText" class="lighting-textarea" spellcheck="false">${escapeHtml(lightingGroupsToText(lamp.groups || []))}</textarea>
+                <small>Format je Zeile: Name; X; Y; Breite; Tiefe; Watt; Winkel; PAR; Abstand; Dimmung</small>
+            </label>
+            <button type="button" class="btn-secondary lighting-editor-remove" onclick="copyLightingMainProfileToLamp(${index})">Hauptprofil übernehmen</button>
+        </details>
+    `).join('');
+}
+
+function getLightingClusterColorLabel(color) {
+    const labels = {
+        mixed: 'Gemischt',
+        blue: 'Blau',
+        white: 'Weiß',
+        uv: 'UV / Violett',
+        red: 'Rot',
+        green: 'Grün'
+    };
+    return labels[color] || labels.mixed;
+}
+
+function getLightingClusterLayout(layout, lampLength, lampWidth, customSpacingX = null, customSpacingY = null) {
+    const length = Math.max(8, parseLightingNumber(lampLength, 45));
+    const width = Math.max(8, parseLightingNumber(lampWidth, 22));
+    const defaultX = Math.max(2, Math.min(length * 0.27, length / 2 - 3));
+    const defaultY = Math.max(2, Math.min(width * 0.25, width / 2 - 3));
+    const x = customSpacingX === null ? defaultX : Math.max(1, Math.min(length / 2 - 1, parseLightingNumber(customSpacingX, defaultX) / 2));
+    const y = customSpacingY === null ? defaultY : Math.max(1, Math.min(width / 2 - 1, parseLightingNumber(customSpacingY, defaultY) / 2));
+    const layouts = {
+        single: [[0, 0]],
+        dualHorizontal: [[-x, 0], [x, 0]],
+        dualVertical: [[0, -y], [0, y]],
+        tripleHorizontal: [[-x, 0], [0, 0], [x, 0]],
+        quadGrid: [[-x, -y], [x, -y], [-x, y], [x, y]],
+        sixGrid: [[-x, -y], [0, -y], [x, -y], [-x, y], [0, y], [x, y]]
+    };
+    return layouts[layout] || null;
+}
+
+function refreshLightingClusterPreview() {
+    const preview = document.getElementById('lightingClusterPreview');
+    if (!preview) return;
+    const groups = getLightingGroupEditorValues() || [];
+    const length = Math.max(8, parseLightingNumber(document.getElementById('lightingLampLength')?.value, 45));
+    const width = Math.max(8, parseLightingNumber(document.getElementById('lightingLampWidth')?.value, 22));
+    const totalWatt = groups.reduce((sum, group) => sum + Math.max(0, parseLightingNumber(group.watt, 0)), 0);
+    const markerHtml = groups.map((group, index) => {
+        const left = Math.max(4, Math.min(96, ((parseLightingNumber(group.x, 0) + length / 2) / length) * 100));
+        const top = Math.max(7, Math.min(93, ((parseLightingNumber(group.y, 0) + width / 2) / width) * 100));
+        const sourceWidth = getLightingSourceWidth(group);
+        const sourceDepth = getLightingSourceDepth(group);
+        const markerWidth = Math.max(24, Math.min(64, 18 + sourceWidth * 2.1));
+        const markerHeight = Math.max(24, Math.min(64, 18 + sourceDepth * 2.1));
+        return `<span class="lighting-cluster-marker is-${escapeHtml(group.color || 'mixed')}" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%;--cluster-width:${markerWidth.toFixed(1)}px;--cluster-height:${markerHeight.toFixed(1)}px" title="${escapeHtml(group.label || `Cluster ${index + 1}`)} · ${formatLightingNumber(sourceWidth, 1)} × ${formatLightingNumber(sourceDepth, 1)} cm Lichtfläche"><b>${index + 1}</b></span>`;
+    }).join('');
+    preview.innerHTML = `
+        <div class="lighting-housing-shell" style="aspect-ratio:${length} / ${width}">
+            <span class="lighting-housing-brand">${escapeHtml(document.getElementById('lightingLampName')?.value?.trim() || 'LED')}</span>
+            ${markerHtml || '<span class="lighting-housing-empty">Noch kein Cluster</span>'}
+        </div>
+        <div class="lighting-housing-scale"><span>${formatLightingNumber(length, 1)} cm</span><span>${formatLightingNumber(width, 1)} cm</span></div>
+    `;
+    const countTarget = document.querySelector('[data-lighting-stat="clusters"]');
+    const wattTarget = document.querySelector('[data-lighting-stat="watt"]');
+    if (countTarget) countTarget.textContent = String(groups.length);
+    if (wattTarget) wattTarget.textContent = `${formatLightingNumber(totalWatt, 0)} W`;
+}
+
+function markLightingClusterLayoutCustom() {
+    const select = document.getElementById('lightingClusterLayout');
+    if (select) select.value = 'custom';
+    refreshLightingClusterPreview();
+}
+
+function syncLightingClusterSpacingDefaults() {
+    const groups = getLightingGroupEditorValues() || [];
+    const xs = groups.map(group => parseLightingNumber(group.x, 0));
+    const ys = groups.map(group => parseLightingNumber(group.y, 0));
+    const spacingX = xs.length > 1 ? Math.max(...xs) - Math.min(...xs) : 0;
+    const spacingY = ys.length > 1 ? Math.max(...ys) - Math.min(...ys) : 0;
+    const spacingXInput = document.getElementById('lightingClusterSpacingX');
+    const spacingYInput = document.getElementById('lightingClusterSpacingY');
+    if (spacingXInput && !spacingXInput.value) spacingXInput.value = spacingX ? Number(spacingX.toFixed(1)) : '';
+    if (spacingYInput && !spacingYInput.value) spacingYInput.value = spacingY ? Number(spacingY.toFixed(1)) : '';
+}
+
+function applyLightingClusterLayout(value = null) {
+    const select = document.getElementById('lightingClusterLayout');
+    const layout = value || select?.value || 'custom';
+    if (layout === 'custom') {
+        refreshLightingClusterPreview();
+        return;
+    }
+    const positions = getLightingClusterLayout(
+        layout,
+        document.getElementById('lightingLampLength')?.value,
+        document.getElementById('lightingLampWidth')?.value,
+        document.getElementById('lightingClusterSpacingX')?.value || null,
+        document.getElementById('lightingClusterSpacingY')?.value || null
+    );
+    if (!positions) return;
+    const existing = getLightingGroupEditorValues() || [];
+    const fallback = existing[0] || createDefaultLightingPlanner().lamps[0].groups[0];
+    const groups = positions.map((position, index) => ({
+        ...cloneSerializable(existing[index] || fallback),
+        label: existing[index]?.label || `Cluster ${index + 1}`,
+        x: Number(position[0].toFixed(1)),
+        y: Number(position[1].toFixed(1))
+    }));
+    const editor = document.getElementById('lightingLedGroupEditor');
+    if (editor) editor.innerHTML = renderLightingGroupEditorRows(groups);
+    if (select) select.value = layout;
+    refreshLightingClusterPreview();
+    updateLightingPlannerFromInputs(true);
+}
+
+function setLightingClusterMode(mode) {
+    const selectedMode = mode === 'single' ? 'single' : 'multiple';
+    const settings = readLightingPlannerForm();
+    const firstLamp = settings.lamps?.[0] || createDefaultLightingPlanner().lamps[0];
+    if (selectedMode === 'single') {
+        const source = cloneSerializable(firstLamp.groups?.[0] || createDefaultLightingPlanner().lamps[0].groups[0]);
+        source.label = source.label || 'LED-Cluster';
+        source.x = 0;
+        source.y = 0;
+        settings.lamps = (settings.lamps || [firstLamp]).map(lamp => ({
+            ...lamp,
+            clusterMode: 'single',
+            clusterLayout: 'single',
+            groups: [cloneSerializable(source)]
+        }));
+    } else {
+        settings.lamps = (settings.lamps || [firstLamp]).map(lamp => ({
+            ...lamp,
+            clusterMode: 'multiple',
+            clusterLayout: lamp.clusterLayout === 'single' ? 'custom' : (lamp.clusterLayout || 'custom')
+        }));
+    }
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+}
+
+function renderLightingGroupEditorRows(groups = []) {
+    const safeGroups = groups.length ? groups : createDefaultLightingPlanner().lamps[0].groups;
+    return safeGroups.map((group, index) => `
+        <details class="lighting-editor-row lighting-led-row" ${index === 0 ? 'open' : ''}>
+            <summary class="lighting-editor-row-head">
+                <span>
+                    <strong>${escapeHtml(group.label || `LED ${index + 1}`)}</strong>
+                    <small>${escapeHtml(getLightingClusterColorLabel(group.color))} · ${escapeHtml(group.watt ?? 0)} W · ${escapeHtml(group.beamAngleDeg ?? 90)}° · Quelle ${formatLightingNumber(getLightingSourceWidth(group), 1)} × ${formatLightingNumber(getLightingSourceDepth(group), 1)} cm</small>
+                </span>
+                <span class="lighting-editor-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="lighting-editor-grid lighting-editor-row-body">
+                <label>Cluster-Name<input type="text" data-field="label" value="${escapeHtml(group.label || `LED ${index + 1}`)}" placeholder="z.B. Cluster links" oninput="refreshLightingClusterPreview()"></label>
+                <label>Spektrum
+                    <select data-field="color" onchange="refreshLightingClusterPreview()">
+                        ${[
+                            ['mixed', 'Gemischt / Weiß-Blau'],
+                            ['blue', 'Blau'],
+                            ['white', 'Weiß'],
+                            ['uv', 'UV / Violett'],
+                            ['red', 'Rot'],
+                            ['green', 'Grün']
+                        ].map(([value, label]) => `<option value="${value}" ${String(group.color || 'mixed') === value ? 'selected' : ''}>${label}</option>`).join('')}
+                    </select>
+                </label>
+                <label class="lighting-cluster-position-field">X im Gehäuse cm<input type="number" inputmode="decimal" data-field="x" value="${escapeHtml(group.x ?? 0)}" oninput="markLightingClusterLayoutCustom()"><small>Links/rechts ab Leuchtenmitte.</small></label>
+                <label class="lighting-cluster-position-field">Y im Gehäuse cm<input type="number" inputmode="decimal" data-field="y" value="${escapeHtml(group.y ?? 0)}" oninput="markLightingClusterLayoutCustom()"><small>Vorne/hinten ab Leuchtenmitte.</small></label>
+                <label>Lichtfläche Breite cm<input type="number" inputmode="decimal" min="0.5" step="0.5" data-field="sourceWidthCm" value="${escapeHtml(getLightingSourceWidth(group))}" oninput="refreshLightingClusterPreview()"><small>Sichtbare leuchtende Fläche.</small></label>
+                <label>Lichtfläche Tiefe cm<input type="number" inputmode="decimal" min="0.5" step="0.5" data-field="sourceDepthCm" value="${escapeHtml(getLightingSourceDepth(group))}" oninput="refreshLightingClusterPreview()"><small>Die zweite Achse der Lichtfläche.</small></label>
+                <label>Cluster-Leistung W<input type="number" inputmode="decimal" data-field="watt" value="${escapeHtml(group.watt ?? 0)}" oninput="refreshLightingClusterPreview()"><small>Elektrische Leistung dieses Clusters.</small></label>
+                <label>Abstrahlwinkel
+                    <select data-field="beamAngleDeg">
+                        ${[60, 70, 80, 90, 100, 120, 140].map(value => `<option value="${value}" ${Number(group.beamAngleDeg || 90) === value ? 'selected' : ''}>${value}°</option>`).join('')}
+                    </select>
+                    <small>Breiter Winkel = weichere Ausleuchtung.</small>
+                </label>
+                <label>PAR Referenz optional<input type="number" inputmode="decimal" data-field="parRef" placeholder="optional" value="${group.parRef == null ? '' : escapeHtml(group.parRef)}"><small>Gemessener PAR-Wert zur Kalibrierung.</small></label>
+                <label>Referenzabstand optional<input type="number" inputmode="decimal" data-field="refDistanceCm" placeholder="40 cm" value="${group.refDistanceCm == null ? '' : escapeHtml(group.refDistanceCm)}"><small>Abstand der PAR-Referenzmessung.</small></label>
+                <label>Referenz-Dimmung optional<input type="number" inputmode="decimal" data-field="refDimPercent" placeholder="100 %" value="${group.refDimPercent == null ? '' : escapeHtml(group.refDimPercent)}"><small>Dimmung bei der Referenzmessung.</small></label>
+            </div>
+            <button type="button" class="btn-out lighting-editor-remove" onclick="removeLightingLedGroup(${index})">LED-Gruppe entfernen</button>
+        </details>
+    `).join('');
+}
+
+function addLightingLedGroup() {
+    const groups = getLightingGroupEditorValues() || [];
+    groups.push({ label: `LED ${groups.length + 1}`, color: 'mixed', x: 0, y: 0, sourceWidthCm: 6, sourceDepthCm: 6, watt: 20, beamAngleDeg: 90, parRef: null, refDistanceCm: null, refDimPercent: null });
+    const editor = document.getElementById('lightingLedGroupEditor');
+    if (editor) editor.innerHTML = renderLightingGroupEditorRows(groups);
+    markLightingClusterLayoutCustom();
+}
+
+function removeLightingLedGroup(index) {
+    const groups = getLightingGroupEditorValues() || [];
+    groups.splice(index, 1);
+    const editor = document.getElementById('lightingLedGroupEditor');
+    if (editor) editor.innerHTML = renderLightingGroupEditorRows(groups);
+    markLightingClusterLayoutCustom();
+}
+
+function lightingCoralsToText(corals = []) {
+    return corals.map(coral => [
+        coral.name || 'Koralle',
+        coral.type || 'SPS',
+        coral.x ?? 0,
+        coral.y ?? 0,
+        coral.z ?? 0,
+        coral.minPar ?? 80,
+        coral.maxPar ?? 220
+    ].join('; ')).join('\n');
+}
+
+function parseLightingCoralsText(text) {
+    return String(text || '').split(/\n+/).map(line => line.trim()).filter(Boolean).map((line, index) => {
+        const parts = line.split(/[;\t]/).map(part => part.trim());
+        return {
+            name: parts[0] || `Koralle ${index + 1}`,
+            type: parts[1] || 'SPS',
+            x: parseLightingNumber(parts[2], 0),
+            y: parseLightingNumber(parts[3], 0),
+            z: parseLightingNumber(parts[4], 25),
+            minPar: parseLightingNumber(parts[5], 80),
+            maxPar: parseLightingNumber(parts[6], 220)
+        };
+    });
+}
+
+function getLightingCoralDefaults(type) {
+    const map = {
+        SPS: [220, 380],
+        LPS: [80, 180],
+        Weichkoralle: [40, 120],
+        Zoanthus: [60, 160],
+        Gorgonie: [80, 220],
+        Anemone: [120, 260],
+        Sonstiges: [80, 220]
+    };
+    return map[type] || map.Sonstiges;
+}
+
+function getLightingCoralEditorValues() {
+    const rows = document.querySelectorAll('#lightingCoralEditor .lighting-editor-row');
+    if (!rows.length) return null;
+    return Array.from(rows).map((row, index) => {
+        const type = row.querySelector('[data-field="type"]')?.value || 'SPS';
+        const defaults = getLightingCoralDefaults(type);
+        return {
+            name: row.querySelector('[data-field="name"]')?.value?.trim() || `Koralle ${index + 1}`,
+            type,
+            x: parseLightingNumber(row.querySelector('[data-field="x"]')?.value, 0),
+            y: parseLightingNumber(row.querySelector('[data-field="y"]')?.value, 0),
+            z: parseLightingNumber(row.querySelector('[data-field="z"]')?.value, 25),
+        minPar: parseOptionalLightingNumber(row.querySelector('[data-field="minPar"]')?.value) ?? defaults[0],
+        maxPar: parseOptionalLightingNumber(row.querySelector('[data-field="maxPar"]')?.value) ?? defaults[1]
+        };
+    });
+}
+
+function renderLightingCoralEditorRows(corals = []) {
+    const safeCorals = corals.length ? corals : createDefaultLightingPlanner().corals;
+    const types = ['SPS', 'LPS', 'Weichkoralle', 'Zoanthus', 'Gorgonie', 'Anemone', 'Sonstiges'];
+    return safeCorals.map((coral, index) => `
+        <details class="lighting-editor-row lighting-coral-editor-row" ${index === 0 ? 'open' : ''}>
+            <summary class="lighting-editor-row-head">
+                <span>
+                    <strong>${escapeHtml(coral.name || `Koralle ${index + 1}`)}</strong>
+                    <small>${escapeHtml(coral.type || 'SPS')} · Ziel ${escapeHtml(coral.minPar ?? getLightingCoralDefaults(coral.type)[0])}-${escapeHtml(coral.maxPar ?? getLightingCoralDefaults(coral.type)[1])} PAR</small>
+                </span>
+                <span class="lighting-editor-chevron" aria-hidden="true"></span>
+            </summary>
+            <div class="lighting-editor-grid lighting-editor-row-body">
+                <label>Name<input type="text" data-field="name" value="${escapeHtml(coral.name || `Koralle ${index + 1}`)}" placeholder="z.B. Acropora oben"></label>
+                <label>Typ
+                    <select data-field="type" onchange="applyLightingCoralTypeDefaults(this)">
+                        ${types.map(type => `<option value="${type}" ${String(coral.type || 'SPS') === type ? 'selected' : ''}>${type}</option>`).join('')}
+                    </select>
+                </label>
+                <label>X cm<input type="number" inputmode="decimal" data-field="x" value="${escapeHtml(coral.x ?? 0)}"></label>
+                <label>Y cm<input type="number" inputmode="decimal" data-field="y" value="${escapeHtml(coral.y ?? 0)}"></label>
+                <label>Tiefe cm<input type="number" inputmode="decimal" data-field="z" value="${escapeHtml(coral.z ?? 25)}"></label>
+                <label>PAR min optional<input type="number" inputmode="decimal" data-field="minPar" placeholder="${escapeHtml(getLightingCoralDefaults(coral.type)[0])}" value="${coral.minPar == null ? '' : escapeHtml(coral.minPar)}"></label>
+                <label>PAR max optional<input type="number" inputmode="decimal" data-field="maxPar" placeholder="${escapeHtml(getLightingCoralDefaults(coral.type)[1])}" value="${coral.maxPar == null ? '' : escapeHtml(coral.maxPar)}"></label>
+            </div>
+            <button type="button" class="btn-out lighting-editor-remove" onclick="removeLightingCoralPoint(${index})">Korallenpunkt entfernen</button>
+        </details>
+    `).join('');
+}
+
+function applyLightingCoralTypeDefaults(select) {
+    const row = select.closest('.lighting-editor-row');
+    if (!row) return;
+    const [minPar, maxPar] = getLightingCoralDefaults(select.value);
+    const minInput = row.querySelector('[data-field="minPar"]');
+    const maxInput = row.querySelector('[data-field="maxPar"]');
+    if (minInput) minInput.value = minPar;
+    if (maxInput) maxInput.value = maxPar;
+}
+
+function addLightingCoralPoint() {
+    const corals = getLightingCoralEditorValues() || [];
+    const [minPar, maxPar] = getLightingCoralDefaults('SPS');
+    corals.push({ name: `Koralle ${corals.length + 1}`, type: 'SPS', x: 60, y: 30, z: 25, minPar, maxPar });
+    const editor = document.getElementById('lightingCoralEditor');
+    if (editor) editor.innerHTML = renderLightingCoralEditorRows(corals);
+}
+
+function removeLightingCoralPoint(index) {
+    const corals = getLightingCoralEditorValues() || [];
+    corals.splice(index, 1);
+    const editor = document.getElementById('lightingCoralEditor');
+    if (editor) editor.innerHTML = renderLightingCoralEditorRows(corals);
+}
+
+function readLightingPlannerForm() {
+    const current = getLightingPlannerSettings();
+    const lamp = current.lamps[0] || createDefaultLightingPlanner().lamps[0];
+    const lampCount = Math.max(1, Math.min(8, Math.round(parseLightingNumber(document.getElementById('lightingLampCount')?.value, current.lamps.length || 1))));
+    const mixedLampProfiles = Boolean(document.getElementById('lightingMixedLampProfiles')?.checked ?? current.mixedLampProfiles);
+    const individualLampProfiles = mixedLampProfiles ? getLightingLampProfileEditorValues() : null;
+    const templateLamp = {
+        ...current,
+        lamps: [],
+        mixedLampProfiles,
+        tank: {
+            lengthCm: Math.max(10, parseLightingNumber(document.getElementById('lightingTankLength')?.value, current.tank.lengthCm)),
+            widthCm: Math.max(10, parseLightingNumber(document.getElementById('lightingTankWidth')?.value, current.tank.widthCm)),
+            waterHeightCm: Math.max(10, parseLightingNumber(document.getElementById('lightingWaterHeight')?.value, current.tank.waterHeightCm)),
+            absorptionK: Math.max(0, parseLightingNumber(document.getElementById('lightingAbsorptionK')?.value, current.tank.absorptionK)),
+            resolutionCm: 5,
+            sliceDepthCm: Math.max(0, parseLightingNumber(document.getElementById('lightingSliceDepth')?.value, current.tank.sliceDepthCm)),
+            optimizerStepCm: 5
+        },
+        lampTemplate: {
+            ...lamp,
+            name: document.getElementById('lightingLampName')?.value?.trim() || 'Test LED',
+            lengthCm: Math.max(1, parseLightingNumber(document.getElementById('lightingLampLength')?.value, lamp.lengthCm)),
+            widthCm: Math.max(1, parseLightingNumber(document.getElementById('lightingLampWidth')?.value, lamp.widthCm)),
+            heightCmAboveWater: Math.max(0, parseLightingNumber(document.getElementById('lightingLampMountHeight')?.value, lamp.heightCmAboveWater || lamp.heightCm)),
+            heightCm: Math.max(0, parseLightingNumber(document.getElementById('lightingLampMountHeight')?.value, lamp.heightCmAboveWater || lamp.heightCm)),
+            rotationDeg: parseLightingNumber(document.getElementById('lightingLampRotation')?.value, lamp.rotationDeg || 0),
+            tiltXDeg: parseLightingNumber(document.getElementById('lightingLampTiltX')?.value, lamp.tiltXDeg),
+            tiltYDeg: parseLightingNumber(document.getElementById('lightingLampTiltY')?.value, lamp.tiltYDeg),
+            dimPercent: Math.max(0, Math.min(100, parseLightingNumber(document.getElementById('lightingLampDim')?.value, lamp.dimPercent))),
+            clusterMode: document.getElementById('lightingClusterMode')?.value
+                || lamp.clusterMode
+                || ((getLightingGroupEditorValues() || lamp.groups || []).length > 1 ? 'multiple' : 'single'),
+            clusterLayout: document.getElementById('lightingClusterLayout')?.value || lamp.clusterLayout || 'custom',
+            groups: getLightingGroupEditorValues()
+                || parseLightingGroupsText(document.getElementById('lightingLedGroups')?.value)
+        },
+        corals: []
+    };
+    templateLamp.lamps = (current.lamps || []).map((existing, index) => {
+        const profile = individualLampProfiles?.[index];
+        if (mixedLampProfiles && profile) {
+            return {
+                ...cloneSerializable(existing),
+                ...profile,
+                x: parseLightingNumber(existing.x, templateLamp.tank.lengthCm / 2),
+                y: parseLightingNumber(existing.y, templateLamp.tank.widthCm / 2),
+                groups: cloneSerializable(profile.groups || existing.groups || [])
+            };
+        }
+        return {
+            ...templateLamp.lampTemplate,
+            name: index === 0 ? templateLamp.lampTemplate.name : (existing.name || `${templateLamp.lampTemplate.name} ${index + 1}`),
+            x: parseLightingNumber(existing.x, templateLamp.tank.lengthCm / 2),
+            y: parseLightingNumber(existing.y, templateLamp.tank.widthCm / 2)
+        };
+    });
+    const normalized = ensureLightingLampCount(templateLamp, lampCount);
+    if (window.ReefLightingSim?.clampLampInsideTank) {
+        normalized.lamps = normalized.lamps.map(currentLamp => window.ReefLightingSim.clampLampInsideTank(currentLamp, normalized.tank));
+    }
+    delete normalized.lampTemplate;
+    return normalized;
+}
+
+function getLightingStatusLabel(status) {
+    if (status === 'low') return 'zu wenig';
+    if (status === 'high') return 'zu viel';
+    return 'passend';
+}
+
+function renderLightingPlannerSettingsLegacy() {
+    const container = document.getElementById('lightingPlannerSettings');
+    if (!container) return;
+
+    if (!lightingPlannerUnlocked) {
+        container.innerHTML = `
+            <div class="dev-lock-card lighting-lock-card">
+                <p class="hint">Dieser Testbereich ist geschützt, weil die PAR-Simulation noch experimentell ist.</p>
+                <div class="local-device-unlock-row">
+                    <input type="password" id="lightingPlannerPassword" placeholder="Passwort" autocomplete="off" onkeydown="if(event.key==='Enter') unlockLightingPlanner()">
+                    <button type="button" class="btn-secondary btn-animated" onclick="unlockLightingPlanner()">Entsperren</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const settings = getLightingPlannerSettings();
+    const lamp = settings.lamps[0] || createDefaultLightingPlanner().lamps[0];
+    const clusterMode = lamp.clusterMode || ((lamp.groups || []).length > 1 ? 'multiple' : 'single');
+    const totalClusterWatt = (lamp.groups || []).reduce((sum, group) => sum + Math.max(0, parseLightingNumber(group.watt, 0)), 0);
+    container.innerHTML = `
+        <div class="lighting-planner">
+            <section class="lighting-studio-header">
+                <div class="lighting-studio-title">
+                    <span>REEF LIGHT PLANNER</span>
+                    <h3>Professionelle Leuchten- &amp; PAR-Planung</h3>
+                    <p>Plane Gehäuse, LED-Cluster, Montage und Korallenpositionen als zusammenhängendes Beleuchtungssystem.</p>
+                </div>
+                <div class="lighting-studio-stats" aria-label="Aktuelle Leuchtenkonfiguration">
+                    <span><b>${escapeHtml(settings.lamps.length || 1)}</b><small>Leuchten</small></span>
+                    <span><b data-lighting-stat="clusters">${escapeHtml((lamp.groups || []).length)}</b><small>Cluster je Leuchte</small></span>
+                    <span><b data-lighting-stat="watt">${formatLightingNumber(totalClusterWatt, 0)} W</b><small>Clusterleistung</small></span>
+                </div>
+            </section>
+            <div class="sync-maintenance-banner lighting-warning">
+                <strong>Testversion</strong>
+                <span>Die Berechnung ist eine physikalische Näherung. Echte PAR-Messungen am Aquarium bleiben die Referenz und sollten zur Kalibrierung genutzt werden.</span>
+            </div>
+            <div class="lighting-actions">
+                <button type="button" class="btn-primary btn-animated" onclick="updateLightingPlannerFromInputs(true)">Planung aktualisieren</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="optimizeLightingPlannerPosition()">Optimal ausrichten</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="optimizeLightingPlannerLampCount()">Leuchtenanzahl empfehlen</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="resetLightingPlannerDemo()">Beispiel laden</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="lockLightingPlanner()">Bereich sperren</button>
+            </div>
+            <div class="lighting-grid">
+                <section class="lighting-panel">
+                    <h4>Aquarium</h4>
+                    <div class="lighting-form-grid">
+                        <label>Länge cm<input id="lightingTankLength" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.lengthCm)}"></label>
+                        <label>Breite cm<input id="lightingTankWidth" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.widthCm)}"></label>
+                        <label>Wasserhöhe cm<input id="lightingWaterHeight" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.waterHeightCm)}"><small>Von Wasseroberfläche bis Boden.</small></label>
+                        <label>Lichtverlust im Wasser<input id="lightingAbsorptionK" type="number" inputmode="decimal" step="0.001" value="${escapeHtml(settings.tank.absorptionK)}"><small>Höherer Wert = Licht nimmt mit Tiefe stärker ab.</small></label>
+                        <label>Genauigkeit der Karte<input id="lightingResolution" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.resolutionCm)}" aria-describedby="lightingResolutionHint"><small id="lightingResolutionHint">Kleiner Wert = feinere PAR-Karte.</small></label>
+                        <label>Kartentiefe cm<input id="lightingSliceDepth" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.sliceDepthCm)}"><small>Tiefe, in der die PAR-Karte gezeigt wird.</small></label>
+                    </div>
+                </section>
+                <section class="lighting-panel">
+                    <h4>Leuchtenprofil</h4>
+                    <p class="hint">Beschreibt das komplette Gehäuse. Mehrere identische Leuchten verwenden automatisch dasselbe Clusterprofil.</p>
+                    <div class="lighting-form-grid">
+                        <label>Hersteller / Modell<input id="lightingLampName" type="text" value="${escapeHtml(lamp.name)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Anzahl Lampen<input id="lightingLampCount" type="number" min="1" max="8" step="1" inputmode="numeric" value="${escapeHtml(settings.lamps.length || 1)}" onchange="changeLightingLampCount(this.value)"></label>
+                        <label>Gehäuselänge cm<input id="lightingLampLength" type="number" inputmode="decimal" value="${escapeHtml(lamp.lengthCm)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Gehäusebreite cm<input id="lightingLampWidth" type="number" inputmode="decimal" value="${escapeHtml(lamp.widthCm)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Höhe über Wasser cm<input id="lightingLampMountHeight" type="number" inputmode="decimal" value="${escapeHtml(lamp.heightCmAboveWater || lamp.heightCm)}"><small>Abstand Lampe zur Wasseroberfläche.</small></label>
+                        <label>Drehung °<input id="lightingLampRotation" type="number" inputmode="decimal" value="${escapeHtml(lamp.rotationDeg || 0)}"><small>Rotation in der Draufsicht.</small></label>
+                        <label>Neigung X °<input id="lightingLampTiltX" type="number" inputmode="decimal" value="${escapeHtml(lamp.tiltXDeg || 0)}"><small>Kippt den Lichtkegel nach links/rechts.</small></label>
+                        <label>Neigung Y °<input id="lightingLampTiltY" type="number" inputmode="decimal" value="${escapeHtml(lamp.tiltYDeg || 0)}"><small>Kippt den Lichtkegel nach vorne/hinten.</small></label>
+                        <label>Dimmung %<input id="lightingLampDim" type="number" inputmode="decimal" value="${escapeHtml(lamp.dimPercent)}"><small>Aktuelle Leistung im Tagesprofil.</small></label>
+                    </div>
+                    <label class="lighting-mix-toggle">
+                        <input id="lightingMixedLampProfiles" type="checkbox" ${settings.mixedLampProfiles ? 'checked' : ''} onchange="setLightingMixedLampProfiles(this.checked)">
+                        <span>
+                            <strong>Verschiedene Lampenarten mischen</strong>
+                            <small>Aktivieren, wenn nicht alle Lampen dasselbe Modell oder Clusterprofil haben.</small>
+                        </span>
+                    </label>
+                </section>
+            </div>
+            ${settings.mixedLampProfiles ? `<section class="lighting-panel">
+                <div class="lighting-editor-head">
+                    <div>
+                        <span class="lighting-section-kicker">GEMISCHTE LEUCHTEN</span>
+                        <h4>Lampenprofile pro Position</h4>
+                        <p class="hint">Hier kannst du jede Lampe einzeln als eigene Lampenart definieren. Positionen bleiben in der Draufsicht per Drag &amp; Drop steuerbar.</p>
+                    </div>
+                    <button type="button" class="btn-secondary btn-animated" onclick="copyLightingMainProfileToAllLamps()">Hauptprofil auf alle kopieren</button>
+                </div>
+                <div class="lighting-editor-help" role="note">
+                    <strong>Wann nutzen?</strong>
+                    <span>Nutze diesen Modus für gemischte Setups, zum Beispiel zwei große Panels plus eine kleine Spot-Leuchte. Für identische Lampen bleibt der Schalter aus.</span>
+                </div>
+                <div id="lightingLampProfileEditor" class="lighting-editor-list">${renderLightingLampProfileRows(settings.lamps)}</div>
+            </section>` : ''}
+            <section class="lighting-panel lighting-cluster-config ${clusterMode === 'single' ? 'is-single' : ''}">
+                <div class="lighting-cluster-mode-control">
+                    <div>
+                        <span class="lighting-section-kicker">LEUCHTENBAUART</span>
+                        <strong>Wie ist die Leuchte aufgebaut?</strong>
+                        <small>Wähle Einzelcluster für kompakte Leuchten mit nur einer zentralen Lichtquelle.</small>
+                    </div>
+                    <select id="lightingClusterMode" onchange="setLightingClusterMode(this.value)">
+                        <option value="single" ${clusterMode === 'single' ? 'selected' : ''}>Einzelcluster</option>
+                        <option value="multiple" ${clusterMode === 'multiple' ? 'selected' : ''}>Mehrere Cluster</option>
+                    </select>
+                </div>
+                <div class="lighting-editor-head">
+                    <div>
+                        <span class="lighting-section-kicker">LEUCHTENAUFBAU</span>
+                        <h4>${clusterMode === 'single' ? 'LED-Lichtquelle' : 'LED-Cluster im Gehäuse'}</h4>
+                        <p class="hint">${clusterMode === 'single'
+                            ? 'Diese Leuchte besitzt eine einzelne Lichtquelle. Du brauchst nur Leistung, Optik und PAR-Referenz einzutragen.'
+                            : 'Eine Leuchte kann aus mehreren getrennten LED-Clustern bestehen. Jeder Cluster wird als eigene Lichtquelle mit Position, Leistung, Optik und PAR-Referenz berechnet.'}</p>
+                    </div>
+                    ${clusterMode === 'multiple' ? '<button type="button" class="btn-secondary btn-animated" onclick="addLightingLedGroup()">Cluster hinzufügen</button>' : ''}
+                </div>
+                <div class="lighting-cluster-workbench ${clusterMode === 'single' ? 'is-single' : ''}">
+                    <div class="lighting-housing-preview-card">
+                        <div class="lighting-preview-head">
+                            <span><b>Gehäuse-Draufsicht</b><small>Clusterpositionen relativ zur Leuchtenmitte</small></span>
+                            <em>LIVE</em>
+                        </div>
+                        <div id="lightingClusterPreview"></div>
+                    </div>
+                    ${clusterMode === 'multiple' ? `<div class="lighting-layout-control">
+                        <label>Cluster-Anordnung
+                            <select id="lightingClusterLayout" onchange="applyLightingClusterLayout(this.value)">
+                                <option value="custom" ${(lamp.clusterLayout || 'custom') === 'custom' ? 'selected' : ''}>Individuell</option>
+                                <option value="dualHorizontal" ${lamp.clusterLayout === 'dualHorizontal' ? 'selected' : ''}>2 · nebeneinander</option>
+                                <option value="dualVertical" ${lamp.clusterLayout === 'dualVertical' ? 'selected' : ''}>2 · untereinander</option>
+                                <option value="tripleHorizontal" ${lamp.clusterLayout === 'tripleHorizontal' ? 'selected' : ''}>3 · in einer Reihe</option>
+                                <option value="quadGrid" ${lamp.clusterLayout === 'quadGrid' ? 'selected' : ''}>4 · Raster 2 × 2</option>
+                                <option value="sixGrid" ${lamp.clusterLayout === 'sixGrid' ? 'selected' : ''}>6 · Raster 3 × 2</option>
+                            </select>
+                        </label>
+                        <div class="lighting-spacing-grid">
+                            <label>Abstand X cm<input id="lightingClusterSpacingX" type="number" inputmode="decimal" min="0" step="0.5" placeholder="auto" onchange="applyLightingClusterLayout(document.getElementById('lightingClusterLayout')?.value)"><small>Abstand zwischen linken/rechten Clustern.</small></label>
+                            <label>Abstand Y cm<input id="lightingClusterSpacingY" type="number" inputmode="decimal" min="0" step="0.5" placeholder="auto" onchange="applyLightingClusterLayout(document.getElementById('lightingClusterLayout')?.value)"><small>Abstand zwischen vorderen/hinteren Clustern.</small></label>
+                        </div>
+                        <div class="lighting-editor-help" role="note">
+                            <strong>Schnellstart oder Herstellerdaten</strong>
+                            <span>Wähle ein Raster und passe die Abstände an. Bei „Individuell“ bleiben die X/Y-Positionen pro Cluster komplett frei.</span>
+                        </div>
+                    </div>` : `<div class="lighting-layout-control lighting-single-cluster-note">
+                        <strong>Ein zentraler Lichtpunkt</strong>
+                        <span>Die Position ist automatisch auf die Gehäusemitte gesetzt. Eine Cluster-Anordnung wird für diese Leuchtenbauart nicht benötigt.</span>
+                    </div>`}
+                </div>
+                <div class="lighting-editor-help" role="note">
+                    <strong>PAR-Referenz richtig eintragen</strong>
+                    <span>Der Referenzwert gilt pro Cluster. Nutze einen gemessenen PAR-Wert mit bekanntem Abstand und bekannter Dimmung. Bei einer Herstellerangabe für die gesamte Leuchte muss der Wert fachgerecht auf die Cluster verteilt werden.</span>
+                </div>
+                <div id="lightingLedGroupEditor" class="lighting-editor-list">${renderLightingGroupEditorRows(lamp.groups)}</div>
+            </section>
+            <div id="lightingPlannerResult"></div>
+        </div>
+    `;
+    updateLightingPlannerFromInputs(false);
+    refreshLightingClusterPreview();
+    syncLightingClusterSpacingDefaults();
+}
+
+function renderLightingPlannerSettings() {
+    const container = document.getElementById('lightingPlannerSettings');
+    if (!container) return;
+
+    if (!lightingPlannerUnlocked) {
+        container.innerHTML = `
+            <div class="dev-lock-card lighting-lock-card">
+                <p class="hint">Dieser Testbereich ist geschützt, weil die Lichtsimulation noch experimentell ist.</p>
+                <div class="local-device-unlock-row">
+                    <input type="password" id="lightingPlannerPassword" placeholder="Passwort" autocomplete="off" onkeydown="if(event.key==='Enter') unlockLightingPlanner()">
+                    <button type="button" class="btn-secondary btn-animated" onclick="unlockLightingPlanner()">Entsperren</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    const settings = getLightingPlannerSettings();
+    const lamp = settings.lamps[0] || createDefaultLightingPlanner().lamps[0];
+    const clusterMode = lamp.clusterMode || ((lamp.groups || []).length > 1 ? 'multiple' : 'single');
+    const lastQuality = Number(settings.lastResult?.qualityPercent);
+    container.innerHTML = `
+        <div class="lighting-planner">
+            <section class="lighting-studio-header">
+                <div class="lighting-studio-title">
+                    <span>REEF LIGHT PLANNER</span>
+                    <h3>Leuchten einfach und gleichmäßig planen</h3>
+                    <p>Becken und Leuchte festlegen, optimal ausleuchten lassen und das Ergebnis direkt in der Draufsicht prüfen.</p>
+                </div>
+                <div class="lighting-studio-stats" aria-label="Aktuelle Leuchtenkonfiguration">
+                    <span><b>${escapeHtml(settings.lamps.length || 1)}</b><small>Leuchten</small></span>
+                    <span><b data-lighting-stat="clusters">${escapeHtml((lamp.groups || []).length)}</b><small>Cluster je Leuchte</small></span>
+                    <span><b data-lighting-stat="quality">${Number.isFinite(lastQuality) ? `${formatLightingNumber(lastQuality, 0)} %` : '–'}</b><small>Qualität</small></span>
+                </div>
+            </section>
+            <div class="sync-maintenance-banner lighting-warning">
+                <strong>Planungshilfe in Testphase</strong>
+                <span>Die Karte zeigt eine physikalische Näherung. Eine echte PAR-Messung im Aquarium bleibt die verlässlichste Kontrolle.</span>
+            </div>
+            <div class="lighting-actions">
+                <button type="button" class="btn-primary btn-animated" onclick="optimizeLightingPlannerPosition()">Optimal ausleuchten</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="optimizeLightingPlannerLampCount()">Leuchtenanzahl empfehlen</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="updateLightingPlannerFromInputs(true)">Plan neu berechnen</button>
+            </div>
+            <div class="lighting-grid">
+                <section class="lighting-panel lighting-step-card">
+                    <div class="lighting-step-heading"><span>1</span><div><h4>Aquarium</h4><p>Maße eingeben oder ein gespeichertes Becken laden.</p></div></div>
+                    <div class="lighting-preset-bar">
+                        <select id="lightingTankPresetSelect" onchange="loadLightingTankPreset(this.value)">${renderLightingPresetOptions(settings.presets?.tanks, 'Beckenpreset laden', settings.presets?.selectedTankId)}</select>
+                        <input id="lightingTankPresetName" type="text" placeholder="Name, z. B. Schaubecken">
+                        <button type="button" class="btn-secondary" onclick="saveLightingTankPreset()">Speichern</button>
+                        <button type="button" class="lighting-icon-button" onclick="deleteLightingTankPreset()" title="Gewähltes Beckenpreset löschen" aria-label="Gewähltes Beckenpreset löschen">×</button>
+                    </div>
+                    <div class="lighting-form-grid">
+                        <label>Länge cm<input id="lightingTankLength" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.lengthCm)}"></label>
+                        <label>Breite cm<input id="lightingTankWidth" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.widthCm)}"></label>
+                        <label>Wasserhöhe cm<input id="lightingWaterHeight" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.waterHeightCm)}"><small>Von Wasseroberfläche bis Boden.</small></label>
+                        <label>Kartentiefe cm<input id="lightingSliceDepth" type="number" inputmode="decimal" value="${escapeHtml(settings.tank.sliceDepthCm)}"><small>Tiefe, in der die Ausleuchtung geprüft wird.</small></label>
+                    </div>
+                    <details class="lighting-inline-details">
+                        <summary>Erweiterte Wasserberechnung</summary>
+                        <div class="lighting-form-grid">
+                            <label>Lichtverlust im Wasser<input id="lightingAbsorptionK" type="number" inputmode="decimal" step="0.001" value="${escapeHtml(settings.tank.absorptionK)}"><small>Nur ändern, wenn ein belastbarer Messwert vorliegt.</small></label>
+                        </div>
+                    </details>
+                </section>
+                <section class="lighting-panel lighting-step-card">
+                    <div class="lighting-step-heading"><span>2</span><div><h4>Leuchte</h4><p>Modell laden oder als eigenes Lampenpreset speichern.</p></div></div>
+                    <div class="lighting-preset-bar">
+                        <select id="lightingLampPresetSelect" onchange="loadLightingLampPreset(this.value)">${renderLightingPresetOptions(settings.presets?.lamps, 'Lampenpreset laden', settings.presets?.selectedLampId)}</select>
+                        <input id="lightingLampPresetName" type="text" placeholder="Name des Lampenpresets">
+                        <button type="button" class="btn-secondary" onclick="saveLightingLampPreset()">Speichern</button>
+                        <button type="button" class="lighting-icon-button" onclick="deleteLightingLampPreset()" title="Gewähltes Lampenpreset löschen" aria-label="Gewähltes Lampenpreset löschen">×</button>
+                    </div>
+                    <div class="lighting-form-grid">
+                        <label>Hersteller / Modell<input id="lightingLampName" type="text" value="${escapeHtml(lamp.name)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Anzahl Lampen<input id="lightingLampCount" type="number" min="1" max="8" step="1" inputmode="numeric" value="${escapeHtml(settings.lamps.length || 1)}" onchange="changeLightingLampCount(this.value)"></label>
+                        <label>Gehäuselänge cm<input id="lightingLampLength" type="number" min="1" inputmode="decimal" value="${escapeHtml(lamp.lengthCm)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Gehäusebreite cm<input id="lightingLampWidth" type="number" min="1" inputmode="decimal" value="${escapeHtml(lamp.widthCm)}" oninput="refreshLightingClusterPreview()"></label>
+                        <label>Höhe über Wasser cm<input id="lightingLampMountHeight" type="number" min="0" inputmode="decimal" value="${escapeHtml(lamp.heightCmAboveWater || lamp.heightCm)}"><small>Abstand zur Wasseroberfläche.</small></label>
+                        <label>Dimmung %<input id="lightingLampDim" type="number" min="0" max="100" inputmode="decimal" value="${escapeHtml(lamp.dimPercent)}"><small>Leistung im geplanten Tagesprofil.</small></label>
+                    </div>
+                    <details class="lighting-inline-details">
+                        <summary>Erweiterte Montage</summary>
+                        <div class="lighting-form-grid">
+                            <label>Drehung °<input id="lightingLampRotation" type="number" inputmode="decimal" value="${escapeHtml(lamp.rotationDeg || 0)}"><small>Wird bei der Optimierung mitgeprüft.</small></label>
+                            <label>Neigung X °<input id="lightingLampTiltX" type="number" inputmode="decimal" value="${escapeHtml(lamp.tiltXDeg || 0)}"><small>Kippt den Lichtkegel links oder rechts.</small></label>
+                            <label>Neigung Y °<input id="lightingLampTiltY" type="number" inputmode="decimal" value="${escapeHtml(lamp.tiltYDeg || 0)}"><small>Kippt den Lichtkegel vorne oder hinten.</small></label>
+                        </div>
+                        <label class="lighting-mix-toggle">
+                            <input id="lightingMixedLampProfiles" type="checkbox" ${settings.mixedLampProfiles ? 'checked' : ''} onchange="setLightingMixedLampProfiles(this.checked)">
+                            <span><strong>Verschiedene Lampenarten mischen</strong><small>Nur aktivieren, wenn mehrere unterschiedliche Modelle eingesetzt werden.</small></span>
+                        </label>
+                    </details>
+                </section>
+            </div>
+            ${settings.mixedLampProfiles ? `<details class="lighting-panel lighting-tool-details">
+                <summary><span><strong>Unterschiedliche Lampen bearbeiten</strong><small>Jede Position kann ein eigenes Modell erhalten.</small></span><i aria-hidden="true"></i></summary>
+                <div class="lighting-details-body">
+                    <div class="lighting-editor-head">
+                        <div><h4>Lampenprofile pro Position</h4><p class="hint">Modell, Gehäuse, Höhe und Cluster je Lampenposition festlegen.</p></div>
+                        <button type="button" class="btn-secondary btn-animated" onclick="copyLightingMainProfileToAllLamps()">Hauptprofil auf alle kopieren</button>
+                    </div>
+                    <div id="lightingLampProfileEditor" class="lighting-editor-list">${renderLightingLampProfileRows(settings.lamps)}</div>
+                </div>
+            </details>` : ''}
+            <details class="lighting-panel lighting-tool-details lighting-cluster-config ${clusterMode === 'single' ? 'is-single' : ''}">
+                <summary><span><strong>Leuchtenaufbau &amp; PAR-Kalibrierung</strong><small>LED-Cluster und optionale Messwerte für genauere Ergebnisse.</small></span><i aria-hidden="true"></i></summary>
+                <div class="lighting-details-body">
+                    <div class="lighting-cluster-mode-control">
+                        <div><strong>Wie ist die Leuchte aufgebaut?</strong><small>Einzelcluster für kompakte Leuchten, mehrere Cluster für Panels.</small></div>
+                        <select id="lightingClusterMode" onchange="setLightingClusterMode(this.value)">
+                            <option value="single" ${clusterMode === 'single' ? 'selected' : ''}>Einzelcluster</option>
+                            <option value="multiple" ${clusterMode === 'multiple' ? 'selected' : ''}>Mehrere Cluster</option>
+                        </select>
+                    </div>
+                    <div class="lighting-editor-head">
+                        <div><h4>${clusterMode === 'single' ? 'LED-Lichtquelle' : 'LED-Cluster im Gehäuse'}</h4><p class="hint">${clusterMode === 'single' ? 'Leistung, Lichtfläche und Abstrahlwinkel der zentralen Lichtquelle.' : 'Position, Leistung und Optik jeder Lichtquelle im Gehäuse.'}</p></div>
+                        ${clusterMode === 'multiple' ? '<button type="button" class="btn-secondary btn-animated" onclick="addLightingLedGroup()">Cluster hinzufügen</button>' : ''}
+                    </div>
+                    <div class="lighting-cluster-workbench ${clusterMode === 'single' ? 'is-single' : ''}">
+                        <div class="lighting-housing-preview-card">
+                            <div class="lighting-preview-head"><span><b>Gehäuse-Draufsicht</b><small>Position der Lichtquellen im Gehäuse</small></span><em>LIVE</em></div>
+                            <div id="lightingClusterPreview"></div>
+                        </div>
+                        ${clusterMode === 'multiple' ? `<div class="lighting-layout-control">
+                            <label>Cluster-Anordnung
+                                <select id="lightingClusterLayout" onchange="applyLightingClusterLayout(this.value)">
+                                    <option value="custom" ${(lamp.clusterLayout || 'custom') === 'custom' ? 'selected' : ''}>Individuell</option>
+                                    <option value="dualHorizontal" ${lamp.clusterLayout === 'dualHorizontal' ? 'selected' : ''}>2 · nebeneinander</option>
+                                    <option value="dualVertical" ${lamp.clusterLayout === 'dualVertical' ? 'selected' : ''}>2 · untereinander</option>
+                                    <option value="tripleHorizontal" ${lamp.clusterLayout === 'tripleHorizontal' ? 'selected' : ''}>3 · in einer Reihe</option>
+                                    <option value="quadGrid" ${lamp.clusterLayout === 'quadGrid' ? 'selected' : ''}>4 · Raster 2 × 2</option>
+                                    <option value="sixGrid" ${lamp.clusterLayout === 'sixGrid' ? 'selected' : ''}>6 · Raster 3 × 2</option>
+                                </select>
+                            </label>
+                            <div class="lighting-spacing-grid">
+                                <label>Abstand X cm<input id="lightingClusterSpacingX" type="number" inputmode="decimal" min="0" step="0.5" placeholder="auto" onchange="applyLightingClusterLayout(document.getElementById('lightingClusterLayout')?.value)"></label>
+                                <label>Abstand Y cm<input id="lightingClusterSpacingY" type="number" inputmode="decimal" min="0" step="0.5" placeholder="auto" onchange="applyLightingClusterLayout(document.getElementById('lightingClusterLayout')?.value)"></label>
+                            </div>
+                        </div>` : `<div class="lighting-layout-control lighting-single-cluster-note"><strong>Ein zentraler Lichtpunkt</strong><span>Die Lichtquelle sitzt automatisch in der Gehäusemitte.</span></div>`}
+                    </div>
+                    <div class="lighting-editor-help" role="note"><strong>PAR-Werte sind optional</strong><span>Ohne Messwert wird die Lichtverteilung relativ berechnet. Mit einer passenden Referenz werden auch die angezeigten PAR-Werte aussagekräftiger.</span></div>
+                    <div id="lightingLedGroupEditor" class="lighting-editor-list">${renderLightingGroupEditorRows(lamp.groups)}</div>
+                </div>
+            </details>
+            <div id="lightingPlannerResult"></div>
+            <details class="lighting-inline-details lighting-utility-details">
+                <summary>Weitere Aktionen</summary>
+                <div class="lighting-utility-actions">
+                    <button type="button" class="btn-secondary" onclick="resetLightingPlannerDemo()">Beispiel laden</button>
+                    <button type="button" class="btn-secondary" onclick="lockLightingPlanner()">Bereich sperren</button>
+                </div>
+            </details>
+        </div>
+    `;
+    updateLightingPlannerFromInputs(false);
+    refreshLightingClusterPreview();
+    syncLightingClusterSpacingDefaults();
+}
+
+function renderLightingHeatmap(canvas, grid, corals = []) {
+    if (!canvas || !grid || !Array.isArray(grid.rows)) return;
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width = Math.max(320, canvas.clientWidth || 640);
+    const height = canvas.height = Math.max(220, canvas.clientHeight || 320);
+    ctx.clearRect(0, 0, width, height);
+    const rows = grid.rows;
+    const rowCount = rows.length;
+    const colCount = rows[0]?.length || 0;
+    const cellW = width / Math.max(1, colCount);
+    const cellH = height / Math.max(1, rowCount);
+    const max = Math.max(1, grid.max || 1);
+    rows.forEach((row, rowIndex) => {
+        row.forEach((value, colIndex) => {
+            const t = Math.max(0, Math.min(1, value / max));
+            const hue = 205 - (175 * t);
+            const light = 18 + (42 * t);
+            ctx.fillStyle = `hsl(${hue} 88% ${light}%)`;
+            ctx.fillRect(colIndex * cellW, rowIndex * cellH, Math.ceil(cellW) + 1, Math.ceil(cellH) + 1);
+        });
+    });
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, width - 1, height - 1);
+    if (grid.mode === 'top') {
+        corals.forEach(coral => {
+            const x = (parseLightingNumber(coral.x) / Math.max(1, grid.xMax)) * width;
+            const y = (parseLightingNumber(coral.y) / Math.max(1, grid.yMax)) * height;
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fillStyle = coral.status === 'ok' ? '#30d158' : coral.status === 'low' ? '#ffcc00' : '#ff453a';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.82)';
+            ctx.stroke();
+        });
+    }
+}
+
+function getLightingSceneMetrics(canvas, settings) {
+    const tank = settings.tank || {};
+    const length = Math.max(10, parseLightingNumber(tank.lengthCm, 120));
+    const widthCm = Math.max(10, parseLightingNumber(tank.widthCm, 60));
+    const waterHeight = Math.max(10, parseLightingNumber(tank.waterHeightCm, 55));
+    const rect = canvas.getBoundingClientRect();
+    const width = canvas.width = Math.max(340, rect.width || canvas.clientWidth || 720);
+    const height = canvas.height = Math.max(260, rect.height || canvas.clientHeight || 380);
+    const margin = 30;
+    const scale = Math.min((width - margin * 2) / length, (height - margin * 2) / widthCm);
+    const plotWidth = length * scale;
+    const plotHeight = widthCm * scale;
+    const origin = {
+        x: (width - plotWidth) / 2,
+        y: (height - plotHeight) / 2
+    };
+    return { length, widthCm, waterHeight, width, height, scale, origin, plotWidth, plotHeight };
+}
+
+function projectLightingPoint(point, metrics) {
+    return {
+        x: metrics.origin.x + point.x * metrics.scale,
+        y: metrics.origin.y + point.y * metrics.scale
+    };
+}
+
+function unprojectLightingTop(screen, metrics) {
+    const x = Math.max(0, Math.min(metrics.length, (screen.x - metrics.origin.x) / metrics.scale));
+    const y = Math.max(0, Math.min(metrics.widthCm, (screen.y - metrics.origin.y) / metrics.scale));
+    return { x, y };
+}
+
+function drawLighting3DScene(canvas, settings, result) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const metrics = getLightingSceneMetrics(canvas, settings);
+    ctx.clearRect(0, 0, metrics.width, metrics.height);
+
+    const gradient = ctx.createLinearGradient(metrics.origin.x, metrics.origin.y, metrics.origin.x + metrics.plotWidth, metrics.origin.y + metrics.plotHeight);
+    gradient.addColorStop(0, 'rgba(58, 220, 255, 0.18)');
+    gradient.addColorStop(1, 'rgba(18, 72, 122, 0.46)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.roundRect(metrics.origin.x, metrics.origin.y, metrics.plotWidth, metrics.plotHeight, 18);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(180, 244, 255, 0.35)';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(180, 244, 255, 0.12)';
+    ctx.lineWidth = 1;
+    for (let x = 20; x < metrics.length; x += 20) {
+        const a = projectLightingPoint({ x, y: 0 }, metrics);
+        const b = projectLightingPoint({ x, y: metrics.widthCm }, metrics);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+    }
+    for (let y = 20; y < metrics.widthCm; y += 20) {
+        const a = projectLightingPoint({ x: 0, y }, metrics);
+        const b = projectLightingPoint({ x: metrics.length, y }, metrics);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+    }
+
+    canvas._lightingLampHitAreas = [];
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(metrics.origin.x, metrics.origin.y, metrics.plotWidth, metrics.plotHeight);
+    ctx.clip();
+    (settings.lamps || []).forEach((lamp, index) => {
+        const lampPoint = projectLightingPoint({ x: parseLightingNumber(lamp.x), y: parseLightingNumber(lamp.y) }, metrics);
+        const w = Math.max(34, parseLightingNumber(lamp.lengthCm, 45) * metrics.scale);
+        const h = Math.max(18, parseLightingNumber(lamp.widthCm, 22) * metrics.scale);
+        const active = lightingDragState.activeIndex === index;
+        ctx.save();
+        ctx.translate(lampPoint.x, lampPoint.y);
+        ctx.rotate(parseLightingNumber(lamp.rotationDeg, 0) * Math.PI / 180);
+        ctx.shadowColor = active ? 'rgba(48, 209, 255, 0.65)' : 'rgba(0,0,0,0.38)';
+        ctx.shadowBlur = active ? 24 : 14;
+        const invalid = Boolean(lamp.placementInvalid) || (window.ReefLightingSim?.lampFitsTank && !window.ReefLightingSim.lampFitsTank(lamp, settings.tank || {}));
+        ctx.fillStyle = invalid ? 'rgba(255,69,58,0.34)' : active ? 'rgba(48, 209, 255, 0.42)' : 'rgba(255,255,255,0.16)';
+        ctx.strokeStyle = invalid ? '#ff6961' : active ? '#30d1ff' : 'rgba(180,244,255,0.58)';
+        ctx.lineWidth = active ? 2.4 : 1.4;
+        ctx.beginPath();
+        ctx.roundRect(-w / 2, -h / 2, w, h, 8);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#f5fbff';
+        ctx.font = '700 12px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(index + 1), 0, 0);
+        ctx.beginPath();
+        ctx.moveTo(w * 0.18, 0);
+        ctx.lineTo(w * 0.38, -h * 0.22);
+        ctx.lineTo(w * 0.38, h * 0.22);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(245,251,255,0.64)';
+        ctx.fill();
+        ctx.restore();
+        canvas._lightingLampHitAreas.push({ index, x: lampPoint.x, y: lampPoint.y, r: Math.max(w, h) / 2 + 12, metrics });
+    });
+    ctx.restore();
+
+    ctx.fillStyle = 'rgba(245,251,255,0.76)';
+    ctx.font = '600 12px system-ui, -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.fillText('Leuchte ziehen · Position bleibt innerhalb des Beckens', 18, 24);
+}
+
+function bindLightingSceneInteractions() {
+    const canvas = document.getElementById('lightingSceneCanvas');
+    if (!canvas || canvas.dataset.bound === 'true') return;
+    canvas.dataset.bound = 'true';
+    const getScreen = event => {
+        const rect = canvas.getBoundingClientRect();
+        return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+    const startDrag = event => {
+        const screen = getScreen(event);
+        const hit = (canvas._lightingLampHitAreas || []).find(area => Math.hypot(screen.x - area.x, screen.y - area.y) <= area.r);
+        if (!hit) return;
+        lightingDragState.activeIndex = hit.index;
+        if (event.pointerId !== undefined && canvas.setPointerCapture) {
+            try { canvas.setPointerCapture(event.pointerId); } catch (error) {}
+        }
+        event.preventDefault();
+    };
+    const moveDrag = event => {
+        if (lightingDragState.activeIndex === null) return;
+        const settings = getLightingPlannerSettings();
+        const metrics = getLightingSceneMetrics(canvas, settings);
+        const point = unprojectLightingTop(getScreen(event), metrics);
+        const lamp = settings.lamps[lightingDragState.activeIndex];
+        if (!lamp) return;
+        lamp.x = Number(point.x.toFixed(1));
+        lamp.y = Number(point.y.toFixed(1));
+        if (window.ReefLightingSim?.clampLampInsideTank) {
+            settings.lamps[lightingDragState.activeIndex] = window.ReefLightingSim.clampLampInsideTank(lamp, settings.tank || {});
+        }
+        setLightingPlannerSettings(settings, false);
+        const result = window.ReefLightingSim?.simulate(settings);
+        drawLighting3DScene(canvas, settings, result);
+        event.preventDefault();
+    };
+    const finish = event => {
+        if (lightingDragState.activeIndex === null) return;
+        lightingDragState.activeIndex = null;
+        if (event?.pointerId !== undefined && canvas.releasePointerCapture) {
+            try { canvas.releasePointerCapture(event.pointerId); } catch (error) {}
+        }
+        updateLightingPlannerFromInputs(true);
+    };
+    canvas.addEventListener('pointerdown', startDrag);
+    canvas.addEventListener('pointermove', moveDrag);
+    canvas.addEventListener('pointerup', finish);
+    canvas.addEventListener('pointercancel', finish);
+    canvas.addEventListener('mousedown', startDrag);
+    canvas.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', finish);
+    canvas.addEventListener('touchstart', event => {
+        if (!event.touches?.[0]) return;
+        startDrag(event.touches[0]);
+    }, { passive: false });
+    canvas.addEventListener('touchmove', event => {
+        if (!event.touches?.[0]) return;
+        moveDrag(event.touches[0]);
+    }, { passive: false });
+    canvas.addEventListener('touchend', finish);
+    canvas.addEventListener('touchcancel', finish);
+}
+
+function renderLightingResult(settings, result) {
+    const target = document.getElementById('lightingPlannerResult');
+    if (!target) return;
+    const metrics = result.coverage || window.ReefLightingSim?.analyzeGrid?.(result.top) || {};
+    const avg = Number(metrics.avg) || result.top.values.reduce((sum, value) => sum + value, 0) / Math.max(1, result.top.values.length);
+    const clusterCount = (settings.lamps || []).reduce((sum, lamp) => sum + (Array.isArray(lamp.groups) ? lamp.groups.length : 0), 0);
+    const quality = Number(metrics.qualityPercent) || 0;
+    const qualityLabel = quality >= 82 ? 'Sehr gleichmäßig' : quality >= 68 ? 'Gut verteilt' : quality >= 52 ? 'Noch ungleichmäßig' : 'Deutliche Schattenbereiche';
+    const placementWarning = result.placementValid ? '' : `
+        <div class="lighting-placement-warning" role="alert">
+            <strong>Leuchte passt nicht vollständig in das Aquarium</strong>
+            <span>Gehäusemaße oder Drehung anpassen. Eine optimale Platzierung außerhalb des Beckenrands wird nicht zugelassen.</span>
+        </div>`;
+    target.innerHTML = `
+        ${placementWarning}
+        <section class="lighting-quality-banner">
+            <span><small>Ergebnis</small><strong>${qualityLabel}</strong><em>Optimiert auf gleichmäßige Verteilung; Stärke über Höhe und Dimmung einstellen.</em></span>
+            <b>${formatLightingNumber(quality, 0)} %</b>
+        </section>
+        <div class="lighting-result-summary">
+            <span><strong>${formatLightingNumber(metrics.uniformityPercent || 0, 0)} %</strong><small>Gleichmäßigkeit</small></span>
+            <span><strong>${formatLightingNumber(metrics.coveragePercent || 0, 0)} %</strong><small>gleichmäßig abgedeckte Fläche</small></span>
+            <span><strong>${formatLightingNumber(result.top.min, 0)}</strong><small>schwächste Stelle</small></span>
+            <span><strong>${formatLightingNumber(avg, 0)}</strong><small>Durchschnitt an Kartentiefe</small></span>
+            <span><strong>${formatLightingNumber(settings.lamps.length, 0)} / ${formatLightingNumber(clusterCount, 0)}</strong><small>Leuchten / Lichtquellen</small></span>
+        </div>
+        <div class="lighting-canvas-grid lighting-primary-canvases">
+            <section class="lighting-canvas-card lighting-scene-card">
+                <div class="lighting-canvas-heading"><span><h4>Leuchtenplan</h4><small>Leuchten per Drag &amp; Drop verschieben</small></span><em>INTERAKTIV</em></div>
+                <canvas id="lightingSceneCanvas"></canvas>
+                <div class="lighting-lamp-position-list">
+                    ${(settings.lamps || []).map((currentLamp, index) => `
+                        <span><strong>${escapeHtml(currentLamp.name || `Lampe ${index + 1}`)}</strong><small>X ${formatLightingNumber(currentLamp.x, 1)} · Y ${formatLightingNumber(currentLamp.y, 1)} cm · ${formatLightingNumber(currentLamp.rotationDeg || 0, 0)}° · Höhe ${formatLightingNumber(currentLamp.heightCmAboveWater || currentLamp.heightCm, 1)} cm</small></span>
+                    `).join('')}
+                </div>
+            </section>
+            <section class="lighting-canvas-card lighting-heatmap-card">
+                <div class="lighting-canvas-heading"><span><h4>Ausleuchtung</h4><small>${formatLightingNumber(result.top.depth || 0, 0)} cm unter der Wasseroberfläche</small></span><em>RELATIV</em></div>
+                <canvas id="lightingTopCanvas"></canvas>
+                <div class="lighting-heatmap-legend"><span>weniger Licht</span><i></i><span>mehr Licht</span></div>
+            </section>
+        </div>
+        <details class="lighting-inline-details lighting-depth-details">
+            <summary>Tiefenprofil anzeigen</summary>
+            <section class="lighting-canvas-card">
+                <h4>Seitenansicht durch die Beckenmitte</h4>
+                <canvas id="lightingSideCanvas"></canvas>
+            </section>
+        </details>
+    `;
+    window.requestAnimationFrame(() => {
+        drawLighting3DScene(document.getElementById('lightingSceneCanvas'), settings, result);
+        bindLightingSceneInteractions();
+        renderLightingHeatmap(document.getElementById('lightingTopCanvas'), result.top, []);
+        renderLightingHeatmap(document.getElementById('lightingSideCanvas'), result.side, []);
+    });
+}
+
+function updateLightingPlannerFromInputs(persist = true) {
+    if (!window.ReefLightingSim) {
+        showToast('Lichtsimulation konnte nicht geladen werden.', 'warning');
+        return;
+    }
+    const settings = readLightingPlannerForm();
+    const result = window.ReefLightingSim.simulate(settings);
+    settings.lastResult = {
+        at: new Date().toISOString(),
+        maxPar: result.top.max,
+        score: result.score,
+        qualityPercent: result.coverage?.qualityPercent || 0,
+        coveragePercent: result.coverage?.coveragePercent || 0
+    };
+    setLightingPlannerSettings(settings, persist);
+    renderLightingResult(settings, result);
+    const qualityTarget = document.querySelector('[data-lighting-stat="quality"]');
+    if (qualityTarget) qualityTarget.textContent = `${formatLightingNumber(result.coverage?.qualityPercent || 0, 0)} %`;
+}
+
+function optimizeLightingPlannerPosition() {
+    if (!window.ReefLightingSim) return;
+    const settings = readLightingPlannerForm();
+    const best = window.ReefLightingSim.suggestOptimalLampAlignment
+        ? window.ReefLightingSim.suggestOptimalLampAlignment(settings)
+        : window.ReefLightingSim.suggestLampLayout
+        ? window.ReefLightingSim.suggestLampLayout(settings, settings.lamps.length, settings.lamps.length)
+        : window.ReefLightingSim.suggestSingleLampPosition(settings);
+    if (!best) {
+        showToast('Keine Lampe für die Positionssuche gefunden.', 'warning');
+        return;
+    }
+    if (best.error === 'lamp-too-large') {
+        showToast(`Lampe ${Number(best.lampIndex) + 1} ist größer als die Beckenfläche. Maße oder Drehung anpassen.`, 'warning', 5200);
+        return;
+    }
+    setLightingPlannerSettings(best.setup || settings, true);
+    renderLightingPlannerSettings();
+    showToast(`${settings.lamps.length} Lampe(n) auf gleichmäßige Ausleuchtung optimiert`, 'success');
+}
+
+function optimizeLightingPlannerLampCount() {
+    if (!window.ReefLightingSim?.suggestLampLayout) return;
+    const settings = readLightingPlannerForm();
+    const best = window.ReefLightingSim.suggestLampLayout(settings, 1, 6);
+    if (!best) {
+        showToast('Keine sinnvolle Lampenanzahl berechenbar.', 'warning');
+        return;
+    }
+    setLightingPlannerSettings(best.setup, true);
+    renderLightingPlannerSettings();
+    showToast(`Geometrischer Vorschlag: ${best.count} Lampe(n)`, 'success');
+}
+
+function changeLightingLampCount(value) {
+    const settings = readLightingPlannerForm();
+    ensureLightingLampCount(settings, value);
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+}
+
+function setLightingMixedLampProfiles(enabled) {
+    const settings = readLightingPlannerForm();
+    settings.mixedLampProfiles = Boolean(enabled);
+    if (!settings.mixedLampProfiles) {
+        const mainLamp = settings.lamps[0] || createDefaultLightingPlanner().lamps[0];
+        settings.lamps = settings.lamps.map((lamp, index) => ({
+            ...cloneSerializable(mainLamp),
+            name: index === 0 ? mainLamp.name : (lamp.name || `${mainLamp.name || 'Lampe'} ${index + 1}`),
+            x: lamp.x,
+            y: lamp.y
+        }));
+    }
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+}
+
+function copyLightingMainProfileToLamp(index) {
+    const settings = readLightingPlannerForm();
+    const mainLamp = settings.lamps[0] || createDefaultLightingPlanner().lamps[0];
+    if (!settings.lamps[index]) return;
+    settings.lamps[index] = {
+        ...cloneSerializable(mainLamp),
+        name: settings.lamps[index].name || `${mainLamp.name || 'Lampe'} ${index + 1}`,
+        x: settings.lamps[index].x,
+        y: settings.lamps[index].y
+    };
+    settings.mixedLampProfiles = true;
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+}
+
+function copyLightingMainProfileToAllLamps() {
+    const settings = readLightingPlannerForm();
+    const mainLamp = settings.lamps[0] || createDefaultLightingPlanner().lamps[0];
+    settings.lamps = settings.lamps.map((lamp, index) => ({
+        ...cloneSerializable(mainLamp),
+        name: index === 0 ? mainLamp.name : (lamp.name || `${mainLamp.name || 'Lampe'} ${index + 1}`),
+        x: lamp.x,
+        y: lamp.y
+    }));
+    settings.mixedLampProfiles = true;
+    setLightingPlannerSettings(settings, true);
+    renderLightingPlannerSettings();
+    showToast('Hauptprofil auf alle Lampen kopiert', 'success');
+}
+
+function resetLightingPlannerDemo() {
+    setLightingPlannerSettings(createDefaultLightingPlanner(), true);
+    renderLightingPlannerSettings();
+    showToast('Demo-Werte geladen', 'success');
+}
+
+function unlockLightingPlanner() {
+    const input = document.getElementById('lightingPlannerPassword');
+    if ((input?.value || '').trim() !== 'LIGHT') {
+        showToast('Falsches LIGHT-Passwort', 'warning');
+        return;
+    }
+    lightingPlannerUnlocked = true;
+    renderLightingPlannerSettings();
+}
+
+function lockLightingPlanner() {
+    lightingPlannerUnlocked = false;
+    renderLightingPlannerSettings();
+}
 
 function getLocalDeviceSettings() {
     if (!db.settings) db.settings = {};
@@ -8316,11 +10209,6 @@ function addReefManagerImportToTraceHistory() {
         tankLitersInput?.focus();
         return;
     }
-    const validation = getTraceCalculatorIcpValidation();
-    if (!validation.valid) {
-        showTraceCalculatorIcpValidationError(validation.invalid);
-        return;
-    }
     const config = {
         ...currentConfig,
         tankLiters,
@@ -8335,7 +10223,8 @@ function addReefManagerImportToTraceHistory() {
     const entry = normalizeTraceCalculatorHistoryEntry({
         id: createWarehouseId(),
         source: 'reefManager',
-        includeInCalculation: true,
+        includeInCalculation: false,
+        calculationLocked: true,
         createdAt: Date.now(),
         mixtureDate: meta.mixtureDate || getTodayDateInputValue(),
         config,
@@ -8347,18 +10236,11 @@ function addReefManagerImportToTraceHistory() {
     });
     state.history.push(entry);
     pruneTraceCalculatorHistory();
-    state.config = config;
-    state.currentMixtureDate = entry.mixtureDate;
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
     saveDB();
-    document.querySelectorAll('[id^="traceCalc"]').forEach(el => {
-        if (el && el.dataset) delete el.dataset.traceCalcSynced;
-    });
-    const icpContainer = document.getElementById('traceCalcIcpInputs');
-    if (icpContainer) delete icpContainer.dataset.traceCalcReady;
     renderTraceExportInputs();
     renderTraceCalculator();
-    showToast('Reef Manager Import zur Historie hinzugefügt', 'success');
+    showToast('Reef Manager Import als Archiv gespeichert', 'success');
 }
 
 function ensureTraceCalculatorState() {
@@ -8477,6 +10359,10 @@ function normalizeTraceCalculatorHistoryEntry(entry) {
     if (!entry.id) entry.id = createWarehouseId();
     if (!entry.createdAt) entry.createdAt = Date.now();
     if (entry.includeInCalculation === undefined) entry.includeInCalculation = true;
+    if (entry.source === 'reefManager') {
+        entry.includeInCalculation = false;
+        entry.calculationLocked = true;
+    }
     if (!entry.amounts || typeof entry.amounts !== 'object') entry.amounts = {};
     if (!entry.grams || typeof entry.grams !== 'object') entry.grams = {};
     if (!entry.config || typeof entry.config !== 'object') entry.config = {};
@@ -8509,6 +10395,16 @@ function isTraceStartMixture(entry) {
     return entry?.isStartMixture === true || entry?.source === 'traceStartMixture';
 }
 
+function isReefManagerTraceArchive(entry) {
+    return entry?.source === 'reefManager';
+}
+
+function canTraceHistoryEntryAffectCalculation(entry) {
+    if (!entry || entry.includeInCalculation === false) return false;
+    if (isReefManagerTraceArchive(entry)) return false;
+    return true;
+}
+
 function getTraceCalculatorAnalysisHistory(limit = 5) {
     return getTraceCalculatorHistoryEntries({ calculationOnly: true, sort: 'asc' })
         .filter(hasTraceCalculatorIcpValues)
@@ -8534,7 +10430,7 @@ function pruneTraceCalculatorHistory(maxEntries = 60) {
 function getTraceCalculatorHistoryEntries({ calculationOnly = false, sort = 'asc' } = {}) {
     const state = ensureTraceCalculatorState();
     state.history.forEach(normalizeTraceCalculatorHistoryEntry);
-    const entries = state.history.filter(entry => !calculationOnly || entry.includeInCalculation !== false);
+    const entries = state.history.filter(entry => !calculationOnly || canTraceHistoryEntryAffectCalculation(entry));
     return sortTraceHistoryByDate(entries, sort);
 }
 
@@ -8566,6 +10462,9 @@ function getTraceHistoryEntrySummary(entry) {
 }
 
 function getTraceHistoryEntryStatus(entry) {
+    if (isReefManagerTraceArchive(entry)) {
+        return { className: 'ignored', label: 'Archiv', note: 'nur Auslagerung/Doku' };
+    }
     if (entry?.includeInCalculation === false && !isTraceStartMixture(entry)) {
         return { className: 'ignored', label: 'Ignoriert', note: 'fließt nicht ein' };
     }
@@ -9407,11 +11306,11 @@ function renderTraceCalculatorHistory() {
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
                 ${renderTraceCalculatorHistoryChart(chartHistory)}
                 <div class="trace-history-list">
-                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Bearbeiten steuert, ob ein Eintrag einfließt</small></div>
+                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Reef Manager Importe sind reine Archiv-Einträge</small></div>
                     ${history.map(entry => {
                         const status = getTraceHistoryEntryStatus(entry);
                         return `
-                        <div class="trace-history-row ${entry.includeInCalculation === false ? 'trace-history-row-inactive' : ''}">
+                        <div class="trace-history-row ${!canTraceHistoryEntryAffectCalculation(entry) && !isTraceStartMixture(entry) ? 'trace-history-row-inactive' : ''}">
                             <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small></span>
                             <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small></span>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
@@ -9439,6 +11338,10 @@ function toggleTraceHistoryCalculation(id) {
     const entry = state.history.find(item => item.id === id);
     if (!entry) return;
     normalizeTraceCalculatorHistoryEntry(entry);
+    if (isReefManagerTraceArchive(entry)) {
+        showToast('Reef Manager Importe bleiben reine Archiv-Einträge und fließen nicht in die Trace-Berechnung ein.', 'info');
+        return;
+    }
     entry.includeInCalculation = entry.includeInCalculation === false;
     entry.updatedAt = Date.now();
     saveDB();
@@ -9482,105 +11385,109 @@ async function editTraceHistoryEntry(id) {
     const entry = state.history.find(item => item.id === id);
     if (!entry) return;
     normalizeTraceCalculatorHistoryEntry(entry);
+    const isReefManagerArchive = isReefManagerTraceArchive(entry);
+    const fields = [
+        ...(!isReefManagerArchive ? [{
+            name: 'includeInCalculation',
+            label: 'In weitere Trace-Berechnung einfließen lassen?',
+            value: entry.includeInCalculation === false ? 'no' : 'yes',
+            options: [
+                { value: 'yes', label: 'Ja, einbeziehen' },
+                { value: 'no', label: 'Nein, ignorieren' }
+            ]
+        }] : []),
+        {
+            name: 'mixtureDate',
+            label: 'Ansatzdatum',
+            type: 'date',
+            value: entry.mixtureDate || getTodayDateInputValue(),
+            required: true
+        },
+        {
+            name: 'tankLiters',
+            label: 'Aquariumvolumen in Litern',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(entry.config?.tankLiters || state.config?.tankLiters || 500),
+            required: true
+        },
+        {
+            name: 'days',
+            label: 'Laufzeit in Tagen',
+            type: 'number',
+            inputMode: 'numeric',
+            value: String(entry.config?.days || state.config?.days || 40),
+            required: true
+        },
+        {
+            name: 'dailyDoseMl',
+            label: 'Tagesdosierung je Lösung in ml',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(entry.config?.dailyDoseMl || state.config?.dailyDoseMl || 5),
+            required: true
+        },
+        {
+            name: 'kationenVolumeMl',
+            label: 'Kationen Gesamtvolumen K+ (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'volumeMl') ?? ''),
+            required: true
+        },
+        {
+            name: 'kationenOsmoseMl',
+            label: 'Kationen Osmoseanteil K+ (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'osmoseMl') ?? ''),
+            required: true
+        },
+        {
+            name: 'anionenVolumeMl',
+            label: 'Anionen Gesamtvolumen A- (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'volumeMl') ?? ''),
+            required: true
+        },
+        {
+            name: 'anionenOsmoseMl',
+            label: 'Anionen Osmoseanteil A- (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'osmoseMl') ?? ''),
+            required: true
+        },
+        {
+            name: 'kationenAmounts',
+            label: 'Kationen K+ Elementmengen',
+            value: getTraceHistoryAmountsText(entry, 'kationen'),
+            multiline: true,
+            required: true,
+            description: 'Eine Zeile pro Kation, z.B. Co 33,01'
+        },
+        {
+            name: 'anionenAmounts',
+            label: 'Anionen A- Elementmengen',
+            value: getTraceHistoryAmountsText(entry, 'anionen'),
+            multiline: true,
+            required: true,
+            description: 'Eine Zeile pro Anion, z.B. F 32,18'
+        }
+    ];
     const values = await showAppDialog({
         kind: 'prompt',
         type: 'info',
         title: 'Trace-Historie bearbeiten',
         eyebrow: 'Historie & Analyse',
-        message: 'Passe den Historien-Eintrag an. Nur Einträge mit „Ja“ fließen in die nächste Trace-Berechnung ein.',
+        message: isReefManagerArchive
+            ? 'Passe den Archiv-Eintrag an. Reef Manager Importe dienen nur zur Dokumentation und Auslagerung, nicht als Grundlage der Trace-Berechnung.'
+            : 'Passe den Historien-Eintrag an. Nur Einträge mit „Ja“ fließen in die nächste Trace-Berechnung ein.',
         wide: true,
         confirmText: 'Speichern',
         cancelText: 'Abbrechen',
-        fields: [
-            {
-                name: 'includeInCalculation',
-                label: 'In weitere Trace-Berechnung einfließen lassen?',
-                value: entry.includeInCalculation === false ? 'no' : 'yes',
-                options: [
-                    { value: 'yes', label: 'Ja, einbeziehen' },
-                    { value: 'no', label: 'Nein, ignorieren' }
-                ]
-            },
-            {
-                name: 'mixtureDate',
-                label: 'Ansatzdatum',
-                type: 'date',
-                value: entry.mixtureDate || getTodayDateInputValue(),
-                required: true
-            },
-            {
-                name: 'tankLiters',
-                label: 'Aquariumvolumen in Litern',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(entry.config?.tankLiters || state.config?.tankLiters || 500),
-                required: true
-            },
-            {
-                name: 'days',
-                label: 'Laufzeit in Tagen',
-                type: 'number',
-                inputMode: 'numeric',
-                value: String(entry.config?.days || state.config?.days || 40),
-                required: true
-            },
-            {
-                name: 'dailyDoseMl',
-                label: 'Tagesdosierung je Lösung in ml',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(entry.config?.dailyDoseMl || state.config?.dailyDoseMl || 5),
-                required: true
-            },
-            {
-                name: 'kationenVolumeMl',
-                label: 'Kationen Gesamtvolumen K+ (ml)',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'volumeMl') ?? ''),
-                required: true
-            },
-            {
-                name: 'kationenOsmoseMl',
-                label: 'Kationen Osmoseanteil K+ (ml)',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'osmoseMl') ?? ''),
-                required: true
-            },
-            {
-                name: 'anionenVolumeMl',
-                label: 'Anionen Gesamtvolumen A- (ml)',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'volumeMl') ?? ''),
-                required: true
-            },
-            {
-                name: 'anionenOsmoseMl',
-                label: 'Anionen Osmoseanteil A- (ml)',
-                type: 'number',
-                inputMode: 'decimal',
-                value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'osmoseMl') ?? ''),
-                required: true
-            },
-            {
-                name: 'kationenAmounts',
-                label: 'Kationen K+ Elementmengen',
-                value: getTraceHistoryAmountsText(entry, 'kationen'),
-                multiline: true,
-                required: true,
-                description: 'Eine Zeile pro Kation, z.B. Co 33,01'
-            },
-            {
-                name: 'anionenAmounts',
-                label: 'Anionen A- Elementmengen',
-                value: getTraceHistoryAmountsText(entry, 'anionen'),
-                multiline: true,
-                required: true,
-                description: 'Eine Zeile pro Anion, z.B. F 32,18'
-            }
-        ]
+        fields
     });
     if (!values) return;
     const parsedAmounts = {
@@ -9591,7 +11498,8 @@ async function editTraceHistoryEntry(id) {
         await appAlert('Keine gültigen Elementmengen erkannt. Änderungen wurden nicht gespeichert.', { title: 'Bitte prüfen', type: 'warning' });
         return;
     }
-    entry.includeInCalculation = values.includeInCalculation !== 'no';
+    entry.includeInCalculation = isReefManagerArchive ? false : values.includeInCalculation !== 'no';
+    if (isReefManagerArchive) entry.calculationLocked = true;
     entry.mixtureDate = String(values.mixtureDate || '').trim() || entry.mixtureDate || getTodayDateInputValue();
     entry.config = {
         ...(entry.config || {}),
@@ -10168,17 +12076,55 @@ function initTools() {
     runToolInit('Tool-Kategorien', setupToolSections);
     runToolInit('Tool-Favoriten', renderToolFavorites);
     runToolInit('Rechner UI', setupPriority4CalculatorUI);
-    applyPresentationModeUI();
+    applyToolVisibility();
     document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
         initToolSection(section.dataset.sectionId || '');
     });
 }
 
 function getToolSettings() {
-    if (!db.toolSettings) db.toolSettings = { lastSection: '', favorites: [] };
+    if (!db.toolSettings) db.toolSettings = { lastSection: '', favorites: [], hidden: [] };
     if (!Array.isArray(db.toolSettings.favorites)) db.toolSettings.favorites = [];
+    if (!Array.isArray(db.toolSettings.hidden)) db.toolSettings.hidden = [];
     if (!db.toolSettings.lastSection) db.toolSettings.lastSection = '';
     return db.toolSettings;
+}
+
+function getHiddenToolIds() {
+    const validIds = new Set(TOOL_DEFINITIONS.map(tool => tool.id));
+    return getToolSettings().hidden.filter(id => validIds.has(id));
+}
+
+function isToolHidden(toolId) {
+    return getHiddenToolIds().includes(toolId)
+        || (!isOsciFeaturesEnabled() && OSCI_ONLY_TOOL_IDS.has(toolId));
+}
+
+function toggleToolVisibility(toolId, visible) {
+    if (!TOOL_DEFINITIONS.some(tool => tool.id === toolId)) return;
+    const settings = getToolSettings();
+    settings.hidden = visible
+        ? settings.hidden.filter(id => id !== toolId)
+        : [...new Set([...settings.hidden, toolId])];
+    if (!visible) settings.favorites = settings.favorites.filter(id => id !== toolId);
+    saveDB();
+    applyToolVisibility();
+    renderToolVisibilitySettings();
+    renderToolFavorites();
+}
+
+function applyToolVisibility() {
+    document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
+    document.querySelectorAll('#tools .tool-card-grid > .card[data-tool-id]').forEach(card => {
+        card.classList.toggle('tool-user-hidden', isToolHidden(card.dataset.toolId));
+    });
+    document.querySelectorAll('#tools .tool-section').forEach(section => {
+        const visibleCards = Array.from(section.querySelectorAll('.tool-card-grid > .card[data-tool-id]'))
+            .filter(card => !card.classList.contains('tool-user-hidden'));
+        section.classList.toggle('tool-section-user-hidden', visibleCards.length === 0);
+    });
+    const searchInput = document.getElementById('toolSearchInput');
+    if (searchInput) filterTools(searchInput.value || '');
 }
 
 function isCustomCRUnlocked() {
@@ -10508,7 +12454,7 @@ function getToolFavoriteOptions() {
     return Array.from(document.querySelectorAll('#tools .tool-compact-card')).map(card => ({
         id: card.dataset.toolId,
         title: getToolCardTitle(card)
-    })).filter(option => option.id && option.title);
+    })).filter(option => option.id && option.title && !isToolHidden(option.id));
 }
 
 function renderToolFavorites() {
@@ -10553,6 +12499,7 @@ function removeToolFavorite(toolId) {
 }
 
 function openToolFavorite(toolId) {
+    if (isToolHidden(toolId)) return;
     const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
     if (!card) return;
     const section = card.closest('.tool-section');
@@ -10599,7 +12546,7 @@ function filterTools(query = '') {
             const toolId = card.dataset.toolId || '';
             const sectionText = section.querySelector('.tool-section-summary')?.textContent || '';
             const searchableText = `${card.dataset.toolSearch || card.textContent} ${sectionText} ${TOOL_SEARCH_KEYWORDS[toolId] || ''}`;
-            const matches = smartSearchMatches(normalized, searchableText);
+            const matches = !isToolHidden(toolId) && smartSearchMatches(normalized, searchableText);
             card.classList.toggle('tool-card-hidden', !matches);
             if (matches) matchesInSection += 1;
         });
@@ -17662,7 +19609,40 @@ function setFieldError(fieldId, message = '') {
     }
 }
 
-Object.assign(window, { showAppDialog, appAlert, appConfirm, appPrompt, closeAppDialog, closeLegalModal, openLegalModal, unlockWavePumpDemo, lockWavePumpDemo, renderWavePumpDemoSettings, setFieldError, enhanceFormAccessibility });
+Object.assign(window, {
+    showAppDialog,
+    appAlert,
+    appConfirm,
+    appPrompt,
+    closeAppDialog,
+    closeLegalModal,
+    openLegalModal,
+    unlockWavePumpDemo,
+    lockWavePumpDemo,
+    renderWavePumpDemoSettings,
+    unlockLightingPlanner,
+    lockLightingPlanner,
+    renderLightingPlannerSettings,
+    updateLightingPlannerFromInputs,
+    optimizeLightingPlannerPosition,
+    optimizeLightingPlannerLampCount,
+    changeLightingLampCount,
+    setLightingMixedLampProfiles,
+    copyLightingMainProfileToLamp,
+    copyLightingMainProfileToAllLamps,
+    resetLightingPlannerDemo,
+    addLightingLedGroup,
+    removeLightingLedGroup,
+    applyLightingClusterLayout,
+    setLightingClusterMode,
+    refreshLightingClusterPreview,
+    markLightingClusterLayoutCustom,
+    addLightingCoralPoint,
+    removeLightingCoralPoint,
+    applyLightingCoralTypeDefaults,
+    setFieldError,
+    enhanceFormAccessibility
+});
 enhanceFormAccessibility(document);
 document.addEventListener('DOMContentLoaded', () => enhanceFormAccessibility(document));
 window.setTimeout(() => enhanceFormAccessibility(document), 500);
@@ -17862,6 +19842,7 @@ document.addEventListener('keydown', (e) => {
 async function bootstrapApplication() {
     await initDB();
     renderLegacyDomainBanner();
+    document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
     let startupTab = db.lastTab || 'uebersicht';
     try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
     if (window.location.hash) {
@@ -17870,7 +19851,6 @@ async function bootstrapApplication() {
     }
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     showTab(startupTab);
-    applyPresentationModeUI();
     updateNotificationStatus();
     renderStorageSecurityStatus();
     renderAppUpdateStatus();
@@ -18034,6 +20014,7 @@ function refreshVisibleViewAfterPull() {
         renderCloudShareOverview();
         renderWarehouseEventLog();
         renderSupabaseSyncSettings();
+        renderLightingPlannerSettings();
     }
     updateWarehouseUI();
 }

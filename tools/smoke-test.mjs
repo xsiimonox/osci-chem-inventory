@@ -49,6 +49,10 @@ await page.waitForTimeout(1000);
 
 const results = [];
 for (const tab of tabs) {
+  const hidden = await page.evaluate(tabId => {
+    const button = document.getElementById(`tab-${tabId}`);
+    return !button || button.hidden || getComputedStyle(button).display === 'none';
+  }, tab);
   await page.evaluate(tabId => selectTab(tabId), tab);
   await page.waitForTimeout(150);
   const active = await page.evaluate(() => document.querySelector('.tab-content.active')?.id || '');
@@ -59,7 +63,8 @@ for (const tab of tabs) {
   results.push({
     tab,
     active,
-    ok: active === tab,
+    hidden,
+    ok: hidden ? active !== tab : active === tab,
     horizontalOverflow: width.scroll > width.inner + 2
   });
 }

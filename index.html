@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.5-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.29-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.5</span>
+                    <span class="version-badge">v3.4.29</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -284,7 +284,7 @@
                     <div class="input-group">
                         <label for="reefManagerAquariumLiters">Aquariumvolumen für diesen Import (L):</label>
                         <input type="number" id="reefManagerAquariumLiters" min="1" step="0.1" placeholder="z.B. 100" inputmode="decimal">
-                        <small class="hint">Pflichtangabe, da der Reef-Manager-Export kein Aquariumvolumen enthält. Zusätzlich müssen oben die zugehörigen ICP-Werte eingetragen sein.</small>
+                        <small class="hint">Pflichtangabe, da der Reef-Manager-Export kein Aquariumvolumen enthält. Der Import dient nur zur Auslagerung und optionalen Dokumentation.</small>
                     </div>
                 </div>
                 <div class="btn-group calculator-actions">
@@ -929,11 +929,11 @@
                                     <strong>Reeftools Anleitung</strong>
                                     <span>Alle wichtigen Funktionen mit Bildern und Schritt-für-Schritt-Erklärung</span>
                                 </a>
-                                <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card">
+                                <a href="https://osci-motion.de/anleitungen/" target="_blank" rel="noopener" class="resource-link-card" data-osci-only="true">
                                     <strong>Anleitungen</strong>
                                     <span>Bedienungsanleitungen, Rezepte und Produktinformationen</span>
                                 </a>
-                                <a href="https://osci-motion.de/tools/" target="_blank" rel="noopener" class="resource-link-card">
+                                <a href="https://osci-motion.de/tools/" target="_blank" rel="noopener" class="resource-link-card" data-osci-only="true">
                                     <strong>OSCI Tools</strong>
                                     <span>Weitere offizielle Rechner und Plausibilitäts-Tools</span>
                                 </a>
@@ -1380,12 +1380,6 @@
                 <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
             </section>
 
-            <div class="card settings-card settings-card-experience">
-                <h3>Start &amp; Darstellung</h3>
-                <p class="hint">Aktiviere bei Bedarf eine ruhigere Präsentationsansicht für Vorführungen.</p>
-                <div id="experienceModeSettings"></div>
-            </div>
-
             <div class="card data-safety-card data-recovery-center-card">
                 <h3>Datensicherheit &amp; Backup</h3>
                 <p class="hint">Alles rund um Speicherschutz, Wiederherstellung, Datei-Export und Google Drive an einem Ort.</p>
@@ -1405,6 +1399,16 @@
                             <button onclick="restoreLatestLocalSnapshot()" class="btn-secondary btn-animated">Letzten Stand laden</button>
                             <button onclick="clearLocalSnapshots()" class="btn-out btn-animated">Sicherungspunkte löschen</button>
                         </div>
+                    </section>
+
+                    <section class="data-safety-section demo-profile-section">
+                        <div class="data-safety-section-head">
+                            <span>
+                                <strong>Demo-Profil</strong>
+                                <small>Ein vollständig befülltes Beispielsystem testen, ohne eigene Daten zu überschreiben.</small>
+                            </span>
+                        </div>
+                        <div id="demoProfileSettings"></div>
                     </section>
 
                     <section class="data-safety-section">
@@ -1474,6 +1478,12 @@
                 <div id="wavePumpDemoSettings"></div>
             </div>
 
+            <div class="card settings-card settings-card-lighting-sim">
+                <h3>Licht &amp; PAR Simulation</h3>
+                <p class="hint">Geschützter Testbereich für eine physikalische Lampenplanung mit PAR-Heatmap und Positionssuche.</p>
+                <div id="lightingPlannerSettings"></div>
+            </div>
+
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">App-Updates</h3>
                 <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
@@ -1508,8 +1518,11 @@
             </div>
 
             <div class="card settings-card settings-card-navigation">
-                <h3>Menü anpassen</h3>
-                <p class="hint">Sortiere die Hauptnavigation so, wie du sie nutzen möchtest. Die mobile Schnellnavigation nimmt automatisch die ersten vier Menüpunkte.</p>
+                <h3>Ansicht &amp; Inhalte</h3>
+                <p class="hint">Bestimme, welche Bereiche und Tools du wirklich sehen möchtest. Ausgeblendete Funktionen und Daten bleiben erhalten.</p>
+                <div id="feature-visibility-settings"></div>
+                <div id="tool-visibility-settings"></div>
+                <h4 class="settings-subheading">Navigation anpassen</h4>
                 <div id="menu-order-settings"></div>
             </div>
 
@@ -1841,8 +1854,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.5-release"></script>
-    <script src="assets/js/app.js?v=3.4.5-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.29-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.29-release"></script>
+    <script src="assets/js/app.js?v=3.4.29-release"></script>
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
