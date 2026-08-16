@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.39-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.40-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.39</span>
+                    <span class="version-badge">v3.4.40</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1016,7 +1016,7 @@
                             </div>
                             <div class="input-group">
                                 <label for="measurementValue">Messwert:</label>
-                                <input type="number" id="measurementValue" step="0.001" placeholder="z.B. 7.8">
+                                <input type="number" id="measurementValue" step="0.1" placeholder="Optimalwert: 7.5">
                             </div>
                             <div class="input-group">
                                 <label for="measurementDate">Datum/Uhrzeit:</label>
@@ -1982,9 +1982,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.39-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.39-release"></script>
-    <script src="assets/js/app.js?v=3.4.39-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.40-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.40-release"></script>
+    <script src="assets/js/app.js?v=3.4.40-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

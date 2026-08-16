@@ -16765,6 +16765,31 @@ function formatMeasurementTypeOption(type) {
     return `${type.label}${type.unit ? ` (${type.unit})` : ''}`;
 }
 
+function getMeasurementOptimalMeta(typeId, unit = '') {
+    const salinityUnit = unit || 'PSU';
+    const map = {
+        KH: { value: '7.5', step: '0.1' },
+        CA: { value: '425', step: '1' },
+        MG: { value: '1350', step: '1' },
+        PO4: { value: '0.05', step: '0.001' },
+        NO3: { value: '5', step: '0.1' },
+        [SALINITY_MEASUREMENT_TYPE_ID]: salinityUnit === 'kg/l'
+            ? { value: '1.0230', step: '0.0001' }
+            : salinityUnit === 'SG'
+                ? { value: '1.0260', step: '0.0001' }
+                : { value: '34.5', step: '0.1' }
+    };
+    return map[typeId] || { value: '', step: '0.001' };
+}
+
+function updateMeasurementValueInputHint(typeId, unit = '') {
+    const valueInput = document.getElementById('measurementValue');
+    if (!valueInput) return;
+    const meta = getMeasurementOptimalMeta(typeId, unit);
+    valueInput.step = meta.step || '0.001';
+    valueInput.placeholder = meta.value ? `Optimalwert: ${meta.value}` : 'Messwert eintragen';
+}
+
 function addMeasurementEntryToLogbook(typeId, value, note = '', at = new Date().toISOString(), unit = '') {
     const numericValue = parseFloat(value);
     if (!Number.isFinite(numericValue)) return false;
@@ -16945,6 +16970,7 @@ function renderMeasurementTracker(forceTypeId = null) {
     }
     if (unitGroup) unitGroup.hidden = currentType !== SALINITY_MEASUREMENT_TYPE_ID;
     const unit = getSelectedMeasurementUnit(currentType);
+    updateMeasurementValueInputHint(currentType, unit);
     const rangeValue = rangeSelect.value || '30';
     const allEntries = getMeasurementEntries()
         .filter(entry => entry.typeId === currentType)
