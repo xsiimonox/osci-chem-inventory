@@ -16033,8 +16033,7 @@ progress.mini-progress::-moz-progress-bar {
     gap: var(--space-3);
 }
 
-.icp-compare-shell,
-.icp-ratio-shell {
+.icp-compare-shell {
     display: grid;
     grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
     gap: var(--space-3);
@@ -16046,14 +16045,12 @@ progress.mini-progress::-moz-progress-bar {
     background: color-mix(in srgb, var(--surface-card) 74%, transparent);
 }
 
-.icp-compare-shell strong,
-.icp-ratio-shell strong {
+.icp-compare-shell strong {
     display: block;
     color: var(--text-primary);
 }
 
-.icp-compare-shell small,
-.icp-ratio-shell small {
+.icp-compare-shell small {
     display: block;
     margin-top: 3px;
     color: var(--text-secondary);
@@ -16112,36 +16109,7 @@ progress.mini-progress::-moz-progress-bar {
     transform: translateY(-1px);
 }
 
-.icp-ratio-manager {
-    display: grid;
-    gap: var(--space-2);
-}
-
-.icp-ratio-list {
-    display: grid;
-    gap: var(--space-2);
-}
-
-.icp-ratio-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
-    gap: var(--space-2);
-    align-items: center;
-}
-
-.icp-ratio-row span {
-    color: var(--primary);
-    font-weight: 900;
-}
-
-.icp-ratio-row .btn-out {
-    width: auto;
-    min-height: 38px;
-    padding-inline: 12px;
-}
-
-.icp-compare-results,
-.icp-ratio-results {
+.icp-compare-results {
     margin-bottom: var(--space-4);
 }
 
@@ -16434,15 +16402,9 @@ progress.mini-progress::-moz-progress-bar {
     .icp-control-grid,
     .icp-stat-grid,
     .icp-compare-shell,
-    .icp-ratio-shell,
-    .icp-ratio-row,
     .icp-compare-grid,
     .icp-report-detail {
         grid-template-columns: 1fr;
-    }
-
-    .icp-ratio-row > span {
-        justify-self: center;
     }
 
     .icp-card-head,

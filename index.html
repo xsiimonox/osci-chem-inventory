@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.40-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.42-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.40</span>
+                    <span class="version-badge">v3.4.42</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1331,16 +1331,6 @@
                     </div>
                     <div id="icpComparePicker" class="icp-compare-picker"></div>
                 </div>
-                <div class="icp-ratio-shell">
-                    <div>
-                        <strong>Verhältnisse anzeigen</strong>
-                        <small>Lege mehrere Vergleiche an. Jede Zeile berechnet Wert A geteilt durch Wert B.</small>
-                    </div>
-                    <div class="icp-ratio-manager">
-                        <div id="icpRatioList" class="icp-ratio-list"></div>
-                        <button type="button" class="btn-secondary btn-animated" onclick="addIcpRatioPair()">Verhältnis hinzufügen</button>
-                    </div>
-                </div>
                 <div id="icpAnalysis"></div>
             </section>
 
@@ -1982,9 +1972,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.40-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.40-release"></script>
-    <script src="assets/js/app.js?v=3.4.40-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.42-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.42-release"></script>
+    <script src="assets/js/app.js?v=3.4.42-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

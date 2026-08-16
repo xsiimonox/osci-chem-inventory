@@ -247,7 +247,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
-const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [], ratioPairs: [] };
+const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [] };
 const logBookUiState = { editingEntryId: null };
 const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null, photosCleared: false };
 const CORAL_STATUS_OPTIONS = [
@@ -16246,7 +16246,7 @@ function deleteIcpReport(reportId) {
 }
 
 function selectIcpReport(reportId) {
-    icpUiState.selectedReportId = reportId;
+    icpUiState.selectedReportId = icpUiState.selectedReportId === reportId ? null : reportId;
     renderIcpPage();
 }
 
@@ -16254,57 +16254,6 @@ function updateIcpCompareSelection() {
     icpUiState.selectedParameters = [...document.querySelectorAll('[data-icp-compare-key]:checked')]
         .map(input => input.dataset.icpCompareKey)
         .filter(Boolean);
-    renderIcpPage();
-}
-
-function createIcpRatioPair(options = [], preferredA = '') {
-    const first = options.find(option => option.key === preferredA)?.key || options[0]?.key || '';
-    const second = options.find(option => option.key !== first)?.key || options[1]?.key || '';
-    return { a: first, b: second };
-}
-
-function ensureIcpRatioPairs(options = [], selectedKey = '') {
-    if (!Array.isArray(icpUiState.ratioPairs)) icpUiState.ratioPairs = [];
-    const validKeys = new Set(options.map(option => option.key));
-    icpUiState.ratioPairs = icpUiState.ratioPairs
-        .map(pair => ({
-            a: validKeys.has(pair?.a) ? pair.a : '',
-            b: validKeys.has(pair?.b) ? pair.b : ''
-        }))
-        .filter(pair => pair.a && pair.b);
-    if (icpUiState.ratioPairs.length === 0 && options.length >= 2) {
-        icpUiState.ratioPairs.push(createIcpRatioPair(options, selectedKey));
-    }
-}
-
-function addIcpRatioPair() {
-    const options = getIcpParameterOptions();
-    if (options.length < 2) return showToast('Für ein Verhältnis brauchst du mindestens zwei ICP-Werte.', 'warning', 3000);
-    ensureIcpRatioPairs(options, icpUiState.selectedParameter);
-    const usedPairs = new Set(icpUiState.ratioPairs.map(pair => `${pair.a}__${pair.b}`));
-    let nextPair = null;
-    for (const optionA of options) {
-        const optionB = options.find(candidate => candidate.key !== optionA.key && !usedPairs.has(`${optionA.key}__${candidate.key}`));
-        if (optionB) {
-            nextPair = { a: optionA.key, b: optionB.key };
-            break;
-        }
-    }
-    icpUiState.ratioPairs.push(nextPair || createIcpRatioPair(options, icpUiState.selectedParameter));
-    renderIcpPage();
-}
-
-function updateIcpRatioPair(index, side, value) {
-    const options = getIcpParameterOptions();
-    ensureIcpRatioPairs(options, icpUiState.selectedParameter);
-    if (!icpUiState.ratioPairs[index]) return;
-    icpUiState.ratioPairs[index][side] = value;
-    renderIcpPage();
-}
-
-function removeIcpRatioPair(index) {
-    if (!Array.isArray(icpUiState.ratioPairs)) return;
-    icpUiState.ratioPairs.splice(index, 1);
     renderIcpPage();
 }
 
@@ -16341,32 +16290,6 @@ function renderIcpMiniGraphCard(options, chronologicalReports, key) {
             ${renderIcpChart(series, unit)}
         </article>
     `;
-}
-
-function buildIcpRatioSeries(chronologicalReports, keyA, keyB, options) {
-    const labelA = getIcpOptionLabel(options, keyA);
-    const labelB = getIcpOptionLabel(options, keyB);
-    return chronologicalReports.map(report => {
-        const valueA = getIcpValueFromReport(report, keyA);
-        const valueB = getIcpValueFromReport(report, keyB);
-        if (!Number.isFinite(valueA?.value) || !Number.isFinite(valueB?.value) || Math.abs(valueB.value) < 0.000001) return null;
-        return {
-            key: `${keyA}-zu-${keyB}`,
-            section: 'Verhältnis',
-            name: `${labelA} / ${labelB}`,
-            symbol: '',
-            value: valueA.value / valueB.value,
-            rawValue: '',
-            min: null,
-            optimal: null,
-            max: null,
-            unit: '',
-            diff: null,
-            reportId: report.id,
-            reportName: report.name,
-            date: report.date
-        };
-    }).filter(Boolean);
 }
 
 function renderIcpChart(series, unit = '') {
@@ -16448,7 +16371,6 @@ function renderIcpPage() {
     const parameterSelect = document.getElementById('icpParameterSelect');
     const rangeSelect = document.getElementById('icpRangeSelect');
     const comparePicker = document.getElementById('icpComparePicker');
-    const ratioList = document.getElementById('icpRatioList');
     const analysis = document.getElementById('icpAnalysis');
     const list = document.getElementById('icpReportList');
     if (!parameterSelect || !rangeSelect || !analysis || !list) return;
@@ -16478,33 +16400,6 @@ function renderIcpPage() {
             : '<span class="hint">Noch keine Werte verfügbar.</span>';
     }
 
-    ensureIcpRatioPairs(options, selectedKey);
-    const ratioOptionsHtml = options.length
-        ? options.map(option => `<option value="${escapeHtml(option.key)}">${escapeHtml(option.label)}${option.unit ? ` (${escapeHtml(option.unit)})` : ''}</option>`).join('')
-        : '<option value="">Noch keine Werte</option>';
-    if (ratioList) {
-        ratioList.innerHTML = icpUiState.ratioPairs.length
-            ? icpUiState.ratioPairs.map((pair, index) => `
-                <div class="icp-ratio-row">
-                    <select aria-label="Verhältnis ${index + 1} Wert A" onchange="updateIcpRatioPair(${index}, 'a', this.value)">
-                        ${ratioOptionsHtml}
-                    </select>
-                    <span>/</span>
-                    <select aria-label="Verhältnis ${index + 1} Wert B" onchange="updateIcpRatioPair(${index}, 'b', this.value)">
-                        ${ratioOptionsHtml}
-                    </select>
-                    <button type="button" class="btn-out btn-animated" onclick="removeIcpRatioPair(${index})" aria-label="Verhältnis ${index + 1} entfernen">Löschen</button>
-                </div>
-            `).join('')
-            : '<p class="hint">Noch kein Verhältnis angelegt.</p>';
-        icpUiState.ratioPairs.forEach((pair, index) => {
-            const row = ratioList.querySelectorAll('.icp-ratio-row')[index];
-            const selects = row?.querySelectorAll('select') || [];
-            if (selects[0]) selects[0].value = pair.a;
-            if (selects[1]) selects[1].value = pair.b;
-        });
-    }
-
     if (reports.length === 0) {
         analysis.innerHTML = '<div class="icp-empty-state"><strong>Noch keine ICP gespeichert</strong><span>Importiere deine erste ICP, dann erscheinen hier Verlauf, Trend und Referenzbewertung.</span></div>';
         list.innerHTML = '<div class="icp-empty-state"><strong>Historie leer</strong><span>Gespeicherte ICPs werden chronologisch angezeigt.</span></div>';
@@ -16527,25 +16422,6 @@ function renderIcpPage() {
     const unit = selectedOption?.unit || latest?.unit || '';
     const compareKeys = (icpUiState.selectedParameters || []).filter(key => key !== selectedKey);
     const compareCards = compareKeys.map(key => renderIcpMiniGraphCard(options, chronological, key)).join('');
-    const ratioCards = (icpUiState.ratioPairs || []).map(pair => {
-        const ratioTitle = pair.a && pair.b
-            ? `${getIcpOptionLabel(options, pair.a)} / ${getIcpOptionLabel(options, pair.b)}`
-            : '';
-        const ratioSeries = pair.a && pair.b && pair.a !== pair.b
-            ? buildIcpRatioSeries(chronological, pair.a, pair.b, options)
-            : [];
-        return `
-            <article class="icp-chart-card icp-ratio-card">
-                <div class="icp-card-head">
-                    <div>
-                        <h3>Verhältnis ${escapeHtml(ratioTitle || '')}</h3>
-                        <p class="hint">Wert A geteilt durch Wert B. Punkte fehlen, wenn einer der beiden Werte in einer ICP nicht numerisch ist.</p>
-                    </div>
-                </div>
-                ${ratioSeries.length ? renderIcpChart(ratioSeries, '') : '<div class="icp-empty-state"><strong>Kein Verhältnis berechenbar</strong><span>Wähle zwei unterschiedliche numerische Werte mit gemeinsamen ICP-Daten.</span></div>'}
-            </article>
-        `;
-    }).join('');
 
     analysis.innerHTML = `
         <div class="icp-stat-grid">
@@ -16585,17 +16461,6 @@ function renderIcpPage() {
                 <div class="icp-compare-grid">${compareCards}</div>
             </div>
         ` : ''}
-        ${ratioCards ? `
-            <div class="icp-ratio-results">
-                <div class="icp-card-head">
-                    <div>
-                        <h3>Verhältnisse</h3>
-                        <p class="hint">${icpUiState.ratioPairs.length} Vergleich(e) im gewählten ICP-Zeitraum.</p>
-                    </div>
-                </div>
-                <div class="icp-compare-grid">${ratioCards}</div>
-            </div>
-        ` : ''}
         <div class="icp-value-table">
             ${series.slice().reverse().map(point => {
                 const status = getIcpValueStatus(point);
@@ -16617,7 +16482,7 @@ function renderIcpPage() {
         const groupedValues = groupIcpValuesBySection(report.values || []);
         return `
             <article class="icp-report-card ${selected ? 'active' : ''}">
-                <button type="button" class="icp-report-main" onclick="selectIcpReport('${report.id}')">
+                <button type="button" class="icp-report-main" onclick="selectIcpReport('${report.id}')" aria-expanded="${selected ? 'true' : 'false'}">
                     <span><strong>${escapeHtml(report.name)}</strong><small>${escapeHtml(formatWarehouseDate(report.date))}</small></span>
                     <span>${numericCount}/${(report.values || []).length} numerisch · ${issueCount} auffällig</span>
                 </button>
