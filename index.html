@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.29-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.38-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.29</span>
+                    <span class="version-badge">v3.4.38</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -84,6 +84,7 @@
             <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
             <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
             <button onclick="selectTab('logbuch')" id="tab-logbuch">Logbuch</button>
+            <button onclick="selectTab('icp')" id="tab-icp">ICP</button>
             <button onclick="selectTab('statistik')" id="tab-statistik">Statistik</button>
             <button onclick="selectTab('log')" id="tab-log">Protokoll</button>
             <button onclick="selectTab('korallen')" id="tab-korallen">Korallen</button>
@@ -661,6 +662,20 @@
                                 <input type="range" id="salinityTemp" min="15" max="32" step="0.1" value="25" aria-label="Temperatur mit Schieberegler einstellen" oninput="updateSalinityCalculator('tempSlider')">
                             </div>
                             <div id="salinityResult" class="tool-result"></div>
+                            <div class="tool-grid calculator-subsection">
+                                <div class="input-group">
+                                    <label>Ins Logbuch speichern als:</label>
+                                    <select id="salinityLogTarget">
+                                        <option value="PSU">Salinität (PSU)</option>
+                                        <option value="SPINDEL">Spindelwert (kg/l)</option>
+                                        <option value="SG">Specific Gravity</option>
+                                    </select>
+                                </div>
+                                <div class="input-group input-group-action">
+                                    <label>Messwert übernehmen:</label>
+                                    <button class="btn-secondary btn-animated" onclick="saveSalinityResultToLogbook()">Ergebnis ins Logbuch</button>
+                                </div>
+                            </div>
                             <div class="tool-grid">
                                 <div class="input-group">
                                     <label>PSU-Korrekturwert:</label>
@@ -1239,6 +1254,104 @@
             </div>
         </div>
 
+        <div id="icp" class="tab-content">
+            <section class="section-page-head icp-page-head">
+                <div>
+                    <small>Analyse & Verlauf</small>
+                    <h2>ICP Daten</h2>
+                    <p class="hint">Speichere ICP-Auswertungen pro Aquarium, vergleiche Werte im Verlauf und erkenne Trends über die letzten Analysen.</p>
+                </div>
+            </section>
+
+            <section class="card icp-import-card">
+                <div class="icp-card-head">
+                    <div>
+                        <h3>ICP Import</h3>
+                        <p class="hint">Kopiere die Tabelle aus der ICP-Auswertung hier hinein. Reihenfolge: Wert, Messwert, Minimum, optimal, Maximum, Einheit, Differenz.</p>
+                    </div>
+                    <span class="status-badge status-info">Aquariumgebunden</span>
+                </div>
+                <div class="icp-import-grid">
+                    <div class="input-group">
+                        <label for="icpReportName">Name</label>
+                        <input type="text" id="icpReportName" placeholder="z.B. ICP Juli">
+                    </div>
+                    <div class="input-group">
+                        <label for="icpReportDate">Datum</label>
+                        <input type="date" id="icpReportDate">
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="icpImportText">ICP Tabellen-Text</label>
+                    <textarea id="icpImportText" class="icp-import-textarea" placeholder="Basiswerte&#9;Messwert&#9;Minimum&#9;Referenz optimal&#9;Maximum&#9;Einheit&#9;Differenz"></textarea>
+                    <p class="hint icp-import-note"><strong>Hinweis:</strong> Die App sortiert automatisch in Basiswerte, Mengenelemente, essenzielle Spurenelemente und weitere Spurenelemente. <strong>nn</strong> bedeutet nicht nachweisbar, <strong>nwb</strong> bedeutet nachweisbar an der unteren Nachweisgrenze.</p>
+                </div>
+                <div class="button-row">
+                    <button type="button" class="btn-primary btn-animated" onclick="saveIcpReportFromImport()">ICP speichern</button>
+                    <button type="button" class="btn-secondary btn-animated" onclick="previewIcpImport()">Vorschau prüfen</button>
+                    <button type="button" class="btn-secondary btn-animated" onclick="clearIcpImportForm()">Leeren</button>
+                </div>
+                <div id="icpImportPreview" class="icp-import-preview"></div>
+            </section>
+
+            <section class="card icp-analysis-card">
+                <div class="icp-card-head">
+                    <div>
+                        <h3>Verlauf & Trend</h3>
+                        <p class="hint">Wähle einen Wert und wie viele der letzten ICPs angezeigt werden sollen.</p>
+                    </div>
+                </div>
+                <div class="icp-control-grid">
+                    <div class="input-group">
+                        <label for="icpParameterSelect">Hauptwert</label>
+                        <select id="icpParameterSelect" onchange="renderIcpPage()"></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="icpRangeSelect">Anzeige</label>
+                        <select id="icpRangeSelect" onchange="renderIcpPage()">
+                            <option value="1">letzte ICP</option>
+                            <option value="2">letzte 2 ICPs</option>
+                            <option value="5" selected>letzte 5 ICPs</option>
+                            <option value="10">letzte 10 ICPs</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="icp-compare-shell">
+                    <div>
+                        <strong>Weitere Graphen</strong>
+                        <small>Wähle zusätzliche Werte, die unter dem Hauptgraphen separat angezeigt werden.</small>
+                    </div>
+                    <div id="icpComparePicker" class="icp-compare-picker"></div>
+                </div>
+                <div class="icp-ratio-shell">
+                    <div>
+                        <strong>Verhältnisse anzeigen</strong>
+                        <small>Lege mehrere Vergleiche an. Jede Zeile berechnet Wert A geteilt durch Wert B.</small>
+                    </div>
+                    <div class="icp-ratio-manager">
+                        <div id="icpRatioList" class="icp-ratio-list"></div>
+                        <button type="button" class="btn-secondary btn-animated" onclick="addIcpRatioPair()">Verhältnis hinzufügen</button>
+                    </div>
+                </div>
+                <div id="icpAnalysis"></div>
+            </section>
+
+            <section class="card icp-history-card">
+                <details class="icp-history-details">
+                    <summary class="icp-history-summary">
+                        <div>
+                            <h3>Gespeicherte ICPs</h3>
+                            <p class="hint">Alle gespeicherten Analysen des aktiven Aquariums.</p>
+                        </div>
+                        <span class="settings-chevron" aria-hidden="true">⌄</span>
+                    </summary>
+                    <div class="icp-history-body">
+                        <div id="icpReportList"></div>
+                    </div>
+                </details>
+            </section>
+        </div>
+
         <div id="korallen" class="tab-content">
             <div class="card coral-hero-card coral-page-header">
                 <div class="coral-hero-copy">
@@ -1711,6 +1824,13 @@
                 <div class="settings-danger-row last">
                     <button onclick="resetLagerSingle()" class="btn-danger btn-animated">Lagerbestand löschen</button>
                 </div>
+                <div class="settings-full-reset">
+                    <div>
+                        <strong>Komplettes System leeren</strong>
+                        <small>Setzt dieses Gerät auf den Startzustand zurück. Vorher wird automatisch ein Projekt-Backup heruntergeladen.</small>
+                    </div>
+                    <button type="button" onclick="resetEntireSystem()" class="btn-danger btn-animated">Alles zurücksetzen</button>
+                </div>
             </div>
         </div>
         <!-- Wareneingang (Warenkorb) Tab Content -->
@@ -1854,11 +1974,11 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.29-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.29-release"></script>
-    <script src="assets/js/app.js?v=3.4.29-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.38-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.38-release"></script>
+    <script src="assets/js/app.js?v=3.4.38-release"></script>
     <script>
-        if ('serviceWorker' in navigator) {
+        if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
                 .then(() => console.log('OSCI Motion Service Worker aktiv.'))
                 .catch(err => console.error('PWA Fehler:', err));

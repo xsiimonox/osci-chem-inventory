@@ -247,6 +247,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
+const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [], ratioPairs: [] };
 const logBookUiState = { editingEntryId: null };
 const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null, photosCleared: false };
 const CORAL_STATUS_OPTIONS = [
@@ -262,6 +263,7 @@ const AQUARIUM_FIELD_KEYS = [
     'dosingContainers',
     'measurementTypes',
     'measurementEntries',
+    'icpReports',
     'feedNutrientLog',
     'osmoseTank',
     'traceDraft',
@@ -469,12 +471,12 @@ const googleDriveMonitorState = {
     newerRemote: false,
     message: ''
 };
-const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'icp', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
 const CLOUD_SYNC_ENABLED = false;
 const CLOUD_SYNC_MAINTENANCE_MESSAGE = 'Cloud Login & Share ist wegen Wartungsarbeiten voruebergehend deaktiviert.';
-const DEFAULT_MENU_ORDER = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
+const DEFAULT_MENU_ORDER = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'icp', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
 const HIDDEN_MENU_TABS_KEY = 'osci_hidden_menu_tabs_v1';
@@ -487,6 +489,7 @@ const TAB_LABELS = {
     'trace-export': 'Trace',
     tools: 'Tools',
     logbuch: 'Logbuch',
+    icp: 'ICP',
     korallen: 'Korallen',
     statistik: 'Statistik',
     log: 'Protokoll',
@@ -595,6 +598,7 @@ const TAB_ICONS = {
     'trace-export': '<path d="M12 3s6 6.2 6 11a6 6 0 0 1-12 0c0-4.8 6-11 6-11Z"></path><path d="M9 15.5a3.2 3.2 0 0 0 3 2"></path>',
     tools: '<path d="M14.7 6.3a4 4 0 0 0-5-5l2.1 2.1-2.4 2.4-2.1-2.1a4 4 0 0 0 5 5L20 16.4a2.1 2.1 0 1 1-3 3l-7.7-7.7"></path>',
     logbuch: '<path d="M5 4.5A2.5 2.5 0 0 1 7.5 2H20v18H7.5A2.5 2.5 0 0 0 5 22V4.5Z"></path><path d="M5 18h15"></path><path d="m9 10 2 2 4-4"></path>',
+    icp: '<path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m7 15 3-3 3 2 5-7"></path><circle cx="7" cy="15" r="1.2"></circle><circle cx="10" cy="12" r="1.2"></circle><circle cx="13" cy="14" r="1.2"></circle><circle cx="18" cy="7" r="1.2"></circle>',
     korallen: '<path d="M12 21V10"></path><path d="M12 14 7 9"></path><path d="M12 16l5-5"></path><path d="M7 9V5"></path><path d="M7 9H3"></path><path d="M17 11V6"></path><path d="M17 11h4"></path><path d="M12 10 9 7"></path><path d="M12 10l3-4"></path>',
     statistik: '<path d="M4 20V10"></path><path d="M10 20V4"></path><path d="M16 20v-7"></path><path d="M22 20H2"></path>',
     log: '<path d="M8 6h12"></path><path d="M8 12h12"></path><path d="M8 18h12"></path><path d="M3.5 6h.01"></path><path d="M3.5 12h.01"></path><path d="M3.5 18h.01"></path>',
@@ -846,6 +850,21 @@ async function idbDelete(storeName, key) {
         const request = store.delete(key);
         request.onsuccess = () => resolve(true);
         request.onerror = () => reject(request.error || new Error(`IndexedDB delete failed for ${storeName}`));
+    }).catch(err => {
+        console.error(err);
+        return false;
+    });
+}
+
+async function idbClearStore(storeName) {
+    const idb = await openAppStorage();
+    if (!idb) return false;
+    return new Promise((resolve, reject) => {
+        const tx = idb.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const request = store.clear();
+        request.onsuccess = () => resolve(true);
+        request.onerror = () => reject(request.error || new Error(`IndexedDB clear failed for ${storeName}`));
     }).catch(err => {
         console.error(err);
         return false;
@@ -3045,14 +3064,9 @@ function createWarehouseData(source = {}) {
         logBookEntries: source.logBookEntries || [],
         aquariumTodos: source.aquariumTodos || [],
         dosingContainers: source.dosingContainers || [],
-        measurementTypes: source.measurementTypes || [
-            { id: 'KH', label: 'KH', unit: 'dKH' },
-            { id: 'CA', label: 'CA', unit: 'mg/l' },
-            { id: 'MG', label: 'MG', unit: 'mg/l' },
-            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
-            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
-        ],
+        measurementTypes: ensureDefaultMeasurementTypes(source.measurementTypes),
         measurementEntries: source.measurementEntries || [],
+        icpReports: source.icpReports || [],
         feedNutrientLog: source.feedNutrientLog || [],
         osmoseTank: source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 },
         traceDraft: source.traceDraft || {},
@@ -3210,14 +3224,9 @@ function createAquariumData(source = {}) {
         logBookEntries: cloneSerializable(source.logBookEntries || []),
         aquariumTodos: cloneSerializable(source.aquariumTodos || []),
         dosingContainers: cloneSerializable(source.dosingContainers || []),
-        measurementTypes: cloneSerializable(source.measurementTypes || [
-            { id: 'KH', label: 'KH', unit: 'dKH' },
-            { id: 'CA', label: 'CA', unit: 'mg/l' },
-            { id: 'MG', label: 'MG', unit: 'mg/l' },
-            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
-            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
-        ]),
+        measurementTypes: cloneSerializable(ensureDefaultMeasurementTypes(source.measurementTypes)),
         measurementEntries: cloneSerializable(source.measurementEntries || []),
+        icpReports: cloneSerializable(source.icpReports || []),
         feedNutrientLog: cloneSerializable(source.feedNutrientLog || []),
         osmoseTank: cloneSerializable(source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 }),
         traceDraft: cloneSerializable(source.traceDraft || {}),
@@ -3260,6 +3269,26 @@ function createWarehouseRecord(name, data = {}) {
         lastImportAt: null,
         lastExportAt: null,
         data: createWarehouseData(data)
+    };
+}
+
+function createFreshAppState() {
+    const warehouseData = createWarehouseData({ theme: 'default' });
+    const aquariumData = createAquariumData();
+    const warehouse = createWarehouseRecord('Hauptlager', warehouseData);
+    const aquarium = createAquariumRecord('Hauptaquarium', aquariumData);
+    warehouse.id = 'main';
+    aquarium.id = 'aquarium-main';
+    return {
+        version: 1,
+        activeWarehouseId: 'main',
+        activeAquariumId: 'aquarium-main',
+        pendingDeletedRemoteIds: [],
+        communityMapProfileDraft: {},
+        hiddenSharedOwners: {},
+        knownSharedOwners: {},
+        warehouses: { main: warehouse },
+        aquariums: { 'aquarium-main': aquarium }
     };
 }
 
@@ -3350,14 +3379,9 @@ function normalizeWarehouseData(data) {
     if (!db.logBookEntries) db.logBookEntries = [];
     if (!db.aquariumTodos) db.aquariumTodos = [];
     if (!db.dosingContainers) db.dosingContainers = [];
-    if (!db.measurementTypes) db.measurementTypes = [
-        { id: 'KH', label: 'KH', unit: 'dKH' },
-        { id: 'CA', label: 'CA', unit: 'mg/l' },
-        { id: 'MG', label: 'MG', unit: 'mg/l' },
-        { id: 'PO4', label: 'PO4', unit: 'mg/l' },
-        { id: 'NO3', label: 'NO3', unit: 'mg/l' }
-    ];
+    db.measurementTypes = ensureDefaultMeasurementTypes(db.measurementTypes);
     if (!db.measurementEntries) db.measurementEntries = [];
+    if (!Array.isArray(db.icpReports)) db.icpReports = [];
     if (!db.feedNutrientLog) db.feedNutrientLog = [];
     if (!db.osmoseTank) db.osmoseTank = { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 };
     if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
@@ -6354,6 +6378,7 @@ function showTab(tabId) {
     renderActiveTabContent(tabId);
     scheduleTextFitPass();
     window.requestAnimationFrame(() => refreshDesignMotionTargets(resolvedTab));
+    scheduleActiveTabHealthCheck(tabId);
 }
 
 function renderActiveTabContent(tabId) {
@@ -6378,6 +6403,7 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'nachbestellen') renderNachbestellen();
         if(tabId === 'tools') initTools();
         if(tabId === 'logbuch') renderLogBook();
+        if(tabId === 'icp') renderIcpPage();
         if(tabId === 'korallen') renderCoralCatalog();
         if(tabId === 'einstellungen') {
             setupSettingsAccordions();
@@ -6425,6 +6451,44 @@ function renderTabErrorFallback(tabId, err) {
             </div>
         </section>
     `;
+}
+
+function scheduleActiveTabHealthCheck(tabId) {
+    window.requestAnimationFrame(() => {
+        window.setTimeout(() => verifyActiveTabRendered(tabId), 180);
+        window.setTimeout(() => verifyActiveTabRendered(tabId), 950);
+    });
+}
+
+function verifyActiveTabRendered(tabId) {
+    const tab = document.getElementById(tabId);
+    if (!tab || !tab.classList.contains('active')) return;
+    if (tabId !== 'tools') return;
+
+    const sections = tab.querySelectorAll('.tool-section');
+    const cards = tab.querySelectorAll('.tool-compact-card, .resource-tools-card');
+    const hasVisibleText = tab.innerText.trim().length > 20;
+    if (sections.length && cards.length && hasVisibleText) {
+        tab.querySelectorAll('.design-reveal').forEach(element => {
+            element.classList.add('design-reveal-visible');
+        });
+        return;
+    }
+
+    console.warn('Tools tab looked incomplete; running recovery init.');
+    try {
+        initializedToolSections.clear();
+        initTools();
+        tab.querySelectorAll('.tool-card-hidden, .tool-section-hidden').forEach(element => {
+            element.classList.remove('tool-card-hidden', 'tool-section-hidden');
+        });
+        tab.querySelectorAll('.design-reveal').forEach(element => {
+            element.classList.add('design-reveal-visible');
+        });
+    } catch (err) {
+        console.error('Tools recovery failed:', err);
+        renderTabErrorFallback('tools', err);
+    }
 }
 
 const TEXT_FIT_SELECTOR = [
@@ -15864,22 +15928,755 @@ function formatDateTimeLocal(value) {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+const ICP_SECTION_NAMES = new Set([
+    'Basiswerte',
+    'Mengenelemente',
+    'Essenzielle Spurenelemente',
+    'Weitere Spurenelemente'
+]);
+
+const ICP_SECTION_ORDER = [
+    'Basiswerte',
+    'Mengenelemente',
+    'Essenzielle Spurenelemente',
+    'Weitere Spurenelemente'
+];
+
+const ICP_BASIS_VALUE_ORDER = [
+    { match: /^dichte\b/, order: 0 },
+    { match: /^salinit/, order: 1 },
+    { match: /^phosphor\b/, order: 2 },
+    { match: /^gesamtphosphat\b/, order: 3 },
+    { match: /^gesamtstickstoff\b|^tnb\b/, order: 4 },
+    { match: /^gesamtkohlenstoff\b|^tc\b/, order: 5 },
+    { match: /^anorganischer kohlenstoff\b|^tic\b/, order: 6 },
+    { match: /^organischer kohlenstoff\b|^toc\b/, order: 7 },
+    { match: /^karbonath|^kh\b/, order: 8 }
+];
+
+const ICP_ELEMENT_SECTION_ORDER = {
+    Cl: { section: 'Mengenelemente', order: 0 },
+    Na: { section: 'Mengenelemente', order: 1 },
+    Mg: { section: 'Mengenelemente', order: 2 },
+    S: { section: 'Mengenelemente', order: 3 },
+    Ca: { section: 'Mengenelemente', order: 4 },
+    K: { section: 'Mengenelemente', order: 5 },
+    Br: { section: 'Mengenelemente', order: 6 },
+    Sr: { section: 'Mengenelemente', order: 7 },
+    B: { section: 'Mengenelemente', order: 8 },
+    F: { section: 'Mengenelemente', order: 9 },
+    I: { section: 'Essenzielle Spurenelemente', order: 0 },
+    V: { section: 'Essenzielle Spurenelemente', order: 1 },
+    Se: { section: 'Essenzielle Spurenelemente', order: 2 },
+    Co: { section: 'Essenzielle Spurenelemente', order: 3 },
+    Ni: { section: 'Essenzielle Spurenelemente', order: 4 },
+    Fe: { section: 'Essenzielle Spurenelemente', order: 5 },
+    Mn: { section: 'Essenzielle Spurenelemente', order: 6 },
+    Cu: { section: 'Essenzielle Spurenelemente', order: 7 },
+    Cr: { section: 'Essenzielle Spurenelemente', order: 8 },
+    Zn: { section: 'Essenzielle Spurenelemente', order: 9 },
+    Ba: { section: 'Essenzielle Spurenelemente', order: 10 },
+    Mo: { section: 'Essenzielle Spurenelemente', order: 11 },
+    Li: { section: 'Essenzielle Spurenelemente', order: 12 },
+    Si: { section: 'Essenzielle Spurenelemente', order: 13 },
+    As: { section: 'Weitere Spurenelemente', order: 0 },
+    Al: { section: 'Weitere Spurenelemente', order: 1 },
+    Sb: { section: 'Weitere Spurenelemente', order: 2 },
+    Be: { section: 'Weitere Spurenelemente', order: 3 },
+    Bi: { section: 'Weitere Spurenelemente', order: 4 },
+    Pb: { section: 'Weitere Spurenelemente', order: 5 },
+    Cd: { section: 'Weitere Spurenelemente', order: 6 },
+    La: { section: 'Weitere Spurenelemente', order: 7 },
+    Hg: { section: 'Weitere Spurenelemente', order: 8 },
+    Ag: { section: 'Weitere Spurenelemente', order: 9 },
+    Tl: { section: 'Weitere Spurenelemente', order: 10 },
+    Ti: { section: 'Weitere Spurenelemente', order: 11 },
+    W: { section: 'Weitere Spurenelemente', order: 12 },
+    Sn: { section: 'Weitere Spurenelemente', order: 13 },
+    Zr: { section: 'Weitere Spurenelemente', order: 14 }
+};
+
+function ensureIcpReports() {
+    if (!Array.isArray(db.icpReports)) db.icpReports = [];
+    return db.icpReports;
+}
+
+function cleanIcpCell(value = '') {
+    return String(value || '')
+        .replace(/\*\*/g, '')
+        .replace(/\*/g, '')
+        .replace(/\u00a0/g, ' ')
+        .trim();
+}
+
+function parseIcpNumber(value = '') {
+    const cleaned = cleanIcpCell(value)
+        .replace(/µ/g, 'u')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!cleaned || /^(-|--|---|nn)$/i.test(cleaned)) return null;
+    if (/^nwb\b/i.test(cleaned)) return null;
+    const match = cleaned.match(/[~+\-]?\s*\d+(?:[,.]\d+)?/);
+    if (!match) return null;
+    const number = parseFloat(match[0].replace(/\s+/g, '').replace(',', '.').replace('~', ''));
+    return Number.isFinite(number) ? number : null;
+}
+
+function normalizeIcpKey(name = '', symbol = '') {
+    const base = symbol || name;
+    return normalizeSearchText(base).replace(/\s+/g, '-') || `icp-${Date.now()}`;
+}
+
+function getIcpSectionIndex(section = '') {
+    const index = ICP_SECTION_ORDER.indexOf(section);
+    return index >= 0 ? index : ICP_SECTION_ORDER.length;
+}
+
+function getIcpCanonicalInfo(name = '', symbol = '', currentSection = '') {
+    const normalizedName = normalizeSearchText(name);
+    const basisMatch = ICP_BASIS_VALUE_ORDER.find(entry => entry.match.test(normalizedName));
+    if (basisMatch) return { section: 'Basiswerte', order: basisMatch.order };
+    const symbolKey = String(symbol || '').trim();
+    if (ICP_ELEMENT_SECTION_ORDER[symbolKey]) return ICP_ELEMENT_SECTION_ORDER[symbolKey];
+    const fallbackSection = ICP_SECTION_NAMES.has(currentSection) ? currentSection : 'Weitere Spurenelemente';
+    return { section: fallbackSection, order: 900 };
+}
+
+function getIcpValueSortIndex(value = {}) {
+    const canonical = getIcpCanonicalInfo(value.name, value.symbol, value.section);
+    return {
+        section: canonical.section,
+        sectionIndex: getIcpSectionIndex(canonical.section),
+        order: Number.isFinite(value.sortOrder) ? value.sortOrder : canonical.order,
+        label: value.name || value.key || ''
+    };
+}
+
+function sortIcpValues(values = []) {
+    return (Array.isArray(values) ? values.slice() : []).sort((a, b) => {
+        const sortA = getIcpValueSortIndex(a);
+        const sortB = getIcpValueSortIndex(b);
+        return sortA.sectionIndex - sortB.sectionIndex
+            || sortA.order - sortB.order
+            || sortA.label.localeCompare(sortB.label, 'de');
+    });
+}
+
+function groupIcpValuesBySection(values = []) {
+    const groups = new Map(ICP_SECTION_ORDER.map(section => [section, []]));
+    sortIcpValues(values).forEach(value => {
+        const sortInfo = getIcpValueSortIndex(value);
+        if (!groups.has(sortInfo.section)) groups.set(sortInfo.section, []);
+        groups.get(sortInfo.section).push({ ...value, section: sortInfo.section });
+    });
+    return [...groups.entries()].filter(([, rows]) => rows.length > 0);
+}
+
+function extractIcpSymbol(name = '') {
+    const match = String(name || '').match(/\(([A-Za-z0-9]+)\)/);
+    if (match) return match[1];
+    if (/salinit/i.test(name)) return 'PSU';
+    if (/dichte/i.test(name)) return 'Dichte';
+    if (/karbonath/i.test(name)) return 'KH';
+    return '';
+}
+
+function getIcpValueStatus(entry) {
+    if (!entry || entry.value === null || entry.value === undefined) {
+        const raw = cleanIcpCell(entry?.rawValue || '');
+        if (/^nn$/i.test(raw)) return { key: 'unknown', label: 'nicht nachweisbar' };
+        if (/^nwb\b/i.test(raw)) return { key: 'unknown', label: 'nachweisbar, untere Nachweisgrenze' };
+        return { key: 'unknown', label: raw || 'kein numerischer Wert' };
+    }
+    if (Number.isFinite(entry.min) && entry.value < entry.min) return { key: 'low', label: 'unter Minimum' };
+    if (Number.isFinite(entry.max) && entry.value > entry.max) return { key: 'high', label: 'über Maximum' };
+    return { key: 'ok', label: 'im Referenzbereich' };
+}
+
+function parseIcpImportText(text = '') {
+    const rows = [];
+    let currentSection = 'Basiswerte';
+    String(text || '').split(/\r?\n/).forEach(line => {
+        const raw = line.trim();
+        if (!raw) return;
+        const cells = raw.split(/\t+/).map(cleanIcpCell).filter(cell => cell !== '');
+        if (cells.length < 2) return;
+        const first = cells[0];
+        if (ICP_SECTION_NAMES.has(first) && /messwert/i.test(cells[1] || '')) {
+            currentSection = first;
+            return;
+        }
+        if (/^(Basiswerte|Messwert|Minimum|Referenz optimal|Maximum|Einheit|Referenzlinie|Differenz)$/i.test(first)) return;
+        if (/messwert/i.test(cells[1] || '') && /minimum/i.test(cells[2] || '')) return;
+        const name = first;
+        const rawValue = cells[1] || '';
+        const unit = cells[5] || '';
+        const symbol = extractIcpSymbol(name);
+        const value = parseIcpNumber(rawValue);
+        const min = parseIcpNumber(cells[2] || '');
+        const optimal = parseIcpNumber(cells[3] || '');
+        const max = parseIcpNumber(cells[4] || '');
+        const diff = parseIcpNumber(cells[cells.length - 1] || '');
+        if (!name || (!rawValue && !unit)) return;
+        const canonical = getIcpCanonicalInfo(name, symbol, currentSection);
+        rows.push({
+            key: normalizeIcpKey(name, symbol),
+            section: canonical.section,
+            name,
+            symbol,
+            value,
+            rawValue,
+            min,
+            optimal,
+            max,
+            unit,
+            diff,
+            sortOrder: canonical.order,
+            raw: cells
+        });
+    });
+    return sortIcpValues(rows);
+}
+
+function getIcpReportsSorted(desc = true) {
+    const reports = ensureIcpReports().slice().sort((a, b) => new Date(a.date || a.createdAt || 0) - new Date(b.date || b.createdAt || 0));
+    return desc ? reports.reverse() : reports;
+}
+
+function getIcpParameterOptions() {
+    const map = new Map();
+    getIcpReportsSorted(false).forEach(report => {
+        sortIcpValues(report.values || []).forEach(value => {
+            const sortInfo = getIcpValueSortIndex(value);
+            if (!map.has(value.key)) {
+                map.set(value.key, {
+                    key: value.key,
+                    label: value.symbol ? `${value.name}` : value.name,
+                    unit: value.unit || '',
+                    section: sortInfo.section,
+                    sortOrder: sortInfo.order
+                });
+            }
+        });
+    });
+    return [...map.values()].sort((a, b) => {
+        const sectionDiff = getIcpSectionIndex(a.section) - getIcpSectionIndex(b.section);
+        return sectionDiff || (a.sortOrder || 900) - (b.sortOrder || 900) || a.label.localeCompare(b.label, 'de');
+    });
+}
+
+function getIcpValueFromReport(report, key) {
+    return (report?.values || []).find(value => value.key === key) || null;
+}
+
+function formatIcpNumber(value, unit = '') {
+    if (!Number.isFinite(value)) return '-';
+    const abs = Math.abs(value);
+    const decimals = abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
+    return `${value.toFixed(decimals).replace(/\.?0+$/, '')}${unit ? ` ${unit}` : ''}`;
+}
+
+function previewIcpImport() {
+    const preview = document.getElementById('icpImportPreview');
+    if (!preview) return;
+    const rows = parseIcpImportText(document.getElementById('icpImportText')?.value || '');
+    const numeric = rows.filter(row => Number.isFinite(row.value)).length;
+    const nonNumeric = rows.length - numeric;
+    preview.innerHTML = rows.length
+        ? `
+            <div class="icp-preview-summary">
+                <strong>${rows.length} Werte erkannt</strong>
+                <span>${numeric} numerisch · ${nonNumeric} qualitativ/ohne Zahlenwert</span>
+            </div>
+            <div class="icp-preview-groups">
+                ${groupIcpValuesBySection(rows).map(([section, values]) => `
+                    <div class="icp-preview-group">
+                        <strong>${escapeHtml(section)}</strong>
+                        <div class="icp-preview-list">
+                            ${values.map(row => `<span>${escapeHtml(row.name)} <strong>${escapeHtml(row.value === null ? row.rawValue : formatIcpNumber(row.value, row.unit))}</strong></span>`).join('')}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `
+        : '<p class="hint">Noch keine ICP-Werte erkannt. Prüfe, ob die Tabelle mit Tabulatoren eingefügt wurde.</p>';
+}
+
+function clearIcpImportForm() {
+    const name = document.getElementById('icpReportName');
+    const text = document.getElementById('icpImportText');
+    const preview = document.getElementById('icpImportPreview');
+    if (name) name.value = '';
+    if (text) text.value = '';
+    if (preview) preview.innerHTML = '';
+}
+
+function saveIcpReportFromImport() {
+    const dateInput = document.getElementById('icpReportDate');
+    const nameInput = document.getElementById('icpReportName');
+    const textInput = document.getElementById('icpImportText');
+    const values = sortIcpValues(parseIcpImportText(textInput?.value || ''));
+    if (values.length === 0) return alert('Bitte füge zuerst ICP-Tabellendaten ein.');
+    const date = dateInput?.value ? new Date(`${dateInput.value}T12:00:00`).toISOString() : new Date().toISOString();
+    const report = {
+        id: createWarehouseId(),
+        name: (nameInput?.value || '').trim() || `ICP ${new Date(date).toLocaleDateString('de-DE')}`,
+        date,
+        values,
+        createdAt: new Date().toISOString()
+    };
+    ensureIcpReports().unshift(report);
+    icpUiState.selectedReportId = report.id;
+    if (!icpUiState.selectedParameter && values[0]) icpUiState.selectedParameter = values[0].key;
+    saveDB();
+    clearIcpImportForm();
+    renderIcpPage();
+    showToast('ICP gespeichert', 'success', 2400);
+}
+
+function deleteIcpReport(reportId) {
+    const report = ensureIcpReports().find(item => item.id === reportId);
+    if (!report) return;
+    if (!confirm(`ICP "${report.name}" löschen?`)) return;
+    db.icpReports = ensureIcpReports().filter(item => item.id !== reportId);
+    if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
+    saveDB();
+    renderIcpPage();
+}
+
+function selectIcpReport(reportId) {
+    icpUiState.selectedReportId = reportId;
+    renderIcpPage();
+}
+
+function updateIcpCompareSelection() {
+    icpUiState.selectedParameters = [...document.querySelectorAll('[data-icp-compare-key]:checked')]
+        .map(input => input.dataset.icpCompareKey)
+        .filter(Boolean);
+    renderIcpPage();
+}
+
+function createIcpRatioPair(options = [], preferredA = '') {
+    const first = options.find(option => option.key === preferredA)?.key || options[0]?.key || '';
+    const second = options.find(option => option.key !== first)?.key || options[1]?.key || '';
+    return { a: first, b: second };
+}
+
+function ensureIcpRatioPairs(options = [], selectedKey = '') {
+    if (!Array.isArray(icpUiState.ratioPairs)) icpUiState.ratioPairs = [];
+    const validKeys = new Set(options.map(option => option.key));
+    icpUiState.ratioPairs = icpUiState.ratioPairs
+        .map(pair => ({
+            a: validKeys.has(pair?.a) ? pair.a : '',
+            b: validKeys.has(pair?.b) ? pair.b : ''
+        }))
+        .filter(pair => pair.a && pair.b);
+    if (icpUiState.ratioPairs.length === 0 && options.length >= 2) {
+        icpUiState.ratioPairs.push(createIcpRatioPair(options, selectedKey));
+    }
+}
+
+function addIcpRatioPair() {
+    const options = getIcpParameterOptions();
+    if (options.length < 2) return showToast('Für ein Verhältnis brauchst du mindestens zwei ICP-Werte.', 'warning', 3000);
+    ensureIcpRatioPairs(options, icpUiState.selectedParameter);
+    const usedPairs = new Set(icpUiState.ratioPairs.map(pair => `${pair.a}__${pair.b}`));
+    let nextPair = null;
+    for (const optionA of options) {
+        const optionB = options.find(candidate => candidate.key !== optionA.key && !usedPairs.has(`${optionA.key}__${candidate.key}`));
+        if (optionB) {
+            nextPair = { a: optionA.key, b: optionB.key };
+            break;
+        }
+    }
+    icpUiState.ratioPairs.push(nextPair || createIcpRatioPair(options, icpUiState.selectedParameter));
+    renderIcpPage();
+}
+
+function updateIcpRatioPair(index, side, value) {
+    const options = getIcpParameterOptions();
+    ensureIcpRatioPairs(options, icpUiState.selectedParameter);
+    if (!icpUiState.ratioPairs[index]) return;
+    icpUiState.ratioPairs[index][side] = value;
+    renderIcpPage();
+}
+
+function removeIcpRatioPair(index) {
+    if (!Array.isArray(icpUiState.ratioPairs)) return;
+    icpUiState.ratioPairs.splice(index, 1);
+    renderIcpPage();
+}
+
+function getIcpSeriesForKey(chronologicalReports, key) {
+    return chronologicalReports.map(report => {
+        const value = getIcpValueFromReport(report, key);
+        return value ? { ...value, reportId: report.id, reportName: report.name, date: report.date } : null;
+    }).filter(Boolean);
+}
+
+function getIcpOptionLabel(options, key) {
+    const option = options.find(item => item.key === key);
+    return option ? option.label : key;
+}
+
+function renderIcpMiniGraphCard(options, chronologicalReports, key) {
+    const option = options.find(item => item.key === key);
+    if (!option) return '';
+    const series = getIcpSeriesForKey(chronologicalReports, key);
+    const numeric = series.filter(point => Number.isFinite(point.value));
+    const latest = [...series].reverse().find(point => Number.isFinite(point.value)) || null;
+    const first = numeric[0] || null;
+    const last = numeric[numeric.length - 1] || null;
+    const delta = first && last && first !== last ? last.value - first.value : 0;
+    const unit = option.unit || latest?.unit || '';
+    return `
+        <article class="icp-chart-card icp-compare-card">
+            <div class="icp-card-head">
+                <div>
+                    <h3>${escapeHtml(option.label)}</h3>
+                    <p class="hint">${latest ? `Aktuell ${escapeHtml(formatIcpNumber(latest.value, unit))}` : 'Kein numerischer Wert'}${numeric.length > 1 ? ` · Trend ${delta >= 0 ? '+' : ''}${escapeHtml(formatIcpNumber(delta, unit))}` : ''}</p>
+                </div>
+            </div>
+            ${renderIcpChart(series, unit)}
+        </article>
+    `;
+}
+
+function buildIcpRatioSeries(chronologicalReports, keyA, keyB, options) {
+    const labelA = getIcpOptionLabel(options, keyA);
+    const labelB = getIcpOptionLabel(options, keyB);
+    return chronologicalReports.map(report => {
+        const valueA = getIcpValueFromReport(report, keyA);
+        const valueB = getIcpValueFromReport(report, keyB);
+        if (!Number.isFinite(valueA?.value) || !Number.isFinite(valueB?.value) || Math.abs(valueB.value) < 0.000001) return null;
+        return {
+            key: `${keyA}-zu-${keyB}`,
+            section: 'Verhältnis',
+            name: `${labelA} / ${labelB}`,
+            symbol: '',
+            value: valueA.value / valueB.value,
+            rawValue: '',
+            min: null,
+            optimal: null,
+            max: null,
+            unit: '',
+            diff: null,
+            reportId: report.id,
+            reportName: report.name,
+            date: report.date
+        };
+    }).filter(Boolean);
+}
+
+function renderIcpChart(series, unit = '') {
+    const numeric = series.filter(point => Number.isFinite(point.value));
+    if (numeric.length === 0) {
+        return '<div class="icp-empty-state"><strong>Keine numerischen Werte</strong><span>Dieser Parameter enthält in den gewählten ICPs nur qualitative Angaben wie nn, nwb oder ---.</span></div>';
+    }
+    const width = window.innerWidth <= 640 ? 430 : 720;
+    const height = window.innerWidth <= 640 ? 280 : 300;
+    const padL = window.innerWidth <= 640 ? 54 : 72;
+    const padR = 24;
+    const padT = 24;
+    const padB = 44;
+    const optimalReference = [...numeric].reverse().find(point => Number.isFinite(point.optimal))?.optimal ?? null;
+    const values = numeric.map(point => point.value);
+    if (Number.isFinite(optimalReference)) values.push(optimalReference);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const spread = Math.max(0.001, max - min);
+    const floor = height - padB;
+    const usableW = width - padL - padR;
+    const usableH = height - padT - padB;
+    const points = numeric.map((point, index) => ({
+        ...point,
+        x: numeric.length === 1 ? padL + usableW / 2 : padL + (usableW * index) / (numeric.length - 1),
+        y: padT + usableH - ((point.value - min) / spread) * usableH
+    }));
+    const path = points.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+    const area = `${path} L ${points[points.length - 1].x.toFixed(2)} ${floor} L ${points[0].x.toFixed(2)} ${floor} Z`;
+    const markers = [
+        { value: max, y: padT },
+        { value: min + spread / 2, y: padT + usableH / 2 },
+        { value: min, y: floor }
+    ];
+    const optimalY = Number.isFinite(optimalReference)
+        ? padT + usableH - ((optimalReference - min) / spread) * usableH
+        : null;
+    const trendPath = points.length > 1 ? `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} L ${points[points.length - 1].x.toFixed(2)} ${points[points.length - 1].y.toFixed(2)}` : '';
+    return `
+        <div class="measurement-chart-scroll icp-chart-scroll" tabindex="0" aria-label="ICP Diagramm horizontal ansehen">
+            <svg class="measurement-chart icp-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="ICP Verlauf">
+                <defs>
+                    <linearGradient id="icpFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.28"></stop>
+                        <stop offset="100%" stop-color="var(--primary)" stop-opacity="0.02"></stop>
+                    </linearGradient>
+                </defs>
+                ${markers.map(marker => `
+                    <line x1="${padL}" y1="${marker.y}" x2="${width - padR}" y2="${marker.y}" class="measurement-grid-line"></line>
+                    <text x="${padL - 10}" y="${marker.y + 4}" text-anchor="end" class="measurement-y-label">${escapeHtml(formatIcpNumber(marker.value, unit))}</text>
+                `).join('')}
+                <line x1="${padL}" y1="${floor}" x2="${width - padR}" y2="${floor}" class="measurement-axis"></line>
+                <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${floor}" class="measurement-axis"></line>
+                ${Number.isFinite(optimalY) ? `
+                    <line x1="${padL}" y1="${optimalY.toFixed(2)}" x2="${width - padR}" y2="${optimalY.toFixed(2)}" class="icp-optimal-line"></line>
+                    <text x="${width - padR}" y="${Math.max(padT + 12, optimalY - 7).toFixed(2)}" text-anchor="end" class="icp-optimal-label">Optimal ${escapeHtml(formatIcpNumber(optimalReference, unit))}</text>
+                ` : ''}
+                <path d="${area}" class="measurement-area icp-area"></path>
+                ${trendPath ? `<path d="${trendPath}" class="icp-trend-line"></path>` : ''}
+                <path d="${path}" class="measurement-line"></path>
+                ${points.map(point => `
+                    <g class="measurement-point-group" role="button" tabindex="0" aria-label="${escapeHtml(formatIcpNumber(point.value, unit))}, ${escapeHtml(formatWarehouseDate(point.date))}" onclick="selectIcpReport('${point.reportId}')">
+                        <circle cx="${point.x}" cy="${point.y}" r="12" class="measurement-point-hit"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="10" class="measurement-point-halo"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="6.8" class="measurement-point-ring"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="4.4" class="measurement-point"></circle>
+                    </g>
+                    <text x="${point.x}" y="${height - 12}" text-anchor="middle" class="measurement-label">${escapeHtml(new Date(point.date).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}</text>
+                `).join('')}
+            </svg>
+        </div>
+    `;
+}
+
+function renderIcpPage() {
+    const dateInput = document.getElementById('icpReportDate');
+    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+    const reports = getIcpReportsSorted(true);
+    const parameterSelect = document.getElementById('icpParameterSelect');
+    const rangeSelect = document.getElementById('icpRangeSelect');
+    const comparePicker = document.getElementById('icpComparePicker');
+    const ratioList = document.getElementById('icpRatioList');
+    const analysis = document.getElementById('icpAnalysis');
+    const list = document.getElementById('icpReportList');
+    if (!parameterSelect || !rangeSelect || !analysis || !list) return;
+
+    const options = getIcpParameterOptions();
+    const previous = parameterSelect.value || icpUiState.selectedParameter || options[0]?.key || '';
+    parameterSelect.innerHTML = options.length
+        ? options.map(option => `<option value="${escapeHtml(option.key)}">${escapeHtml(option.label)}${option.unit ? ` (${escapeHtml(option.unit)})` : ''}</option>`).join('')
+        : '<option value="">Noch keine ICP-Werte</option>';
+    const selectedKey = options.some(option => option.key === previous) ? previous : (options[0]?.key || '');
+    parameterSelect.value = selectedKey;
+    icpUiState.selectedParameter = selectedKey;
+
+    const checkedBeforeRender = comparePicker
+        ? [...comparePicker.querySelectorAll('[data-icp-compare-key]:checked')].map(input => input.dataset.icpCompareKey)
+        : [];
+    if (checkedBeforeRender.length) icpUiState.selectedParameters = checkedBeforeRender;
+    icpUiState.selectedParameters = (icpUiState.selectedParameters || []).filter(key => options.some(option => option.key === key));
+    if (comparePicker) {
+        comparePicker.innerHTML = options.length
+            ? options.map(option => `
+                <label class="icp-compare-chip">
+                    <input type="checkbox" data-icp-compare-key="${escapeHtml(option.key)}" ${icpUiState.selectedParameters.includes(option.key) ? 'checked' : ''} onchange="updateIcpCompareSelection()">
+                    <span>${escapeHtml(option.symbol || option.label)}${option.unit ? `<small>${escapeHtml(option.unit)}</small>` : ''}</span>
+                </label>
+            `).join('')
+            : '<span class="hint">Noch keine Werte verfügbar.</span>';
+    }
+
+    ensureIcpRatioPairs(options, selectedKey);
+    const ratioOptionsHtml = options.length
+        ? options.map(option => `<option value="${escapeHtml(option.key)}">${escapeHtml(option.label)}${option.unit ? ` (${escapeHtml(option.unit)})` : ''}</option>`).join('')
+        : '<option value="">Noch keine Werte</option>';
+    if (ratioList) {
+        ratioList.innerHTML = icpUiState.ratioPairs.length
+            ? icpUiState.ratioPairs.map((pair, index) => `
+                <div class="icp-ratio-row">
+                    <select aria-label="Verhältnis ${index + 1} Wert A" onchange="updateIcpRatioPair(${index}, 'a', this.value)">
+                        ${ratioOptionsHtml}
+                    </select>
+                    <span>/</span>
+                    <select aria-label="Verhältnis ${index + 1} Wert B" onchange="updateIcpRatioPair(${index}, 'b', this.value)">
+                        ${ratioOptionsHtml}
+                    </select>
+                    <button type="button" class="btn-out btn-animated" onclick="removeIcpRatioPair(${index})" aria-label="Verhältnis ${index + 1} entfernen">Löschen</button>
+                </div>
+            `).join('')
+            : '<p class="hint">Noch kein Verhältnis angelegt.</p>';
+        icpUiState.ratioPairs.forEach((pair, index) => {
+            const row = ratioList.querySelectorAll('.icp-ratio-row')[index];
+            const selects = row?.querySelectorAll('select') || [];
+            if (selects[0]) selects[0].value = pair.a;
+            if (selects[1]) selects[1].value = pair.b;
+        });
+    }
+
+    if (reports.length === 0) {
+        analysis.innerHTML = '<div class="icp-empty-state"><strong>Noch keine ICP gespeichert</strong><span>Importiere deine erste ICP, dann erscheinen hier Verlauf, Trend und Referenzbewertung.</span></div>';
+        list.innerHTML = '<div class="icp-empty-state"><strong>Historie leer</strong><span>Gespeicherte ICPs werden chronologisch angezeigt.</span></div>';
+        return;
+    }
+
+    const count = parseInt(rangeSelect.value || '5', 10);
+    const newestFirst = reports.slice(0, count);
+    const chronological = newestFirst.slice().reverse();
+    const selectedOption = options.find(option => option.key === selectedKey);
+    const series = getIcpSeriesForKey(chronological, selectedKey);
+    const numeric = series.filter(point => Number.isFinite(point.value));
+    const latest = [...series].reverse().find(point => Number.isFinite(point.value)) || null;
+    const first = numeric[0] || null;
+    const last = numeric[numeric.length - 1] || null;
+    const delta = first && last && first !== last ? last.value - first.value : 0;
+    const percent = first && Math.abs(first.value) > 0.000001 ? (delta / first.value) * 100 : 0;
+    const latestStatus = latest ? getIcpValueStatus(latest) : { key: 'unknown', label: 'kein Zahlenwert' };
+    const avg = numeric.length ? numeric.reduce((sum, point) => sum + point.value, 0) / numeric.length : null;
+    const unit = selectedOption?.unit || latest?.unit || '';
+    const compareKeys = (icpUiState.selectedParameters || []).filter(key => key !== selectedKey);
+    const compareCards = compareKeys.map(key => renderIcpMiniGraphCard(options, chronological, key)).join('');
+    const ratioCards = (icpUiState.ratioPairs || []).map(pair => {
+        const ratioTitle = pair.a && pair.b
+            ? `${getIcpOptionLabel(options, pair.a)} / ${getIcpOptionLabel(options, pair.b)}`
+            : '';
+        const ratioSeries = pair.a && pair.b && pair.a !== pair.b
+            ? buildIcpRatioSeries(chronological, pair.a, pair.b, options)
+            : [];
+        return `
+            <article class="icp-chart-card icp-ratio-card">
+                <div class="icp-card-head">
+                    <div>
+                        <h3>Verhältnis ${escapeHtml(ratioTitle || '')}</h3>
+                        <p class="hint">Wert A geteilt durch Wert B. Punkte fehlen, wenn einer der beiden Werte in einer ICP nicht numerisch ist.</p>
+                    </div>
+                </div>
+                ${ratioSeries.length ? renderIcpChart(ratioSeries, '') : '<div class="icp-empty-state"><strong>Kein Verhältnis berechenbar</strong><span>Wähle zwei unterschiedliche numerische Werte mit gemeinsamen ICP-Daten.</span></div>'}
+            </article>
+        `;
+    }).join('');
+
+    analysis.innerHTML = `
+        <div class="icp-stat-grid">
+            <div class="icp-stat-card">
+                <small>Aktuell</small>
+                <strong>${latest ? escapeHtml(formatIcpNumber(latest.value, unit)) : '-'}</strong>
+                <span class="icp-status-pill is-${latestStatus.key}">${escapeHtml(latestStatus.label)}</span>
+            </div>
+            <div class="icp-stat-card">
+                <small>Trend</small>
+                <strong>${numeric.length > 1 ? `${delta >= 0 ? '+' : ''}${escapeHtml(formatIcpNumber(delta, unit))}` : '-'}</strong>
+                <span>${numeric.length > 1 ? `${percent >= 0 ? '+' : ''}${percent.toFixed(1)} % über ${numeric.length} ICPs` : 'mindestens 2 ICPs nötig'}</span>
+            </div>
+            <div class="icp-stat-card">
+                <small>Mittelwert</small>
+                <strong>${avg === null ? '-' : escapeHtml(formatIcpNumber(avg, unit))}</strong>
+                <span>${numeric.length} numerische Messung(en)</span>
+            </div>
+        </div>
+        <div class="icp-chart-card">
+            <div class="icp-card-head">
+                <div>
+                    <h3>${escapeHtml(selectedOption?.label || 'ICP Wert')}</h3>
+                    <p class="hint">Anzeige: ${escapeHtml(rangeSelect.options[rangeSelect.selectedIndex]?.textContent || '')}</p>
+                </div>
+            </div>
+            ${renderIcpChart(series, unit)}
+        </div>
+        ${compareCards ? `
+            <div class="icp-compare-results">
+                <div class="icp-card-head">
+                    <div>
+                        <h3>Weitere Graphen</h3>
+                        <p class="hint">${compareKeys.length} zusätzlich ausgewählte Werte.</p>
+                    </div>
+                </div>
+                <div class="icp-compare-grid">${compareCards}</div>
+            </div>
+        ` : ''}
+        ${ratioCards ? `
+            <div class="icp-ratio-results">
+                <div class="icp-card-head">
+                    <div>
+                        <h3>Verhältnisse</h3>
+                        <p class="hint">${icpUiState.ratioPairs.length} Vergleich(e) im gewählten ICP-Zeitraum.</p>
+                    </div>
+                </div>
+                <div class="icp-compare-grid">${ratioCards}</div>
+            </div>
+        ` : ''}
+        <div class="icp-value-table">
+            ${series.slice().reverse().map(point => {
+                const status = getIcpValueStatus(point);
+                return `
+                    <button type="button" class="icp-value-row" onclick="selectIcpReport('${point.reportId}')">
+                        <span><strong>${escapeHtml(point.reportName)}</strong><small>${escapeHtml(formatWarehouseDate(point.date))}</small></span>
+                        <span>${point.value === null ? escapeHtml(point.rawValue || '-') : escapeHtml(formatIcpNumber(point.value, point.unit || unit))}</span>
+                        <em class="icp-status-pill is-${status.key}">${escapeHtml(status.label)}</em>
+                    </button>
+                `;
+            }).join('')}
+        </div>
+    `;
+
+    list.innerHTML = reports.map(report => {
+        const selected = icpUiState.selectedReportId === report.id;
+        const numericCount = (report.values || []).filter(value => Number.isFinite(value.value)).length;
+        const issueCount = (report.values || []).filter(value => ['low', 'high'].includes(getIcpValueStatus(value).key)).length;
+        const groupedValues = groupIcpValuesBySection(report.values || []);
+        return `
+            <article class="icp-report-card ${selected ? 'active' : ''}">
+                <button type="button" class="icp-report-main" onclick="selectIcpReport('${report.id}')">
+                    <span><strong>${escapeHtml(report.name)}</strong><small>${escapeHtml(formatWarehouseDate(report.date))}</small></span>
+                    <span>${numericCount}/${(report.values || []).length} numerisch · ${issueCount} auffällig</span>
+                </button>
+                <button type="button" class="btn-out btn-animated" onclick="deleteIcpReport('${report.id}')">Löschen</button>
+            </article>
+            ${selected ? `
+                <div class="icp-report-detail">
+                    ${groupedValues.map(([section, values]) => `
+                        <div class="icp-report-section-title">${escapeHtml(section)}</div>
+                        ${values.map(value => {
+                            const status = getIcpValueStatus(value);
+                            return `
+                                <div class="icp-report-value is-${status.key}">
+                                    <span><strong>${escapeHtml(value.name)}</strong><small>${value.unit ? escapeHtml(value.unit) : 'ohne Einheit'}</small></span>
+                                    <span>${value.value === null ? escapeHtml(value.rawValue || '-') : escapeHtml(formatIcpNumber(value.value, value.unit))}</span>
+                                    <small>${escapeHtml(status.label)}${Number.isFinite(value.optimal) ? ` · optimal ${escapeHtml(formatIcpNumber(value.optimal, value.unit))}` : ''}</small>
+                                </div>
+                            `;
+                        }).join('')}
+                    `).join('')}
+                </div>
+            ` : ''}
+        `;
+    }).join('');
+}
+
 function ensureLogBookDefaults() {
     if (!db.logBookCategories) db.logBookCategories = ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'];
     if (!db.logBookEntries) db.logBookEntries = [];
     if (!db.aquariumTodos) db.aquariumTodos = [];
 }
 
+function getDefaultMeasurementTypes() {
+    return [
+        { id: 'KH', label: 'KH', unit: 'dKH' },
+        { id: 'CA', label: 'CA', unit: 'mg/l' },
+        { id: 'MG', label: 'MG', unit: 'mg/l' },
+        { id: 'PO4', label: 'PO4', unit: 'mg/l' },
+        { id: 'NO3', label: 'NO3', unit: 'mg/l' },
+        { id: 'PSU', label: 'Salinität', unit: 'PSU' },
+        { id: 'SPINDEL', label: 'Spindelwert', unit: 'kg/l' },
+        { id: 'SG', label: 'Specific Gravity', unit: 'SG' }
+    ];
+}
+
+function ensureDefaultMeasurementTypes(types = []) {
+    const existing = Array.isArray(types) ? types.filter(Boolean) : [];
+    const byId = new Set(existing.map(type => String(type.id || '').toUpperCase()));
+    const merged = existing.map(type => ({ ...type }));
+    getDefaultMeasurementTypes().forEach(type => {
+        if (!byId.has(type.id)) {
+            merged.push({ ...type });
+            byId.add(type.id);
+        }
+    });
+    return merged;
+}
+
 function getMeasurementTypes() {
-    if (!db.measurementTypes || !Array.isArray(db.measurementTypes) || db.measurementTypes.length === 0) {
-        db.measurementTypes = [
-            { id: 'KH', label: 'KH', unit: 'dKH' },
-            { id: 'CA', label: 'CA', unit: 'mg/l' },
-            { id: 'MG', label: 'MG', unit: 'mg/l' },
-            { id: 'PO4', label: 'PO4', unit: 'mg/l' },
-            { id: 'NO3', label: 'NO3', unit: 'mg/l' }
-        ];
-    }
+    db.measurementTypes = ensureDefaultMeasurementTypes(db.measurementTypes);
     return db.measurementTypes;
 }
 
@@ -15908,6 +16705,26 @@ function getSelectedMeasurementTypeId() {
 
 function getMeasurementUnit(typeId) {
     return getMeasurementTypeById(typeId)?.unit || '';
+}
+
+function addMeasurementEntryToLogbook(typeId, value, note = '', at = new Date().toISOString()) {
+    const numericValue = parseFloat(value);
+    if (!Number.isFinite(numericValue)) return false;
+    const types = getMeasurementTypes();
+    if (!types.some(type => type.id === typeId)) return false;
+    const entry = {
+        id: createWarehouseId(),
+        typeId,
+        value: numericValue,
+        at,
+        note: String(note || '').trim(),
+        createdAt: new Date().toISOString()
+    };
+    getMeasurementEntries().unshift(entry);
+    measurementUiState.selectedEntryId = entry.id;
+    measurementUiState.editingEntryId = null;
+    saveDB();
+    return entry;
 }
 
 function saveMeasurementEntry(editId = null) {
@@ -15978,7 +16795,7 @@ function editMeasurementType(typeId) {
 function deleteMeasurementType(typeId) {
     const type = getMeasurementTypeById(typeId);
     if (!type) return;
-    const protectedTypes = ['KH', 'CA', 'MG', 'PO4', 'NO3'];
+    const protectedTypes = getDefaultMeasurementTypes().map(type => type.id);
     if (protectedTypes.includes(type.id)) {
         return alert('Die Standard-Messwert-Arten bleiben erhalten.');
     }
@@ -16790,6 +17607,41 @@ function getSalinityMethodConfig(method) {
     };
 }
 
+function getCurrentSalinityCalculation() {
+    const methodEl = document.getElementById('salinityMethod');
+    const densityEl = document.getElementById('salinityDensity');
+    const tempEl = document.getElementById('salinityTemp');
+    const densityNumberEl = document.getElementById('salinityDensityNumber');
+    if (!densityEl || !tempEl) return null;
+    const method = methodEl?.value || 'density';
+    const methodConfig = getSalinityMethodConfig(method);
+    const densityMin = parseFloat(densityEl.min) || methodConfig.min;
+    const densityMax = parseFloat(densityEl.max) || methodConfig.max;
+    const tempMin = parseFloat(tempEl.min) || 15;
+    const tempMax = parseFloat(tempEl.max) || 32;
+    const measurement = clampNumber(densityNumberEl?.value || densityEl.value, densityMin, densityMax, methodConfig.fallback);
+    const temp = clampNumber(tempEl.value, tempMin, tempMax, 25);
+    const offset = parseFloat(db.psuCorrectionOffset) || 0;
+    let rawPsu = 0;
+    let measuredDensity = 0;
+    if (method === 'specificGravity') {
+        measuredDensity = densityKgLFromSpecificGravity(measurement, temp);
+        rawPsu = psuFromDensityTemp(measuredDensity, temp);
+    } else if (method === 'conductivity') {
+        rawPsu = psuFromConductivityTemp(measurement, temp);
+        measuredDensity = densityKgLFromPsuTemp(rawPsu, temp);
+    } else {
+        measuredDensity = measurement;
+        rawPsu = psuFromDensityTemp(measurement, temp);
+    }
+    const psu = rawPsu + offset;
+    const densityAt25 = densityKgLFromPsuTemp(psu, 25);
+    const densityAtTemp = densityKgLFromPsuTemp(psu, temp);
+    const sgAtTemp = specificGravityFromDensityKgL(densityAtTemp, temp);
+    const conductivity = conductivityFromPsuTemp(psu, temp);
+    return { method, methodLabel: methodConfig.label, measurement, temp, offset, rawPsu, psu, measuredDensity, densityAt25, densityAtTemp, sgAtTemp, conductivity };
+}
+
 function updateSalinityCalculator(source = '') {
     const methodEl = document.getElementById('salinityMethod');
     const densityEl = document.getElementById('salinityDensity');
@@ -16871,6 +17723,38 @@ function updateSalinityCalculator(source = '') {
         <small>${offset ? `Gespeicherte PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)} wurde angewendet.` : 'Keine zusätzliche PSU-Korrektur gespeichert.'}</small>
     `;
     renderPsuCorrectionSettings();
+}
+
+function saveSalinityResultToLogbook() {
+    updateSalinityCalculator('logbook');
+    const calculation = getCurrentSalinityCalculation();
+    if (!calculation) return alert('Salzgehalt-Rechner konnte nicht gelesen werden.');
+    const target = document.getElementById('salinityLogTarget')?.value || 'PSU';
+    const targets = {
+        PSU: {
+            typeId: 'PSU',
+            value: calculation.psu,
+            label: `${calculation.psu.toFixed(2)} PSU`
+        },
+        SPINDEL: {
+            typeId: 'SPINDEL',
+            value: calculation.densityAtTemp,
+            label: `${calculation.densityAtTemp.toFixed(4)} kg/l`
+        },
+        SG: {
+            typeId: 'SG',
+            value: calculation.sgAtTemp,
+            label: `${calculation.sgAtTemp.toFixed(4)} SG`
+        }
+    };
+    const selected = targets[target] || targets.PSU;
+    const note = `Aus Salzgehalt-Rechner gespeichert. Methode: ${calculation.methodLabel}, Temperatur: ${calculation.temp.toFixed(1)} °C, Rohwert: ${calculation.rawPsu.toFixed(2)} PSU${calculation.offset ? `, PSU-Korrektur: ${calculation.offset > 0 ? '+' : ''}${calculation.offset.toFixed(1)}` : ''}.`;
+    const entry = addMeasurementEntryToLogbook(selected.typeId, selected.value, note);
+    if (!entry) return alert('Messwert konnte nicht ins Logbuch gespeichert werden.');
+    const logSelect = document.getElementById('measurementType');
+    if (logSelect) logSelect.value = selected.typeId;
+    renderMeasurementTracker(selected.typeId);
+    showToast(`Im Logbuch gespeichert: ${selected.label}`, 'success');
 }
 
 function updateSimpleSalinityConverter(source = 'psu') {
@@ -18278,6 +19162,117 @@ function executeQueueWithConflictHandling(queue, index) {
 function resetStatsSingle() { if(confirm("Statistiken nullen?")) { for(let i in db.stats) db.stats[i]=0; db.statsStarted=Date.now(); if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderStats(); updateNotificationStatus(); alert("Statistiken auf 0 gesetzt."); } }
 function resetLogsSingle() { if(confirm("Protokoll löschen?")) { db.logs=[]; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLogs(); updateNotificationStatus(); alert("Protokoll gelöscht."); } }
 function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inventory) for(let i in db.inventory[c]) db.inventory[c][i]=0; if (db.notifications) db.notifications.lastAlertSignature = ''; saveDB(); renderLager(); updateNotificationStatus(); alert("Lager ist leer."); } }
+
+function clearResetLocalPreferences() {
+    [
+        LAST_TAB_KEY,
+        MENU_ORDER_KEY,
+        MOBILE_QUICK_TABS_KEY,
+        HIDDEN_MENU_TABS_KEY,
+        OVERVIEW_ENABLED_KEY,
+        OSCI_FEATURES_ENABLED_KEY,
+        DEMO_PROFILE_ACTIVE_KEY,
+        GOOGLE_DRIVE_SETTINGS_KEY,
+        CUSTOM_CR_UNLOCK_KEY,
+        APP_STORAGE_EMERGENCY_KEY,
+        'reeftools_theme_v1'
+    ].forEach(key => {
+        try { localStorage.removeItem(key); } catch (err) {}
+    });
+}
+
+function disconnectGoogleDriveLocallyForReset() {
+    if (googleDriveAccessToken && window.google?.accounts?.oauth2?.revoke) {
+        try { google.accounts.oauth2.revoke(googleDriveAccessToken, () => {}); } catch (err) {}
+    }
+    googleDriveAccessToken = '';
+    googleDriveTokenExpiresAt = 0;
+    clearTimeout(googleDriveSyncTimer);
+    clearTimeout(googleDriveRemoteWatchTimer);
+    googleDriveMonitorState.checking = false;
+    googleDriveMonitorState.newerRemote = false;
+    googleDriveMonitorState.busyAction = '';
+    googleDriveMonitorState.message = 'Google Drive ist nach dem Reset getrennt.';
+}
+
+async function resetEntireSystem() {
+    const confirmed = await appConfirm(
+        'Damit wird dieses Gerät komplett geleert: Lager, Aquarien, Logbuch, ToDos, Messwerte, Korallen, Tools, Presets, Einstellungen und lokale Sicherungspunkte. Vorher wird automatisch ein Projekt-Backup heruntergeladen. Cloud-Backups werden nicht gelöscht, Google Drive wird auf diesem Gerät getrennt.',
+        {
+            title: 'Komplettes System zurücksetzen',
+            type: 'danger',
+            confirmText: 'Reset vorbereiten',
+            cancelText: 'Abbrechen'
+        }
+    );
+    if (!confirmed) return;
+
+    const typed = await appPrompt('Bitte gib RESET ein, um wirklich alle lokalen Daten dieses Geräts zu löschen.', '', {
+        title: 'Reset bestätigen',
+        label: 'Bestätigungswort',
+        confirmText: 'Alles löschen',
+        cancelText: 'Abbrechen'
+    });
+    if (typed !== 'RESET') {
+        showToast('Reset abgebrochen. Bestätigungswort war nicht korrekt.', 'info', 3000);
+        return;
+    }
+
+    showToast('Backup wird vor dem Reset erstellt ...', 'info', 2200);
+    try {
+        await exportData();
+    } catch (err) {
+        console.error(err);
+        const continueWithoutBackup = await appConfirm(
+            'Das automatische Backup konnte nicht erstellt werden. Soll der Reset trotzdem fortgesetzt werden?',
+            {
+                title: 'Backup fehlgeschlagen',
+                type: 'warning',
+                confirmText: 'Trotzdem zurücksetzen',
+                cancelText: 'Abbrechen'
+            }
+        );
+        if (!continueWithoutBackup) return;
+    }
+    await persistSequence.catch(() => {});
+
+    disconnectGoogleDriveLocallyForReset();
+    clearResetLocalPreferences();
+    await idbClearStore(APP_STORAGE_SNAPSHOT_STORE);
+    await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+
+    resetCatalogToBase();
+    appState = createFreshAppState();
+    activeWarehouseId = 'main';
+    activeAquariumId = 'aquarium-main';
+    db = normalizeWarehouseData(appState.warehouses.main.data);
+    overlayActiveAquariumData();
+    appState.warehouses.main.data = createPersistableWarehouseData(db);
+    applyTheme('default', false);
+    setDemoProfileActive(false);
+    initializedToolSections.clear();
+
+    await idbDelete(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY);
+    await idbDelete(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY);
+    const persisted = await persistAppStateNow('full-system-reset', true);
+    if (!persisted) {
+        await appAlert('Der Reset wurde im Arbeitsspeicher durchgeführt, konnte aber nicht sicher gespeichert werden. Bitte lade die Seite nicht neu und exportiere sofort ein Backup.', {
+            title: 'Reset nicht sicher gespeichert',
+            type: 'warning'
+        });
+        return;
+    }
+
+    try { localStorage.setItem(LAST_TAB_KEY, 'lager'); } catch (err) {}
+    document.body.classList.remove('osci-features-hidden');
+    applyMenuOrder();
+    renderCurrentWarehouseViews();
+    renderGoogleDriveHeaderStatus();
+    renderGoogleDriveSyncCard('Nach dem Reset getrennt.');
+    renderStorageSecurityStatus();
+    showTab('lager');
+    showToast('System wurde geleert. Du startest wieder bei 0.', 'success', 4200);
+}
 
 function formatBackupFileTimestamp(value = new Date().toISOString()) {
     const date = new Date(value);
