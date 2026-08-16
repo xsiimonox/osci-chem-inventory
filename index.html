@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.38-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.39-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.38</span>
+                    <span class="version-badge">v3.4.39</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -666,8 +666,8 @@
                                 <div class="input-group">
                                     <label>Ins Logbuch speichern als:</label>
                                     <select id="salinityLogTarget">
-                                        <option value="PSU">Salinität (PSU)</option>
-                                        <option value="SPINDEL">Spindelwert (kg/l)</option>
+                                        <option value="PSU">PSU</option>
+                                        <option value="SPINDEL">Dichte (kg/l)</option>
                                         <option value="SG">Specific Gravity</option>
                                     </select>
                                 </div>
@@ -1005,6 +1005,14 @@
                             <div class="input-group">
                                 <label for="measurementType">Messwert-Art:</label>
                                 <select id="measurementType" onchange="renderMeasurementTracker()"></select>
+                            </div>
+                            <div class="input-group" id="measurementUnitGroup" hidden>
+                                <label for="measurementUnit">Einheit:</label>
+                                <select id="measurementUnit" onchange="renderMeasurementTracker()">
+                                    <option value="PSU">PSU</option>
+                                    <option value="kg/l">Dichte (kg/l)</option>
+                                    <option value="SG">Specific Gravity</option>
+                                </select>
                             </div>
                             <div class="input-group">
                                 <label for="measurementValue">Messwert:</label>
@@ -1974,9 +1982,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.38-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.38-release"></script>
-    <script src="assets/js/app.js?v=3.4.38-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.39-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.39-release"></script>
+    <script src="assets/js/app.js?v=3.4.39-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

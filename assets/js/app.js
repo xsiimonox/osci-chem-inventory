@@ -5152,6 +5152,7 @@ function toggleDashboardMeasurementPin(typeId, checked) {
 function getMeasurementEntriesForRange(typeId, rangeValue = '30') {
     const allEntries = getMeasurementEntries()
         .filter(entry => entry.typeId === typeId)
+        .filter(entry => typeId !== SALINITY_MEASUREMENT_TYPE_ID || getMeasurementEntryUnit(entry) === 'PSU')
         .slice()
         .sort((a, b) => new Date(a.at) - new Date(b.at));
     if (rangeValue === 'all') return allEntries;
@@ -5184,7 +5185,7 @@ function getDashboardMeasurementSummary(typeId, rangeValue) {
         first,
         delta,
         dailyTrend,
-        unit: getMeasurementUnit(typeId),
+        unit: getMeasurementEntryUnit(latest, typeId),
         meta: getMeasurementTypeById(typeId)
     };
 }
@@ -5349,7 +5350,7 @@ function renderDashboard() {
             <button type="button" class="dashboard-measurement-card dashboard-widget dashboard-widget--chart" onclick="openDashboardDestination('measurement-list', '${typeId}')" ${isEditing ? 'disabled' : ''}>
                 <div class="dashboard-measurement-head">
                     <strong>${escapeHtml(summary.meta?.label || typeId)}</strong>
-                    <small>${summary.latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}</small>
+                    <small>${escapeHtml(formatMeasurementEntryValue(summary.latest, summary.unit))}</small>
                 </div>
                 ${createDashboardMeasurementChart(summary)}
                 <div class="dashboard-measurement-meta">
@@ -16649,6 +16650,13 @@ function ensureLogBookDefaults() {
     if (!db.aquariumTodos) db.aquariumTodos = [];
 }
 
+const SALINITY_MEASUREMENT_TYPE_ID = 'SALINITY';
+const LEGACY_SALINITY_MEASUREMENT_UNITS = {
+    PSU: 'PSU',
+    SPINDEL: 'kg/l',
+    SG: 'SG'
+};
+
 function getDefaultMeasurementTypes() {
     return [
         { id: 'KH', label: 'KH', unit: 'dKH' },
@@ -16656,14 +16664,13 @@ function getDefaultMeasurementTypes() {
         { id: 'MG', label: 'MG', unit: 'mg/l' },
         { id: 'PO4', label: 'PO4', unit: 'mg/l' },
         { id: 'NO3', label: 'NO3', unit: 'mg/l' },
-        { id: 'PSU', label: 'Salinität', unit: 'PSU' },
-        { id: 'SPINDEL', label: 'Spindelwert', unit: 'kg/l' },
-        { id: 'SG', label: 'Specific Gravity', unit: 'SG' }
+        { id: SALINITY_MEASUREMENT_TYPE_ID, label: 'Salzgehalt', unit: 'PSU', multiUnit: true }
     ];
 }
 
 function ensureDefaultMeasurementTypes(types = []) {
-    const existing = Array.isArray(types) ? types.filter(Boolean) : [];
+    const existing = (Array.isArray(types) ? types.filter(Boolean) : [])
+        .filter(type => !LEGACY_SALINITY_MEASUREMENT_UNITS[String(type.id || '').toUpperCase()]);
     const byId = new Set(existing.map(type => String(type.id || '').toUpperCase()));
     const merged = existing.map(type => ({ ...type }));
     getDefaultMeasurementTypes().forEach(type => {
@@ -16680,8 +16687,22 @@ function getMeasurementTypes() {
     return db.measurementTypes;
 }
 
+function normalizeMeasurementEntries(entries = []) {
+    return (Array.isArray(entries) ? entries : []).map(entry => {
+        if (!entry || typeof entry !== 'object') return entry;
+        const legacyUnit = LEGACY_SALINITY_MEASUREMENT_UNITS[String(entry.typeId || '').toUpperCase()];
+        if (legacyUnit) {
+            entry.typeId = SALINITY_MEASUREMENT_TYPE_ID;
+            if (!entry.unit) entry.unit = legacyUnit;
+        }
+        if (entry.typeId === SALINITY_MEASUREMENT_TYPE_ID && !entry.unit) entry.unit = 'PSU';
+        return entry;
+    }).filter(Boolean);
+}
+
 function getMeasurementEntries() {
     if (!db.measurementEntries || !Array.isArray(db.measurementEntries)) db.measurementEntries = [];
+    db.measurementEntries = normalizeMeasurementEntries(db.measurementEntries);
     return db.measurementEntries;
 }
 
@@ -16707,15 +16728,54 @@ function getMeasurementUnit(typeId) {
     return getMeasurementTypeById(typeId)?.unit || '';
 }
 
-function addMeasurementEntryToLogbook(typeId, value, note = '', at = new Date().toISOString()) {
+function getMeasurementUnitOptions(typeId) {
+    if (typeId === SALINITY_MEASUREMENT_TYPE_ID) {
+        return [
+            { value: 'PSU', label: 'PSU' },
+            { value: 'kg/l', label: 'Dichte (kg/l)' },
+            { value: 'SG', label: 'Specific Gravity' }
+        ];
+    }
+    const unit = getMeasurementUnit(typeId);
+    return unit ? [{ value: unit, label: unit }] : [];
+}
+
+function getSelectedMeasurementUnit(typeId = getSelectedMeasurementTypeId()) {
+    const unitSelect = document.getElementById('measurementUnit');
+    const options = getMeasurementUnitOptions(typeId);
+    if (typeId === SALINITY_MEASUREMENT_TYPE_ID) {
+        return options.some(option => option.value === unitSelect?.value) ? unitSelect.value : 'PSU';
+    }
+    return options[0]?.value || getMeasurementUnit(typeId);
+}
+
+function getMeasurementEntryUnit(entry = {}, fallbackTypeId = '') {
+    if (entry.typeId === SALINITY_MEASUREMENT_TYPE_ID) return entry.unit || 'PSU';
+    return entry.unit || getMeasurementUnit(entry.typeId || fallbackTypeId);
+}
+
+function formatMeasurementEntryValue(entry = {}, fallbackUnit = '') {
+    const unit = getMeasurementEntryUnit(entry) || fallbackUnit;
+    const value = Number.isFinite(entry.value) ? entry.value : parseFloat(entry.value);
+    return `${Number.isFinite(value) ? value.toFixed(3).replace(/\.?0+$/, '') : '-'}${unit ? ` ${unit}` : ''}`;
+}
+
+function formatMeasurementTypeOption(type) {
+    if (type.id === SALINITY_MEASUREMENT_TYPE_ID) return type.label;
+    return `${type.label}${type.unit ? ` (${type.unit})` : ''}`;
+}
+
+function addMeasurementEntryToLogbook(typeId, value, note = '', at = new Date().toISOString(), unit = '') {
     const numericValue = parseFloat(value);
     if (!Number.isFinite(numericValue)) return false;
     const types = getMeasurementTypes();
     if (!types.some(type => type.id === typeId)) return false;
+    const entryUnit = typeId === SALINITY_MEASUREMENT_TYPE_ID ? (unit || 'PSU') : (unit || getMeasurementUnit(typeId));
     const entry = {
         id: createWarehouseId(),
         typeId,
         value: numericValue,
+        unit: entryUnit,
         at,
         note: String(note || '').trim(),
         createdAt: new Date().toISOString()
@@ -16730,6 +16790,7 @@ function addMeasurementEntryToLogbook(typeId, value, note = '', at = new Date().
 function saveMeasurementEntry(editId = null) {
     const targetEditId = editId || measurementUiState.editingEntryId || null;
     const typeId = getSelectedMeasurementTypeId();
+    const unit = getSelectedMeasurementUnit(typeId);
     const valueRaw = parseFloat(document.getElementById('measurementValue')?.value);
     const dateValue = document.getElementById('measurementDate')?.value;
     const note = (document.getElementById('measurementNote')?.value || '').trim();
@@ -16741,6 +16802,7 @@ function saveMeasurementEntry(editId = null) {
         Object.assign(entry, {
             typeId,
             value: valueRaw,
+            unit,
             at,
             note,
             updatedAt: new Date().toISOString()
@@ -16750,6 +16812,7 @@ function saveMeasurementEntry(editId = null) {
             id: createWarehouseId(),
             typeId,
             value: valueRaw,
+            unit,
             at,
             note,
             createdAt: new Date().toISOString()
@@ -16813,10 +16876,12 @@ function editMeasurementEntry(entryId) {
     const entry = getMeasurementEntries().find(item => item.id === entryId);
     if (!entry) return;
     const typeSelect = document.getElementById('measurementType');
+    const unitSelect = document.getElementById('measurementUnit');
     const valueInput = document.getElementById('measurementValue');
     const dateInput = document.getElementById('measurementDate');
     const noteInput = document.getElementById('measurementNote');
     if (typeSelect) typeSelect.value = entry.typeId;
+    if (unitSelect && entry.typeId === SALINITY_MEASUREMENT_TYPE_ID) unitSelect.value = getMeasurementEntryUnit(entry);
     if (valueInput) valueInput.value = String(entry.value);
     if (dateInput) dateInput.value = formatDateTimeLocal(entry.at);
     if (noteInput) noteInput.value = entry.note || '';
@@ -16855,6 +16920,8 @@ function selectMeasurementEntry(entryId) {
 function renderMeasurementTracker(forceTypeId = null) {
     const container = document.getElementById('measurementTracker');
     const typeSelect = document.getElementById('measurementType');
+    const unitSelect = document.getElementById('measurementUnit');
+    const unitGroup = document.getElementById('measurementUnitGroup');
     const rangeSelect = document.getElementById('measurementRange');
     const dateInput = document.getElementById('measurementDate');
     const saveButton = document.getElementById('measurementSaveButton');
@@ -16865,15 +16932,23 @@ function renderMeasurementTracker(forceTypeId = null) {
     if (cancelButton) cancelButton.classList.toggle('is-hidden', !measurementUiState.editingEntryId);
 
     const types = getMeasurementTypes();
-    const currentType = forceTypeId || typeSelect.value || types[0]?.id || 'KH';
-    typeSelect.innerHTML = types.map(type => `<option value="${type.id}">${escapeHtml(type.label)}${type.unit ? ` (${escapeHtml(type.unit)})` : ''}</option>`).join('');
+    let currentType = forceTypeId || typeSelect.value || types[0]?.id || 'KH';
+    typeSelect.innerHTML = types.map(type => `<option value="${type.id}">${escapeHtml(formatMeasurementTypeOption(type))}</option>`).join('');
+    if (!types.some(type => type.id === currentType)) currentType = types[0]?.id || 'KH';
     typeSelect.value = currentType;
     if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
 
-    const unit = getMeasurementUnit(currentType);
+    if (unitSelect) {
+        const currentUnit = unitSelect.value || getMeasurementUnitOptions(currentType)[0]?.value || getMeasurementUnit(currentType);
+        unitSelect.innerHTML = getMeasurementUnitOptions(currentType).map(option => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`).join('');
+        unitSelect.value = getMeasurementUnitOptions(currentType).some(option => option.value === currentUnit) ? currentUnit : (getMeasurementUnitOptions(currentType)[0]?.value || '');
+    }
+    if (unitGroup) unitGroup.hidden = currentType !== SALINITY_MEASUREMENT_TYPE_ID;
+    const unit = getSelectedMeasurementUnit(currentType);
     const rangeValue = rangeSelect.value || '30';
     const allEntries = getMeasurementEntries()
         .filter(entry => entry.typeId === currentType)
+        .filter(entry => currentType !== SALINITY_MEASUREMENT_TYPE_ID || getMeasurementEntryUnit(entry) === unit)
         .slice()
         .sort((a, b) => new Date(a.at) - new Date(b.at));
 
@@ -16960,7 +17035,7 @@ function renderMeasurementTracker(forceTypeId = null) {
         <div class="measurement-panel">
             <div class="measurement-stats">
                 <div>
-                    <strong>${latest.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</strong>
+                    <strong>${escapeHtml(formatMeasurementEntryValue(latest, unit))}</strong>
                     <span>Aktueller Wert</span>
                 </div>
                 <div>
@@ -17030,7 +17105,7 @@ function renderMeasurementTracker(forceTypeId = null) {
             <div class="measurement-detail-card">
                 <strong>Ausgewählte Messung</strong>
                 <small>${selectedDetail ? formatWarehouseDate(selectedDetail.at) : '-'}</small>
-                <div class="measurement-detail-value">${selectedDetail ? `${selectedDetail.value.toFixed(3).replace(/\.?0+$/, '')} ${unit}` : '-'}</div>
+                <div class="measurement-detail-value">${selectedDetail ? escapeHtml(formatMeasurementEntryValue(selectedDetail, unit)) : '-'}</div>
                 <p>${selectedDetail?.note ? escapeHtml(selectedDetail.note) : 'Keine zusätzliche Notiz gespeichert.'}</p>
                 ${selectedDetail ? `
                     <div class="measurement-detail-actions">
@@ -17043,7 +17118,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                 ${(visibleEntries.slice().reverse().slice(0, 8)).map(entry => `
                     <div class="measurement-list-row ${selectedDetail?.id === entry.id ? 'active' : ''}">
                         <button class="measurement-list-button" onclick="selectMeasurementEntry('${entry.id}')">
-                            <strong>${entry.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</strong>
+                            <strong>${escapeHtml(formatMeasurementEntryValue(entry, unit))}</strong>
                             <small>${formatWarehouseDate(entry.at)}${entry.note ? ` · ${escapeHtml(entry.note)}` : ''}</small>
                         </button>
                         <div class="logbook-actions">
@@ -17114,7 +17189,7 @@ function renderLogBook() {
     }
     if (measurementType) {
         const currentType = measurementType.value || getMeasurementTypes()[0]?.id || 'KH';
-        measurementType.innerHTML = getMeasurementTypes().map(type => `<option value="${type.id}">${escapeHtml(type.label)}${type.unit ? ` (${escapeHtml(type.unit)})` : ''}</option>`).join('');
+        measurementType.innerHTML = getMeasurementTypes().map(type => `<option value="${type.id}">${escapeHtml(formatMeasurementTypeOption(type))}</option>`).join('');
         measurementType.value = getMeasurementTypes().some(type => type.id === currentType) ? currentType : (getMeasurementTypes()[0]?.id || 'KH');
     }
     if (measurementRange && !measurementRange.value) measurementRange.value = '30';
@@ -17732,27 +17807,32 @@ function saveSalinityResultToLogbook() {
     const target = document.getElementById('salinityLogTarget')?.value || 'PSU';
     const targets = {
         PSU: {
-            typeId: 'PSU',
+            typeId: SALINITY_MEASUREMENT_TYPE_ID,
             value: calculation.psu,
+            unit: 'PSU',
             label: `${calculation.psu.toFixed(2)} PSU`
         },
         SPINDEL: {
-            typeId: 'SPINDEL',
+            typeId: SALINITY_MEASUREMENT_TYPE_ID,
             value: calculation.densityAtTemp,
+            unit: 'kg/l',
             label: `${calculation.densityAtTemp.toFixed(4)} kg/l`
         },
         SG: {
-            typeId: 'SG',
+            typeId: SALINITY_MEASUREMENT_TYPE_ID,
             value: calculation.sgAtTemp,
+            unit: 'SG',
             label: `${calculation.sgAtTemp.toFixed(4)} SG`
         }
     };
     const selected = targets[target] || targets.PSU;
     const note = `Aus Salzgehalt-Rechner gespeichert. Methode: ${calculation.methodLabel}, Temperatur: ${calculation.temp.toFixed(1)} °C, Rohwert: ${calculation.rawPsu.toFixed(2)} PSU${calculation.offset ? `, PSU-Korrektur: ${calculation.offset > 0 ? '+' : ''}${calculation.offset.toFixed(1)}` : ''}.`;
-    const entry = addMeasurementEntryToLogbook(selected.typeId, selected.value, note);
+    const entry = addMeasurementEntryToLogbook(selected.typeId, selected.value, note, new Date().toISOString(), selected.unit);
     if (!entry) return alert('Messwert konnte nicht ins Logbuch gespeichert werden.');
     const logSelect = document.getElementById('measurementType');
+    const unitSelect = document.getElementById('measurementUnit');
     if (logSelect) logSelect.value = selected.typeId;
+    if (unitSelect) unitSelect.value = selected.unit;
     renderMeasurementTracker(selected.typeId);
     showToast(`Im Logbuch gespeichert: ${selected.label}`, 'success');
 }
