@@ -66,6 +66,18 @@ const traceCalculatorIntervalRules = {
 
 const traceCalculatorBase = { liters: 500, days: 40, volumeMl: 200, dailyDoseMl: 5 };
 
+const traceExpertBuiltInPresets = [
+    {
+        id: 'osci-motion-standard-10',
+        name: 'OSCI Motion Standard ±10 %',
+        locked: true,
+        limits: traceCalculatorElements.reduce((limits, element) => {
+            limits[element.item] = { increase: 10, decrease: 10 };
+            return limits;
+        }, {})
+    }
+];
+
 // Single source of truth for both the calculation and its in-app explanation.
 const traceCalculatorRules = {
     roundingMl: 0.01,
@@ -11239,13 +11251,28 @@ function getTraceExpertPresets() {
     return state.config.expertPresets;
 }
 
+function getAllTraceExpertPresets() {
+    return [
+        ...traceExpertBuiltInPresets.map(preset => ({
+            ...preset,
+            createdAt: preset.createdAt || 0,
+            updatedAt: preset.updatedAt || 0,
+            limits: normalizeTraceExpertLimitPresetLimits(preset.limits || {})
+        })),
+        ...getTraceExpertPresets()
+    ];
+}
+
 function renderTraceExpertPresetOptions(config) {
-    const presets = getTraceExpertPresets();
+    const presets = getAllTraceExpertPresets();
     const selectedId = config.selectedExpertPresetId || '';
     return `<option value="">Preset wählen ...</option>${presets
         .slice()
-        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-        .map(preset => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedId ? 'selected' : ''}>${escapeHtml(preset.name)}</option>`)
+        .sort((a, b) => {
+            if (a.locked !== b.locked) return a.locked ? -1 : 1;
+            return a.name.localeCompare(b.name, 'de');
+        })
+        .map(preset => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedId ? 'selected' : ''}>${escapeHtml(preset.name)}${preset.locked ? ' · Standard' : ''}</option>`)
         .join('')}`;
 }
 
@@ -11283,7 +11310,7 @@ function saveTraceExpertPreset() {
 function loadTraceExpertPreset(value = null) {
     const state = ensureTraceCalculatorState();
     const presetId = value || document.getElementById('traceExpertPresetSelect')?.value || '';
-    const preset = getTraceExpertPresets().find(item => item.id === presetId);
+    const preset = getAllTraceExpertPresets().find(item => item.id === presetId);
     if (!preset) return;
     state.config.elementChangeLimits = normalizeTraceExpertLimitPresetLimits(preset.limits || {});
     state.config.expertMode = true;
@@ -11298,6 +11325,11 @@ function deleteTraceExpertPreset() {
     const state = ensureTraceCalculatorState();
     const presetId = document.getElementById('traceExpertPresetSelect')?.value || state.config.selectedExpertPresetId || '';
     const presets = getTraceExpertPresets();
+    const builtInPreset = traceExpertBuiltInPresets.find(item => item.id === presetId);
+    if (builtInPreset) {
+        showToast('Das OSCI Standardpreset kann nicht gelöscht werden.', 'warning', 2600);
+        return;
+    }
     const preset = presets.find(item => item.id === presetId);
     if (!preset) {
         showToast('Bitte zuerst ein Preset auswählen.', 'warning', 2400);
