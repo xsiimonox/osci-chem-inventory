@@ -267,6 +267,7 @@ const AQUARIUM_FIELD_KEYS = [
     'feedNutrientLog',
     'osmoseTank',
     'traceDraft',
+    'reefManagerTraceImport',
     'traceCalculator',
     'testCorrections',
     'majorCorrectionSettings',
@@ -418,7 +419,8 @@ const DEMO_PROFILE_RETURN_STATE_KEY = 'demo_profile_return_state';
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
-const GOOGLE_DRIVE_FILE_NAME = 'osci-motion-project-backup.json';
+const GOOGLE_DRIVE_FILE_NAME = 'reeftools-project-backup.json';
+const LEGACY_GOOGLE_DRIVE_FILE_NAMES = ['osci-motion-project-backup.json'];
 const DEFAULT_SUPABASE_URL = 'https://ymeszigbnoaoqkwxcbqo.supabase.co';
 const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_4LQDgitTmZeu9tO2Mh8Hew_-EseNuP0';
 const COMMUNITY_MAP_DEFAULT_CENTER = { lat: 51.2, lng: 10.45 };
@@ -1480,8 +1482,9 @@ async function googleDriveFetch(url, options = {}) {
 
 function buildProjectBackupPayload() {
     const exportedAt = new Date().toISOString();
-    const warehouse = getActiveWarehouse();
     syncActiveAquariumDataFromDb(false);
+    syncActiveWarehouseDataFromDb(false);
+    const warehouse = getActiveWarehouse();
     if (warehouse) warehouse.lastExportAt = exportedAt;
     return {
         type: 'osci_project_backup',
@@ -1906,12 +1909,18 @@ async function fetchGoogleDriveBackupMetadata() {
             if (json?.id) return json;
         } catch (err) {}
     }
-    const query = encodeURIComponent(`name='${GOOGLE_DRIVE_FILE_NAME.replace(/'/g, "\\'")}' and trashed=false`);
-    const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder&fields=files(id,name,modifiedTime)`);
-    const json = await response.json();
-    const file = json?.files?.[0] || null;
-    if (file?.id) storeGoogleDriveSyncSettings({ fileId: file.id });
-    return file;
+    const backupFileNames = [GOOGLE_DRIVE_FILE_NAME, ...LEGACY_GOOGLE_DRIVE_FILE_NAMES];
+    for (const name of backupFileNames) {
+        const query = encodeURIComponent(`name='${name.replace(/'/g, "\\'")}' and trashed=false`);
+        const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files?q=${query}&spaces=appDataFolder&fields=files(id,name,modifiedTime)`);
+        const json = await response.json();
+        const file = json?.files?.[0] || null;
+        if (file?.id) {
+            storeGoogleDriveSyncSettings({ fileId: file.id });
+            return file;
+        }
+    }
+    return null;
 }
 
 function buildGoogleDriveMultipartBody(metadata, content) {
@@ -1968,11 +1977,11 @@ async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
 
 async function restoreProjectBackupFromGoogleDrive() {
     const fileId = await findGoogleDriveBackupFileId();
-    if (!fileId) throw new Error('In deiner Google Cloud wurde noch kein OSCI Backup gefunden.');
+    if (!fileId) throw new Error('In deiner Google Cloud wurde noch kein ReefTools Backup gefunden.');
     const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
     const parsed = await response.json();
     if (!parsed || parsed.type !== 'osci_project_backup' || !parsed.data) {
-        throw new Error('Die Google-Backup-Datei hat kein gültiges OSCI Projektformat.');
+        throw new Error('Die Google-Backup-Datei hat kein gültiges ReefTools Projektformat.');
     }
     const validation = validateProjectBackupPayload(parsed);
     if (!validation.ok) {
@@ -3070,6 +3079,8 @@ function createWarehouseData(source = {}) {
         feedNutrientLog: source.feedNutrientLog || [],
         osmoseTank: source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 },
         traceDraft: source.traceDraft || {},
+        reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
+        traceCalculator: cloneSerializable(source.traceCalculator || null),
         testCorrections: source.testCorrections || {},
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
@@ -3230,6 +3241,8 @@ function createAquariumData(source = {}) {
         feedNutrientLog: cloneSerializable(source.feedNutrientLog || []),
         osmoseTank: cloneSerializable(source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 }),
         traceDraft: cloneSerializable(source.traceDraft || {}),
+        reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
+        traceCalculator: cloneSerializable(source.traceCalculator || null),
         testCorrections: cloneSerializable(source.testCorrections || {}),
         majorCorrectionSettings: cloneSerializable(source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } }),
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
@@ -3344,6 +3357,14 @@ function syncActiveAquariumDataFromDb(markDirty = true) {
     });
 }
 
+function syncActiveWarehouseDataFromDb(markDirty = true) {
+    const warehouse = getActiveWarehouse();
+    if (!warehouse) return;
+    if (markDirty) db.localUpdatedAt = new Date().toISOString();
+    warehouse.data = createPersistableWarehouseData(db);
+    warehouse.localUpdatedAt = db.localUpdatedAt || warehouse.localUpdatedAt || null;
+}
+
 function overlayActiveAquariumData() {
     const aquarium = getActiveAquarium();
     if (!aquarium) return;
@@ -3386,6 +3407,8 @@ function normalizeWarehouseData(data) {
     if (!db.osmoseTank) db.osmoseTank = { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 };
     if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
     if (!db.traceDraft) db.traceDraft = {};
+    if (db.reefManagerTraceImport === undefined) db.reefManagerTraceImport = null;
+    if (db.traceCalculator && typeof db.traceCalculator !== 'object') db.traceCalculator = null;
     if (!db.testCorrections) db.testCorrections = {};
     if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
     if (!db.majorCorrectionSettings.strengths) db.majorCorrectionSettings.strengths = { KH: 0.05, Ca: 1 };
@@ -3500,19 +3523,13 @@ function saveDB(markDirty = true) {
     try {
         if (!appState) appState = migrateToWarehouseState(db);
         syncActiveAquariumDataFromDb(markDirty);
-        const warehouse = getActiveWarehouse();
-        if (warehouse) {
-            if (markDirty) db.localUpdatedAt = new Date().toISOString();
-            warehouse.data = createPersistableWarehouseData(db);
-            warehouse.localUpdatedAt = db.localUpdatedAt;
-        }
+        syncActiveWarehouseDataFromDb(markDirty);
         appState.activeWarehouseId = activeWarehouseId;
         appState.activeAquariumId = activeAquariumId;
         updateWarehouseUI();
         queuePersistAppState(markDirty ? 'save' : 'save-passive', false);
         if (!isDemoProfileActive()) {
             scheduleGoogleDriveAutoSync();
-            scheduleSupabaseAutoSync();
         }
     } catch(e) {
         markPersistenceFailure('saveDB', e);
@@ -3995,6 +4012,7 @@ function createRemoteWarehouseId() {
 }
 
 function scheduleSupabaseAutoSync() {
+    if (!CLOUD_SYNC_ENABLED) return;
     if (syncIsPulling) return;
     const settings = getSupabaseSettings();
     if (!settings.autoSync || !settings.url || !settings.anonKey) return;
@@ -5354,7 +5372,7 @@ function renderDashboard() {
                 </div>
                 ${createDashboardMeasurementChart(summary)}
                 <div class="dashboard-measurement-meta">
-                    <span>${summary.dailyTrend >= 0 ? '+' : ''}${summary.dailyTrend.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(summary.unit)}/Tag</span>
+                    <span>${summary.dailyTrend >= 0 ? '+' : ''}${formatMeasurementNumber(summary.dailyTrend, summary.unit)} ${escapeHtml(summary.unit)}/Tag</span>
                     <span>${formatWarehouseDate(summary.latest.at)}</span>
                 </div>
             </button>
@@ -12125,7 +12143,6 @@ function initToolSection(sectionId, force = false) {
         runToolInit('Vorratsbehälter', renderDosingContainers);
         runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
         runToolInit('Umsetzungsprotokoll', renderImplementationLog);
-        runToolInit('Community Karte', renderCommunityMapCard);
     }
 }
 
@@ -16172,6 +16189,13 @@ function getIcpValueFromReport(report, key) {
 
 function formatIcpNumber(value, unit = '') {
     if (!Number.isFinite(value)) return '-';
+    const normalizedUnit = String(unit || '').trim().toLowerCase();
+    if (normalizedUnit === 'kg/l' || normalizedUnit === 'g/cm³' || normalizedUnit === 'g/cm3' || normalizedUnit === 'sg') {
+        return `${String(value)}${unit ? ` ${unit}` : ''}`;
+    }
+    if (normalizedUnit === 'psu') {
+        return `${value.toFixed(2).replace(/\.?0+$/, '')}${unit ? ` ${unit}` : ''}`;
+    }
     const abs = Math.abs(value);
     const decimals = abs >= 100 ? 1 : abs >= 10 ? 2 : 3;
     return `${value.toFixed(decimals).replace(/\.?0+$/, '')}${unit ? ` ${unit}` : ''}`;
@@ -16619,10 +16643,27 @@ function getMeasurementEntryUnit(entry = {}, fallbackTypeId = '') {
     return entry.unit || getMeasurementUnit(entry.typeId || fallbackTypeId);
 }
 
+function getMeasurementDisplayDecimals(unit = '') {
+    const normalizedUnit = String(unit || '').trim().toLowerCase();
+    if (normalizedUnit === 'psu') return 2;
+    return 3;
+}
+
+function formatMeasurementNumber(value, unit = '') {
+    const numeric = Number.isFinite(value) ? value : parseFloat(value);
+    if (!Number.isFinite(numeric)) return '-';
+    const normalizedUnit = String(unit || '').trim().toLowerCase();
+    if (normalizedUnit === 'kg/l' || normalizedUnit === 'sg' || normalizedUnit === 'specific gravity') {
+        return String(numeric);
+    }
+    return numeric
+        .toFixed(getMeasurementDisplayDecimals(unit))
+        .replace(/\.?0+$/, '');
+}
+
 function formatMeasurementEntryValue(entry = {}, fallbackUnit = '') {
     const unit = getMeasurementEntryUnit(entry) || fallbackUnit;
-    const value = Number.isFinite(entry.value) ? entry.value : parseFloat(entry.value);
-    return `${Number.isFinite(value) ? value.toFixed(3).replace(/\.?0+$/, '') : '-'}${unit ? ` ${unit}` : ''}`;
+    return `${formatMeasurementNumber(entry.value, unit)}${unit ? ` ${unit}` : ''}`;
 }
 
 function formatMeasurementTypeOption(type) {
@@ -16930,15 +16971,15 @@ function renderMeasurementTracker(forceTypeId = null) {
                     <span>Aktueller Wert</span>
                 </div>
                 <div>
-                    <strong>${dailyTrend >= 0 ? '+' : ''}${dailyTrend.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}/Tag</strong>
+                    <strong>${dailyTrend >= 0 ? '+' : ''}${formatMeasurementNumber(dailyTrend, unit)} ${escapeHtml(unit)}/Tag</strong>
                     <span>Trend in ${escapeHtml(rangeLabel)}</span>
                 </div>
                 <div>
-                    <strong>${forecastValue === null ? '-' : `${forecastValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}`}</strong>
+                    <strong>${forecastValue === null ? '-' : `${formatMeasurementNumber(forecastValue, unit)} ${escapeHtml(unit)}`}</strong>
                     <span>Prognose in 7 Tagen</span>
                 </div>
                 <div>
-                    <strong>${deviationAbs >= 0 ? '+' : ''}${deviationAbs.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)} / ${deviationPct >= 0 ? '+' : ''}${deviationPct.toFixed(1)}%</strong>
+                    <strong>${deviationAbs >= 0 ? '+' : ''}${formatMeasurementNumber(deviationAbs, unit)} ${escapeHtml(unit)} / ${deviationPct >= 0 ? '+' : ''}${deviationPct.toFixed(1)}%</strong>
                     <span>Abweichung vom Mittelwert</span>
                 </div>
             </div>
@@ -16967,7 +17008,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                     </defs>
                     ${yMarkers.map(marker => `
                         <line x1="${paddingLeft}" y1="${marker.y}" x2="${chartWidth - paddingRight}" y2="${marker.y}" class="measurement-grid-line"></line>
-                        <text x="${paddingLeft - 10}" y="${marker.y + 4}" text-anchor="end" class="measurement-y-label">${marker.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</text>
+                        <text x="${paddingLeft - 10}" y="${marker.y + 4}" text-anchor="end" class="measurement-y-label">${formatMeasurementNumber(marker.value, unit)} ${escapeHtml(unit)}</text>
                     `).join('')}
                     <line x1="${paddingLeft}" y1="${chartFloor}" x2="${chartWidth - paddingRight}" y2="${chartFloor}" class="measurement-axis"></line>
                     <line x1="${paddingLeft}" y1="${paddingTop}" x2="${paddingLeft}" y2="${chartFloor}" class="measurement-axis"></line>
@@ -16975,7 +17016,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                     <path d="${areaD}" class="measurement-area"></path>
                     <path d="${pathD}" class="measurement-line"></path>
                     ${points.map(point => `
-                        <g class="measurement-point-group ${selectedDetail?.id === point.id ? 'active' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(typeMeta.label)} ${point.value.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}, ${escapeHtml(formatWarehouseDate(point.at))}" onclick="selectMeasurementEntry('${point.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMeasurementEntry('${point.id}');}">
+                        <g class="measurement-point-group ${selectedDetail?.id === point.id ? 'active' : ''}" role="button" tabindex="0" aria-label="${escapeHtml(typeMeta.label)} ${formatMeasurementNumber(point.value, unit)} ${escapeHtml(unit)}, ${escapeHtml(formatWarehouseDate(point.at))}" onclick="selectMeasurementEntry('${point.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectMeasurementEntry('${point.id}');}">
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 14 : 11}" class="measurement-point-hit"></circle>
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 15 : 11}" class="measurement-point-halo"></circle>
                             <circle cx="${point.x}" cy="${point.y}" r="${selectedDetail?.id === point.id ? 8.6 : 6.5}" class="measurement-point-ring"></circle>
@@ -16988,9 +17029,9 @@ function renderMeasurementTracker(forceTypeId = null) {
                 </svg>
                 </div>
                 <div class="measurement-chart-meta">
-                    <span>Min: ${minValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
-                    <span>Mittel: ${avg.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
-                    <span>Max: ${maxValue.toFixed(3).replace(/\.?0+$/, '')} ${escapeHtml(unit)}</span>
+                    <span>Min: ${formatMeasurementNumber(minValue, unit)} ${escapeHtml(unit)}</span>
+                    <span>Mittel: ${formatMeasurementNumber(avg, unit)} ${escapeHtml(unit)}</span>
+                    <span>Max: ${formatMeasurementNumber(maxValue, unit)} ${escapeHtml(unit)}</span>
                 </div>
             </div>
             <div class="measurement-detail-card">
@@ -17672,15 +17713,15 @@ function updateSalinityCalculator(source = '') {
         </div>
         <div class="tool-row">
             <span><strong>Dichte @ ${temp.toFixed(1)} °C</strong><small>Aus der gewählten Messmethode</small></span>
-            <span>${densityAtTemp.toFixed(4)} kg/l</span>
+            <span>${densityAtTemp.toFixed(5).replace(/\.?0+$/, '')} kg/l</span>
         </div>
         <div class="tool-row">
             <span><strong>Dichte @ 25 °C</strong><small>Temperaturkorrigierte Referenz</small></span>
-            <span>${densityAt25.toFixed(4)} kg/l</span>
+            <span>${densityAt25.toFixed(5).replace(/\.?0+$/, '')} kg/l</span>
         </div>
         <div class="tool-row">
             <span><strong>Specific Gravity</strong><small>Bezugsdichte bei ${temp.toFixed(1)} °C</small></span>
-            <span>${sgAtTemp.toFixed(4)}</span>
+            <span>${sgAtTemp.toFixed(5).replace(/\.?0+$/, '')}</span>
         </div>
         <div class="tool-row">
             <span><strong>Leitwert</strong><small>Äquivalenter Leitwert bei ${temp.toFixed(1)} °C</small></span>
@@ -17707,13 +17748,13 @@ function saveSalinityResultToLogbook() {
             typeId: SALINITY_MEASUREMENT_TYPE_ID,
             value: calculation.densityAtTemp,
             unit: 'kg/l',
-            label: `${calculation.densityAtTemp.toFixed(4)} kg/l`
+            label: `${calculation.densityAtTemp.toFixed(5).replace(/\.?0+$/, '')} kg/l`
         },
         SG: {
             typeId: SALINITY_MEASUREMENT_TYPE_ID,
             value: calculation.sgAtTemp,
             unit: 'SG',
-            label: `${calculation.sgAtTemp.toFixed(4)} SG`
+            label: `${calculation.sgAtTemp.toFixed(5).replace(/\.?0+$/, '')} SG`
         }
     };
     const selected = targets[target] || targets.PSU;
@@ -17753,7 +17794,7 @@ function updateSimpleSalinityConverter(source = 'psu') {
     if (isNaN(psu) && isNaN(density)) {
         result.innerText = '';
     } else {
-        const densityText = isNaN(density) ? '-' : `${density.toFixed(4)} kg/l`;
+        const densityText = isNaN(density) ? '-' : `${density.toFixed(5).replace(/\.?0+$/, '')} kg/l`;
         const psuText = isNaN(psu) ? '-' : `${psu.toFixed(1)} PSU`;
         result.innerHTML = `Dichte: <strong>${densityText}</strong><br>Salinität: <strong>${psuText}</strong><br><small>Bei 25 °C Referenz${offset ? ` · PSU-Korrektur ${offset > 0 ? '+' : ''}${offset.toFixed(1)}` : ''}.</small>`;
     }
@@ -17773,11 +17814,11 @@ function updateSimpleSalinityConverter(source = 'psu') {
                 </div>
                 <div class="tool-row">
                     <span><strong>Dichte @ ${sgTemp.toFixed(1)} °C</strong><small>Aus Specific Gravity abgeleitet</small></span>
-                    <span>${sgDensity.toFixed(4)} kg/l</span>
+                    <span>${sgDensity.toFixed(5).replace(/\.?0+$/, '')} kg/l</span>
                 </div>
                 <div class="tool-row">
                     <span><strong>Dichte @ 25 °C</strong><small>Temperaturkorrigierte Referenz</small></span>
-                    <span>${sgDensity25.toFixed(4)} kg/l</span>
+                    <span>${sgDensity25.toFixed(5).replace(/\.?0+$/, '')} kg/l</span>
                 </div>
             `;
         } else {
@@ -19287,7 +19328,7 @@ function exportWarehouseInventoryTxt() {
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `OSCI_Lagerbestand_${(warehouse?.name || 'Lager').replace(/[^\w.-]+/g, '_')}_${exportedAtLocal.split('T')[0]}.txt`;
+    a.download = `ReefTools_Lagerbestand_${(warehouse?.name || 'Lager').replace(/[^\w.-]+/g, '_')}_${exportedAtLocal.split('T')[0]}.txt`;
     a.click();
     showToast('Lagerbestand als TXT exportiert', 'success', 2200);
 }
@@ -20759,7 +20800,7 @@ function exportToCSV() {
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `osci-motion-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `ReefTools_Export_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
     showToast('CSV exportiert!', 'success');
 }
