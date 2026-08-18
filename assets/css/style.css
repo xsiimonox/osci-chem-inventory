@@ -7910,6 +7910,223 @@ body.theme-badman.party-mode .card {
     font-weight: 750;
 }
 
+.trace-expert-panel {
+    margin-top: var(--space-3);
+    border: 1px solid var(--workflow-border);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+    overflow: hidden;
+}
+
+.trace-expert-panel > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 54px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.trace-expert-panel > summary::-webkit-details-marker {
+    display: none;
+}
+
+.trace-expert-panel > summary > span:first-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.trace-expert-panel > summary strong {
+    color: var(--text-primary);
+    font-size: 0.88rem;
+}
+
+.trace-expert-panel > summary small,
+.trace-expert-panel .hint {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.trace-expert-body {
+    display: grid;
+    gap: var(--space-3);
+    padding: 0 14px 14px;
+}
+
+.trace-expert-preset-panel {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) minmax(170px, 1fr) auto;
+    gap: 10px;
+    align-items: end;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--workflow-border) 80%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-base) 70%, transparent);
+}
+
+.trace-expert-preset-panel .input-group {
+    min-width: 0;
+    margin: 0;
+}
+
+.trace-expert-preset-panel .input-group label {
+    margin-bottom: 5px;
+    font-size: 0.68rem;
+}
+
+.trace-expert-preset-panel input,
+.trace-expert-preset-panel select {
+    height: 38px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+}
+
+.trace-expert-preset-actions {
+    display: flex;
+    gap: 7px;
+    min-width: 0;
+}
+
+.trace-expert-preset-actions button {
+    min-height: 38px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+.trace-expert-group {
+    display: grid;
+    gap: 8px;
+}
+
+.trace-expert-group h4 {
+    margin: 0;
+    color: var(--text-primary);
+    font-size: 0.78rem;
+    letter-spacing: 0;
+}
+
+.trace-expert-limit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 8px;
+}
+
+.trace-expert-limit {
+    display: grid;
+    grid-template-columns: minmax(54px, 0.65fr) minmax(0, 1.35fr);
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 54px;
+    padding: 8px 10px;
+    border: 1px solid color-mix(in srgb, var(--workflow-border) 82%, transparent);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-base) 76%, transparent);
+}
+
+.trace-expert-direction-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    min-width: 0;
+}
+
+.trace-expert-direction-grid label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+}
+
+.trace-expert-element-label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.trace-expert-element-label > span {
+    display: grid;
+    gap: 1px;
+    min-width: 0;
+}
+
+.trace-expert-reset {
+    min-width: 0;
+    min-height: 30px;
+    padding: 5px 8px;
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--workflow-border));
+    border-radius: 8px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    font-size: 0.62rem;
+    font-weight: 850;
+    line-height: 1;
+}
+
+.trace-expert-reset:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.trace-expert-limit strong {
+    color: var(--accent);
+    font-size: 0.8rem;
+}
+
+.trace-expert-limit small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trace-expert-limit .trace-input-with-unit input {
+    height: 36px;
+    padding: 6px 32px 6px 9px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+
+.trace-expert-limit input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.trace-expert-limit .trace-input-with-unit > span {
+    right: 9px;
+    font-size: 0.66rem;
+}
+
+.trace-expert-actions {
+    justify-content: flex-start;
+    margin: 0;
+}
+
+@media (max-width: 760px) {
+    .trace-expert-preset-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .trace-expert-preset-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .trace-expert-preset-actions button {
+        white-space: normal;
+    }
+}
+
 .trace-icp-import {
     min-width: 0;
     overflow: hidden;

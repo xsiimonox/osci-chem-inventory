@@ -10335,9 +10335,17 @@ function ensureTraceCalculatorState() {
             stocking: 'normal',
             days: 40,
             dailyDoseMl: 5,
-            bottleMaxMl: 450
+            bottleMaxMl: 450,
+            expertMode: false,
+            elementChangeLimits: {}
         };
     }
+    if (typeof db.traceCalculator.config.expertMode !== 'boolean') db.traceCalculator.config.expertMode = false;
+    if (!db.traceCalculator.config.elementChangeLimits || typeof db.traceCalculator.config.elementChangeLimits !== 'object') {
+        db.traceCalculator.config.elementChangeLimits = {};
+    }
+    if (!Array.isArray(db.traceCalculator.config.expertPresets)) db.traceCalculator.config.expertPresets = [];
+    if (!db.traceCalculator.config.selectedExpertPresetId) db.traceCalculator.config.selectedExpertPresetId = '';
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
@@ -10360,11 +10368,11 @@ function traceCalcRound(value) {
     return Math.max(0, Math.round((Number(value) || 0) / step) * step);
 }
 
-function traceCalcRoundWithinDoseLimit(value, previousAmount, maximumChange) {
+function traceCalcRoundWithinDoseLimit(value, previousAmount, maximumIncrease, maximumDecrease = maximumIncrease) {
     const step = traceCalculatorRules.roundingMl;
     const previous = Math.max(0, Number(previousAmount) || 0);
-    const lowerLimit = Math.max(0, previous * (1 - maximumChange));
-    const upperLimit = previous * (1 + maximumChange);
+    const lowerLimit = Math.max(0, previous * (1 - Math.max(0, Number(maximumDecrease) || 0)));
+    const upperLimit = previous * (1 + Math.max(0, Number(maximumIncrease) || 0));
     let rounded = traceCalcRound(value);
     if (rounded > upperLimit + 0.000001) {
         rounded = Math.floor((upperLimit + 0.000001) / step) * step;
@@ -10578,7 +10586,11 @@ function getTraceCalculatorConfigFromUi() {
         stocking: document.getElementById('traceCalcStocking')?.value || saved.stocking || 'normal',
         days: readConfigNumber('traceCalcDays', saved.days || 40, 1),
         dailyDoseMl: readConfigNumber('traceCalcDailyDose', saved.dailyDoseMl || 5, 0.01),
-        bottleMaxMl: readConfigNumber('traceCalcBottleMax', saved.bottleMaxMl || 450, 0.01)
+        bottleMaxMl: readConfigNumber('traceCalcBottleMax', saved.bottleMaxMl || 450, 0.01),
+        expertMode: Boolean(saved.expertMode),
+        elementChangeLimits: { ...(saved.elementChangeLimits || {}) },
+        expertPresets: Array.isArray(saved.expertPresets) ? saved.expertPresets : [],
+        selectedExpertPresetId: saved.selectedExpertPresetId || ''
     };
     state.config = config;
     return config;
@@ -10640,7 +10652,10 @@ function getTraceCalculatorStartingRecipe(config) {
 
 function getTraceCalculatorAdjustment(element, measured, previousAmount, config) {
     const intervalRule = traceCalculatorIntervalRules[config.interval] || traceCalculatorIntervalRules.monthly;
-    const maximumChange = intervalRule.maxDoseChange;
+    const limits = getTraceElementChangeLimits(element, config);
+    const limitLabel = config.expertMode
+        ? `Expertenlimit +${traceCalcRulePercent(limits.increase, 2)} / -${traceCalcRulePercent(limits.decrease, 2)}`
+        : `${intervalRule.adjustmentLabel}-Regel`;
     if (measured === null || measured === undefined || measured === '') {
         return {
             amount: previousAmount,
@@ -10661,19 +10676,19 @@ function getTraceCalculatorAdjustment(element, measured, previousAmount, config)
     }
 
     if (value <= 0) {
-        const amount = traceCalcRoundWithinDoseLimit(previousAmount * (1 + maximumChange), previousAmount, maximumChange);
+        const amount = traceCalcRoundWithinDoseLimit(previousAmount * (1 + limits.increase), previousAmount, limits.increase, limits.decrease);
         const actualChangePercent = previousAmount > 0 ? ((amount - previousAmount) / previousAmount) * 100 : 0;
         return {
             amount,
             status: 'low',
             label: 'unter Optimalwert',
-            note: `Bei ${traceCalcFormatValue(value, 2)} ${element.unit} ist keine Quotientenrechnung möglich; maximal +${traceCalcRulePercent(maximumChange)} nach ${intervalRule.adjustmentLabel}-Regel, nach Rundung ${traceCalcFormatPercent(actualChangePercent)}. Manuell prüfen.`
+            note: `Bei ${traceCalcFormatValue(value, 2)} ${element.unit} ist keine Quotientenrechnung möglich; maximal +${traceCalcRulePercent(limits.increase, 2)} nach ${limitLabel}, nach Rundung ${traceCalcFormatPercent(actualChangePercent)}. Manuell prüfen.`
         };
     }
 
     const targetFactor = element.optimal / value;
-    const factor = Math.min(1 + maximumChange, Math.max(1 - maximumChange, targetFactor));
-    const amount = traceCalcRoundWithinDoseLimit(previousAmount * factor, previousAmount, maximumChange);
+    const factor = Math.min(1 + limits.increase, Math.max(1 - limits.decrease, targetFactor));
+    const amount = traceCalcRoundWithinDoseLimit(previousAmount * factor, previousAmount, limits.increase, limits.decrease);
     const targetChangePercent = (targetFactor - 1) * 100;
     const appliedChangePercent = (factor - 1) * 100;
     const actualChangePercent = previousAmount > 0 ? ((amount - previousAmount) / previousAmount) * 100 : 0;
@@ -10682,7 +10697,7 @@ function getTraceCalculatorAdjustment(element, measured, previousAmount, config)
         ? ` Nach 0,01-ml-Rundung tatsächlich ${traceCalcFormatPercent(actualChangePercent)}.`
         : '';
     const adjustmentNote = (wasLimited
-        ? `Rechnerisch ${traceCalcFormatPercent(targetChangePercent)} bis zum Ziel; auf ${traceCalcFormatPercent(appliedChangePercent)} nach ${intervalRule.adjustmentLabel}-Regel begrenzt.`
+        ? `Rechnerisch ${traceCalcFormatPercent(targetChangePercent)} bis zum Ziel; auf ${traceCalcFormatPercent(appliedChangePercent)} nach ${limitLabel} begrenzt.`
         : `Proportionale Änderung um ${traceCalcFormatPercent(appliedChangePercent)} auf Ziel ${traceCalcFormatValue(element.optimal, 2)} ${element.unit}.`) + roundingNote;
 
     if (value < element.optimal) {
@@ -10725,6 +10740,8 @@ function calculateTraceRecipe(config = getTraceCalculatorConfigFromUi()) {
             amount: adjustment.amount,
             grams: traceCalcElementGrams(element.item, adjustment.amount),
             previousGrams: traceCalcElementGrams(element.item, previousAmount),
+            maximumIncrease: getTraceElementChangeLimits(element, config).increase,
+            maximumDecrease: getTraceElementChangeLimits(element, config).decrease,
             status: adjustment.status,
             statusLabel: adjustment.label,
             note: adjustment.note
@@ -10750,6 +10767,116 @@ function calculateTraceRecipe(config = getTraceCalculatorConfigFromUi()) {
         return acc;
     }, {});
     return { config, rows, totals };
+}
+
+function renderTraceCalculatorExpertControls(force = false) {
+    const container = document.getElementById('traceCalcExpertControls');
+    if (!container) return;
+    if (!force && container.dataset.traceExpertReady === 'true' && container.contains(document.activeElement)) return;
+    const state = ensureTraceCalculatorState();
+    const config = state.config || {};
+    const defaultLimit = getTraceDefaultMaximumChange(config);
+    const renderGroup = (group, title) => `
+        <div class="trace-expert-group">
+            <h4>${escapeHtml(title)}</h4>
+            <div class="trace-expert-limit-grid">
+                ${traceCalculatorElements.filter(element => element.group === group).map(element => {
+                    const key = traceCalcElementLimitKey(element);
+                    const storedIncrease = getTraceStoredElementLimitPercent(element, config, 'increase');
+                    const storedDecrease = getTraceStoredElementLimitPercent(element, config, 'decrease');
+                    const rawStored = config.elementChangeLimits?.[key];
+                    const hasIncrease = rawStored !== undefined && (typeof rawStored !== 'object' || rawStored.increase !== undefined);
+                    const hasDecrease = rawStored !== undefined && (typeof rawStored !== 'object' || rawStored.decrease !== undefined);
+                    const placeholder = `${traceCalcRulePercent(defaultLimit, 0).replace(' %', '')}`;
+                    return `
+                        <div class="trace-expert-limit">
+                            <span class="trace-expert-element-label">
+                                <span><strong>${escapeHtml(element.symbol)}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small></span>
+                                <button type="button" class="trace-expert-reset" onclick="resetTraceCalculatorElementLimit(${jsArg(key)})" ${config.expertMode ? '' : 'disabled'}>Reset</button>
+                            </span>
+                            <div class="trace-expert-direction-grid">
+                                <label for="${traceCalcElementLimitInputId(element, 'increase')}">
+                                    <small>max. hoch</small>
+                                    <span class="trace-input-with-unit">
+                                        <input
+                                            type="number"
+                                            id="${traceCalcElementLimitInputId(element, 'increase')}"
+                                            min="0"
+                                            max="100"
+                                            step="0.1"
+                                            inputmode="decimal"
+                                            value="${hasIncrease ? escapeHtml(String(storedIncrease)) : ''}"
+                                            placeholder="${escapeHtml(placeholder)}"
+                                            oninput="setTraceCalculatorElementLimit(${jsArg(key)}, 'increase', this.value)"
+                                            ${config.expertMode ? '' : 'disabled'}
+                                        >
+                                        <span>%</span>
+                                    </span>
+                                </label>
+                                <label for="${traceCalcElementLimitInputId(element, 'decrease')}">
+                                    <small>max. runter</small>
+                                    <span class="trace-input-with-unit">
+                                        <input
+                                            type="number"
+                                            id="${traceCalcElementLimitInputId(element, 'decrease')}"
+                                            min="0"
+                                            max="100"
+                                            step="0.1"
+                                            inputmode="decimal"
+                                            value="${hasDecrease ? escapeHtml(String(storedDecrease)) : ''}"
+                                            placeholder="${escapeHtml(placeholder)}"
+                                            oninput="setTraceCalculatorElementLimit(${jsArg(key)}, 'decrease', this.value)"
+                                            ${config.expertMode ? '' : 'disabled'}
+                                        >
+                                        <span>%</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+    `;
+    container.innerHTML = `
+        <details class="trace-expert-panel" ${config.expertMode ? 'open' : ''}>
+            <summary>
+                <span>
+                    <strong>Expertenmodus</strong>
+                    <small>Maximale Veränderung der Dosiermenge je Element manuell begrenzen</small>
+                </span>
+                <label class="switch trace-expert-switch" onclick="event.stopPropagation()">
+                    <input type="checkbox" ${config.expertMode ? 'checked' : ''} onchange="setTraceCalculatorExpertMode(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </summary>
+            <div class="trace-expert-body">
+                <p class="hint">Leer gelassene Richtungen nutzen weiter das Analyseintervall (${traceCalcRulePercent(defaultLimit, 0)}). „Max. hoch“ begrenzt Erhöhungen, „max. runter“ begrenzt Senkungen der Dosiermenge pro neuer Mischung.</p>
+                <div class="trace-expert-preset-panel">
+                    <div class="input-group">
+                        <label for="traceExpertPresetSelect">Preset laden</label>
+                        <select id="traceExpertPresetSelect" onchange="loadTraceExpertPreset(this.value)">
+                            ${renderTraceExpertPresetOptions(config)}
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="traceExpertPresetName">Preset Name</label>
+                        <input type="text" id="traceExpertPresetName" placeholder="z. B. Vorsichtig SPS" value="">
+                    </div>
+                    <div class="trace-expert-preset-actions">
+                        <button type="button" class="btn-secondary" onclick="saveTraceExpertPreset()" ${config.expertMode ? '' : 'disabled'}>Preset speichern</button>
+                        <button type="button" class="btn-secondary" onclick="deleteTraceExpertPreset()">Preset löschen</button>
+                    </div>
+                </div>
+                ${renderGroup('kationen', 'Kationen K+')}
+                ${renderGroup('anionen', 'Anionen A-')}
+                <div class="btn-group trace-expert-actions">
+                    <button type="button" class="btn-secondary" onclick="resetTraceCalculatorExpertLimits()">Expertenwerte zurücksetzen</button>
+                </div>
+            </div>
+        </details>
+    `;
+    container.dataset.traceExpertReady = 'true';
 }
 
 function renderTraceCalculatorIcpInputs() {
@@ -10899,6 +11026,7 @@ function renderTraceRecipeTable(recipe, group) {
                             <span><strong>${traceCalcFormatMl(row.amount)}</strong><small>${traceCalcFormatG(row.grams)}</small></span>
                             <em>Vorher ${traceCalcFormatMlG(row.previousAmount, row.previousGrams)}</em>
                             <em class="${amountChangeClass}">${traceCalcFormatPercent(amountChangePercent)}</em>
+                            ${recipe.config.expertMode ? `<em>Limit +${traceCalcRulePercent(row.maximumIncrease, 2)} / -${traceCalcRulePercent(row.maximumDecrease, 2)}</em>` : ''}
                         </span>
                     </div>
                     `;
@@ -10957,6 +11085,231 @@ function traceCalcFormatPercent(value) {
 
 function traceCalcRulePercent(value, digits = 0) {
     return `${(Number(value || 0) * 100).toLocaleString('de-DE', { maximumFractionDigits: digits })} %`;
+}
+
+function traceCalcElementLimitKey(element) {
+    return element?.item || '';
+}
+
+function traceCalcElementLimitInputId(element, direction = 'increase') {
+    return `traceCalcLimit-${element.symbol}-${direction}`;
+}
+
+function getTraceDefaultMaximumChange(config) {
+    const intervalRule = traceCalculatorIntervalRules[config.interval] || traceCalculatorIntervalRules.monthly;
+    return intervalRule.maxDoseChange;
+}
+
+function getTraceStoredElementLimitPercent(element, config, direction) {
+    const defaultLimit = getTraceDefaultMaximumChange(config);
+    const raw = config.elementChangeLimits?.[traceCalcElementLimitKey(element)];
+    if (raw && typeof raw === 'object') {
+        const parsedDirectional = traceCalcNumber(raw[direction], null);
+        return parsedDirectional !== null && parsedDirectional >= 0 ? parsedDirectional : defaultLimit * 100;
+    }
+    const parsedPercent = traceCalcNumber(raw, null);
+    return parsedPercent !== null && parsedPercent >= 0 ? parsedPercent : defaultLimit * 100;
+}
+
+function getTraceElementChangeLimits(element, config) {
+    const defaultLimit = getTraceDefaultMaximumChange(config);
+    if (!config?.expertMode) {
+        return { increase: defaultLimit, decrease: defaultLimit };
+    }
+    const increasePercent = getTraceStoredElementLimitPercent(element, config, 'increase');
+    const decreasePercent = getTraceStoredElementLimitPercent(element, config, 'decrease');
+    return {
+        increase: increasePercent / 100,
+        decrease: decreasePercent / 100
+    };
+}
+
+function getTraceElementMaximumChange(element, config) {
+    const defaultLimit = getTraceDefaultMaximumChange(config);
+    if (!config?.expertMode) return defaultLimit;
+    const parsedPercent = getTraceStoredElementLimitPercent(element, config, 'increase');
+    if (parsedPercent === null || parsedPercent < 0) return defaultLimit;
+    return parsedPercent / 100;
+}
+
+function setTraceCalculatorExpertMode(enabled) {
+    const state = ensureTraceCalculatorState();
+    state.config.expertMode = Boolean(enabled);
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+}
+
+function setTraceCalculatorElementLimit(item, direction, value) {
+    const state = ensureTraceCalculatorState();
+    if (!state.config.elementChangeLimits || typeof state.config.elementChangeLimits !== 'object') {
+        state.config.elementChangeLimits = {};
+    }
+    const element = traceCalculatorElements.find(entry => entry.item === item);
+    if (!element) return;
+    const raw = String(value ?? '').trim().replace(',', '.');
+    const existing = state.config.elementChangeLimits[item];
+    const next = existing && typeof existing === 'object'
+        ? { ...existing }
+        : {
+            increase: existing ?? '',
+            decrease: existing ?? ''
+        };
+    if (raw === '') {
+        delete next[direction];
+    } else {
+        const parsed = traceCalcNumber(raw, null);
+        if (parsed !== null && parsed >= 0) {
+            next[direction] = parsed;
+        }
+    }
+    if (next.increase === undefined && next.decrease === undefined) {
+        delete state.config.elementChangeLimits[item];
+    } else {
+        state.config.elementChangeLimits[item] = next;
+    }
+    saveDB();
+    renderTraceCalculator();
+}
+
+function resetTraceCalculatorElementLimit(item) {
+    const state = ensureTraceCalculatorState();
+    if (state.config.elementChangeLimits && typeof state.config.elementChangeLimits === 'object') {
+        delete state.config.elementChangeLimits[item];
+    }
+    const element = traceCalculatorElements.find(entry => entry.item === item);
+    if (element) {
+        ['increase', 'decrease'].forEach(direction => {
+            const input = document.getElementById(traceCalcElementLimitInputId(element, direction));
+            if (input) input.value = '';
+        });
+    }
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+}
+
+function resetTraceCalculatorExpertLimits() {
+    const state = ensureTraceCalculatorState();
+    state.config.elementChangeLimits = {};
+    traceCalculatorElements.forEach(element => {
+        ['increase', 'decrease'].forEach(direction => {
+            const input = document.getElementById(traceCalcElementLimitInputId(element, direction));
+            if (input) input.value = '';
+        });
+    });
+    saveDB();
+    renderTraceCalculator();
+}
+
+function normalizeTraceExpertLimitPresetLimits(limits = {}) {
+    return traceCalculatorElements.reduce((acc, element) => {
+        const key = traceCalcElementLimitKey(element);
+        const raw = limits[key];
+        if (raw === undefined || raw === null || raw === '') return acc;
+        if (raw && typeof raw === 'object') {
+            const increase = traceCalcNumber(raw.increase, null);
+            const decrease = traceCalcNumber(raw.decrease, null);
+            const entry = {};
+            if (increase !== null && increase >= 0) entry.increase = increase;
+            if (decrease !== null && decrease >= 0) entry.decrease = decrease;
+            if (Object.keys(entry).length) acc[key] = entry;
+            return acc;
+        }
+        const legacy = traceCalcNumber(raw, null);
+        if (legacy !== null && legacy >= 0) {
+            acc[key] = { increase: legacy, decrease: legacy };
+        }
+        return acc;
+    }, {});
+}
+
+function getTraceExpertPresets() {
+    const state = ensureTraceCalculatorState();
+    if (!Array.isArray(state.config.expertPresets)) state.config.expertPresets = [];
+    state.config.expertPresets = state.config.expertPresets
+        .filter(preset => preset && typeof preset === 'object')
+        .map(preset => ({
+            id: preset.id || createWarehouseId(),
+            name: String(preset.name || 'Expertenpreset').trim() || 'Expertenpreset',
+            createdAt: preset.createdAt || Date.now(),
+            updatedAt: preset.updatedAt || preset.createdAt || Date.now(),
+            limits: normalizeTraceExpertLimitPresetLimits(preset.limits || {})
+        }));
+    return state.config.expertPresets;
+}
+
+function renderTraceExpertPresetOptions(config) {
+    const presets = getTraceExpertPresets();
+    const selectedId = config.selectedExpertPresetId || '';
+    return `<option value="">Preset wählen ...</option>${presets
+        .slice()
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        .map(preset => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedId ? 'selected' : ''}>${escapeHtml(preset.name)}</option>`)
+        .join('')}`;
+}
+
+function saveTraceExpertPreset() {
+    const state = ensureTraceCalculatorState();
+    const nameInput = document.getElementById('traceExpertPresetName');
+    const name = String(nameInput?.value || '').trim();
+    if (!name) {
+        showToast('Bitte einen Namen für das Preset eintragen.', 'warning', 2600);
+        nameInput?.focus();
+        return;
+    }
+    const limits = normalizeTraceExpertLimitPresetLimits(state.config.elementChangeLimits || {});
+    if (!Object.keys(limits).length) {
+        showToast('Keine Expertenwerte zum Speichern vorhanden.', 'warning', 2600);
+        return;
+    }
+    const presets = getTraceExpertPresets();
+    const existing = presets.find(preset => preset.name.toLocaleLowerCase('de-DE') === name.toLocaleLowerCase('de-DE'));
+    const record = {
+        id: existing?.id || createWarehouseId(),
+        name,
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now(),
+        limits
+    };
+    state.config.expertPresets = [record, ...presets.filter(preset => preset.id !== record.id)].slice(0, 30);
+    state.config.selectedExpertPresetId = record.id;
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+    showToast(`Expertenpreset "${name}" gespeichert`, 'success', 2600);
+}
+
+function loadTraceExpertPreset(value = null) {
+    const state = ensureTraceCalculatorState();
+    const presetId = value || document.getElementById('traceExpertPresetSelect')?.value || '';
+    const preset = getTraceExpertPresets().find(item => item.id === presetId);
+    if (!preset) return;
+    state.config.elementChangeLimits = normalizeTraceExpertLimitPresetLimits(preset.limits || {});
+    state.config.expertMode = true;
+    state.config.selectedExpertPresetId = preset.id;
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+    showToast(`Expertenpreset "${preset.name}" geladen`, 'success', 2400);
+}
+
+function deleteTraceExpertPreset() {
+    const state = ensureTraceCalculatorState();
+    const presetId = document.getElementById('traceExpertPresetSelect')?.value || state.config.selectedExpertPresetId || '';
+    const presets = getTraceExpertPresets();
+    const preset = presets.find(item => item.id === presetId);
+    if (!preset) {
+        showToast('Bitte zuerst ein Preset auswählen.', 'warning', 2400);
+        return;
+    }
+    if (!confirm(`Expertenpreset "${preset.name}" löschen?`)) return;
+    state.config.expertPresets = presets.filter(item => item.id !== presetId);
+    if (state.config.selectedExpertPresetId === presetId) state.config.selectedExpertPresetId = '';
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+    showToast(`Expertenpreset "${preset.name}" gelöscht`, 'success', 2400);
 }
 
 function renderTraceCalculationGuideTable(rows, columns, className = '') {
@@ -11674,8 +12027,9 @@ function renderTraceCalculator() {
     if (!root) return;
     const state = ensureTraceCalculatorState();
     syncTraceCalculatorConfigUi();
-    renderTraceCalculatorIcpInputs();
     const config = getTraceCalculatorConfigFromUi();
+    renderTraceCalculatorExpertControls();
+    renderTraceCalculatorIcpInputs();
     const recipe = calculateTraceRecipe(config);
     state.latestRecipe = recipe;
     renderTraceCalculatorConfigWarnings(config);
