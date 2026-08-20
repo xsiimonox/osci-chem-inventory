@@ -66,18 +66,6 @@ const traceCalculatorIntervalRules = {
 
 const traceCalculatorBase = { liters: 500, days: 40, volumeMl: 200, dailyDoseMl: 5 };
 
-const traceExpertBuiltInPresets = [
-    {
-        id: 'osci-motion-standard-10',
-        name: 'OSCI Motion Standard ±10 %',
-        locked: true,
-        limits: traceCalculatorElements.reduce((limits, element) => {
-            limits[element.item] = { increase: 10, decrease: 10 };
-            return limits;
-        }, {})
-    }
-];
-
 // Single source of truth for both the calculation and its in-app explanation.
 const traceCalculatorRules = {
     roundingMl: 0.01,
@@ -1624,7 +1612,8 @@ function createDemoMeasurementEntries() {
         CA: [430, 428, 425, 424, 421, 423, 425, 426, 424],
         MG: [1345, 1340, 1332, 1328, 1320, 1325, 1322, 1324, 1320],
         PO4: [0.08, 0.07, 0.06, 0.05, 0.04, 0.05, 0.06, 0.05, 0.05],
-        NO3: [8.5, 7.8, 7.1, 6.4, 5.9, 5.2, 4.8, 5.1, 5.0]
+        NO3: [8.5, 7.8, 7.1, 6.4, 5.9, 5.2, 4.8, 5.1, 5.0],
+        [SALINITY_MEASUREMENT_TYPE_ID]: [34.8, 34.7, 34.6, 34.5, 34.6, 34.5, 34.4, 34.5, 34.5]
     };
     Object.entries(series).forEach(([typeId, values]) => {
         values.forEach((value, index) => {
@@ -1633,6 +1622,7 @@ function createDemoMeasurementEntries() {
                 id: `demo-measure-${typeId}-${index}`,
                 typeId,
                 value,
+                unit: typeId === SALINITY_MEASUREMENT_TYPE_ID ? 'PSU' : getMeasurementUnit(typeId),
                 at: demoDate(daysAgo, 20, 0),
                 note: index === values.length - 1 ? 'Aktueller Demo-Messwert' : '',
                 createdAt: demoDate(daysAgo, 20, 2)
@@ -1640,6 +1630,77 @@ function createDemoMeasurementEntries() {
         });
     });
     return points.sort((a, b) => new Date(b.at) - new Date(a.at));
+}
+
+function createDemoIcpValue(section, name, value, min, optimal, max, unit, diff = null, rawValue = '') {
+    const symbol = extractIcpSymbol(name);
+    const canonical = getIcpCanonicalInfo(name, symbol, section);
+    return {
+        key: normalizeIcpKey(name, symbol),
+        section: canonical.section,
+        name,
+        symbol,
+        value,
+        rawValue: rawValue || (value === null || value === undefined ? 'nn' : String(value)),
+        min,
+        optimal,
+        max,
+        unit,
+        diff,
+        sortOrder: canonical.order,
+        raw: []
+    };
+}
+
+function createDemoIcpReport(id, daysAgo, name, overrides = {}) {
+    const values = [
+        createDemoIcpValue('Basiswerte', 'Dichte bei 25°C', overrides.density ?? 1.0232, 1.0226, 1.0230, 1.0237, 'g/cm³', null),
+        createDemoIcpValue('Basiswerte', 'Salinität', overrides.salinity ?? 34.8, 34, 34.5, 35.5, 'PSU', (overrides.salinity ?? 34.8) - 34.5),
+        createDemoIcpValue('Basiswerte', 'Gesamtphosphat (PO4)', overrides.po4 ?? 0.08, 0.04, 0.06, 0.1, 'mg/l', (overrides.po4 ?? 0.08) - 0.06),
+        createDemoIcpValue('Basiswerte', 'Karbonathärte (KH)', overrides.kh ?? 7.4, 6.5, 7.5, 8.5, '°dKH', (overrides.kh ?? 7.4) - 7.5),
+        createDemoIcpValue('Mengenelemente', 'Chlor (Cl)', overrides.cl ?? 19580, 19000, 19500, 20000, 'mg/l', (overrides.cl ?? 19580) - 19500),
+        createDemoIcpValue('Mengenelemente', 'Natrium (Na)', overrides.na ?? 10860, 10300, 10800, 11300, 'mg/l', (overrides.na ?? 10860) - 10800),
+        createDemoIcpValue('Mengenelemente', 'Magnesium (Mg)', overrides.mg ?? 1328, 1230, 1320, 1400, 'mg/l', (overrides.mg ?? 1328) - 1320),
+        createDemoIcpValue('Mengenelemente', 'Calcium (Ca)', overrides.ca ?? 422, 400, 425, 440, 'mg/l', (overrides.ca ?? 422) - 425),
+        createDemoIcpValue('Mengenelemente', 'Kalium (K)', overrides.k ?? 407, 380, 405, 420, 'mg/l', (overrides.k ?? 407) - 405),
+        createDemoIcpValue('Mengenelemente', 'Strontium (Sr)', overrides.sr ?? 8.4, 7.5, 8.2, 9.5, 'mg/l', (overrides.sr ?? 8.4) - 8.2),
+        createDemoIcpValue('Mengenelemente', 'Bor (B)', overrides.b ?? 4.7, 4, 4.5, 6, 'mg/l', (overrides.b ?? 4.7) - 4.5),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Iod (I)', overrides.i ?? 62, 50, 65, 90, 'µg/l', (overrides.i ?? 62) - 65),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Vanadium (V)', overrides.v ?? 4.2, 1, 4.5, 8, 'µg/l', (overrides.v ?? 4.2) - 4.5),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Selen (Se)', overrides.se ?? 3.4, 1.5, 3.5, 8, 'µg/l', (overrides.se ?? 3.4) - 3.5),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Eisen (Fe)', overrides.fe ?? null, null, 1, 2.5, 'µg/l', -1, 'nn'),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Mangan (Mn)', overrides.mn ?? 0.3, 0.1, 0.5, 1, 'µg/l', (overrides.mn ?? 0.3) - 0.5),
+        createDemoIcpValue('Essenzielle Spurenelemente', 'Zink (Zn)', overrides.zn ?? 4.4, 2, 4, 8, 'µg/l', (overrides.zn ?? 4.4) - 4),
+        createDemoIcpValue('Weitere Spurenelemente', 'Aluminium (Al)', overrides.al ?? 12, null, 0, 20, 'µg/l', overrides.al ?? 12),
+        createDemoIcpValue('Weitere Spurenelemente', 'Zinn (Sn)', overrides.sn ?? null, null, 0, 5, 'µg/l', null, 'nn')
+    ];
+    return {
+        id,
+        name,
+        date: demoDate(daysAgo, 12, 0),
+        values: sortIcpValues(values),
+        createdAt: demoDate(daysAgo, 12, 5)
+    };
+}
+
+function createDemoIcpReports() {
+    return [
+        createDemoIcpReport('demo-icp-003', 4, 'ICP Verlauf Juli', {
+            density: 1.0230, salinity: 34.5, po4: 0.06, kh: 7.3, cl: 19520, na: 10820,
+            mg: 1320, ca: 425, k: 405, sr: 8.2, b: 4.5, i: 65, v: 4.5, se: 3.5,
+            mn: 0.5, zn: 4.0, al: 8
+        }),
+        createDemoIcpReport('demo-icp-002', 39, 'ICP Verlauf Juni', {
+            density: 1.0229, salinity: 34.3, po4: 0.09, kh: 7.0, cl: 19430, na: 10790,
+            mg: 1308, ca: 416, k: 398, sr: 7.9, b: 4.3, i: 58, v: 3.6, se: 3.1,
+            mn: 0.25, zn: 3.5, al: 18
+        }),
+        createDemoIcpReport('demo-icp-001', 74, 'ICP Verlauf Mai', {
+            density: 1.0234, salinity: 34.9, po4: 0.12, kh: 7.6, cl: 19660, na: 10940,
+            mg: 1342, ca: 432, k: 414, sr: 8.8, b: 4.9, i: 71, v: 5.1, se: 3.9,
+            mn: 0.7, zn: 5.2, al: 28
+        })
+    ];
 }
 
 function createDemoAquariumData() {
@@ -1662,6 +1723,7 @@ function createDemoAquariumData() {
             { id: 'demo-dose-003', name: 'A- Trace', capacityMl: 1000, currentMl: 220, tareG: 72, density: 1.01, usage: 5, usageUnit: 'day', warnHours: 120, lastFilledAt: demoDate(75, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) }
         ],
         measurementEntries: createDemoMeasurementEntries(),
+        icpReports: createDemoIcpReports(),
         feedNutrientLog: [
             { id: 'demo-feed-001', type: 'Frostfutter', amount: 2, at: demoDate(1, 18, 0) },
             { id: 'demo-feed-002', type: 'Staubfutter', amount: 0.5, at: demoDate(4, 18, 0) }
@@ -1681,8 +1743,36 @@ function createDemoAquariumData() {
         },
         traceDraft: {
             history: [
-                { id: 'demo-trace-001', date: demoDate(70, 8, 0), runtimeDays: 40, dailyDoseMl: 5, totalVolumeMl: 200, elementVolumeMl: 94, osmoseMl: 106, tankLiters: 440, isInitial: true, includeInCalculation: true },
-                { id: 'demo-trace-002', date: demoDate(28, 8, 0), runtimeDays: 40, dailyDoseMl: 5, totalVolumeMl: 200, elementVolumeMl: 98, osmoseMl: 102, tankLiters: 440, includeInCalculation: true }
+                {
+                    id: 'demo-trace-001',
+                    date: demoDate(70, 8, 0),
+                    runtimeDays: 40,
+                    dailyDoseMl: 5,
+                    totalVolumeMl: 200,
+                    elementVolumeMl: 94,
+                    osmoseMl: 106,
+                    tankLiters: 440,
+                    isInitial: true,
+                    includeInCalculation: false,
+                    label: 'Startmischung',
+                    cations: { Co: 30, Ni: 15, Fe: 4, Mn: 0.5, Cu: 1, Cr: 0.4, Zn: 2 },
+                    anions: { F: 90, I: 1.2, V: 0.8, Se: 1.5 }
+                },
+                {
+                    id: 'demo-trace-002',
+                    date: demoDate(28, 8, 0),
+                    runtimeDays: 40,
+                    dailyDoseMl: 5,
+                    totalVolumeMl: 200,
+                    elementVolumeMl: 98,
+                    osmoseMl: 102,
+                    tankLiters: 440,
+                    includeInCalculation: true,
+                    sourceIcpReportId: 'demo-icp-002',
+                    label: 'Reef Manager Import',
+                    cations: { Co: 33, Ni: 18, Fe: 5, Mn: 0.7, Cu: 1.2, Cr: 0.5, Zn: 2.6 },
+                    anions: { F: 86, I: 1.6, V: 1.1, Se: 1.9 }
+                }
             ]
         },
         testCorrections: {
@@ -1816,23 +1906,95 @@ async function restoreOwnProfileFromDemo() {
     showToast('Eigenes Profil wiederhergestellt.', 'success', 3000);
 }
 
+function getDemoProfileStats(state = null) {
+    const sourceState = state || (isDemoProfileActive() ? appState : createDemoAppState());
+    const warehouses = Object.values(sourceState?.warehouses || {});
+    const aquariums = Object.values(sourceState?.aquariums || {});
+    const activeWarehouse = sourceState?.warehouses?.[sourceState.activeWarehouseId] || warehouses[0] || null;
+    const activeAquarium = sourceState?.aquariums?.[sourceState.activeAquariumId] || aquariums[0] || null;
+    const warehouseData = activeWarehouse?.data || {};
+    const aquariumData = activeAquarium?.data || {};
+    const productCount = Object.values(warehouseData.inventory || {}).reduce((sum, group) => {
+        if (!group || typeof group !== 'object') return sum;
+        return sum + Object.values(group).filter(value => Number(value) > 0).length;
+    }, 0);
+    return {
+        warehouses: warehouses.length,
+        products: productCount,
+        logs: Array.isArray(warehouseData.logs) ? warehouseData.logs.length : 0,
+        logBook: Array.isArray(aquariumData.logBookEntries) ? aquariumData.logBookEntries.length : 0,
+        todos: Array.isArray(aquariumData.aquariumTodos) ? aquariumData.aquariumTodos.length : 0,
+        measurements: Array.isArray(aquariumData.measurementEntries) ? aquariumData.measurementEntries.length : 0,
+        icp: Array.isArray(aquariumData.icpReports) ? aquariumData.icpReports.length : 0,
+        trace: Array.isArray(aquariumData.traceDraft?.history) ? aquariumData.traceDraft.history.length : 0,
+        dosing: Array.isArray(aquariumData.dosingContainers) ? aquariumData.dosingContainers.length : 0,
+        corals: Array.isArray(aquariumData.coralCatalog) ? aquariumData.coralCatalog.length : 0,
+        transfers: Array.isArray(aquariumData.coralTransfers) ? aquariumData.coralTransfers.length : 0
+    };
+}
+
 async function renderDemoProfileSettings() {
     const container = document.getElementById('demoProfileSettings');
     if (!container) return;
     const active = isDemoProfileActive();
     const returnRecord = await idbGet(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+    const stats = getDemoProfileStats();
+    const returnDate = returnRecord?.savedAt ? formatWarehouseDate(returnRecord.savedAt) : '';
+    const quickLinks = [
+        ['lager', 'Lager'],
+        ['logbuch', 'Logbuch'],
+        ['icp', 'ICP'],
+        ['trace-export', 'Trace'],
+        ['statistik', 'Statistik'],
+        ['protokoll', 'Protokoll'],
+        ['korallen', 'Korallen']
+    ];
+    const statCards = [
+        ['Lager', stats.warehouses],
+        ['Produkte', stats.products],
+        ['Buchungen', stats.logs],
+        ['Logs', stats.logBook],
+        ['ToDos', stats.todos],
+        ['Messwerte', stats.measurements],
+        ['ICPs', stats.icp],
+        ['Trace', stats.trace],
+        ['Behälter', stats.dosing],
+        ['Korallen', stats.corals]
+    ];
     container.innerHTML = `
         <div class="demo-profile-panel ${active ? 'is-active' : ''}">
-            <div>
-                <strong>${active ? 'Demo-Profil aktiv' : 'Demo-Profil testen'}</strong>
+            <div class="demo-profile-copy">
+                <span class="demo-profile-kicker">${active ? 'Präsentation läuft' : 'Demo für Verein & Beratung'}</span>
+                <strong>${active ? 'Demo-Profil aktiv' : 'Voll befülltes Demo-Profil laden'}</strong>
                 <small>${active
-                    ? `Deine echten Daten sind ${returnRecord?.savedAt ? `seit ${formatWarehouseDate(returnRecord.savedAt)}` : ''} als Rückkehrpunkt gespeichert. Cloud-Upload ist im Demo-Modus pausiert.`
-                    : 'Lädt ein komplett befülltes Beispielprojekt mit Lager, Logbuch, ToDos, Messwerten, Statistik, Protokoll, Osmose, Vorratsbehältern und Korallen.'}</small>
+                    ? `Deine echten Daten sind ${returnDate ? `seit ${returnDate}` : 'als Rückkehrpunkt'} gespeichert. Cloud-Upload ist im Demo-Modus pausiert, damit keine Beispieldaten hochgeladen werden.`
+                    : 'Lädt ein fertiges Beispielsystem mit Lagerbestand, Protokoll, Logbuch, ToDos, Messwerten, ICP-Verlauf, Trace-Historie, Osmosetank, Vorratsbehältern und Korallenbestand.'}</small>
             </div>
             <div class="demo-profile-actions">
-                <button type="button" class="btn-secondary btn-animated" onclick="loadDemoProfile()">${active ? 'Demo neu laden' : 'Demo-Profil laden'}</button>
-                <button type="button" class="btn-primary btn-animated" onclick="restoreOwnProfileFromDemo()" ${active && returnRecord?.payload ? '' : 'disabled'}>Zu meinen Daten</button>
+                <button type="button" class="btn-primary btn-animated" onclick="loadDemoProfile()">${active ? 'Demo neu laden' : 'Demo-Profil laden'}</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="restoreOwnProfileFromDemo()" ${active && returnRecord?.payload ? '' : 'disabled'}>Zu meinen Daten</button>
             </div>
+            <div class="demo-profile-stats" aria-label="Demo-Inhalte">
+                ${statCards.map(([label, value]) => `
+                    <span>
+                        <strong>${escapeHtml(value)}</strong>
+                        <small>${escapeHtml(label)}</small>
+                    </span>
+                `).join('')}
+            </div>
+            <div class="demo-profile-features">
+                <span>Gefülltes Haupt- und Reservelager</span>
+                <span>Messwerte mit Verlauf und Trends</span>
+                <span>ICP-Berichte mit Optimalwerten</span>
+                <span>Trace-Historie und Beispielmischungen</span>
+                <span>Osmose- und Dosierbehälter</span>
+                <span>Korallenbestand mit Abgabehistorie</span>
+            </div>
+            ${active ? `
+                <div class="demo-profile-quicknav" aria-label="Demo-Schnellzugriff">
+                    ${quickLinks.map(([tab, label]) => `<button type="button" class="btn-secondary btn-animated" onclick="selectTab('${tab}')">${escapeHtml(label)}</button>`).join('')}
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -10349,7 +10511,9 @@ function ensureTraceCalculatorState() {
             dailyDoseMl: 5,
             bottleMaxMl: 450,
             expertMode: false,
-            elementChangeLimits: {}
+            elementChangeLimits: {},
+            dynamicLimitMinPercent: '',
+            dynamicLimitMaxPercent: ''
         };
     }
     if (typeof db.traceCalculator.config.expertMode !== 'boolean') db.traceCalculator.config.expertMode = false;
@@ -10358,6 +10522,8 @@ function ensureTraceCalculatorState() {
     }
     if (!Array.isArray(db.traceCalculator.config.expertPresets)) db.traceCalculator.config.expertPresets = [];
     if (!db.traceCalculator.config.selectedExpertPresetId) db.traceCalculator.config.selectedExpertPresetId = '';
+    if (db.traceCalculator.config.dynamicLimitMinPercent === undefined) db.traceCalculator.config.dynamicLimitMinPercent = '';
+    if (db.traceCalculator.config.dynamicLimitMaxPercent === undefined) db.traceCalculator.config.dynamicLimitMaxPercent = '';
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
@@ -10591,6 +10757,13 @@ function getTraceCalculatorConfigFromUi() {
         if (raw === '') return Math.max(minimum, traceCalcNumber(fallback, minimum));
         return Math.max(minimum, traceCalcNumber(raw, fallback));
     };
+    const readOptionalConfigNumber = (id, fallback, minimum = 0) => {
+        const input = document.getElementById(id);
+        const raw = input ? String(input.value ?? '').trim() : String(fallback ?? '').trim();
+        if (raw === '') return '';
+        const parsed = traceCalcNumber(raw, null);
+        return parsed !== null && parsed >= minimum ? parsed : '';
+    };
     state.currentMixtureDate = dateValue;
     const config = {
         tankLiters: readConfigNumber('traceCalcTankLiters', saved.tankLiters || 500, 1),
@@ -10602,7 +10775,9 @@ function getTraceCalculatorConfigFromUi() {
         expertMode: Boolean(saved.expertMode),
         elementChangeLimits: { ...(saved.elementChangeLimits || {}) },
         expertPresets: Array.isArray(saved.expertPresets) ? saved.expertPresets : [],
-        selectedExpertPresetId: saved.selectedExpertPresetId || ''
+        selectedExpertPresetId: saved.selectedExpertPresetId || '',
+        dynamicLimitMinPercent: readOptionalConfigNumber('traceExpertDynamicMin', saved.dynamicLimitMinPercent ?? '', 0),
+        dynamicLimitMaxPercent: readOptionalConfigNumber('traceExpertDynamicMax', saved.dynamicLimitMaxPercent ?? '', 0)
     };
     state.config = config;
     return config;
@@ -10787,7 +10962,10 @@ function renderTraceCalculatorExpertControls(force = false) {
     if (!force && container.dataset.traceExpertReady === 'true' && container.contains(document.activeElement)) return;
     const state = ensureTraceCalculatorState();
     const config = state.config || {};
+    const intervalLimit = getTraceIntervalMaximumChange(config);
     const defaultLimit = getTraceDefaultMaximumChange(config);
+    const dynamicMin = config.dynamicLimitMinPercent ?? '';
+    const dynamicMax = config.dynamicLimitMaxPercent ?? '';
     const renderGroup = (group, title) => `
         <div class="trace-expert-group">
             <h4>${escapeHtml(title)}</h4>
@@ -10804,7 +10982,7 @@ function renderTraceCalculatorExpertControls(force = false) {
                         <div class="trace-expert-limit">
                             <span class="trace-expert-element-label">
                                 <span><strong>${escapeHtml(element.symbol)}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small></span>
-                                <button type="button" class="trace-expert-reset" onclick="resetTraceCalculatorElementLimit(${jsArg(key)})" ${config.expertMode ? '' : 'disabled'}>Reset</button>
+                                <button type="button" class="trace-expert-reset" onclick='resetTraceCalculatorElementLimit(${jsArg(key)})' ${config.expertMode ? '' : 'disabled'}>Reset</button>
                             </span>
                             <div class="trace-expert-direction-grid">
                                 <label for="${traceCalcElementLimitInputId(element, 'increase')}">
@@ -10819,7 +10997,7 @@ function renderTraceCalculatorExpertControls(force = false) {
                                             inputmode="decimal"
                                             value="${hasIncrease ? escapeHtml(String(storedIncrease)) : ''}"
                                             placeholder="${escapeHtml(placeholder)}"
-                                            oninput="setTraceCalculatorElementLimit(${jsArg(key)}, 'increase', this.value)"
+                                            oninput='setTraceCalculatorElementLimit(${jsArg(key)}, "increase", this.value)'
                                             ${config.expertMode ? '' : 'disabled'}
                                         >
                                         <span>%</span>
@@ -10837,7 +11015,7 @@ function renderTraceCalculatorExpertControls(force = false) {
                                             inputmode="decimal"
                                             value="${hasDecrease ? escapeHtml(String(storedDecrease)) : ''}"
                                             placeholder="${escapeHtml(placeholder)}"
-                                            oninput="setTraceCalculatorElementLimit(${jsArg(key)}, 'decrease', this.value)"
+                                            oninput='setTraceCalculatorElementLimit(${jsArg(key)}, "decrease", this.value)'
                                             ${config.expertMode ? '' : 'disabled'}
                                         >
                                         <span>%</span>
@@ -10863,7 +11041,51 @@ function renderTraceCalculatorExpertControls(force = false) {
                 </label>
             </summary>
             <div class="trace-expert-body">
-                <p class="hint">Leer gelassene Richtungen nutzen weiter das Analyseintervall (${traceCalcRulePercent(defaultLimit, 0)}). „Max. hoch“ begrenzt Erhöhungen, „max. runter“ begrenzt Senkungen der Dosiermenge pro neuer Mischung.</p>
+                <p class="hint">Leer gelassene Richtungen folgen dynamisch der Laufzeit (${traceCalcRulePercent(intervalLimit, 0)}). Min/Max begrenzt diese Basis, einzelne Elementwerte überschreiben sie gezielt.</p>
+                <div class="trace-expert-dynamic-panel">
+                    <div class="trace-expert-dynamic-summary">
+                        <small>Dynamische Basis</small>
+                        <strong>${traceCalcRulePercent(defaultLimit, 2)}</strong>
+                        <span>Laufzeitregel ${traceCalcRulePercent(intervalLimit, 0)}</span>
+                    </div>
+                    <div class="input-group">
+                        <label for="traceExpertDynamicMin">Min. Änderung</label>
+                        <span class="trace-input-with-unit">
+                            <input
+                                type="number"
+                                id="traceExpertDynamicMin"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                inputmode="decimal"
+                                value="${escapeHtml(String(dynamicMin))}"
+                                placeholder="frei"
+                                oninput="setTraceExpertDynamicLimit('min', this.value)"
+                                ${config.expertMode ? '' : 'disabled'}
+                            >
+                            <span>%</span>
+                        </span>
+                    </div>
+                    <div class="input-group">
+                        <label for="traceExpertDynamicMax">Max. Änderung</label>
+                        <span class="trace-input-with-unit">
+                            <input
+                                type="number"
+                                id="traceExpertDynamicMax"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                inputmode="decimal"
+                                value="${escapeHtml(String(dynamicMax))}"
+                                placeholder="frei"
+                                oninput="setTraceExpertDynamicLimit('max', this.value)"
+                                ${config.expertMode ? '' : 'disabled'}
+                            >
+                            <span>%</span>
+                        </span>
+                    </div>
+                    <button type="button" class="btn-secondary" onclick="resetTraceExpertDynamicLimits()" ${config.expertMode ? '' : 'disabled'}>Dynamik-Reset</button>
+                </div>
                 <div class="trace-expert-preset-panel">
                     <div class="input-group">
                         <label for="traceExpertPresetSelect">Preset laden</label>
@@ -11107,9 +11329,32 @@ function traceCalcElementLimitInputId(element, direction = 'increase') {
     return `traceCalcLimit-${element.symbol}-${direction}`;
 }
 
-function getTraceDefaultMaximumChange(config) {
+function getTraceIntervalMaximumChange(config) {
     const intervalRule = traceCalculatorIntervalRules[config.interval] || traceCalculatorIntervalRules.monthly;
     return intervalRule.maxDoseChange;
+}
+
+function getTraceDynamicLimitPercentBounds(config) {
+    let min = traceCalcNumber(config?.dynamicLimitMinPercent, null);
+    let max = traceCalcNumber(config?.dynamicLimitMaxPercent, null);
+    min = min !== null && min >= 0 ? min : null;
+    max = max !== null && max >= 0 ? max : null;
+    if (min !== null && max !== null && min > max) {
+        const swap = min;
+        min = max;
+        max = swap;
+    }
+    return { min, max };
+}
+
+function getTraceDefaultMaximumChange(config) {
+    const intervalLimit = getTraceIntervalMaximumChange(config);
+    if (!config?.expertMode) return intervalLimit;
+    let percent = intervalLimit * 100;
+    const bounds = getTraceDynamicLimitPercentBounds(config);
+    if (bounds.min !== null) percent = Math.max(percent, bounds.min);
+    if (bounds.max !== null) percent = Math.min(percent, bounds.max);
+    return Math.max(0, percent) / 100;
 }
 
 function getTraceStoredElementLimitPercent(element, config, direction) {
@@ -11147,6 +11392,29 @@ function getTraceElementMaximumChange(element, config) {
 function setTraceCalculatorExpertMode(enabled) {
     const state = ensureTraceCalculatorState();
     state.config.expertMode = Boolean(enabled);
+    saveDB();
+    renderTraceCalculatorExpertControls(true);
+    renderTraceCalculator();
+}
+
+function setTraceExpertDynamicLimit(kind, value) {
+    const state = ensureTraceCalculatorState();
+    const field = kind === 'max' ? 'dynamicLimitMaxPercent' : 'dynamicLimitMinPercent';
+    const raw = String(value ?? '').trim().replace(',', '.');
+    const parsed = traceCalcNumber(raw, null);
+    state.config[field] = raw === '' || parsed === null || parsed < 0 ? '' : parsed;
+    saveDB();
+    renderTraceCalculator();
+}
+
+function resetTraceExpertDynamicLimits() {
+    const state = ensureTraceCalculatorState();
+    state.config.dynamicLimitMinPercent = '';
+    state.config.dynamicLimitMaxPercent = '';
+    const minInput = document.getElementById('traceExpertDynamicMin');
+    const maxInput = document.getElementById('traceExpertDynamicMax');
+    if (minInput) minInput.value = '';
+    if (maxInput) maxInput.value = '';
     saveDB();
     renderTraceCalculatorExpertControls(true);
     renderTraceCalculator();
@@ -11241,38 +11509,29 @@ function getTraceExpertPresets() {
     if (!Array.isArray(state.config.expertPresets)) state.config.expertPresets = [];
     state.config.expertPresets = state.config.expertPresets
         .filter(preset => preset && typeof preset === 'object')
-        .map(preset => ({
-            id: preset.id || createWarehouseId(),
-            name: String(preset.name || 'Expertenpreset').trim() || 'Expertenpreset',
-            createdAt: preset.createdAt || Date.now(),
-            updatedAt: preset.updatedAt || preset.createdAt || Date.now(),
-            limits: normalizeTraceExpertLimitPresetLimits(preset.limits || {})
-        }));
+        .map(preset => {
+            const dynamicMin = traceCalcNumber(preset.dynamicLimitMinPercent, null);
+            const dynamicMax = traceCalcNumber(preset.dynamicLimitMaxPercent, null);
+            return {
+                id: preset.id || createWarehouseId(),
+                name: String(preset.name || 'Expertenpreset').trim() || 'Expertenpreset',
+                createdAt: preset.createdAt || Date.now(),
+                updatedAt: preset.updatedAt || preset.createdAt || Date.now(),
+                limits: normalizeTraceExpertLimitPresetLimits(preset.limits || {}),
+                dynamicLimitMinPercent: dynamicMin !== null && dynamicMin >= 0 ? dynamicMin : '',
+                dynamicLimitMaxPercent: dynamicMax !== null && dynamicMax >= 0 ? dynamicMax : ''
+            };
+        });
     return state.config.expertPresets;
 }
 
-function getAllTraceExpertPresets() {
-    return [
-        ...traceExpertBuiltInPresets.map(preset => ({
-            ...preset,
-            createdAt: preset.createdAt || 0,
-            updatedAt: preset.updatedAt || 0,
-            limits: normalizeTraceExpertLimitPresetLimits(preset.limits || {})
-        })),
-        ...getTraceExpertPresets()
-    ];
-}
-
 function renderTraceExpertPresetOptions(config) {
-    const presets = getAllTraceExpertPresets();
+    const presets = getTraceExpertPresets();
     const selectedId = config.selectedExpertPresetId || '';
     return `<option value="">Preset wählen ...</option>${presets
         .slice()
-        .sort((a, b) => {
-            if (a.locked !== b.locked) return a.locked ? -1 : 1;
-            return a.name.localeCompare(b.name, 'de');
-        })
-        .map(preset => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedId ? 'selected' : ''}>${escapeHtml(preset.name)}${preset.locked ? ' · Standard' : ''}</option>`)
+        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
+        .map(preset => `<option value="${escapeHtml(preset.id)}" ${preset.id === selectedId ? 'selected' : ''}>${escapeHtml(preset.name)}</option>`)
         .join('')}`;
 }
 
@@ -11286,7 +11545,8 @@ function saveTraceExpertPreset() {
         return;
     }
     const limits = normalizeTraceExpertLimitPresetLimits(state.config.elementChangeLimits || {});
-    if (!Object.keys(limits).length) {
+    const hasDynamicLimit = state.config.dynamicLimitMinPercent !== '' || state.config.dynamicLimitMaxPercent !== '';
+    if (!Object.keys(limits).length && !hasDynamicLimit) {
         showToast('Keine Expertenwerte zum Speichern vorhanden.', 'warning', 2600);
         return;
     }
@@ -11297,7 +11557,9 @@ function saveTraceExpertPreset() {
         name,
         createdAt: existing?.createdAt || Date.now(),
         updatedAt: Date.now(),
-        limits
+        limits,
+        dynamicLimitMinPercent: state.config.dynamicLimitMinPercent ?? '',
+        dynamicLimitMaxPercent: state.config.dynamicLimitMaxPercent ?? ''
     };
     state.config.expertPresets = [record, ...presets.filter(preset => preset.id !== record.id)].slice(0, 30);
     state.config.selectedExpertPresetId = record.id;
@@ -11310,9 +11572,11 @@ function saveTraceExpertPreset() {
 function loadTraceExpertPreset(value = null) {
     const state = ensureTraceCalculatorState();
     const presetId = value || document.getElementById('traceExpertPresetSelect')?.value || '';
-    const preset = getAllTraceExpertPresets().find(item => item.id === presetId);
+    const preset = getTraceExpertPresets().find(item => item.id === presetId);
     if (!preset) return;
     state.config.elementChangeLimits = normalizeTraceExpertLimitPresetLimits(preset.limits || {});
+    state.config.dynamicLimitMinPercent = preset.dynamicLimitMinPercent ?? '';
+    state.config.dynamicLimitMaxPercent = preset.dynamicLimitMaxPercent ?? '';
     state.config.expertMode = true;
     state.config.selectedExpertPresetId = preset.id;
     saveDB();
@@ -11325,11 +11589,6 @@ function deleteTraceExpertPreset() {
     const state = ensureTraceCalculatorState();
     const presetId = document.getElementById('traceExpertPresetSelect')?.value || state.config.selectedExpertPresetId || '';
     const presets = getTraceExpertPresets();
-    const builtInPreset = traceExpertBuiltInPresets.find(item => item.id === presetId);
-    if (builtInPreset) {
-        showToast('Das OSCI Standardpreset kann nicht gelöscht werden.', 'warning', 2600);
-        return;
-    }
     const preset = presets.find(item => item.id === presetId);
     if (!preset) {
         showToast('Bitte zuerst ein Preset auswählen.', 'warning', 2400);
@@ -20324,6 +20583,11 @@ function submitBulkCart() {
 function renderNachbestellen() {
     const container = document.getElementById('nachbestellen-container');
     if (!container) return;
+    const openPanel = document.getElementById('reorder-open-panel');
+    if (openPanel) {
+        openPanel.hidden = true;
+        openPanel.innerHTML = '';
+    }
 
     // Build a combined product list: catalog + custom products
     const allItems = [];
@@ -20356,15 +20620,15 @@ function renderNachbestellen() {
             const checkId = 'shopcheck-' + item.replace(/[^a-zA-Z0-9]/g, '');
 
             // Build size selection buttons — pre-select URL, no direct shop link
-            const urlEntries = Object.entries(urlMap);
+            const urlEntries = Object.entries(urlMap).filter(([, url]) => isSafeShopUrl(url));
             const sizeBtns = urlEntries.map(([sizeMl, url], idx) => {
-                const s = Number(sizeMl);
-                const unit = getItemUnit(item);
-                const label = unit === 'ml' && s >= 1000 ? (s / 1000) + ' L' : s + ' ' + getUnitLabel(unit);
+                const label = formatShopSizeLabel(item, sizeMl);
                 const isSelected = idx === 0 ? ' selected' : '';
-                return `<button type="button" class="size-select-btn${isSelected}" data-url="${url}" data-item="${item}" onclick="selectShopSize(this)">${label}</button>`;
+                return `<button type="button" class="size-select-btn${isSelected}" data-url="${escapeHtml(url)}" data-item="${escapeHtml(item)}" data-size="${escapeHtml(sizeMl)}" onclick="selectShopSize(this)">${escapeHtml(label)}</button>`;
             }).join(' ');
             const defaultUrl = urlEntries.length > 0 ? urlEntries[0][1] : '';
+            const defaultSize = urlEntries.length > 0 ? urlEntries[0][0] : '';
+            const defaultLabel = defaultSize ? formatShopSizeLabel(item, defaultSize) : '';
             const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
             const weeksLeft = getWeeksLeft(item);
             const threshold = db.thresholds && db.thresholds[item] ? db.thresholds[item] : 0;
@@ -20373,8 +20637,10 @@ function renderNachbestellen() {
 
             catRows += `
                 <div class="shop-order-row ${isLow ? 'is-low' : 'is-ok'}">
-                    <input type="checkbox" id="${checkId}" data-item="${item}" aria-label="${escapeHtml(item)} zum Shop-Warenkorb hinzufügen"
-                        data-selected-url="${defaultUrl}"
+                    <input type="checkbox" id="${checkId}" data-item="${escapeHtml(item)}" aria-label="${escapeHtml(item)} zum Shop-Warenkorb hinzufügen"
+                        data-selected-url="${escapeHtml(defaultUrl)}"
+                        data-selected-size="${escapeHtml(defaultSize)}"
+                        data-selected-label="${escapeHtml(defaultLabel)}"
                         onchange="updateShopCartBtn()" class="shop-order-check">
                     <div class="shop-order-product">
                         <strong>${escapeHtml(item)}</strong>
@@ -20402,6 +20668,17 @@ function renderNachbestellen() {
     updateShopCartBtn();
 }
 
+function formatShopSizeLabel(item, sizeMl) {
+    const s = Number(sizeMl);
+    const unit = getItemUnit(item);
+    if (!Number.isFinite(s) || s <= 0) return 'Größe';
+    return unit === 'ml' && s >= 1000 ? `${s / 1000} L` : `${s} ${getUnitLabel(unit)}`;
+}
+
+function isSafeShopUrl(url) {
+    return /^https?:\/\//i.test(String(url || '').trim());
+}
+
 function selectSuggestedShopItems() {
     const warningWeeks = db.settings && db.settings.forecastWeeks ? db.settings.forecastWeeks : 4;
     document.querySelectorAll('#nachbestellen-container input[type=checkbox][data-item]').forEach(cb => {
@@ -20420,7 +20697,7 @@ function updateShopCartBtn() {
     if (!btn) return;
     const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
     btn.classList.toggle('is-hidden', checked.length === 0);
-    btn.innerText = `Alle ${checked.length} markierten im Shop öffnen`;
+    btn.innerText = checked.length === 1 ? '1 markierten Link öffnen' : `${checked.length} markierte Links öffnen`;
 }
 
 function selectAllShopItems(select) {
@@ -20433,6 +20710,7 @@ function selectAllShopItems(select) {
 function openShopLink(item, sizeMl) {
     const urlMap = getShopUrlMap(item);
     if (!urlMap || !urlMap[sizeMl]) return alert(`Kein Shop-Link für ${item} (${sizeMl} ml) hinterlegt.`);
+    if (!isSafeShopUrl(urlMap[sizeMl])) return alert(`Der Shop-Link für ${item} ist ungültig. Bitte mit https:// eintragen.`);
     window.open(urlMap[sizeMl], '_blank');
 }
 
@@ -20440,33 +20718,123 @@ function openShopLink(item, sizeMl) {
 function selectShopSize(btn) {
     const item = btn.dataset.item;
     const url = btn.dataset.url;
-    // Alle Buttons desselben Produkts deselektieren
-    document.querySelectorAll(`.size-select-btn[data-item="${item}"]`).forEach(b => b.classList.remove('selected'));
-    // Diesen Button selektieren
-    btn.classList.add('selected');
-    // URL im zugehörigen Checkbox-Datensatz aktualisieren
+    const size = btn.dataset.size || '';
+    const label = btn.textContent.trim();
     const row = btn.closest('.shop-order-row');
     if (row) {
+        row.querySelectorAll('.size-select-btn').forEach(b => b.classList.remove('selected'));
+    }
+    btn.classList.add('selected');
+    if (row) {
         const cb = row.querySelector('input[type=checkbox]');
-        if (cb) cb.dataset.selectedUrl = url;
+        if (cb) {
+            cb.dataset.selectedUrl = url;
+            cb.dataset.selectedSize = size;
+            cb.dataset.selectedLabel = label;
+        }
+    }
+}
+
+function getSelectedShopOrderItems() {
+    const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
+    return Array.from(checked)
+        .map(cb => {
+            const item = cb.dataset.item || '';
+            const row = cb.closest('.shop-order-row');
+            const cat = findCat(item);
+            const stock = cat && db.inventory[cat] ? db.inventory[cat][item] || 0 : 0;
+            return {
+                item,
+                cat,
+                stock,
+                url: cb.dataset.selectedUrl || '',
+                size: cb.dataset.selectedSize || '',
+                label: cb.dataset.selectedLabel || row?.querySelector('.size-select-btn.selected')?.textContent.trim() || 'Größe'
+            };
+        })
+        .filter(entry => entry.item && isSafeShopUrl(entry.url));
+}
+
+function tryOpenShopUrl(url) {
+    try {
+        const opened = window.open('about:blank', '_blank');
+        if (!opened) return false;
+        try { opened.opener = null; } catch (error) {}
+        opened.location.href = url;
+        return true;
+    } catch (error) {
+        return false;
     }
 }
 
 function openShopCart() {
-    const checked = document.querySelectorAll('#nachbestellen-container input[type=checkbox]:checked');
-    if (checked.length === 0) return;
-
-    let urls = [];
-    checked.forEach(cb => {
-        const selectedUrl = cb.dataset.selectedUrl;
-        if (selectedUrl) urls.push(selectedUrl);
-    });
-
-    if (urls.length === 0) return;
-    if (urls.length > 5) {
-        if (!confirm(`Es werden ${urls.length} Browser-Tabs geöffnet. Fortfahren?`)) return;
+    const items = getSelectedShopOrderItems();
+    if (items.length === 0) {
+        showToast('Bitte mindestens ein Produkt mit Shop-Link markieren.', 'warning', 2600);
+        return;
     }
-    urls.forEach(url => window.open(url, '_blank'));
+
+    const openedCount = items.reduce((count, entry) => count + (tryOpenShopUrl(entry.url) ? 1 : 0), 0);
+    renderReorderOpenPanel(items, openedCount);
+
+    if (openedCount === items.length) {
+        showToast(`${items.length} ${items.length === 1 ? 'Shop-Link wurde' : 'Shop-Links wurden'} geöffnet.`, 'success', 2600);
+    } else {
+        showToast(`${items.length - openedCount} Link(s) wurden vom Browser blockiert. Bestellliste unten nutzen.`, 'warning', 4200);
+    }
+}
+
+function renderReorderOpenPanel(items, openedCount = 0) {
+    const panel = document.getElementById('reorder-open-panel');
+    if (!panel) return;
+    const blockedCount = Math.max(0, items.length - openedCount);
+    panel.hidden = false;
+    panel.innerHTML = `
+        <div class="reorder-open-head">
+            <div>
+                <strong>${blockedCount ? 'Browser hat Tabs blockiert' : 'Bestelllinks vorbereitet'}</strong>
+                <span>${openedCount} von ${items.length} Link(s) geöffnet. Alle Produkte bleiben hier einzeln erreichbar.</span>
+            </div>
+            <button type="button" class="btn-secondary" onclick="copySelectedShopLinks()">Links kopieren</button>
+        </div>
+        <div class="reorder-open-list">
+            ${items.map((entry, index) => `
+                <a class="reorder-open-link" href="${escapeHtml(entry.url)}" target="_blank" rel="noopener">
+                    <span class="reorder-open-index">${index + 1}</span>
+                    <span class="reorder-open-copy">
+                        <strong>${escapeHtml(entry.item)}</strong>
+                        <small>${escapeHtml(entry.cat || 'Produkt')} · ${escapeHtml(entry.label)} · Bestand ${escapeHtml(formatItemAmount(entry.item, entry.stock))}</small>
+                    </span>
+                    <span class="reorder-open-action">Öffnen</span>
+                </a>
+            `).join('')}
+        </div>
+    `;
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function copySelectedShopLinks() {
+    const items = getSelectedShopOrderItems();
+    if (!items.length) return;
+    const text = items.map((entry, index) => `${index + 1}. ${entry.item} (${entry.label})\n${entry.url}`).join('\n\n');
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            const area = document.createElement('textarea');
+            area.value = text;
+            area.setAttribute('readonly', '');
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
+        }
+        showToast('Bestelllinks kopiert.', 'success', 2200);
+    } catch (error) {
+        showToast('Links konnten nicht automatisch kopiert werden.', 'warning', 3000);
+    }
 }
 
 // --- SHOP-LINK EINSTELLUNGEN ---

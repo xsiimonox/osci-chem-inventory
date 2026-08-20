@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.52-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.55-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.52</span>
+                    <span class="version-badge">v3.4.55</span>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1903,10 +1903,11 @@
                     Wähle Artikel und Größe aus — Jeder Link öffnet das Produkt direkt in der richtigen Größe.
                 </p>
                 <div class="reorder-actions">
-                    <button class="btn-primary btn-animated is-hidden" onclick="openShopCart()" id="btnOpenShopCart">Alle markierten im Shop öffnen</button>
+                    <button class="btn-primary btn-animated is-hidden" onclick="openShopCart()" id="btnOpenShopCart">Markierte Links öffnen</button>
                     <button class="btn-secondary btn-animated" onclick="selectAllShopItems(true)">Alle auswählen</button>
                     <button class="btn-secondary btn-animated" onclick="selectAllShopItems(false)">Auswahl aufheben</button>
                 </div>
+                <div id="reorder-open-panel" class="reorder-open-panel" hidden></div>
                 <div id="nachbestellen-container"></div>
             </div>
         </div>
@@ -1973,9 +1974,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.52-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.52-release"></script>
-    <script src="assets/js/app.js?v=3.4.52-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.55-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.55-release"></script>
+    <script src="assets/js/app.js?v=3.4.55-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -22,6 +22,7 @@ for (const htmlPath of htmlFiles) {
   html = html
     .replace(/assets\/css\/style\.css\?v=[^"]+/g, `assets/css/style.css?v=${cachebuster}`)
     .replace(/assets\/js\/sangokai-data\.js\?v=[^"]+/g, `assets/js/sangokai-data.js?v=${cachebuster}`)
+    .replace(/assets\/js\/lighting-sim\.js\?v=[^"]+/g, `assets/js/lighting-sim.js?v=${cachebuster}`)
     .replace(/assets\/js\/app\.js\?v=[^"]+/g, `assets/js/app.js?v=${cachebuster}`);
 
   if (htmlPath === 'index.html') {
