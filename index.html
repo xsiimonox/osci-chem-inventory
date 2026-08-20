@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.55-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.61-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,8 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.55</span>
+                    <span class="version-badge">v3.4.61</span>
+                    <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
@@ -1493,88 +1494,100 @@
             </section>
 
             <div class="card data-safety-card data-recovery-center-card">
-                <h3>Datensicherheit &amp; Backup</h3>
-                <p class="hint">Alles rund um Speicherschutz, Wiederherstellung, Datei-Export und Google Drive an einem Ort.</p>
+                <h3>Datensicherheit, Demo &amp; Backup</h3>
+                <p class="hint">Speicherschutz, Wiederherstellung, Demo-Profil, Datei-Backup und Google Drive sind hier gebündelt.</p>
                 <div class="data-safety-sections">
-                    <section class="data-safety-section">
-                        <div class="data-safety-section-head">
+                    <details class="data-safety-section">
+                        <summary class="data-safety-section-head">
                             <span>
                                 <strong>Lokaler Speicher</strong>
                                 <small>Automatisches Speichern, Speichertest und Wiederherstellungspunkte.</small>
                             </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="data-safety-section-body">
+                            <div id="storageSecurityStatus"></div>
+                            <div class="btn-group storage-safety-actions">
+                                <button onclick="requestPersistentAppStorage()" class="btn-primary btn-animated">Speicher schützen</button>
+                                <button onclick="runStorageHealthCheck()" class="btn-secondary btn-animated">Speichertest</button>
+                                <button onclick="createManualRecoveryPoint()" class="btn-secondary btn-animated">Sicherungspunkt</button>
+                                <button onclick="restoreLatestLocalSnapshot()" class="btn-secondary btn-animated">Letzten Stand laden</button>
+                                <button onclick="clearLocalSnapshots()" class="btn-out btn-animated">Sicherungspunkte löschen</button>
+                            </div>
                         </div>
-                        <div id="storageSecurityStatus"></div>
-                        <div class="btn-group storage-safety-actions">
-                            <button onclick="requestPersistentAppStorage()" class="btn-primary btn-animated">Speicher schützen</button>
-                            <button onclick="runStorageHealthCheck()" class="btn-secondary btn-animated">Speichertest</button>
-                            <button onclick="createManualRecoveryPoint()" class="btn-secondary btn-animated">Sicherungspunkt</button>
-                            <button onclick="restoreLatestLocalSnapshot()" class="btn-secondary btn-animated">Letzten Stand laden</button>
-                            <button onclick="clearLocalSnapshots()" class="btn-out btn-animated">Sicherungspunkte löschen</button>
-                        </div>
-                    </section>
+                    </details>
 
-                    <section class="data-safety-section demo-profile-section">
-                        <div class="data-safety-section-head">
+                    <details class="data-safety-section demo-profile-section">
+                        <summary class="data-safety-section-head">
                             <span>
                                 <strong>Demo-Profil</strong>
-                                <small>Ein vollständig befülltes Beispielsystem testen, ohne eigene Daten zu überschreiben.</small>
+                                <small>Für Präsentationen ein vollständig befülltes Beispielsystem laden.</small>
                             </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="data-safety-section-body">
+                            <div id="demoProfileSettings"></div>
                         </div>
-                        <div id="demoProfileSettings"></div>
-                    </section>
+                    </details>
 
-                    <section class="data-safety-section">
-                        <div class="data-safety-section-head">
+                    <details class="data-safety-section">
+                        <summary class="data-safety-section-head">
                             <span>
                                 <strong>Datei-Backup &amp; Export</strong>
                                 <small>Projekt sichern, alte Bestände einlesen oder Lagerbestand weitergeben.</small>
                             </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="data-safety-section-body">
+                            <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
+                            <div class="backup-project-actions">
+                                <button onclick="exportData()" class="btn-primary btn-animated">Projekt-Backup</button>
+                                <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated">TXT exportieren</button>
+                                <button onclick="exportWarehouseInventoryPdf()" class="btn-secondary btn-animated">PDF exportieren</button>
+                                <button onclick="exportToCSV()" class="btn-secondary btn-animated">CSV exportieren</button>
+                                <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated">Lagerbestand teilen</button>
+                                <button onclick="emailWarehouseInventory()" class="btn-secondary btn-animated">Per Mail senden</button>
+                            </div>
+                            <div class="backup-project-import">
+                                <label class="hint" for="importFile">Backup oder alten TXT-Lagerbestand einlesen</label>
+                                <input type="file" id="importFile" accept=".json,.txt">
+                                <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
+                            </div>
                         </div>
-                        <p class="hint" id="warehouseBackupInfo">Projektstatus wird geladen ...</p>
-                        <div class="backup-project-actions">
-                            <button onclick="exportData()" class="btn-primary btn-animated">Projekt-Backup</button>
-                            <button onclick="exportWarehouseInventoryTxt()" class="btn-secondary btn-animated">TXT exportieren</button>
-                            <button onclick="exportWarehouseInventoryPdf()" class="btn-secondary btn-animated">PDF exportieren</button>
-                            <button onclick="exportToCSV()" class="btn-secondary btn-animated">CSV exportieren</button>
-                            <button onclick="shareWarehouseInventory()" class="btn-secondary btn-animated">Lagerbestand teilen</button>
-                            <button onclick="emailWarehouseInventory()" class="btn-secondary btn-animated">Per Mail senden</button>
-                        </div>
-                        <div class="backup-project-import">
-                            <label class="hint" for="importFile">Backup oder alten TXT-Lagerbestand einlesen</label>
-                            <input type="file" id="importFile" accept=".json,.txt">
-                            <button onclick="importData()" class="btn-secondary btn-animated">Daten importieren</button>
-                        </div>
-                    </section>
+                    </details>
 
-                    <section class="data-safety-section google-drive-sync-card">
-                        <div class="data-safety-section-head">
+                    <details class="data-safety-section google-drive-sync-card">
+                        <summary class="data-safety-section-head">
                             <span>
                                 <strong>Google Drive Sync</strong>
                                 <small>Optionales Online-Backup in deinem eigenen Google-Konto.</small>
                             </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="data-safety-section-body">
+                            <div id="googleDriveSyncStatus"></div>
+                            <div class="google-drive-sync-actions">
+                                <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google verbinden</button>
+                                <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt hochladen</button>
+                                <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Cloud-Stand laden</button>
+                                <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
+                            </div>
+                            <label class="google-drive-sync-toggle">
+                                <span>
+                                    <strong>Automatisch synchronisieren</strong>
+                                    <small>Speichert Änderungen nach kurzer Zeit in dein Google Drive und prüft regelmäßig, ob in deiner Cloud ein neuerer Stand liegt.</small>
+                                </span>
+                                <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
+                            </label>
+                            <label class="google-drive-sync-toggle">
+                                <span>
+                                    <strong>Automatisch an Cloud-Login erinnern</strong>
+                                    <small>Wenn die Cloud offline ist, erinnert dich die App ans erneute Einloggen. Das kannst du hier oder direkt in der Meldung abschalten.</small>
+                                </span>
+                                <input type="checkbox" id="googleDriveReconnectReminder" onchange="toggleGoogleDriveReconnectReminder(this.checked)">
+                            </label>
                         </div>
-                        <div id="googleDriveSyncStatus"></div>
-                        <div class="google-drive-sync-actions">
-                            <button id="googleDriveConnectBtn" onclick="connectGoogleDriveSync()" class="btn-secondary btn-animated">Mit Google verbinden</button>
-                            <button id="googleDriveSyncBtn" onclick="syncProjectToGoogleDriveNow()" class="btn-primary btn-animated">Jetzt hochladen</button>
-                            <button id="googleDriveRestoreBtn" onclick="restoreProjectFromGoogleDriveNow()" class="btn-secondary btn-animated">Cloud-Stand laden</button>
-                            <button id="googleDriveDisconnectBtn" onclick="disconnectGoogleDriveSync()" class="btn-out btn-animated">Verbindung trennen</button>
-                        </div>
-                        <label class="google-drive-sync-toggle">
-                            <span>
-                                <strong>Automatisch synchronisieren</strong>
-                                <small>Speichert Änderungen nach kurzer Zeit in dein Google Drive und prüft regelmäßig, ob in deiner Cloud ein neuerer Stand liegt.</small>
-                            </span>
-                            <input type="checkbox" id="googleDriveAutoSync" onchange="toggleGoogleDriveAutoSync(this.checked)">
-                        </label>
-                        <label class="google-drive-sync-toggle">
-                            <span>
-                                <strong>Automatisch an Cloud-Login erinnern</strong>
-                                <small>Wenn die Cloud offline ist, erinnert dich die App ans erneute Einloggen. Das kannst du hier oder direkt in der Meldung abschalten.</small>
-                            </span>
-                            <input type="checkbox" id="googleDriveReconnectReminder" onchange="toggleGoogleDriveReconnectReminder(this.checked)">
-                        </label>
-                    </section>
+                    </details>
                 </div>
             </div>
 
@@ -1598,12 +1611,18 @@
 
             <div class="card sync-disabled-card storage-safety-card">
                 <h3 class="storage-safety-title">App-Updates</h3>
-                <p class="hint">Die App prüft beim Öffnen, beim Zurückkehren zur Seite und regelmäßig im Hintergrund, ob eine neue Version verfügbar ist.</p>
+                <p class="hint">Prüft die installierte App-Version und lädt bei Bedarf den frischen Stand aus dem Webcache.</p>
                 <div id="appUpdateStatus"></div>
                 <div class="btn-group storage-safety-actions">
                     <button onclick="checkForAppUpdate(true)" class="btn-secondary btn-animated">Jetzt auf Updates prüfen</button>
                     <button onclick="forceUpdateApp(true)" class="btn-primary btn-animated">Manuelles Update laden</button>
                 </div>
+            </div>
+
+            <div class="card settings-card settings-card-pwa-install">
+                <h3>App installieren</h3>
+                <p class="hint">ReefTools als App-Icon auf Android, iPhone, iPad oder Desktop hinzufügen.</p>
+                <div id="pwaInstallSettings"></div>
             </div>
 
             <div class="card settings-card settings-card-notifications">
@@ -1974,9 +1993,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.55-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.55-release"></script>
-    <script src="assets/js/app.js?v=3.4.55-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.61-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.61-release"></script>
+    <script src="assets/js/app.js?v=3.4.61-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

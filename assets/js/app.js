@@ -462,6 +462,8 @@ let googleDriveAccessToken = '';
 let googleDriveTokenExpiresAt = 0;
 let googleDriveSyncTimer = null;
 let googleDriveRemoteWatchTimer = null;
+let deferredPwaInstallPrompt = null;
+let pwaInstallOutcome = '';
 const googleDriveMonitorState = {
     checking: false,
     authInProgress: false,
@@ -499,6 +501,22 @@ const TAB_LABELS = {
     nachbestellen: 'Nachbestellen',
     einstellungen: 'Einstellungen'
 };
+const TAB_RENDER_HEALTH = {
+    uebersicht: { selectors: ['.dashboard-panel', '.dashboard-widget', '.dashboard-tile'], minText: 18 },
+    lager: { selectors: ['.warehouse-control-card', '.inventory-category-section', '.inventory-card-grid'], minText: 18 },
+    'cr-export': { selectors: ['.workflow-page', '.cr-workflow', '.card'], minText: 12 },
+    'trace-export': { selectors: ['.trace-workstep', '.workflow-card', '.trace-calculator'], minText: 18 },
+    tools: { selectors: ['.tool-section', '.tool-compact-card', '.resource-tools-card'], minText: 20 },
+    logbuch: { selectors: ['.logbook-card', '.measurement-chart-card', '.aquarium-workspace-panel'], minText: 18 },
+    icp: { selectors: ['.icp-workspace', '.icp-chart-card', '#icpImportText'], minText: 18 },
+    statistik: { selectors: ['.stat-block', '.section-empty-state', '.card'], minText: 12 },
+    log: { selectors: ['.protocol-entry', '.section-empty-state', '.card'], minText: 12 },
+    korallen: { selectors: ['.coral-layout', '.coral-card', '.coral-empty-state'], minText: 18 },
+    masseneingang: { selectors: ['.bulk-entry-card', '#bulkProductSelect', '#bulkCartItems'], minText: 18 },
+    nachbestellen: { selectors: ['.reorder-shell', '.shop-order-section', '.section-empty-state'], minText: 14 },
+    einstellungen: { selectors: ['.settings-page-head', '.settings-accordion', '.data-safety-card'], minText: 18 }
+};
+const tabRenderRecoveryAttempts = new Map();
 const TOOL_SEARCH_KEYWORDS = {
     'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
     'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
@@ -1159,6 +1177,14 @@ function openSettingsCard(card, { fallbackGroup = '', focusSelector = '' } = {})
     if (!card) return;
     card.hidden = false;
     card.style.display = '';
+    const parentAccordion = card.closest?.('.settings-accordion');
+    if (parentAccordion) parentAccordion.open = true;
+    const parentSafetySection = card.closest?.('.data-safety-section');
+    if (parentSafetySection && parentSafetySection !== card) parentSafetySection.open = true;
+    if (card.matches?.('details')) card.open = true;
+    renderSettingsCardOnDemand(card);
+    if (parentSafetySection && parentSafetySection !== card) renderSettingsCardOnDemand(parentSafetySection);
+    if (parentAccordion) renderSettingsCardOnDemand(parentAccordion.closest('.card') || parentAccordion);
     const group = card.dataset.settingsGroup || fallbackGroup;
     if (group) {
         document.querySelectorAll('.settings-group-label').forEach(label => {
@@ -1906,6 +1932,25 @@ async function restoreOwnProfileFromDemo() {
     showToast('Eigenes Profil wiederhergestellt.', 'success', 3000);
 }
 
+function openDemoProfileSettings() {
+    selectTab('einstellungen');
+    window.setTimeout(() => {
+        const demoMount = document.getElementById('demoProfileSettings');
+        const card = demoMount?.closest('.card') || document.querySelector('.data-recovery-center-card');
+        const details = card?.querySelector(':scope > details.settings-accordion');
+        const demoSection = demoMount?.closest('details');
+        if (details) details.open = true;
+        if (demoSection) demoSection.open = true;
+        if (card) renderSettingsCardOnDemand(card, true);
+        window.setTimeout(() => {
+            const target = demoMount || card;
+            target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            const restoreButton = demoMount?.querySelector('button[onclick="restoreOwnProfileFromDemo()"]');
+            if (restoreButton && !restoreButton.disabled) restoreButton.focus({ preventScroll: true });
+        }, 120);
+    }, 80);
+}
+
 function getDemoProfileStats(state = null) {
     const sourceState = state || (isDemoProfileActive() ? appState : createDemoAppState());
     const warehouses = Object.values(sourceState?.warehouses || {});
@@ -2558,7 +2603,11 @@ Object.assign(window, {
     closeCloudQuickSyncMenu,
     runCloudQuickAction,
     reconnectGoogleDriveFromPrompt,
-    disableGoogleDriveReconnectPrompt
+    disableGoogleDriveReconnectPrompt,
+    promptInstallPwa,
+    showPwaInstallHelp,
+    renderPwaInstallSettings,
+    openDemoProfileSettings
 });
 
 async function restoreLocalSnapshot(snapshotId, ask = true) {
@@ -5207,7 +5256,12 @@ function updateWarehouseUI() {
 
 function renderCurrentWarehouseViews() {
     const safeRender = (label, fn) => {
-        try { fn(); }
+        try {
+            const result = fn();
+            if (result && typeof result.catch === 'function') {
+                result.catch(err => console.error(`Render failed: ${label}`, err));
+            }
+        }
         catch (err) { console.error(`Render failed: ${label}`, err); }
     };
     safeRender('Dashboard', renderDashboard);
@@ -6541,6 +6595,7 @@ function showTab(tabId) {
     const resolvedTab = document.getElementById(tabId);
     const resolvedBtn = document.getElementById('tab-' + tabId);
     if (resolvedTab && resolvedBtn) {
+        tabRenderRecoveryAttempts.set(tabId, 0);
         // Re-trigger the slide-in animation by briefly removing the class
         resolvedTab.style.animation = 'none';
         resolvedTab.offsetHeight; // Force reflow
@@ -6600,20 +6655,7 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'korallen') renderCoralCatalog();
         if(tabId === 'einstellungen') {
             setupSettingsAccordions();
-            renderFeatureVisibilitySettings();
-            renderToolVisibilitySettings();
-            updateNotificationStatus();
-            renderCustomProductSettings();
-            renderCustomContainers();
-            renderProductVisibilitySettings();
-            renderShopLinkSettings();
-            renderProductPresets();
-            renderSupabaseSyncSettings();
-            renderDemoProfileSettings();
-            renderMenuOrderSettings();
-            renderLocalDeviceSettings();
-            renderWavePumpDemoSettings();
-            renderLightingPlannerSettings();
+            renderOpenSettingsCards();
         }
     } catch (err) {
         console.error(`Render failed for tab ${tabId}:`, err);
@@ -6650,38 +6692,76 @@ function scheduleActiveTabHealthCheck(tabId) {
     window.requestAnimationFrame(() => {
         window.setTimeout(() => verifyActiveTabRendered(tabId), 180);
         window.setTimeout(() => verifyActiveTabRendered(tabId), 950);
+        window.setTimeout(() => verifyActiveTabRendered(tabId), 2200);
     });
+}
+
+function isTabRenderHealthy(tabId, tab) {
+    if (!tab) return false;
+    const health = TAB_RENDER_HEALTH[tabId] || { selectors: [':scope > *'], minText: 8 };
+    const textLength = (tab.innerText || '').trim().length;
+    const hasText = textLength >= (health.minText || 8);
+    const hasSelector = (health.selectors || []).some(selector => {
+        try { return tab.querySelector(selector); }
+        catch (err) { return false; }
+    });
+    const hasErrorFallback = !!tab.querySelector('.render-error-card');
+    return hasErrorFallback || (hasText && hasSelector);
+}
+
+function scheduleActiveTabSelfCheck(tabId = document.querySelector('.tab-content.active')?.id || '') {
+    if (!tabId) return;
+    window.setTimeout(() => verifyActiveTabRendered(tabId), 120);
+    window.setTimeout(() => verifyActiveTabRendered(tabId), 850);
+}
+
+Object.assign(window, {
+    scheduleActiveTabSelfCheck
+});
+
+function revealRenderedTab(tab) {
+    if (!tab) return;
+    tab.querySelectorAll('.design-reveal').forEach(element => {
+        element.classList.add('design-reveal-visible');
+    });
+}
+
+function recoverIncompleteTab(tabId, tab) {
+    const attempts = tabRenderRecoveryAttempts.get(tabId) || 0;
+    if (attempts >= 2) {
+        console.warn(`${tabId} tab stayed incomplete after recovery attempts.`);
+        renderTabErrorFallback(tabId, new Error('Die Ansicht blieb nach mehreren Ladeversuchen unvollständig.'));
+        return;
+    }
+    tabRenderRecoveryAttempts.set(tabId, attempts + 1);
+    console.warn(`${tabId} tab looked incomplete; running recovery render ${attempts + 1}.`);
+    try {
+        if (tabId === 'tools') {
+            initializedToolSections.clear();
+            initTools();
+            tab.querySelectorAll('.tool-card-hidden, .tool-section-hidden').forEach(element => {
+                element.classList.remove('tool-card-hidden', 'tool-section-hidden');
+            });
+        } else {
+            renderActiveTabContent(tabId);
+        }
+        revealRenderedTab(tab);
+        scheduleTextFitPass(tab);
+        window.setTimeout(() => verifyActiveTabRendered(tabId), 420);
+    } catch (err) {
+        console.error(`${tabId} recovery failed:`, err);
+        renderTabErrorFallback(tabId, err);
+    }
 }
 
 function verifyActiveTabRendered(tabId) {
     const tab = document.getElementById(tabId);
     if (!tab || !tab.classList.contains('active')) return;
-    if (tabId !== 'tools') return;
-
-    const sections = tab.querySelectorAll('.tool-section');
-    const cards = tab.querySelectorAll('.tool-compact-card, .resource-tools-card');
-    const hasVisibleText = tab.innerText.trim().length > 20;
-    if (sections.length && cards.length && hasVisibleText) {
-        tab.querySelectorAll('.design-reveal').forEach(element => {
-            element.classList.add('design-reveal-visible');
-        });
+    if (isTabRenderHealthy(tabId, tab)) {
+        revealRenderedTab(tab);
         return;
     }
-
-    console.warn('Tools tab looked incomplete; running recovery init.');
-    try {
-        initializedToolSections.clear();
-        initTools();
-        tab.querySelectorAll('.tool-card-hidden, .tool-section-hidden').forEach(element => {
-            element.classList.remove('tool-card-hidden', 'tool-section-hidden');
-        });
-        tab.querySelectorAll('.design-reveal').forEach(element => {
-            element.classList.add('design-reveal-visible');
-        });
-    } catch (err) {
-        console.error('Tools recovery failed:', err);
-        renderTabErrorFallback('tools', err);
-    }
+    recoverIncompleteTab(tabId, tab);
 }
 
 const TEXT_FIT_SELECTOR = [
@@ -6777,6 +6857,12 @@ function setupSettingsAccordions() {
         if (firstChild && firstChild.tagName === 'DETAILS') {
             const existingTitle = card.querySelector('h2, h3');
             if (existingTitle) applySettingsMetadata(card, existingTitle.innerText || '');
+            if (card.dataset.settingsLazyBound !== 'true') {
+                card.dataset.settingsLazyBound = 'true';
+                firstChild.addEventListener('toggle', () => {
+                    if (firstChild.open) renderSettingsCardOnDemand(card);
+                });
+            }
             firstChild.open = false;
             return;
         }
@@ -6808,6 +6894,12 @@ function setupSettingsAccordions() {
 
         card.dataset.settingsAccordion = 'true';
         details.open = false;
+        if (card.dataset.settingsLazyBound !== 'true') {
+            card.dataset.settingsLazyBound = 'true';
+            details.addEventListener('toggle', () => {
+                if (details.open) renderSettingsCardOnDemand(card);
+            });
+        }
         applySettingsMetadata(card, title.innerText || '');
     });
 
@@ -6821,12 +6913,96 @@ function setupSettingsAccordions() {
     });
 }
 
+function runSettingsRender(label, fn) {
+    try {
+        const result = fn();
+        if (result && typeof result.catch === 'function') {
+            result.catch(err => console.error(`Settings lazy render failed: ${label}`, err));
+        }
+    } catch (err) {
+        console.error(`Settings lazy render failed: ${label}`, err);
+    }
+}
+
+function renderSettingsCardOnDemand(card, force = false) {
+    if (!card) return;
+    const targetCard = card.closest?.('.card') || card;
+    if (!force && targetCard.dataset.settingsLazyRendered === 'true') return;
+    targetCard.dataset.settingsLazyRendered = 'true';
+
+    if (targetCard.classList.contains('data-recovery-center-card')) {
+        runSettingsRender('Lokaler Speicher', renderStorageSecurityStatus);
+        runSettingsRender('Demo-Profil', renderDemoProfileSettings);
+        runSettingsRender('Google Drive', renderGoogleDriveSyncCard);
+    }
+    if (targetCard.classList.contains('settings-card-local-devices')) {
+        runSettingsRender('Lokale Geräte', renderLocalDeviceSettings);
+    }
+    if (targetCard.classList.contains('settings-card-wave-demo')) {
+        runSettingsRender('Wave Demo', renderWavePumpDemoSettings);
+    }
+    if (targetCard.classList.contains('settings-card-lighting-sim')) {
+        runSettingsRender('Licht Simulation', renderLightingPlannerSettings);
+    }
+    if (targetCard.classList.contains('sync-disabled-card')) {
+        runSettingsRender('App Updates', renderAppUpdateStatus);
+    }
+    if (targetCard.classList.contains('settings-card-pwa-install')) {
+        runSettingsRender('App installieren', renderPwaInstallSettings);
+    }
+    if (targetCard.classList.contains('settings-card-notifications')) {
+        runSettingsRender('Benachrichtigungen', updateNotificationStatus);
+    }
+    if (targetCard.classList.contains('settings-card-navigation')) {
+        runSettingsRender('Menüsichtbarkeit', renderFeatureVisibilitySettings);
+        runSettingsRender('Toolsichtbarkeit', renderToolVisibilitySettings);
+        runSettingsRender('Menüreihenfolge', renderMenuOrderSettings);
+    }
+    if (targetCard.querySelector('#customProductCategory, #custom-products-list')) {
+        runSettingsRender('Eigene Produkte', renderCustomProductSettings);
+        runSettingsRender('Produkteinheit', toggleCustomProductUnitFields);
+    }
+    if (targetCard.querySelector('#custom-containers-list')) {
+        runSettingsRender('Behälter', renderCustomContainers);
+    }
+    if (targetCard.querySelector('#product-presets-list')) {
+        runSettingsRender('Produktpresets', renderProductPresets);
+    }
+    if (targetCard.querySelector('#product-visibility-list')) {
+        runSettingsRender('Produktsichtbarkeit', renderProductVisibilitySettings);
+    }
+    if (targetCard.querySelector('#shop-links-settings-list')) {
+        runSettingsRender('Shoplinks', renderShopLinkSettings);
+    }
+    if (targetCard.classList.contains('settings-card-appearance')) {
+        runSettingsRender('Cursor', applyCursorSettings);
+        const themeSelect = document.getElementById('themeSelect');
+        if (themeSelect && db?.theme) themeSelect.value = db.theme;
+    }
+    scheduleTextFitPass(targetCard);
+    scheduleActiveTabSelfCheck('einstellungen');
+}
+
+function renderOpenSettingsCards() {
+    const settings = document.getElementById('einstellungen');
+    if (!settings) return;
+    settings.querySelectorAll(':scope > .card').forEach(card => {
+        const details = card.querySelector(':scope > details.settings-accordion');
+        if (details?.open) renderSettingsCardOnDemand(card);
+    });
+}
+
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
     if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud|demo-profil/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup, Demo-Profil und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download demo beispieldaten testprofil' };
+    if (/app installieren|pwa|home-bildschirm|startbildschirm/.test(normalized)) return { group: 'System & Hilfe', hint: 'ReefTools als App-Icon auf Handy oder Desktop hinzufügen', keywords: 'app installieren pwa android chrome iphone ipad home bildschirm startbildschirm desktop icon' };
+    if (/app-update|app-updates|update|version/.test(normalized)) return { group: 'System & Hilfe', hint: 'Version prüfen, Cache aktualisieren und neue App-Stände laden', keywords: 'app update version aktualisieren cache neu laden release' };
+    if (/projekt unterstützen|unterstützen|spenden|paypal|coffee/.test(normalized)) return { group: 'System & Hilfe', hint: 'Freiwillige Unterstützung für Betrieb, Tests und Weiterentwicklung', keywords: 'projekt unterstützen spenden paypal buy me coffee freiwillig' };
+    if (/problem melden|fehler melden|bug/.test(normalized)) return { group: 'System & Hilfe', hint: 'Fehlerbericht mit Beschreibung und technischen Basisdaten erstellen', keywords: 'problem melden fehler bug mail support diagnose' };
+    if (/hilfe|anleitung/.test(normalized)) return { group: 'System & Hilfe', hint: 'Hilfe, Anleitung und Orientierung', keywords: 'hilfe anleitung dokumentation' };
     if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
     if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev|licht|par|simulation/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und geschützte Testbereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal licht par simulation led lampe' };
-    if (/app|system|update|problem|bug|unterstützen|support/.test(normalized)) return { group: 'Allgemein', hint: 'App, Updates und Hilfe', keywords: 'app system update version bug problem mail unterstützen paypal coffee' };
+    if (/app|system|support/.test(normalized)) return { group: 'System & Hilfe', hint: 'Allgemeine App-Funktionen und Support', keywords: 'app system support hilfe' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
     if (/eigene produkte|produktlisten|preset|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen und Links', keywords: 'produkt eigene waren preset produktlisten shop link größe dichte stück gramm ml' };
@@ -6855,7 +7031,7 @@ function applySettingsMetadata(card, title) {
 
 function renderSettingsGroupLabels(settings) {
     settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
-    const groupOrder = ['Allgemein', 'Datensicherheit', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
+    const groupOrder = ['Datensicherheit', 'System & Hilfe', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
     const cards = Array.from(settings.querySelectorAll(':scope > .card'));
     cards.sort((a, b) => {
         const aIndex = groupOrder.indexOf(a.dataset.settingsGroup || 'Weitere');
@@ -8884,6 +9060,194 @@ function initLiveUpdateChecks() {
             checkForAppUpdate(false);
         });
     }
+}
+
+function initPwaInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredPwaInstallPrompt = event;
+        pwaInstallOutcome = '';
+        renderPwaInstallSettings();
+    });
+    window.addEventListener('appinstalled', () => {
+        deferredPwaInstallPrompt = null;
+        pwaInstallOutcome = 'installed';
+        showToast('ReefTools wurde installiert.', 'success', 2600);
+        renderPwaInstallSettings();
+    });
+}
+
+function isPwaStandalone() {
+    return window.matchMedia?.('(display-mode: standalone)')?.matches || window.navigator.standalone === true;
+}
+
+function isPwaInstallSecureContext() {
+    return location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+}
+
+function getPwaInstallStatus() {
+    const installed = isPwaStandalone();
+    const secure = isPwaInstallSecureContext();
+    const android = /Android/i.test(navigator.userAgent || '');
+    const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+    const canPrompt = Boolean(deferredPwaInstallPrompt);
+    const serviceWorkerSupported = 'serviceWorker' in navigator;
+    if (installed || pwaInstallOutcome === 'installed') {
+        return {
+            state: 'installed',
+            label: 'Installiert',
+            title: 'ReefTools läuft bereits als App',
+            detail: 'Du nutzt ReefTools im App-Modus oder die Installation wurde gerade abgeschlossen.',
+            canPrompt,
+            installed,
+            secure,
+            android,
+            ios,
+            serviceWorkerSupported
+        };
+    }
+    if (canPrompt) {
+        return {
+            state: 'ready',
+            label: 'Bereit',
+            title: 'Installation ist verfügbar',
+            detail: 'Dein Browser kann ReefTools jetzt direkt als App hinzufügen.',
+            canPrompt,
+            installed,
+            secure,
+            android,
+            ios,
+            serviceWorkerSupported
+        };
+    }
+    if (!secure) {
+        return {
+            state: 'blocked',
+            label: 'Hinweis',
+            title: 'Installation über diese Adresse eingeschränkt',
+            detail: 'Öffne ReefTools über https://reeftools.de oder localhost. Direkt über file:// bieten Browser keine echte PWA-Installation an.',
+            canPrompt,
+            installed,
+            secure,
+            android,
+            ios,
+            serviceWorkerSupported
+        };
+    }
+    if (ios) {
+        return {
+            state: 'help',
+            label: 'iOS',
+            title: 'iPhone und iPad installieren über Teilen',
+            detail: 'Safari zeigt keinen App-Installationsdialog. Nutze Teilen und dann „Zum Home-Bildschirm“.',
+            canPrompt,
+            installed,
+            secure,
+            android,
+            ios,
+            serviceWorkerSupported
+        };
+    }
+    if (!serviceWorkerSupported) {
+        return {
+            state: 'blocked',
+            label: 'Browser',
+            title: 'Dieser Browser unterstützt die App-Installation nicht vollständig',
+            detail: 'Nutze auf Android am besten Chrome und öffne die Online-Version.',
+            canPrompt,
+            installed,
+            secure,
+            android,
+            ios,
+            serviceWorkerSupported
+        };
+    }
+    return {
+        state: android ? 'help' : 'waiting',
+        label: android ? 'Android' : 'Bereit?',
+        title: android ? 'Android kann die App meist über Chrome installieren' : 'Installationsdialog noch nicht angeboten',
+        detail: android
+            ? 'Falls kein Dialog erscheint: Chrome-Menü öffnen und „App installieren“ oder „Zum Startbildschirm hinzufügen“ wählen.'
+            : 'Nicht jeder Browser zeigt den Installationsdialog sofort. Die Hilfestellung zeigt dir die passenden Schritte.',
+        canPrompt,
+        installed,
+        secure,
+        android,
+        ios,
+        serviceWorkerSupported
+    };
+}
+
+async function promptInstallPwa() {
+    const status = getPwaInstallStatus();
+    if (status.installed) {
+        showToast('ReefTools ist bereits als App geöffnet.', 'success', 2400);
+        renderPwaInstallSettings();
+        return;
+    }
+    if (deferredPwaInstallPrompt) {
+        const promptEvent = deferredPwaInstallPrompt;
+        deferredPwaInstallPrompt = null;
+        try {
+            await promptEvent.prompt();
+            const choice = await promptEvent.userChoice;
+            pwaInstallOutcome = choice?.outcome || '';
+            if (choice?.outcome === 'accepted') {
+                showToast('Installation gestartet.', 'success', 2400);
+            } else {
+                showToast('Installation abgebrochen.', 'info', 2400);
+            }
+        } catch (err) {
+            console.warn('PWA install prompt failed:', err);
+            await showPwaInstallHelp();
+        } finally {
+            renderPwaInstallSettings();
+        }
+        return;
+    }
+    await showPwaInstallHelp();
+}
+
+async function showPwaInstallHelp() {
+    await appAlert('', {
+        title: 'App installieren',
+        type: 'info',
+        html: `
+            <div class="pwa-install-help">
+                <p><strong>Android mit Chrome</strong><br>Öffne <span class="nowrap">reeftools.de</span>, tippe oben rechts auf das Drei-Punkte-Menü und wähle <strong>App installieren</strong> oder <strong>Zum Startbildschirm hinzufügen</strong>.</p>
+                <p><strong>iPhone oder iPad</strong><br>Öffne die Seite in Safari, tippe auf <strong>Teilen</strong> und wähle <strong>Zum Home-Bildschirm</strong>.</p>
+                <p><strong>Was passiert dann?</strong><br>ReefTools bekommt ein eigenes Icon und startet wie eine App. Es wird keine Play-Store- oder App-Store-App installiert; deine Daten bleiben lokal im Browser beziehungsweise in deinem eigenen Google Drive, wenn Sync aktiv ist.</p>
+            </div>
+        `
+    });
+}
+
+function renderPwaInstallSettings() {
+    const mount = document.getElementById('pwaInstallSettings');
+    if (!mount) return;
+    const status = getPwaInstallStatus();
+    const isInstalled = status.state === 'installed';
+    const primaryLabel = status.canPrompt ? 'App installieren' : 'Installationshilfe anzeigen';
+    mount.innerHTML = `
+        <div class="pwa-install-panel">
+            <div class="pwa-install-status is-${escapeHtml(status.state)}">
+                <span class="pwa-install-dot" aria-hidden="true"></span>
+                <div>
+                    <strong>${escapeHtml(status.title)}</strong>
+                    <small>${escapeHtml(status.detail)}</small>
+                </div>
+                <span class="pwa-install-pill">${escapeHtml(status.label)}</span>
+            </div>
+            <div class="pwa-install-actions">
+                <button type="button" class="btn-primary btn-animated" onclick="promptInstallPwa()" ${isInstalled ? 'disabled' : ''}>${escapeHtml(primaryLabel)}</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="showPwaInstallHelp()">Kurzanleitung</button>
+            </div>
+            <div class="pwa-install-explain">
+                <strong>Was macht der Button?</strong>
+                <span>Wenn dein Browser es erlaubt, öffnet er den nativen Installationsdialog. Sonst zeigt ReefTools die passenden Schritte für Android, iPhone und Desktop.</span>
+            </div>
+        </div>
+    `;
 }
 
 async function forceUpdateApp(ask = true) {
@@ -18858,17 +19222,21 @@ function updateLiveConversion() {
 
 // Hier wird sichergestellt, dass beim manuellen Öffnen der Einstellungen das Dropdown synchron ist
 document.addEventListener("DOMContentLoaded", () => {
-    const themeSelect = document.getElementById('themeSelect');
-    if(themeSelect && db.theme) themeSelect.value = db.theme;
-    const forecastSelect = document.getElementById('forecastWeeks');
-    if(forecastSelect) forecastSelect.value = String((db.settings && db.settings.forecastWeeks) || 4);
-    applyCursorSettings();
-    renderLocalDeviceSettings();
-    syncCRPreferredUnitUI();
-    toggleCustomProductUnitFields();
-    initBulkProductSelect();
-    renderOtpCooldownState();
-    setTimeout(() => autoSyncWarehousesOnStartup(), 900);
+    try {
+        const themeSelect = document.getElementById('themeSelect');
+        if(themeSelect && db?.theme) themeSelect.value = db.theme;
+        const forecastSelect = document.getElementById('forecastWeeks');
+        if(forecastSelect) forecastSelect.value = String((db?.settings && db.settings.forecastWeeks) || 4);
+        applyCursorSettings();
+        renderLocalDeviceSettings();
+        syncCRPreferredUnitUI();
+        toggleCustomProductUnitFields();
+        initBulkProductSelect();
+        renderOtpCooldownState();
+        setTimeout(() => autoSyncWarehousesOnStartup(), 900);
+    } catch (err) {
+        console.warn('Early DOM setup skipped:', err);
+    }
 });
 
 function closeModal() {
@@ -21623,6 +21991,7 @@ async function bootstrapApplication() {
     initCustomCursor();
     initTextFitGuard();
     initLiveUpdateChecks();
+    initPwaInstallPrompt();
     setTimeout(checkForAppUpdate, 2500);
     setTimeout(() => refreshGoogleDrivePresence(false), 3200);
     setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
@@ -21639,9 +22008,48 @@ async function bootstrapApplication() {
     setInterval(checkDosingContainerReminders, 60 * 60 * 1000);
 }
 
+function renderStartupErrorFallback(err) {
+    const message = err && err.message ? err.message : 'Unbekannter Startfehler';
+    const targetTabId = APP_TAB_IDS.find(id => document.getElementById(id)?.classList.contains('active')) || 'lager';
+    const target = document.getElementById(targetTabId) || document.getElementById('lager') || document.querySelector('.tab-content');
+    if (!target) return;
+    document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.toggle('active', el === target);
+        el.setAttribute('aria-hidden', el === target ? 'false' : 'true');
+    });
+    target.innerHTML = `
+        <section class="card render-error-card" role="alert">
+            <div class="section-header">
+                <div>
+                    <p class="eyebrow">Startproblem</p>
+                    <h2>ReefTools konnte nicht vollständig laden</h2>
+                    <p class="hint">Deine lokal gespeicherten Daten werden dadurch nicht gelöscht. Versuche zuerst die Ansicht neu zu laden oder exportiere vorsichtshalber ein Backup.</p>
+                </div>
+            </div>
+            <div class="workflow-message workflow-message--error">
+                <strong>Technische Meldung</strong>
+                <span>${escapeHtml(message)}</span>
+            </div>
+            <div class="button-row">
+                <button type="button" class="btn-primary btn-animated" onclick="location.reload()">Seite neu laden</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="exportData()">Backup exportieren</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="forceUpdateApp(true)">Cache leeren &amp; Update laden</button>
+            </div>
+        </section>
+    `;
+}
+
 bootstrapApplication().catch(err => {
     console.error('App bootstrap failed:', err);
-    alert('Die App konnte nicht sicher gestartet werden. Bitte die Seite neu laden.');
+    renderStartupErrorFallback(err);
+});
+
+window.addEventListener('unhandledrejection', event => {
+    console.error('Unhandled app promise rejection:', event.reason);
+    const activeTab = document.querySelector('.tab-content.active');
+    if (activeTab && !isTabRenderHealthy(activeTab.id, activeTab)) {
+        renderTabErrorFallback(activeTab.id, event.reason || new Error('Unbehandelter Ladefehler'));
+    }
 });
 
 window.addEventListener('hashchange', () => {

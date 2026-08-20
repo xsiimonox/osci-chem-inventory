@@ -505,6 +505,37 @@ header.warehouse-tools-hidden .header-warehouse-access-badge {
 .header-title-container { display: flex; align-items: center; gap: 8px; }
 .version-badge { font-size: 0.7rem; background: rgba(191, 90, 242, 0.15); color: var(--primary); padding: 2px 6px; border-radius: 6px; border: 1px solid rgba(191, 90, 242, 0.3); font-weight: 600; transition: all 0.3s ease; }
 
+.demo-mode-badge {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 184, 77, 0.72);
+    color: #1d1200;
+    background: linear-gradient(135deg, #ffd76a, #ff9f1a);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.22) inset, 0 0 24px rgba(255, 167, 38, 0.35);
+    font-size: 0.78rem;
+    font-weight: 950;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+body.demo-profile-active .demo-mode-badge {
+    display: inline-flex;
+}
+
+.demo-mode-badge:hover,
+.demo-mode-badge:focus-visible {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 0 0 1px rgba(255,255,255,0.28) inset, 0 0 30px rgba(255, 167, 38, 0.42);
+}
+
 .legacy-domain-banner {
     width: min(1200px, calc(100vw - 32px));
     max-width: calc(100vw - 32px);
@@ -3095,11 +3126,35 @@ body.theme-mint.party-mode .card {
     background: color-mix(in srgb, var(--surface-raised) 32%, transparent);
 }
 
+.data-safety-section[open] {
+    background:
+        radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 10%, transparent), transparent 42%),
+        color-mix(in srgb, var(--surface-raised) 42%, transparent);
+}
+
 .data-safety-section-head {
     display: flex;
     justify-content: space-between;
     gap: 12px;
     align-items: flex-start;
+    cursor: pointer;
+    list-style: none;
+}
+
+.data-safety-section-head::-webkit-details-marker {
+    display: none;
+}
+
+.data-safety-section[open] > .data-safety-section-head .settings-chevron {
+    transform: rotate(180deg);
+}
+
+.data-safety-section-body {
+    display: grid;
+    gap: 12px;
+    min-width: 0;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--border-color) 82%, transparent);
 }
 
 .data-safety-section-head strong,
@@ -3123,6 +3178,58 @@ body.theme-mint.party-mode .card {
     display: flex;
     gap: 10px;
     flex-wrap: wrap;
+}
+
+body.demo-profile-active {
+    --accent: #ffb13b;
+    --accent-strong: #ffd27a;
+    --primary: #ffb13b;
+    --primary-light: #ffd27a;
+}
+
+body.demo-profile-active::before {
+    content: "DEMO-PROFIL AKTIV";
+    position: fixed;
+    z-index: 9998;
+    right: max(14px, env(safe-area-inset-right));
+    bottom: calc(var(--mobile-nav-height, 0px) + max(14px, env(safe-area-inset-bottom)));
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 184, 77, 0.54);
+    color: #1c1200;
+    background: linear-gradient(135deg, rgba(255, 215, 106, 0.96), rgba(255, 159, 26, 0.94));
+    box-shadow: 0 14px 44px rgba(255, 159, 26, 0.24), 0 0 0 1px rgba(255,255,255,0.22) inset;
+    font-size: 0.72rem;
+    font-weight: 950;
+    letter-spacing: 0.1em;
+    pointer-events: none;
+}
+
+body.demo-profile-active header {
+    background:
+        linear-gradient(135deg, rgba(34, 20, 0, 0.92), rgba(21, 27, 32, 0.92)),
+        var(--glass-bg);
+    border-bottom-color: rgba(255, 184, 77, 0.34);
+    box-shadow: 0 1px 0 rgba(255, 184, 77, 0.24), 0 16px 56px rgba(255, 159, 26, 0.1);
+}
+
+body.demo-profile-active .subtitle::after {
+    content: "Demo-Daten - nicht dein echtes System";
+    display: inline-flex;
+    align-items: center;
+    margin-left: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: #ffd27a;
+    background: rgba(255, 177, 59, 0.12);
+    border: 1px solid rgba(255, 184, 77, 0.28);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+}
+
+body.demo-profile-active :where(.card, .inventory-card, .dashboard-widget, .tool-section, .settings-card, .data-safety-card) {
+    border-color: color-mix(in srgb, #ffb13b 18%, var(--border-color));
 }
 
 .demo-profile-panel {
@@ -3463,7 +3570,136 @@ body.theme-mint.party-mode .card {
     accent-color: var(--success);
 }
 
+.pwa-install-panel {
+    display: grid;
+    gap: 12px;
+}
+
+.pwa-install-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid rgba(100, 210, 255, 0.16);
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+}
+
+.pwa-install-status strong,
+.pwa-install-status small {
+    display: block;
+    min-width: 0;
+}
+
+.pwa-install-status strong {
+    color: var(--text);
+    font-size: 0.96rem;
+    line-height: 1.25;
+}
+
+.pwa-install-status small {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    line-height: 1.4;
+}
+
+.pwa-install-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--warning);
+    box-shadow: 0 0 0 6px rgba(255, 204, 0, 0.1);
+}
+
+.pwa-install-status.is-ready,
+.pwa-install-status.is-installed {
+    border-color: rgba(48, 209, 88, 0.28);
+    background: linear-gradient(135deg, rgba(48, 209, 88, 0.10), rgba(100, 210, 255, 0.05));
+}
+
+.pwa-install-status.is-ready .pwa-install-dot,
+.pwa-install-status.is-installed .pwa-install-dot {
+    background: var(--success);
+    box-shadow: 0 0 0 6px rgba(48, 209, 88, 0.12);
+}
+
+.pwa-install-status.is-blocked {
+    border-color: rgba(255, 69, 58, 0.28);
+    background: rgba(255, 69, 58, 0.08);
+}
+
+.pwa-install-status.is-blocked .pwa-install-dot {
+    background: var(--danger);
+    box-shadow: 0 0 0 6px rgba(255, 69, 58, 0.12);
+}
+
+.pwa-install-pill {
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    color: var(--secondary);
+    background: rgba(255,255,255,0.04);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.pwa-install-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.pwa-install-actions button {
+    width: auto;
+    min-width: 180px;
+}
+
+.pwa-install-explain,
+.pwa-install-help {
+    display: grid;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
+}
+
+.pwa-install-explain {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(100, 210, 255, 0.12);
+    background: rgba(100, 210, 255, 0.045);
+}
+
+.pwa-install-explain strong,
+.pwa-install-help strong {
+    color: var(--text);
+}
+
 @media (max-width: 767px) {
+    .pwa-install-status {
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .pwa-install-pill {
+        grid-column: 2;
+        justify-self: flex-start;
+    }
+
+    .pwa-install-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .pwa-install-actions button {
+        width: 100%;
+        min-width: 0;
+    }
+
     .header-title-block {
         display: grid;
         gap: 8px;
@@ -13146,6 +13382,20 @@ body.theme-light .app-footer { background: rgba(0, 122, 255, 0.05); }
     }
     .demo-profile-quicknav {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    body.demo-profile-active::before {
+        right: max(10px, env(safe-area-inset-right));
+        bottom: calc(var(--mobile-nav-height, 84px) + max(10px, env(safe-area-inset-bottom)));
+        font-size: 0.64rem;
+        padding: 7px 10px;
+    }
+    body.demo-profile-active .subtitle::after {
+        flex-basis: 100%;
+        margin-left: 0;
+        margin-top: 6px;
+        width: fit-content;
+        max-width: 100%;
+        white-space: normal;
     }
     .tab-content {
         padding: 14px 12px 24px;
