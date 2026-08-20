@@ -557,6 +557,23 @@ const TOOL_DEFINITIONS = [
 ];
 const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
 const OSCI_ONLY_TOOL_IDS = new Set(TOOL_DEFINITIONS.filter(tool => tool.osciOnly).map(tool => tool.id));
+const OSCI_PRODUCT_CATEGORIES = new Set(['C&R Produkte', 'Makro Elements', 'Nutrition Elements', 'Anionen', 'Kationen']);
+
+function isOsciProductCategory(category) {
+    return OSCI_PRODUCT_CATEGORIES.has(String(category || ''));
+}
+
+function shouldShowCatalogProduct(category, item) {
+    if (!isOsciFeaturesEnabled() && isOsciProductCategory(category)) return false;
+    return !isProductHidden(item);
+}
+
+function getVisibleCatalogCategoryNames() {
+    return Object.keys(catalog).filter(category => {
+        if (!isOsciFeaturesEnabled() && isOsciProductCategory(category)) return false;
+        return Object.keys(catalog[category] || {}).some(item => shouldShowCatalogProduct(category, item));
+    });
+}
 
 function normalizeSearchText(value) {
     return String(value || '')
@@ -1224,6 +1241,18 @@ function openProjectSupportSettings() {
             openSettingsCard(document.getElementById('projectSupportCard'), {
                 fallbackGroup: 'Allgemein',
                 focusSelector: '.project-support-actions a'
+            });
+        }, 120);
+    });
+}
+
+function openFeatureVisibilitySettings() {
+    selectTab('einstellungen');
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            openSettingsCard(document.querySelector('.settings-card-navigation'), {
+                fallbackGroup: 'Navigation',
+                focusSelector: '#feature-visibility-settings input[type="checkbox"]'
             });
         }, 120);
     });
@@ -2607,7 +2636,8 @@ Object.assign(window, {
     promptInstallPwa,
     showPwaInstallHelp,
     renderPwaInstallSettings,
-    openDemoProfileSettings
+    openDemoProfileSettings,
+    openFeatureVisibilitySettings
 });
 
 async function restoreLocalSnapshot(snapshotId, ask = true) {
@@ -2985,6 +3015,8 @@ function refreshFeatureVisibility() {
     renderToolVisibilitySettings();
     renderMenuOrderSettings();
     if (isMenuTabHidden(getActiveTabId())) showTab(getFirstVisibleTab());
+    updateLagerCategoryFilterOptions();
+    renderCurrentWarehouseViews();
 }
 
 function setOverviewEnabled(enabled) {
@@ -5581,7 +5613,7 @@ function renderDashboard() {
         ? `${lastLog.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${lastLog.item} · ${formatItemAmount(lastLog.item, lastLog.amount)}`
         : 'Noch keine Buchung';
     const activeProducts = Object.keys(catalog).reduce((sum, cat) => {
-        return sum + Object.keys(catalog[cat]).filter(item => !isProductHidden(item)).length;
+        return sum + Object.keys(catalog[cat]).filter(item => shouldShowCatalogProduct(cat, item)).length;
     }, 0);
     const criticalRows = alerts.slice(0, 4).map(alert => `
         <button type="button" class="dashboard-list-row" onclick="openDashboardDestination('stock'); setTimeout(() => focusProductInLager(${jsArg(alert.item)}), 80)">
@@ -6208,7 +6240,7 @@ function openSmartStockModal(action) {
     const visibleItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (!isProductHidden(item)) visibleItems.push({ cat, item });
+            if (shouldShowCatalogProduct(cat, item)) visibleItems.push({ cat, item });
         }
     }
     const term = prompt(`${action === 'in' ? 'Einlagern' : 'Auslagern'}: Produktname suchen`, '');
@@ -9605,7 +9637,7 @@ function getStockAlerts() {
 
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             if (db.alerts && db.alerts.disabled && db.alerts.disabled[item]) continue;
 
             const stock = db.inventory[cat][item] || 0;
@@ -9923,7 +9955,9 @@ function renderCustomProductSettings() {
 
     if (categorySelect) {
         const currentValue = categorySelect.value;
-        categorySelect.innerHTML = Object.keys(catalog)
+        const categoryNames = getVisibleCatalogCategoryNames();
+        if (currentValue && catalog[currentValue] && !categoryNames.includes(currentValue)) categoryNames.push(currentValue);
+        categorySelect.innerHTML = categoryNames
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
         if (currentValue && catalog[currentValue]) categorySelect.value = currentValue;
@@ -10388,7 +10422,7 @@ function renderLager() {
 
     // Such- und Filterfeld gezielt im Lager-Tab aufbauen, falls die Struktur fehlt
     if (!hasLagerShell) {
-        const categoryOptions = Object.keys(catalog)
+        const categoryOptions = getVisibleCatalogCategoryNames()
             .map(cat => `<option value="${cat}">${cat}</option>`)
             .join('');
         container.innerHTML = `
@@ -10462,6 +10496,18 @@ function renderLager() {
 
 let lagerQuickFilter = 'all';
 
+function updateLagerCategoryFilterOptions() {
+    const categoryFilter = document.getElementById('categoryFilter');
+    if (!categoryFilter) return;
+    const current = categoryFilter.value || 'all';
+    const visibleCategories = getVisibleCatalogCategoryNames();
+    categoryFilter.innerHTML = [
+        '<option value="all">Alle Kategorien</option>',
+        ...visibleCategories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`)
+    ].join('');
+    categoryFilter.value = current === 'all' || visibleCategories.includes(current) ? current : 'all';
+}
+
 function setLagerQuickFilter(filter) {
     lagerQuickFilter = filter || 'all';
     document.querySelectorAll('.lager-filter-chips button').forEach(btn => {
@@ -10487,11 +10533,12 @@ function filterLager() {
     const resultCount = document.getElementById('lager-result-count');
     const emptyState = document.getElementById('lager-empty-state');
     const resetButton = document.getElementById('lager-filter-reset');
+    if (!listContainer) return;
+    updateLagerCategoryFilterOptions();
     const term = searchInput ? searchInput.value.toLowerCase() : '';
     const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
     const alertItems = new Set(getStockAlerts().map(alert => alert.item));
     
-    if (!listContainer) return;
     listContainer.innerHTML = '';
     renderStockAlerts(alertsContainer);
 
@@ -10499,7 +10546,7 @@ function filterLager() {
     const matchedItems = new Set();
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             if (!isFavoriteProduct(item)) continue;
             if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
@@ -10513,13 +10560,14 @@ function filterLager() {
     }
     
     for (let cat in catalog) {
+        if (!isOsciFeaturesEnabled() && isOsciProductCategory(cat)) continue;
         if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
 
         let catHTML = '';
         let hasItems = false;
         
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             if (lagerQuickFilter === 'favorites' && !isFavoriteProduct(item)) continue;
             if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (item.toLowerCase().includes(term)) {
@@ -10534,9 +10582,25 @@ function filterLager() {
     }
     const matchCount = matchedItems.size;
     const filtersActive = Boolean(term || selectedCategory !== 'all' || lagerQuickFilter !== 'all');
+    const visibleCategoryCount = getVisibleCatalogCategoryNames().length;
     if (resultCount) resultCount.textContent = `${matchCount} ${matchCount === 1 ? 'Produkt' : 'Produkte'}`;
     if (resetButton) resetButton.hidden = !filtersActive;
-    if (emptyState) emptyState.hidden = matchCount !== 0;
+    if (emptyState) {
+        if (matchCount === 0 && visibleCategoryCount === 0 && !isOsciFeaturesEnabled()) {
+            emptyState.innerHTML = `
+                <strong class="empty-state-title">OSCI Produkte sind ausgeblendet</strong>
+                <p class="empty-state-text">C&amp;R, Trace, Makro, Nutrition, Anionen und Kationen sind nur verborgen. Deine Bestände bleiben gespeichert und erscheinen wieder, sobald du OSCI Motion Funktionen aktivierst oder eigene Produkte anlegst.</p>
+                <button type="button" class="btn btn-secondary" onclick="openFeatureVisibilitySettings()">OSCI Schalter öffnen</button>
+            `;
+        } else {
+            emptyState.innerHTML = `
+                <strong class="empty-state-title">Keine Produkte gefunden</strong>
+                <p class="empty-state-text">Passe Suche oder Filter an, um wieder Produkte anzuzeigen.</p>
+                <button type="button" class="btn btn-secondary" onclick="resetLagerFilters()">Filter zurücksetzen</button>
+            `;
+        }
+        emptyState.hidden = matchCount !== 0;
+    }
     listContainer.hidden = matchCount === 0;
 }
 
@@ -18912,6 +18976,8 @@ function renderStats() {
 
     let content = '';
     for (let item in db.stats) {
+        const cat = findCat(item);
+        if (catalogHasItem(item) && !shouldShowCatalogProduct(cat, item)) continue;
         let totalConsumed = db.stats[item] || 0;
         if (totalConsumed > 0) {
             let perWeek = totalConsumed / weeksElapsed;
@@ -18962,14 +19028,15 @@ function exportConsumptionPdf() {
     const rows = [];
     let maxConsumed = 0;
     for (let item in db.stats) {
-        if (isProductHidden(item)) continue;
+        const cat = findCat(item);
+        if (catalogHasItem(item) && !shouldShowCatalogProduct(cat, item)) continue;
         const consumed = db.stats[item] || 0;
         if (consumed > maxConsumed) maxConsumed = consumed;
     }
 
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             const stock = (db.inventory[cat] && db.inventory[cat][item]) || 0;
             const consumed = db.stats[item] || 0;
             const threshold = (db.thresholds && db.thresholds[item]) || 0;
@@ -20350,7 +20417,7 @@ function buildWarehouseInventoryRows() {
     const rows = [];
     for (const cat in catalog) {
         for (const item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             const stock = db.inventory[cat] && db.inventory[cat][item] ? db.inventory[cat][item] : 0;
             if (stock <= 0) continue;
             const threshold = (db.thresholds && db.thresholds[item]) || 0;
@@ -20657,7 +20724,7 @@ function buildWarehouseInventoryShareText() {
     for (let cat in catalog) {
         const rows = [];
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             const stock = db.inventory[cat] && db.inventory[cat][item] ? db.inventory[cat][item] : 0;
             if (stock > 0) rows.push(`- ${item}: ${formatItemAmount(item, stock)}`);
         }
@@ -20716,17 +20783,18 @@ function initBulkProductSelect() {
     select.appendChild(defaultOpt);
     
     for (let category in catalog) {
+        if (!isOsciFeaturesEnabled() && isOsciProductCategory(category)) continue;
         let optGroup = document.createElement('optgroup');
         optGroup.label = category;
         
         for (let item in catalog[category]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(category, item)) continue;
             let option = document.createElement('option');
             option.value = JSON.stringify({ cat: category, item: item });
             option.innerText = item;
             optGroup.appendChild(option);
         }
-        select.appendChild(optGroup);
+        if (optGroup.children.length > 0) select.appendChild(optGroup);
     }
     
     // Behälter-Dropdown befüllen
@@ -20961,7 +21029,7 @@ function renderNachbestellen() {
     const allItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
         }
     }
@@ -21215,7 +21283,7 @@ function renderShopLinkSettings() {
     const allItems = [];
     for (let cat in catalog) {
         for (let item in catalog[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             allItems.push({ cat, item, sizes: catalog[cat][item] || [] });
         }
     }
@@ -21914,7 +21982,7 @@ function exportToCSV() {
     let csv = 'Kategorie,Produkt,Bestand,Einheit\n';
     for (let cat in db.inventory) {
         for (let item in db.inventory[cat]) {
-            if (isProductHidden(item)) continue;
+            if (!shouldShowCatalogProduct(cat, item)) continue;
             const stock = db.inventory[cat][item];
             csv += `"${cat}","${item}",${stock},${getUnitLabel(getItemUnit(item))}\n`;
         }

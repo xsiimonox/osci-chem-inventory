@@ -18359,7 +18359,7 @@ html.guide-embedded .guide-hero {
     }
 
     #appHeader .header-support-button::before {
-        content: "Support";
+        content: "Spenden";
         font-size: clamp(0.64rem, 3.1vw, 0.74rem);
     }
 
@@ -18390,7 +18390,7 @@ html.guide-embedded .guide-hero {
     }
 
     #appHeader .header-support-button::before {
-        content: "Support";
+        content: "Spenden";
         font-size: 0.62rem;
     }
 
