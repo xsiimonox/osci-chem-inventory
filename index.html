@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.61-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.63-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.61</span>
+                    <span class="version-badge">v3.4.63</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -48,7 +48,8 @@
                             <button type="button" onclick="runCloudQuickAction('settings')">Einstellungen</button>
                         </div>
                     </div>
-                    <button type="button" class="header-quick-sync-button" onclick="openProjectSupportSettings()" aria-label="Projekt unterstützen öffnen">Projekt unterstützen</button>
+                    <button type="button" class="header-quick-sync-button header-demo-button" onclick="openDemoProfileSettings()" aria-label="Demo-Profil öffnen">Demo</button>
+                    <button type="button" class="header-quick-sync-button header-support-button" onclick="openProjectSupportSettings()" aria-label="Projekt unterstützen öffnen">Projekt unterstützen</button>
                     <a href="anleitung.html" class="header-quick-sync-button header-help-link" data-help-page="guide" aria-label="Hilfe und Anleitung öffnen">Hilfe</a>
                 </div>
             </div>
@@ -1993,9 +1994,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.61-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.61-release"></script>
-    <script src="assets/js/app.js?v=3.4.61-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.63-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.63-release"></script>
+    <script src="assets/js/app.js?v=3.4.63-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
