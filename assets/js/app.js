@@ -247,7 +247,7 @@ const BASE_CATALOG = JSON.parse(JSON.stringify(catalog));
 const BASE_DENSITY_FACTORS = { ...densityFactors };
 const containers = { "30ml": 9.3, "100ml": 18.5, "1000ml": 57, "5000ml": 260, "10000ml": 440 };
 const measurementUiState = { selectedEntryId: null, editingEntryId: null };
-const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [] };
+const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [], editingReportId: null };
 const logBookUiState = { editingEntryId: null };
 const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null, photosCleared: false };
 const CORAL_STATUS_OPTIONS = [
@@ -17622,16 +17622,55 @@ function clearIcpImportForm() {
     if (preview) preview.innerHTML = '';
 }
 
-function saveIcpReportFromImport() {
+function getIcpReportDateKey(dateValue = '') {
+    const parsed = new Date(dateValue || Date.now());
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : '';
+}
+
+function getIcpDuplicateWarnings(name = '', dateValue = '', excludeReportId = '') {
+    const normalizedName = normalizeSearchText(cleanIcpCell(name));
+    const dateKey = getIcpReportDateKey(dateValue);
+    const warnings = [];
+    ensureIcpReports().forEach(report => {
+        if (!report || report.id === excludeReportId) return;
+        const sameName = normalizedName && normalizeSearchText(report.name || '') === normalizedName;
+        const sameDate = dateKey && getIcpReportDateKey(report.date || report.createdAt) === dateKey;
+        if (!sameName && !sameDate) return;
+        const parts = [];
+        if (sameName) parts.push('gleicher Name');
+        if (sameDate) parts.push('gleiches Datum');
+        warnings.push(`${report.name || 'Unbenannte ICP'} (${formatWarehouseDate(report.date || report.createdAt)}) - ${parts.join(' und ')}`);
+    });
+    return warnings;
+}
+
+async function confirmIcpDuplicateIfNeeded(name, dateValue, excludeReportId = '') {
+    const warnings = getIcpDuplicateWarnings(name, dateValue, excludeReportId);
+    if (!warnings.length) return true;
+    return await appConfirm(
+        `Es gibt bereits eine gespeicherte ICP mit gleichem Namen oder Datum:\n\n${warnings.map(item => `- ${item}`).join('\n')}\n\nTrotzdem speichern?`,
+        {
+            title: 'Mögliche doppelte ICP',
+            type: 'warning',
+            confirmText: 'Trotzdem speichern',
+            cancelText: 'Abbrechen'
+        }
+    );
+}
+
+async function saveIcpReportFromImport() {
     const dateInput = document.getElementById('icpReportDate');
     const nameInput = document.getElementById('icpReportName');
     const textInput = document.getElementById('icpImportText');
     const values = sortIcpValues(parseIcpImportText(textInput?.value || ''));
     if (values.length === 0) return alert('Bitte füge zuerst ICP-Tabellendaten ein.');
     const date = dateInput?.value ? new Date(`${dateInput.value}T12:00:00`).toISOString() : new Date().toISOString();
+    const reportName = (nameInput?.value || '').trim() || `ICP ${new Date(date).toLocaleDateString('de-DE')}`;
+    const confirmed = await confirmIcpDuplicateIfNeeded(reportName, date);
+    if (!confirmed) return;
     const report = {
         id: createWarehouseId(),
-        name: (nameInput?.value || '').trim() || `ICP ${new Date(date).toLocaleDateString('de-DE')}`,
+        name: reportName,
         date,
         values,
         createdAt: new Date().toISOString()
@@ -17651,13 +17690,181 @@ function deleteIcpReport(reportId) {
     if (!confirm(`ICP "${report.name}" löschen?`)) return;
     db.icpReports = ensureIcpReports().filter(item => item.id !== reportId);
     if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
+    if (icpUiState.editingReportId === reportId) icpUiState.editingReportId = null;
     saveDB();
     renderIcpPage();
 }
 
 function selectIcpReport(reportId) {
     icpUiState.selectedReportId = icpUiState.selectedReportId === reportId ? null : reportId;
+    if (icpUiState.selectedReportId !== reportId && icpUiState.editingReportId === reportId) {
+        icpUiState.editingReportId = null;
+    }
     renderIcpPage();
+}
+
+function startEditIcpReport(reportId) {
+    const report = ensureIcpReports().find(item => item.id === reportId);
+    if (!report) return;
+    const historyDetails = document.querySelector('.icp-history-details');
+    if (historyDetails) historyDetails.open = true;
+    icpUiState.selectedReportId = reportId;
+    icpUiState.editingReportId = reportId;
+    renderIcpPage();
+}
+
+function cancelEditIcpReport() {
+    icpUiState.editingReportId = null;
+    renderIcpPage();
+}
+
+function formatIcpDateForInput(date) {
+    const parsed = new Date(date || Date.now());
+    if (!Number.isFinite(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+    return parsed.toISOString().slice(0, 10);
+}
+
+function getIcpRawCell(entry = {}, index, fallback = '') {
+    if (Array.isArray(entry.raw)) {
+        if (index === 'last') return entry.raw[entry.raw.length - 1] ?? fallback;
+        if (entry.raw[index] !== undefined) return entry.raw[index];
+    }
+    return fallback;
+}
+
+function getIcpEditableCell(entry = {}, field = '') {
+    if (field === 'name') return entry.name || '';
+    if (field === 'rawValue') return entry.rawValue || (Number.isFinite(entry.value) ? String(entry.value) : '');
+    if (field === 'min') return getIcpRawCell(entry, 2, Number.isFinite(entry.min) ? String(entry.min) : '');
+    if (field === 'optimal') return getIcpRawCell(entry, 3, Number.isFinite(entry.optimal) ? String(entry.optimal) : '');
+    if (field === 'max') return getIcpRawCell(entry, 4, Number.isFinite(entry.max) ? String(entry.max) : '');
+    if (field === 'unit') return entry.unit || getIcpRawCell(entry, 5, '');
+    if (field === 'diff') return getIcpRawCell(entry, 'last', Number.isFinite(entry.diff) ? String(entry.diff) : '');
+    return '';
+}
+
+function renderIcpReportEditForm(report) {
+    const indexedValues = (report.values || []).map((value, index) => ({ ...value, __index: index }));
+    const groupedValues = groupIcpValuesBySection(indexedValues);
+    return `
+        <div class="icp-report-detail icp-report-edit-detail">
+            <div class="icp-edit-meta">
+                <label>
+                    <span>Name der ICP</span>
+                    <input type="text" data-icp-report-field="name" value="${escapeHtml(report.name || '')}" placeholder="ICP Name">
+                </label>
+                <label>
+                    <span>Datum</span>
+                    <input type="date" data-icp-report-field="date" value="${escapeHtml(formatIcpDateForInput(report.date))}">
+                </label>
+            </div>
+            <form class="icp-edit-form" data-icp-edit-form>
+                ${groupedValues.map(([section, values]) => `
+                    <div class="icp-report-section-title">${escapeHtml(section)}</div>
+                    <div class="icp-edit-section">
+                        ${values.map(value => `
+                            <div class="icp-edit-row">
+                                <label class="icp-edit-name">
+                                    <span>Parameter</span>
+                                    <input type="text" data-icp-edit-index="${value.__index}" data-icp-edit-field="name" value="${escapeHtml(getIcpEditableCell(value, 'name'))}">
+                                </label>
+                                <label>
+                                    <span>Messwert</span>
+                                    <input type="text" inputmode="decimal" data-icp-edit-index="${value.__index}" data-icp-edit-field="rawValue" value="${escapeHtml(getIcpEditableCell(value, 'rawValue'))}" placeholder="nn, nwb, --- oder Zahl">
+                                </label>
+                                <label>
+                                    <span>Minimum</span>
+                                    <input type="text" inputmode="decimal" data-icp-edit-index="${value.__index}" data-icp-edit-field="min" value="${escapeHtml(getIcpEditableCell(value, 'min'))}">
+                                </label>
+                                <label>
+                                    <span>Optimal</span>
+                                    <input type="text" inputmode="decimal" data-icp-edit-index="${value.__index}" data-icp-edit-field="optimal" value="${escapeHtml(getIcpEditableCell(value, 'optimal'))}">
+                                </label>
+                                <label>
+                                    <span>Maximum</span>
+                                    <input type="text" inputmode="decimal" data-icp-edit-index="${value.__index}" data-icp-edit-field="max" value="${escapeHtml(getIcpEditableCell(value, 'max'))}">
+                                </label>
+                                <label>
+                                    <span>Einheit</span>
+                                    <input type="text" data-icp-edit-index="${value.__index}" data-icp-edit-field="unit" value="${escapeHtml(getIcpEditableCell(value, 'unit'))}">
+                                </label>
+                                <label>
+                                    <span>Differenz</span>
+                                    <input type="text" inputmode="decimal" data-icp-edit-index="${value.__index}" data-icp-edit-field="diff" value="${escapeHtml(getIcpEditableCell(value, 'diff'))}">
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('')}
+            </form>
+            <div class="icp-edit-actions">
+                <button type="button" class="btn btn-animated" onclick='saveEditedIcpReport(${jsArg(report.id)})'>Änderungen speichern</button>
+                <button type="button" class="btn-secondary btn-animated" onclick="cancelEditIcpReport()">Abbrechen</button>
+            </div>
+        </div>
+    `;
+}
+
+async function saveEditedIcpReport(reportId) {
+    const reports = ensureIcpReports();
+    const reportIndex = reports.findIndex(item => item.id === reportId);
+    if (reportIndex < 0) return;
+    const report = reports[reportIndex];
+    const root = document.querySelector('[data-icp-edit-form]');
+    if (!root) return;
+    const nameInput = document.querySelector('[data-icp-report-field="name"]');
+    const dateInput = document.querySelector('[data-icp-report-field="date"]');
+    const fields = new Map();
+    root.querySelectorAll('[data-icp-edit-index][data-icp-edit-field]').forEach(input => {
+        const index = Number(input.dataset.icpEditIndex);
+        const field = input.dataset.icpEditField;
+        if (!Number.isInteger(index) || !field) return;
+        if (!fields.has(index)) fields.set(index, {});
+        fields.get(index)[field] = input.value;
+    });
+    const nextValues = (report.values || []).map((entry, index) => {
+        const row = fields.get(index) || {};
+        const name = cleanIcpCell(row.name || entry.name || '');
+        const rawValue = cleanIcpCell(row.rawValue ?? entry.rawValue ?? '');
+        const minRaw = cleanIcpCell(row.min ?? getIcpEditableCell(entry, 'min'));
+        const optimalRaw = cleanIcpCell(row.optimal ?? getIcpEditableCell(entry, 'optimal'));
+        const maxRaw = cleanIcpCell(row.max ?? getIcpEditableCell(entry, 'max'));
+        const unit = cleanIcpCell(row.unit ?? entry.unit ?? '');
+        const diffRaw = cleanIcpCell(row.diff ?? getIcpEditableCell(entry, 'diff'));
+        const symbol = extractIcpSymbol(name) || entry.symbol || '';
+        const canonical = getIcpCanonicalInfo(name, symbol, entry.section);
+        return {
+            ...entry,
+            key: entry.key || normalizeIcpKey(name, symbol),
+            section: canonical.section,
+            name,
+            symbol,
+            value: parseIcpNumber(rawValue),
+            rawValue,
+            min: parseIcpNumber(minRaw),
+            optimal: parseIcpNumber(optimalRaw),
+            max: parseIcpNumber(maxRaw),
+            unit,
+            diff: parseIcpNumber(diffRaw),
+            sortOrder: canonical.order,
+            raw: [name, rawValue, minRaw, optimalRaw, maxRaw, unit, diffRaw]
+        };
+    });
+    const dateValue = dateInput?.value ? new Date(`${dateInput.value}T12:00:00`).toISOString() : report.date;
+    const nextName = cleanIcpCell(nameInput?.value || '') || report.name || `ICP ${formatWarehouseDate(dateValue)}`;
+    const confirmed = await confirmIcpDuplicateIfNeeded(nextName, dateValue, reportId);
+    if (!confirmed) return;
+    reports[reportIndex] = {
+        ...report,
+        name: nextName,
+        date: dateValue,
+        values: sortIcpValues(nextValues),
+        updatedAt: new Date().toISOString()
+    };
+    icpUiState.editingReportId = null;
+    saveDB();
+    renderIcpPage();
+    showToast('ICP aktualisiert', 'success', 2400);
 }
 
 function updateIcpCompareSelection() {
@@ -17887,18 +18094,22 @@ function renderIcpPage() {
 
     list.innerHTML = reports.map(report => {
         const selected = icpUiState.selectedReportId === report.id;
+        const editing = selected && icpUiState.editingReportId === report.id;
         const numericCount = (report.values || []).filter(value => Number.isFinite(value.value)).length;
         const issueCount = (report.values || []).filter(value => ['low', 'high'].includes(getIcpValueStatus(value).key)).length;
         const groupedValues = groupIcpValuesBySection(report.values || []);
         return `
             <article class="icp-report-card ${selected ? 'active' : ''}">
-                <button type="button" class="icp-report-main" onclick="selectIcpReport('${report.id}')" aria-expanded="${selected ? 'true' : 'false'}">
+                <button type="button" class="icp-report-main" onclick='selectIcpReport(${jsArg(report.id)})' aria-expanded="${selected ? 'true' : 'false'}">
                     <span><strong>${escapeHtml(report.name)}</strong><small>${escapeHtml(formatWarehouseDate(report.date))}</small></span>
                     <span>${numericCount}/${(report.values || []).length} numerisch · ${issueCount} auffällig</span>
                 </button>
-                <button type="button" class="btn-out btn-animated" onclick="deleteIcpReport('${report.id}')">Löschen</button>
+                <div class="icp-report-actions">
+                    <button type="button" class="btn-secondary btn-animated" onclick='event.stopPropagation(); startEditIcpReport(${jsArg(report.id)})'>Bearbeiten</button>
+                    <button type="button" class="btn-out btn-animated" onclick='event.stopPropagation(); deleteIcpReport(${jsArg(report.id)})'>Löschen</button>
+                </div>
             </article>
-            ${selected ? `
+            ${editing ? renderIcpReportEditForm(report) : (selected ? `
                 <div class="icp-report-detail">
                     ${groupedValues.map(([section, values]) => `
                         <div class="icp-report-section-title">${escapeHtml(section)}</div>
@@ -17914,7 +18125,7 @@ function renderIcpPage() {
                         }).join('')}
                     `).join('')}
                 </div>
-            ` : ''}
+            ` : '')}
         `;
     }).join('');
 }

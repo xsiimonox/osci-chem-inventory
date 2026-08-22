@@ -17353,6 +17353,21 @@ progress.mini-progress::-moz-progress-bar {
     border-color: color-mix(in srgb, var(--primary) 48%, var(--border-color));
 }
 
+.icp-report-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    min-width: 0;
+}
+
+.icp-report-actions .btn-secondary,
+.icp-report-actions .btn-out {
+    min-height: 42px;
+    padding-inline: 13px;
+    white-space: nowrap;
+}
+
 .icp-report-main {
     display: flex;
     justify-content: space-between;
@@ -17402,6 +17417,72 @@ progress.mini-progress::-moz-progress-bar {
     box-shadow: inset 3px 0 0 color-mix(in srgb, var(--status-warning) 82%, transparent);
 }
 
+.icp-report-edit-detail {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+}
+
+.icp-edit-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.icp-edit-form {
+    display: grid;
+    gap: var(--space-3);
+}
+
+.icp-edit-section {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.icp-edit-row {
+    display: grid;
+    grid-template-columns: minmax(160px, 1.5fr) repeat(6, minmax(90px, 1fr));
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-elevated) 62%, transparent);
+}
+
+.icp-edit-meta label,
+.icp-edit-row label {
+    display: grid;
+    gap: 6px;
+    min-width: 0;
+}
+
+.icp-edit-meta span,
+.icp-edit-row span {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+    font-weight: 850;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.icp-edit-meta input,
+.icp-edit-row input {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding: 9px 10px;
+    font-size: 0.88rem;
+}
+
+.icp-edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: var(--space-2);
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--border-color);
+}
+
 .icp-empty-state {
     padding: var(--space-4);
     color: var(--text-secondary);
@@ -17427,6 +17508,24 @@ progress.mini-progress::-moz-progress-bar {
     .icp-report-main {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .icp-report-card {
+        grid-template-columns: 1fr;
+    }
+
+    .icp-report-actions {
+        justify-content: stretch;
+    }
+
+    .icp-report-actions .btn-secondary,
+    .icp-report-actions .btn-out {
+        flex: 1 1 0;
+    }
+
+    .icp-edit-meta,
+    .icp-edit-row {
+        grid-template-columns: 1fr;
     }
 
     .icp-value-row {
