@@ -1252,7 +1252,7 @@ function openFeatureVisibilitySettings() {
         setTimeout(() => {
             openSettingsCard(document.querySelector('.settings-card-navigation'), {
                 fallbackGroup: 'Navigation',
-                focusSelector: '#feature-visibility-settings input[type="checkbox"]'
+                focusSelector: '#osciFeaturesToggle'
             });
         }, 120);
     });
@@ -3028,7 +3028,12 @@ function setOverviewEnabled(enabled) {
 function setOsciFeaturesEnabled(enabled) {
     localStorage.setItem(OSCI_FEATURES_ENABLED_KEY, String(Boolean(enabled)));
     refreshFeatureVisibility();
-    showToast(enabled ? 'OSCI Motion Funktionen eingeblendet' : 'OSCI Motion Funktionen ausgeblendet', 'info');
+    showToast(
+        enabled
+            ? 'OSCI Motion Funktionen eingeblendet'
+            : 'OSCI Motion Funktionen ausgeblendet. Bestände bleiben gespeichert.',
+        'info'
+    );
 }
 
 function getVisibleMenuOrder() {
@@ -3244,17 +3249,17 @@ function renderFeatureVisibilitySettings() {
     container.innerHTML = `
         <div class="feature-visibility-settings">
             <label class="settings-toggle-row">
-                <input type="checkbox" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
+                <input type="checkbox" id="overviewEnabledToggle" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
                 <span>
                     <span class="settings-toggle-title">Übersichtsseite anzeigen</span>
                     <small>Standardmäßig aus. Aktiviert das frei konfigurierbare Dashboard als eigenen Menüpunkt.</small>
                 </span>
             </label>
             <label class="settings-toggle-row">
-                <input type="checkbox" ${isOsciFeaturesEnabled() ? 'checked' : ''} onchange="setOsciFeaturesEnabled(this.checked)">
+                <input type="checkbox" id="osciFeaturesToggle" ${isOsciFeaturesEnabled() ? 'checked' : ''} onchange="setOsciFeaturesEnabled(this.checked)">
                 <span>
                     <span class="settings-toggle-title">OSCI Motion Funktionen anzeigen</span>
-                    <small>Blendet C&amp;R, Trace, Nutrition und OSCI-spezifische Mischrechner gemeinsam ein oder aus.</small>
+                    <small>Blendet C&amp;R, Trace, Nutrition, OSCI-Rechner und OSCI-Produktkategorien im Lager gemeinsam ein oder aus. Bestehende Bestände bleiben gespeichert.</small>
                 </span>
             </label>
         </div>
@@ -5227,12 +5232,19 @@ function getWarehouseOptionLabel(warehouse) {
     return `${warehouse.name} (${suffix})`;
 }
 
+function getWarehouseSystemNote() {
+    return isOsciFeaturesEnabled()
+        ? 'Dieser Lagerbereich ist auf das OSCI Motion Versorgungssystem, C&R und Trace-Produkte abgestimmt.'
+        : 'OSCI Motion Produkte sind ausgeblendet. Im Lager siehst du nur eigene und allgemein relevante Produkte.';
+}
+
 function updateWarehouseUI() {
     const select = document.getElementById('warehouseSelect');
     const meta = document.getElementById('warehouseMeta');
     const backupInfo = document.getElementById('warehouseBackupInfo');
     const accessBadge = document.getElementById('warehouseAccessBadge');
     const activeWarehouseName = document.getElementById('activeWarehouseName');
+    const osciSystemNote = document.getElementById('warehouseOsciSystemNote');
     const shareHint = document.getElementById('shareActiveWarehouseHint');
     const shareBox = document.getElementById('shareActiveWarehouseBox');
     const warehouses = appState && appState.warehouses ? Object.values(appState.warehouses) : [];
@@ -5262,6 +5274,7 @@ function updateWarehouseUI() {
         const info = `Import: ${formatWarehouseDate(active.lastImportAt)} · Export: ${formatWarehouseDate(active.lastExportAt)}${sync}${access}`;
         if (meta) meta.innerText = info;
         if (activeWarehouseName) activeWarehouseName.innerText = active.name;
+        if (osciSystemNote) osciSystemNote.innerText = getWarehouseSystemNote();
         if (backupInfo) backupInfo.innerText = `Aktives Lager: ${active.name} · ${info} · Lokales Auto-Save: ${latestPersistAt ? formatWarehouseDate(latestPersistAt) : 'läuft'}`;
         if (accessBadge) {
             // Eigene Lager brauchen keine zusätzliche Kennzeichnung. Der Hinweis
@@ -10431,7 +10444,7 @@ function renderLager() {
                     <small>Lagerverwaltung</small>
                     <h2>Lagerbestand</h2>
                     <p>Alle Buchungen wirken auf <strong id="activeWarehouseName">das aktive Lager</strong>.</p>
-                    <div class="osci-system-note">Dieser Lagerbereich ist auf das OSCI Motion Versorgungssystem, C&amp;R und Trace-Produkte abgestimmt.</div>
+                    <div class="osci-system-note" id="warehouseOsciSystemNote">${escapeHtml(getWarehouseSystemNote())}</div>
                 </div>
                 <div class="warehouse-head-actions">
                     <button type="button" class="btn btn-primary" onclick="openSmartStockModal('in')">Einlagern</button>
@@ -10952,6 +10965,12 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator.config.selectedExpertPresetId) db.traceCalculator.config.selectedExpertPresetId = '';
     if (db.traceCalculator.config.dynamicLimitMinPercent === undefined) db.traceCalculator.config.dynamicLimitMinPercent = '';
     if (db.traceCalculator.config.dynamicLimitMaxPercent === undefined) db.traceCalculator.config.dynamicLimitMaxPercent = '';
+    if (!db.traceCalculator.reusePlan || typeof db.traceCalculator.reusePlan !== 'object') {
+        db.traceCalculator.reusePlan = {
+            kationenRemainingMl: '',
+            anionenRemainingMl: ''
+        };
+    }
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
@@ -11382,6 +11401,297 @@ function calculateTraceRecipe(config = getTraceCalculatorConfigFromUi()) {
         return acc;
     }, {});
     return { config, rows, totals };
+}
+
+function getTraceReuseGroupLabel(group) {
+    return group === 'kationen' ? 'Kationen K+' : 'Anionen A-';
+}
+
+function getTraceReuseGroupShort(group) {
+    return group === 'kationen' ? 'K+' : 'A-';
+}
+
+function getTraceReuseRemainingValue(group) {
+    const state = ensureTraceCalculatorState();
+    const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    return state.reusePlan?.[key] ?? '';
+}
+
+function getTraceReuseSourceEntry() {
+    return getTraceCalculatorLatestHistory();
+}
+
+function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
+    const source = getTraceReuseSourceEntry();
+    const remainingMl = traceCalcNumber(remainingMlRaw, null);
+    const groupRows = recipe.rows.filter(row => row.group === group);
+    const targetVolumeMl = traceCalcNumber(recipe.totals?.[group]?.volumeMl, 0);
+    const sourceVolumeMl = traceCalcNumber(source?.totals?.[group]?.volumeMl, 0);
+    const bottleMaxMl = traceCalcNumber(recipe.config?.bottleMaxMl, 0);
+
+    if (!source) {
+        return { group, status: 'missing-source', source: null, remainingMl, rows: [], warnings: ['Bitte zuerst die aktuell laufende Mischung in der Historie speichern.'] };
+    }
+    if (remainingMl === null || remainingMl <= 0) {
+        return { group, status: 'empty-input', source, remainingMl, rows: [], warnings: ['Restmenge eintragen, um die laufende Lösung zu prüfen.'] };
+    }
+    if (sourceVolumeMl <= 0 || targetVolumeMl <= 0) {
+        return { group, status: 'invalid-source', source, remainingMl, rows: [], warnings: ['Für die laufende Mischung fehlt das Gesamtvolumen. Historien-Eintrag prüfen.'] };
+    }
+
+    const sourceScale = remainingMl / sourceVolumeMl;
+    const impossible = [];
+    const concentrationRows = groupRows.map(row => {
+        const existingAmount = traceCalcRound(traceCalcNumber(source.amounts?.[row.item], 0) * sourceScale);
+        const targetConcentration = targetVolumeMl > 0 ? traceCalcNumber(row.amount, 0) / targetVolumeMl : 0;
+        if (targetConcentration <= 0 && existingAmount > 0.000001) impossible.push(row);
+        return {
+            ...row,
+            existingAmount,
+            existingGrams: traceCalcElementGrams(row.item, existingAmount),
+            targetConcentration
+        };
+    });
+
+    if (impossible.length) {
+        return {
+            group,
+            status: 'impossible',
+            source,
+            remainingMl,
+            rows: concentrationRows,
+            warnings: [`${impossible.map(row => row.symbol).join(', ')} ist in der Restlösung vorhanden, soll im Zielrezept aber 0 ml sein. Das lässt sich durch Verdünnung nicht sinnvoll korrigieren.`]
+        };
+    }
+
+    const calculateForVolume = finalVolume => {
+        const rows = concentrationRows.map(row => {
+            const targetAmountAtVolume = row.targetConcentration * finalVolume;
+            const additionMl = traceCalcRound(Math.max(0, targetAmountAtVolume - row.existingAmount));
+            return {
+                ...row,
+                targetAmountAtVolume: traceCalcRound(targetAmountAtVolume),
+                additionMl,
+                additionG: traceCalcElementGrams(row.item, additionMl)
+            };
+        });
+        const additionsMl = traceCalcRound(rows.reduce((sum, row) => sum + row.additionMl, 0));
+        const additionsG = traceCalcRound(rows.reduce((sum, row) => sum + row.additionG, 0));
+        const osmoseMl = traceCalcRound(finalVolume - remainingMl - additionsMl);
+        return { rows, additionsMl, additionsG, osmoseMl, finalVolumeMl: traceCalcRound(finalVolume) };
+    };
+
+    const isFeasible = finalVolume => {
+        if (finalVolume < remainingMl - 0.000001) return false;
+        const dilutionOk = concentrationRows.every(row => row.existingAmount <= (row.targetConcentration * finalVolume) + 0.000001);
+        if (!dilutionOk) return false;
+        return calculateForVolume(finalVolume).osmoseMl >= -0.000001;
+    };
+
+    let finalVolume = Math.max(targetVolumeMl, remainingMl);
+    concentrationRows.forEach(row => {
+        if (row.targetConcentration > 0) {
+            finalVolume = Math.max(finalVolume, row.existingAmount / row.targetConcentration);
+        }
+    });
+
+    if (!isFeasible(finalVolume)) {
+        let upper = Math.max(finalVolume, targetVolumeMl, remainingMl, 1);
+        let guard = 0;
+        while (!isFeasible(upper) && guard < 60) {
+            upper *= 1.25;
+            guard += 1;
+        }
+        if (guard >= 60) {
+            return {
+                group,
+                status: 'impossible',
+                source,
+                remainingMl,
+                rows: concentrationRows,
+                warnings: ['Es konnte kein sinnvolles Verdünnungsvolumen berechnet werden. Restlösung lieber verwerfen und neu ansetzen.']
+            };
+        }
+        let lower = Math.max(targetVolumeMl, remainingMl);
+        concentrationRows.forEach(row => {
+            if (row.targetConcentration > 0) lower = Math.max(lower, row.existingAmount / row.targetConcentration);
+        });
+        for (let i = 0; i < 50; i += 1) {
+            const mid = (lower + upper) / 2;
+            if (isFeasible(mid)) upper = mid;
+            else lower = mid;
+        }
+        finalVolume = upper;
+    }
+
+    const result = calculateForVolume(finalVolume);
+    result.osmoseMl = Math.max(0, result.osmoseMl);
+    const needsDilution = result.finalVolumeMl > targetVolumeMl + 0.01;
+    const warnings = [];
+    if (needsDilution) {
+        warnings.push(`Zielvolumen ${traceCalcFormatMl(targetVolumeMl)} reicht nicht. Für gleiche Konzentration wird auf ${traceCalcFormatMl(result.finalVolumeMl)} verdünnt.`);
+    }
+    if (bottleMaxMl > 0 && result.finalVolumeMl > bottleMaxMl + 0.000001) {
+        warnings.push(`Benötigtes Endvolumen liegt über dem eingestellten Flaschenlimit von ${traceCalcFormatMl(bottleMaxMl)}.`);
+    }
+    if (result.additionsMl <= 0.000001 && result.osmoseMl <= 0.000001) {
+        warnings.push('Die Restlösung passt rechnerisch bereits zur neuen Zielmischung. Bitte trotzdem ICP und Plausibilität prüfen.');
+    }
+
+    return {
+        group,
+        status: warnings.some(text => text.includes('über dem eingestellten Flaschenlimit')) ? 'warning' : 'ok',
+        source,
+        remainingMl,
+        sourceVolumeMl,
+        targetVolumeMl,
+        finalVolumeMl: result.finalVolumeMl,
+        additionsMl: result.additionsMl,
+        additionsG: result.additionsG,
+        osmoseMl: traceCalcRound(result.osmoseMl),
+        osmoseG: traceCalcRound(result.osmoseMl),
+        mode: needsDilution ? 'Verdünnen & ergänzen' : 'Ergänzen',
+        rows: result.rows,
+        warnings
+    };
+}
+
+function calculateTraceReusePlan(recipe = ensureTraceCalculatorState().latestRecipe || calculateTraceRecipe()) {
+    return ['kationen', 'anionen'].map(group => calculateTraceReuseGroupPlan(recipe, group, getTraceReuseRemainingValue(group)));
+}
+
+function renderTraceReuseGroupPlan(plan) {
+    const label = getTraceReuseGroupLabel(plan.group);
+    const short = getTraceReuseGroupShort(plan.group);
+    const warningHtml = plan.warnings?.length
+        ? `<div class="trace-reuse-warnings">${plan.warnings.map(text => `<span>${escapeHtml(text)}</span>`).join('')}</div>`
+        : '';
+    if (['missing-source', 'empty-input', 'invalid-source', 'impossible'].includes(plan.status)) {
+        return `
+            <section class="trace-reuse-card trace-reuse-card-${plan.status}">
+                <div class="trace-reuse-card-head">
+                    <span class="trace-group-symbol" aria-hidden="true">${short}</span>
+                    <span><strong>${label}</strong><small>${plan.status === 'empty-input' ? 'Restmenge offen' : 'Nicht berechenbar'}</small></span>
+                </div>
+                ${warningHtml}
+            </section>
+        `;
+    }
+    const additions = plan.rows.filter(row => row.additionMl > 0.000001);
+    return `
+        <section class="trace-reuse-card trace-reuse-card-${plan.status}">
+            <div class="trace-reuse-card-head">
+                <span class="trace-group-symbol" aria-hidden="true">${short}</span>
+                <span><strong>${label}</strong><small>${escapeHtml(plan.mode)} · Quelle ${formatTraceMixtureDate(plan.source)}</small></span>
+            </div>
+            <div class="trace-reuse-summary">
+                <span><small>Restlösung</small><strong>${traceCalcFormatMl(plan.remainingMl)}</strong></span>
+                <span><small>Endvolumen</small><strong>${traceCalcFormatMl(plan.finalVolumeMl)}</strong></span>
+                <span><small>Elemente dazu</small><strong>${traceCalcFormatMlG(plan.additionsMl, plan.additionsG)}</strong></span>
+                <span><small>Osmose dazu</small><strong>${traceCalcFormatMlG(plan.osmoseMl, plan.osmoseG)}</strong></span>
+            </div>
+            ${warningHtml}
+            <div class="trace-reuse-additions">
+                ${additions.length ? additions.map(row => `
+                    <span>
+                        <strong>${escapeHtml(row.symbol)}</strong>
+                        <small>${escapeHtml(row.item.replace(` (${row.symbol})`, ''))}</small>
+                        <em>${traceCalcFormatMlG(row.additionMl, row.additionG)}</em>
+                    </span>
+                `).join('') : '<p class="hint">Keine Elementzugabe nötig.</p>'}
+            </div>
+        </section>
+    `;
+}
+
+function renderTraceReusePlanResult(recipe = ensureTraceCalculatorState().latestRecipe || calculateTraceRecipe()) {
+    const plans = calculateTraceReusePlan(recipe);
+    const hasUsableAdditions = plans.some(plan => plan.status === 'ok' || plan.status === 'warning');
+    return `
+        <div class="trace-reuse-result-grid">
+            ${plans.map(renderTraceReuseGroupPlan).join('')}
+        </div>
+        <div class="trace-reuse-actions">
+            <button type="button" class="btn-secondary" onclick="applyTraceReusePlanToDraft()" ${hasUsableAdditions ? '' : 'disabled'}>Ergänzungen in Auslagerung übernehmen</button>
+        </div>
+    `;
+}
+
+function renderTraceReusePlanner(recipe) {
+    const state = ensureTraceCalculatorState();
+    const source = getTraceReuseSourceEntry();
+    return `
+        <details class="trace-reuse-panel">
+            <summary>
+                <span>
+                    <strong>Laufende Mischung weiterverwenden</strong>
+                    <small>Restmenge prüfen, verdünnen oder fehlende Elemente ergänzen</small>
+                </span>
+                <span class="trace-icp-import-badge">${source ? formatTraceMixtureDate(source) : 'keine Historie'}</span>
+            </summary>
+            <div class="trace-reuse-body">
+                <p class="hint">Nutze das, wenn K+ oder A- noch im Dosierbehälter vorhanden ist und nach einer neuen ICP angepasst werden soll. Als Zusammensetzung der Restlösung wird die aktuellste aktive Trace-Mischung aus der Historie verwendet.</p>
+                <div class="trace-reuse-inputs">
+                    <label class="input-group" for="traceReuseKationenRemaining">
+                        <span>Restmenge Kationen K+</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingMl ?? ''))}" oninput="updateTraceReuseRemaining('kationen', this.value)"><span>ml</span></div>
+                    </label>
+                    <label class="input-group" for="traceReuseAnionenRemaining">
+                        <span>Restmenge Anionen A-</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingMl ?? ''))}" oninput="updateTraceReuseRemaining('anionen', this.value)"><span>ml</span></div>
+                    </label>
+                </div>
+                <div id="traceReusePlanResult">
+                    ${renderTraceReusePlanResult(recipe)}
+                </div>
+            </div>
+        </details>
+    `;
+}
+
+function updateTraceReuseRemaining(group, value) {
+    const state = ensureTraceCalculatorState();
+    const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    const raw = String(value ?? '').replace(',', '.').trim();
+    const parsed = traceCalcNumber(raw, null);
+    state.reusePlan[key] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
+    saveDB(false);
+    const result = document.getElementById('traceReusePlanResult');
+    if (result) {
+        result.innerHTML = renderTraceReusePlanResult(state.latestRecipe || calculateTraceRecipe());
+    }
+}
+
+function applyTraceReusePlanToDraft() {
+    const state = ensureTraceCalculatorState();
+    const recipe = state.latestRecipe || calculateTraceRecipe();
+    const plans = calculateTraceReusePlan(recipe).filter(plan => plan.status === 'ok' || plan.status === 'warning');
+    if (!plans.length) {
+        showToast('Keine nutzbaren Ergänzungen berechnet.', 'warning');
+        return;
+    }
+    if (!db.traceDraft) db.traceDraft = {};
+    traceCalculatorElements.forEach(element => {
+        delete db.traceDraft[element.item];
+    });
+    let count = 0;
+    plans.forEach(plan => {
+        plan.rows.forEach(row => {
+            if (row.additionMl > 0.000001) {
+                db.traceDraft[row.item] = row.additionMl.toFixed(2);
+                count += 1;
+            }
+        });
+    });
+    saveDB();
+    renderTraceExportInputs();
+    showToast(
+        count
+            ? `${count} Ergänzung(en) in die Trace-Auslagerung übernommen. Bitte danach K+ und A- gezielt auslagern.`
+            : 'Es waren keine Elementzugaben nötig. Nur Osmosewasser/Verdünnung prüfen.',
+        count ? 'success' : 'info',
+        3600
+    );
 }
 
 function renderTraceCalculatorExpertControls(force = false) {
@@ -12783,6 +13093,7 @@ function renderTraceCalculator() {
                 ${renderTraceRecipeTable(recipe, 'kationen')}
                 ${renderTraceRecipeTable(recipe, 'anionen')}
             </div>
+            ${renderTraceReusePlanner(recipe)}
         </div>
     `;
     renderTraceCalculatorHistory();
@@ -13100,6 +13411,8 @@ window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
 window.toggleTraceHistoryCalculation = toggleTraceHistoryCalculation;
 window.editTraceHistoryEntry = editTraceHistoryEntry;
 window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
+window.updateTraceReuseRemaining = updateTraceReuseRemaining;
+window.applyTraceReusePlanToDraft = applyTraceReusePlanToDraft;
 
 function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(

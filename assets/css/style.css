@@ -9200,6 +9200,212 @@ body.theme-badman.party-mode .card {
     color: var(--text-muted);
 }
 
+.trace-reuse-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--workflow-border));
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+}
+
+.trace-reuse-panel > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 58px;
+    padding: 13px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.trace-reuse-panel > summary::-webkit-details-marker {
+    display: none;
+}
+
+.trace-reuse-panel > summary > span:first-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.trace-reuse-panel > summary strong {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    line-height: 1.2;
+}
+
+.trace-reuse-panel > summary small {
+    color: var(--text-secondary);
+    font-size: 0.68rem;
+    line-height: 1.3;
+}
+
+.trace-reuse-panel[open] > summary {
+    border-bottom: 1px solid var(--workflow-border);
+}
+
+.trace-reuse-body {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    padding: var(--space-3);
+}
+
+.trace-reuse-inputs,
+.trace-reuse-result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+}
+
+.trace-reuse-inputs .input-group {
+    margin: 0;
+}
+
+.trace-reuse-card {
+    display: grid;
+    gap: var(--space-3);
+    min-width: 0;
+    padding: var(--space-3);
+    border: 1px solid var(--workflow-border);
+    border-top: 3px solid var(--trace-kation);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+}
+
+.trace-reuse-card:nth-child(2) {
+    border-top-color: var(--trace-anion);
+}
+
+.trace-reuse-card.trace-reuse-card-warning,
+.trace-reuse-card.trace-reuse-card-impossible {
+    border-color: color-mix(in srgb, var(--status-warning) 42%, var(--workflow-border));
+    border-top-color: var(--status-warning);
+}
+
+.trace-reuse-card-head {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.trace-reuse-card-head > span:last-child {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.trace-reuse-card-head strong {
+    overflow: hidden;
+    color: var(--text-primary);
+    font-size: 0.86rem;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trace-reuse-card-head small {
+    color: var(--text-secondary);
+    font-size: 0.64rem;
+    line-height: 1.25;
+}
+
+.trace-reuse-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.trace-reuse-summary span {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: 8px 9px;
+    border: 1px solid var(--workflow-border);
+    border-radius: 8px;
+    background: var(--surface-raised);
+}
+
+.trace-reuse-summary small {
+    color: var(--text-secondary);
+    font-size: 0.58rem;
+    line-height: 1.2;
+}
+
+.trace-reuse-summary strong {
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.22;
+}
+
+.trace-reuse-warnings {
+    display: grid;
+    gap: 5px;
+}
+
+.trace-reuse-warnings span {
+    padding: 8px 9px;
+    border: 1px solid color-mix(in srgb, var(--status-warning) 45%, var(--workflow-border));
+    border-radius: 8px;
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--status-warning) 10%, transparent);
+    font-size: 0.68rem;
+    line-height: 1.35;
+}
+
+.trace-reuse-additions {
+    display: grid;
+    gap: 6px;
+}
+
+.trace-reuse-additions > span {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+    min-width: 0;
+    padding: 8px 9px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.trace-reuse-additions strong {
+    color: var(--accent);
+    font-size: 0.78rem;
+}
+
+.trace-reuse-additions small {
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 0.66rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trace-reuse-additions em {
+    color: var(--text-primary);
+    font-size: 0.68rem;
+    font-style: normal;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.trace-reuse-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-3);
+}
+
+.trace-reuse-actions button {
+    width: auto;
+}
+
 .trace-status-low {
     border-left-color: var(--status-warning);
 }
@@ -10122,6 +10328,25 @@ body.theme-badman.party-mode .card {
 
     .trace-summary-strip > span:last-child {
         grid-column: 1 / -1;
+    }
+
+    .trace-reuse-inputs,
+    .trace-reuse-result-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .trace-reuse-panel > summary {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .trace-reuse-actions {
+        justify-content: stretch;
+    }
+
+    .trace-reuse-actions button {
+        width: 100%;
     }
 
     .trace-recipe-table-head {
@@ -15513,7 +15738,7 @@ textarea[readonly] {
 .inventory-status { flex: 0 0 auto; }
 .inventory-facts {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 96px), 1fr));
     gap: 6px;
     margin: 0;
 }
@@ -15528,12 +15753,12 @@ textarea[readonly] {
 .inventory-facts dd {
     margin: 2px 0 0;
     color: var(--text-primary);
-    font-size: 0.74rem;
+    font-size: clamp(0.68rem, 1vw, 0.74rem);
     font-weight: 750;
     font-variant-numeric: tabular-nums;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    line-height: 1.16;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 .inventory-hints { display: grid; gap: 3px; }
 .inventory-hints .item-hint { margin: 0; font-size: 0.72rem; line-height: 1.22; }
