@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.71-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.78-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.71</span>
+                    <span class="version-badge">v3.4.78</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -1364,6 +1364,167 @@
 
             <div class="card aquarium-workspace-panel aquarium-workspace-panel-logbook" id="coralAquariumPanel"></div>
 
+            <div class="card coral-placement-card">
+                <div class="coral-section-head">
+                    <div>
+                        <h3>Korallen-Platzierungsberater</h3>
+                        <p class="hint">Hilft bei Licht, Strömung, Abstand, Überwuchs-Risiko und Nachbarschaft. Als Entscheidungshilfe gedacht, nicht als Ersatz für Beobachtung und Fachquelle.</p>
+                    </div>
+                    <span class="status-badge status-info">Prototyp</span>
+                </div>
+
+                <details class="coral-advisor-details" open>
+                    <summary>
+                        <span>Platzierung &amp; Verträglichkeit planen</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="coral-advisor-body">
+                        <div class="coral-advisor-grid">
+                            <section class="coral-advisor-panel coral-advisor-select-panel">
+                                <div class="coral-advisor-panel-head">
+                                    <span class="coral-advisor-step">1</span>
+                                    <div>
+                                        <h4>Koralle auswählen</h4>
+                                        <p>Suche frei oder verwende eine Koralle aus deinem Bestand.</p>
+                                    </div>
+                                </div>
+                                <div class="tool-grid coral-advisor-form-grid">
+                                    <div class="input-group">
+                                        <label for="coralPlacementQuery">Koralle suchen</label>
+                                        <input type="search" id="coralPlacementQuery" list="coralPlacementOptions" placeholder="z.B. Acropora, Torch, Zoanthus..." oninput="updateCoralPlacementAdvisor()">
+                                        <datalist id="coralPlacementOptions"></datalist>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="coralPlacementOwned">Aus meinem Bestand</label>
+                                        <select id="coralPlacementOwned" onchange="useOwnedCoralForPlacement()">
+                                            <option value="">Optional auswählen</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section class="coral-advisor-panel coral-advisor-tank-panel">
+                                <div class="coral-advisor-panel-head">
+                                    <span class="coral-advisor-step">2</span>
+                                    <div>
+                                        <h4>Beckenmodell</h4>
+                                        <p>Licht und Strömung bestimmen die empfohlenen Zonen.</p>
+                                    </div>
+                                </div>
+                                <details class="coral-tank-settings">
+                                    <summary>Becken &amp; Technik anpassen</summary>
+                                    <div class="tool-grid coral-advisor-form-grid coral-tank-form-grid">
+                                        <div class="input-group"><label for="coralTankLength">Länge cm</label><input type="number" id="coralTankLength" value="120" min="20" step="1" oninput="updateCoralPlacementAdvisor()"></div>
+                                        <div class="input-group"><label for="coralTankWidth">Tiefe cm</label><input type="number" id="coralTankWidth" value="60" min="20" step="1" oninput="updateCoralPlacementAdvisor()"></div>
+                                        <div class="input-group"><label for="coralTankHeight">Höhe cm</label><input type="number" id="coralTankHeight" value="55" min="20" step="1" oninput="updateCoralPlacementAdvisor()"></div>
+                                        <div class="input-group">
+                                            <label for="coralLightSetup">Lichtbild</label>
+                                            <select id="coralLightSetup" onchange="updateCoralPlacementAdvisor()"><option value="center">zentral stark</option><option value="even">flächig gleichmäßig</option><option value="spot">Spot / Schattenzonen</option><option value="soft">eher schwach</option></select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralPumpSetup">Strömung</label>
+                                            <select id="coralPumpSetup" onchange="updateCoralPlacementAdvisor()"><option value="both-high">beidseitig oben</option><option value="left-high">links oben</option><option value="right-high">rechts oben</option><option value="gyre">Ringströmung / Gyre</option><option value="soft">sanft / LPS-lastig</option></select>
+                                        </div>
+                                    </div>
+                                </details>
+                            </section>
+                        </div>
+
+                        <section class="coral-advisor-panel coral-recommendation-panel">
+                            <div class="coral-advisor-panel-head">
+                                <span class="coral-advisor-step">3</span>
+                                <div><h4>Empfohlener Standort</h4><p>Die stärkste Zone wird hervorgehoben. Beobachte die Koralle nach dem Einsetzen weiter.</p></div>
+                            </div>
+                            <div id="coralPlacementResult" class="coral-placement-result"></div>
+                        </section>
+
+                        <div class="coral-advisor-grid">
+                            <section class="coral-advisor-panel">
+                                <h4>Nachbarschaft prüfen</h4>
+                                <div class="tool-grid coral-advisor-form-grid">
+                                    <div class="input-group">
+                                        <label for="coralCompatibilityA">Koralle A</label>
+                                        <input type="search" id="coralCompatibilityA" list="coralPlacementOptions" placeholder="z.B. Euphyllia Torch" oninput="updateCoralCompatibilityAdvisor()">
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="coralCompatibilityB">Koralle B</label>
+                                        <input type="search" id="coralCompatibilityB" list="coralPlacementOptions" placeholder="z.B. Acropora" oninput="updateCoralCompatibilityAdvisor()">
+                                    </div>
+                                </div>
+                                <div id="coralCompatibilityResult" class="coral-compatibility-result"></div>
+                            </section>
+
+                            <section class="coral-advisor-panel">
+                                <h4>Eigenes Profil ergänzen</h4>
+                                <details class="coral-custom-profile-details">
+                                    <summary>
+                                        <span>Nicht gelistete Koralle hinzufügen</span>
+                                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                                    </summary>
+                                    <div class="tool-grid coral-advisor-form-grid">
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileName">Name / Gattung</label>
+                                            <input type="text" id="coralCustomProfileName" placeholder="z.B. unbekannte Chalice">
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileType">Typ</label>
+                                            <select id="coralCustomProfileType">
+                                                <option value="LPS">LPS</option>
+                                                <option value="SPS">SPS</option>
+                                                <option value="Weichkoralle">Weichkoralle</option>
+                                                <option value="Krustenanemone">Krustenanemone</option>
+                                                <option value="Scheibenanemone">Scheibenanemone</option>
+                                                <option value="Gorgonie">Gorgonie</option>
+                                                <option value="Anemone">Anemone</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileLight">Lichtbedarf</label>
+                                            <select id="coralCustomProfileLight">
+                                                <option value="low">niedrig</option>
+                                                <option value="medium" selected>mittel</option>
+                                                <option value="high">hoch</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileFlow">Strömung</label>
+                                            <select id="coralCustomProfileFlow">
+                                                <option value="low">sanft</option>
+                                                <option value="medium" selected>mittel</option>
+                                                <option value="high">stark turbulent</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileAggression">Aggressivität</label>
+                                            <select id="coralCustomProfileAggression">
+                                                <option value="low">friedlich</option>
+                                                <option value="medium" selected>mäßig</option>
+                                                <option value="high">stark nesselnd</option>
+                                                <option value="extreme">sehr stark / lange Kampftentakel</option>
+                                            </select>
+                                        </div>
+                                        <div class="input-group">
+                                            <label for="coralCustomProfileSpacing">Mindestabstand cm</label>
+                                            <input type="number" id="coralCustomProfileSpacing" value="10" min="2" step="1">
+                                        </div>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="coralCustomProfileNotes">Hinweise</label>
+                                        <textarea id="coralCustomProfileNotes" placeholder="z.B. schnell wachsend, besser auf Inselstein, nicht direkt beströmen"></textarea>
+                                    </div>
+                                    <div class="btn-group">
+                                        <button type="button" class="btn-primary btn-animated" onclick="saveCustomCoralPlacementProfile()">Profil speichern</button>
+                                        <button type="button" class="btn-secondary btn-animated" onclick="resetCustomCoralPlacementProfileForm()">Leeren</button>
+                                    </div>
+                                </details>
+                            </section>
+                        </div>
+
+                        <div id="coralAdvisorOwnStockResult" class="coral-own-stock-advice"></div>
+                    </div>
+                </details>
+            </div>
+
             <div class="coral-layout">
                 <div class="card coral-form-card">
                     <div class="coral-section-head">
@@ -1994,9 +2155,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.71-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.71-release"></script>
-    <script src="assets/js/app.js?v=3.4.71-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.78-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.78-release"></script>
+    <script src="assets/js/app.js?v=3.4.78-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

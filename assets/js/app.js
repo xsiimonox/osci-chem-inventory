@@ -250,10 +250,381 @@ const measurementUiState = { selectedEntryId: null, editingEntryId: null };
 const icpUiState = { selectedParameter: '', selectedReportId: null, selectedParameters: [], editingReportId: null };
 const logBookUiState = { editingEntryId: null };
 const coralUiState = { editingId: null, pendingPhotos: [], selectedId: null, photosCleared: false };
+let coralPlacementContextSaveTimer = null;
 const CORAL_STATUS_OPTIONS = [
     { value: 'neuzugang', label: 'Neuzugang' },
     { value: 'bestand', label: 'Bestandskoralle' },
     { value: 'ableger', label: 'Ableger' }
+];
+const CORAL_PLACEMENT_PROFILES = [
+    {
+        id: 'acropora',
+        name: 'Acropora',
+        scientific: 'Acropora spp.',
+        aliases: ['acro', 'tenuis', 'millepora', 'staghorn', 'tabling acropora', 'geweihkoralle', 'tischkoralle', 'astkoralle', 'sps acropora', 'acropora tenuis', 'acropora millepora'],
+        type: 'SPS',
+        light: 'high',
+        flow: 'high',
+        aggression: 'medium',
+        spacingCm: 8,
+        zones: ['oben', 'oberer Riffaufbau', 'lichtstarke Mitte'],
+        placement: 'Oben bis sehr hell mittig, mit wechselnder turbulenter Strömung. Nicht direkt vor den Pumpenauslass setzen.',
+        goodWith: ['acropora', 'montipora', 'stylophora', 'pocillopora', 'seriatopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia', 'platygyra', 'favites', 'hydnophora', 'anemone'],
+        warnings: ['Stabilität wichtiger als absolute Spitzenwerte.', 'Bei neuen Ablegern erst lichtakklimatisieren.', 'Genug Raum für Wachstum und Abschattung lassen.']
+    },
+    {
+        id: 'montipora-platte',
+        name: 'Montipora Platte',
+        scientific: 'Montipora capricornis / foliosa',
+        aliases: ['montipora capricornis', 'capricornis', 'monti platte', 'plattenmontipora', 'montipora foliosa', 'montipora platte', 'plattige montipora', 'tellerkoralle', 'plattenkoralle', 'montipora foliosa'],
+        type: 'SPS',
+        light: 'high',
+        flow: 'high',
+        aggression: 'low',
+        spacingCm: 10,
+        zones: ['oben', 'mittig', 'freier Randbereich'],
+        placement: 'Hell und turbulent, aber so platzieren, dass die Platten später keine darunterliegenden Korallen abschatten.',
+        goodWith: ['acropora', 'montipora-digitat', 'stylophora', 'pocillopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia', 'zoanthus', 'pachyclavularia'],
+        warnings: ['Kann stark abschatten.', 'Nicht mitten in eng bewachsenen Riffaufbau kleben, wenn sie später kaum entfernbar ist.']
+    },
+    {
+        id: 'montipora-digitat',
+        name: 'Montipora digitata',
+        scientific: 'Montipora digitata',
+        aliases: ['digitata', 'monti digitata', 'finger montipora', 'ast montipora', 'montipora ast', 'verzweigte montipora'],
+        type: 'SPS',
+        light: 'medium-high',
+        flow: 'high',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['oben', 'mittig'],
+        placement: 'Hell bis mittelhell mit wechselnder Strömung. Gute Anfänger-SPS, aber Abstand für Äste lassen.',
+        goodWith: ['acropora', 'montipora-platte', 'stylophora', 'pocillopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Kann schnell wachsen und Nachbarn verschatten.']
+    },
+    {
+        id: 'seriatopora',
+        name: 'Seriatopora',
+        scientific: 'Seriatopora spp.',
+        aliases: ['birdsnest', 'hystrix', 'caliendrum', 'vogelnestkoralle', 'vogel nest', 'buschkoralle', 'seriatopora hystrix'],
+        type: 'SPS',
+        light: 'medium-high',
+        flow: 'high',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['oben', 'mittig'],
+        placement: 'Mittelhell bis hell und klar turbulent. Nicht in tote Strömungsecken setzen.',
+        goodWith: ['acropora', 'montipora-digitat', 'pocillopora', 'stylophora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Feine Äste brechen leicht, genug Arbeitsraum lassen.']
+    },
+    {
+        id: 'stylophora',
+        name: 'Stylophora',
+        scientific: 'Stylophora spp.',
+        aliases: ['milka', 'stylo', 'milka koralle', 'griffelkoralle', 'stylophora pistillata'],
+        type: 'SPS',
+        light: 'medium-high',
+        flow: 'medium-high',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['oben', 'mittig'],
+        placement: 'Mittelhell bis hell, mit kräftiger indirekter Strömung.',
+        goodWith: ['acropora', 'montipora-digitat', 'pocillopora', 'seriatopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Auf stabile KH und Nährstoffe achten.']
+    },
+    {
+        id: 'pocillopora',
+        name: 'Pocillopora',
+        scientific: 'Pocillopora spp.',
+        aliases: ['poci', 'pocillopora damicornis', 'blumenkohlkoralle', 'buschkoralle'],
+        type: 'SPS',
+        light: 'medium-high',
+        flow: 'medium-high',
+        aggression: 'medium',
+        spacingCm: 10,
+        zones: ['oben', 'mittig'],
+        placement: 'Helle, gut bewegte Zone. Kann sich im Aquarium unerwartet verbreiten.',
+        goodWith: ['acropora', 'montipora-digitat', 'stylophora', 'seriatopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Kann Polypen abschnüren und an neuen Stellen auftauchen.']
+    },
+    {
+        id: 'euphyllia',
+        name: 'Euphyllia / Fimbriaphyllia',
+        scientific: 'Euphyllia, Fimbriaphyllia spp.',
+        aliases: ['torch', 'hammer', 'frogspawn', 'paradivisa', 'ancora', 'glabrescens', 'gold torch', 'hammerkoralle', 'froschlaichkoralle', 'fackelkoralle', 'goldfackel', 'torch koralle', 'euphyllia hammer', 'euphyllia paraancora'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'medium',
+        aggression: 'extreme',
+        spacingCm: 20,
+        zones: ['mittig', 'unterer Riffbereich', 'freier Bereich'],
+        placement: 'Mittelhell, indirekt und wechselnd beströmt. Keine direkte Strömung auf das Gewebe.',
+        goodWith: ['euphyllia'],
+        avoidNear: ['acropora', 'montipora-platte', 'montipora-digitat', 'zoanthus', 'ricordea', 'trachyphyllia', 'goniopora', 'caulastrea'],
+        warnings: ['Lange Kampftentakel möglich.', 'Mindestens ca. 20 cm Sicherheitszone planen.', 'Torch-Korallen auch untereinander vorsichtig kombinieren.']
+    },
+    {
+        id: 'galaxea',
+        name: 'Galaxea',
+        scientific: 'Galaxea spp.',
+        aliases: ['galaxea coral', 'sternkoralle', 'galaxiekoralle', 'kristallkoralle', 'galaxea fascicularis'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'medium',
+        aggression: 'extreme',
+        spacingCm: 25,
+        zones: ['mittig', 'isolierter Randbereich'],
+        placement: 'Nur mit großem freien Umkreis. Nicht in dicht bewachsene Bereiche setzen.',
+        goodWith: [],
+        avoidNear: ['acropora', 'montipora-platte', 'euphyllia', 'zoanthus', 'ricordea', 'goniopora'],
+        warnings: ['Sehr lange Kampftentakel möglich.', 'Für Anfänger nur mit klarer Abstandskontrolle.']
+    },
+    {
+        id: 'goniopora',
+        name: 'Goniopora / Alveopora',
+        scientific: 'Goniopora, Alveopora spp.',
+        aliases: ['flowerpot', 'alveopora', 'blumentopfkoralle', 'goniopora blumentopf', 'alveopora blumentopf', 'margeritenkoralle'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'medium',
+        aggression: 'medium',
+        spacingCm: 12,
+        zones: ['mittig', 'unterer Riffbereich'],
+        placement: 'Mittelhell, weiche wechselnde Strömung. Polypen sollen sich bewegen, aber nicht geknickt werden.',
+        goodWith: ['duncan', 'caulastrea', 'trachyphyllia'],
+        avoidNear: ['euphyllia', 'galaxea', 'anemone'],
+        warnings: ['Polypen brauchen Platz zum Ausfahren.', 'Direkter Pumpenstrahl führt oft zu Rückzug.']
+    },
+    {
+        id: 'caulastrea',
+        name: 'Caulastrea',
+        scientific: 'Caulastrea spp.',
+        aliases: ['candy cane', 'trumpet coral', 'trompetenkoralle', 'bonbonkoralle', 'kelchkoralle', 'caulastrea furcata'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'low-medium',
+        aggression: 'medium',
+        spacingCm: 8,
+        zones: ['mittig', 'unten'],
+        placement: 'Mittelhell, sanft bis mittel bewegt. Gute LPS für ruhigere Bereiche.',
+        goodWith: ['duncan', 'trachyphyllia', 'goniopora'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Bei zu starker Strömung ziehen sich Polypen oft ein.']
+    },
+    {
+        id: 'duncan',
+        name: 'Duncanopsammia',
+        scientific: 'Duncanopsammia axifuga',
+        aliases: ['duncan', 'bartkoralle', 'bart koralle', 'duncan koralle', 'duncanopsammia axifuga'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'low-medium',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['mittig', 'unten'],
+        placement: 'Mittel bis eher niedriges Licht, sanfte wechselnde Strömung.',
+        goodWith: ['caulastrea', 'trachyphyllia', 'goniopora', 'ricordea'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Futter wird oft angenommen, aber nicht in direkte Strömung stellen.']
+    },
+    {
+        id: 'trachyphyllia',
+        name: 'Trachyphyllia / offene Hirnkorallen',
+        scientific: 'Trachyphyllia, Lobophyllia, Scolymia spp.',
+        aliases: ['trachy', 'lobophyllia', 'scoly', 'brain coral', 'acantho', 'hirnkoralle', 'offene hirnkoralle', 'fleischkoralle', 'muschelkoralle', 'scolymia', 'acantho koralle', 'trachyphyllia geoffroyi'],
+        type: 'LPS',
+        light: 'low-medium',
+        flow: 'low',
+        aggression: 'medium',
+        spacingCm: 12,
+        zones: ['Sandbett', 'unten', 'ruhige Zone'],
+        placement: 'Am besten auf Sand oder stabiler flacher Fläche, nicht auf scharfkantigem Riffgestein.',
+        goodWith: ['duncan', 'caulastrea', 'ricordea'],
+        avoidNear: ['euphyllia', 'galaxea', 'anemone'],
+        warnings: ['Fleischiges Gewebe kann an Steinkanten verletzt werden.', 'Nicht direkt beströmen.']
+    },
+    {
+        id: 'micromussa',
+        name: 'Micromussa / Acanthastrea',
+        scientific: 'Micromussa lordhowensis, Acanthastrea spp.',
+        aliases: ['acan', 'acanthastrea', 'micromussa', 'lord', 'acan koralle', 'acans', 'lordhowensis', 'micromussa lordhowensis'],
+        type: 'LPS',
+        light: 'low-medium',
+        flow: 'low-medium',
+        aggression: 'medium',
+        spacingCm: 8,
+        zones: ['unten', 'mittig schattiger'],
+        placement: 'Unten bis mittig, nicht zu hell starten. Sanfte wechselnde Strömung.',
+        goodWith: ['caulastrea', 'duncan', 'ricordea'],
+        avoidNear: ['euphyllia', 'galaxea', 'catalaphyllia'],
+        warnings: ['Langsam an Licht gewöhnen, viele Farbmorphen bleichen bei zu schnellem Hochsetzen.']
+    },
+    {
+        id: 'catalaphyllia',
+        name: 'Catalaphyllia',
+        scientific: 'Catalaphyllia jardinei',
+        aliases: ['elegance coral', 'wunderkoralle', 'elegance koralle', 'catalaphyllia jardinei'],
+        type: 'LPS',
+        light: 'medium',
+        flow: 'low-medium',
+        aggression: 'extreme',
+        spacingCm: 20,
+        zones: ['Sandbett', 'freier Bereich'],
+        placement: 'Freistehend auf dem Sand, moderate Lichtzone und sanfte Strömung.',
+        goodWith: [],
+        avoidNear: ['acropora', 'euphyllia', 'galaxea', 'zoanthus', 'trachyphyllia'],
+        warnings: ['Stark nesselnd und empfindlich bei Gewebeschäden.', 'Nicht zwischen Riffsteine quetschen.']
+    },
+    {
+        id: 'zoanthus',
+        name: 'Zoanthus / Palythoa',
+        scientific: 'Zoanthus, Palythoa spp.',
+        aliases: ['zoa', 'zoanthus', 'paly', 'palythoa', 'krustenanemone', 'krustenanemonen', 'zoanthiden', 'zoanthus kruste', 'palythoa kruste'],
+        type: 'Krustenanemone',
+        light: 'low-medium',
+        flow: 'medium',
+        aggression: 'medium',
+        spacingCm: 8,
+        zones: ['Inselstein', 'unten', 'mittig'],
+        placement: 'Am besten auf separatem Inselstein oder leicht kontrollierbarer Fläche.',
+        goodWith: ['zoanthus', 'ricordea', 'discosoma'],
+        avoidNear: ['acropora', 'montipora-platte', 'euphyllia', 'galaxea'],
+        warnings: ['Kann stark überwachsen.', 'Beim Schneiden/Handling Handschuhe und Augenschutz nutzen; Palythoa/Protopalythoa können problematische Toxine enthalten.', 'Nicht unkontrolliert ins Hauptriff wachsen lassen.']
+    },
+    {
+        id: 'pachyclavularia',
+        name: 'Affenhaar / Briareum / GSP',
+        scientific: 'Pachyclavularia, Briareum spp.',
+        aliases: ['affenhaar', 'green star polyps', 'gsp', 'briareum', 'pachyclavularia', 'clavularia', 'röhrenkoralle', 'roehrenkoralle', 'sternpolypen', 'grüne sternpolypen', 'gras koralle', 'briareum violaceum'],
+        type: 'Weichkoralle',
+        light: 'low-medium',
+        flow: 'medium-high',
+        aggression: 'medium',
+        spacingCm: 12,
+        zones: ['Inselstein', 'Rückwand', 'kontrollierbare Fläche'],
+        placement: 'Nur dort, wo Überwuchs erwünscht oder kontrollierbar ist. Ideal auf Inselstein oder Rückwand.',
+        goodWith: ['sarcophyton', 'sinularia'],
+        avoidNear: ['acropora', 'montipora-platte', 'micromussa', 'trachyphyllia'],
+        warnings: ['Sehr hohes Überwuchs-Risiko.', 'Nicht unüberlegt ins Hauptriff kleben.']
+    },
+    {
+        id: 'xenia',
+        name: 'Xenia / Pumpende Xenien',
+        scientific: 'Xenia spp.',
+        aliases: ['xenia', 'pumpende xenie', 'pulsing xenia', 'pumpende xenien', 'xenien', 'xenia umbellata'],
+        type: 'Weichkoralle',
+        light: 'low-medium',
+        flow: 'low-medium',
+        aggression: 'medium',
+        spacingCm: 12,
+        zones: ['Inselstein', 'kontrollierbarer Bereich'],
+        placement: 'Besser isoliert setzen, weil sie wandern und schnell Flächen besiedeln kann.',
+        goodWith: ['sarcophyton', 'sinularia'],
+        avoidNear: ['acropora', 'montipora-platte', 'micromussa'],
+        warnings: ['Sehr ausbreitungsfreudig.', 'Nur auf kontrollierbaren Bereichen platzieren.']
+    },
+    {
+        id: 'ricordea',
+        name: 'Ricordea / Scheibenanemonen',
+        scientific: 'Ricordea, Discosoma spp.',
+        aliases: ['ricordea', 'discosoma', 'mushroom', 'scheibenanemone', 'scheibenanemonen', 'pilzkoralle', 'pilzkorallen', 'yuma', 'florida'],
+        type: 'Scheibenanemone',
+        light: 'low-medium',
+        flow: 'low',
+        aggression: 'medium',
+        spacingCm: 8,
+        zones: ['unten', 'schattiger Rand', 'Inselstein'],
+        placement: 'Unten bis schattiger, wenig direkte Strömung. Kann sich lösen und wandern.',
+        goodWith: ['zoanthus', 'duncan', 'trachyphyllia'],
+        avoidNear: ['acropora', 'euphyllia', 'galaxea'],
+        warnings: ['Einige Scheiben können Nachbarn vernesseln oder überwachsen.', 'Nicht in starke Strömung setzen.']
+    },
+    {
+        id: 'sarcophyton',
+        name: 'Sarcophyton / Lederkoralle',
+        scientific: 'Sarcophyton spp.',
+        aliases: ['lederkoralle', 'sarcophyton', 'pilzlederkoralle', 'pilz lederkoralle', 'sarcophyton lederkoralle'],
+        type: 'Weichkoralle',
+        light: 'medium',
+        flow: 'medium',
+        aggression: 'chemical',
+        spacingCm: 12,
+        zones: ['mittig', 'freier Bereich'],
+        placement: 'Mittelhell und gut umspült. Genug Raum für Häutung und große Oberfläche lassen.',
+        goodWith: ['sinularia', 'pachyclavularia', 'xenia'],
+        avoidNear: ['acropora', 'sps-sensitive'],
+        warnings: ['Kann chemisch auf SPS wirken; Aktivkohle und Abstand helfen im Mischbecken.', 'Häutungsphasen nicht mit Absterben verwechseln.']
+    },
+    {
+        id: 'sinularia',
+        name: 'Sinularia / Weichkoralle',
+        scientific: 'Sinularia spp.',
+        aliases: ['sinularia', 'fingerlederkoralle', 'finger lederkoralle', 'baumlederkoralle', 'weichkoralle sinularia'],
+        type: 'Weichkoralle',
+        light: 'medium',
+        flow: 'medium',
+        aggression: 'chemical',
+        spacingCm: 12,
+        zones: ['mittig', 'freier Bereich'],
+        placement: 'Mittelhell, wechselnd umspült, mit Abstand zu empfindlichen SPS.',
+        goodWith: ['sarcophyton', 'pachyclavularia', 'xenia'],
+        avoidNear: ['acropora', 'sps-sensitive'],
+        warnings: ['Mischbecken mit vielen Weichkorallen: Kohlefilterung und Wasserwechsel einplanen.']
+    },
+    {
+        id: 'anemone',
+        name: 'Anemonen',
+        scientific: 'Entacmaea, Heteractis, Stichodactyla spp.',
+        aliases: ['anemone', 'entacmaea', 'kupferanemone', 'bubble tip', 'quadricolor', 'blasenanemone', 'bubble tip anemone', 'entacmaea quadricolor'],
+        type: 'Anemone',
+        light: 'medium-high',
+        flow: 'medium',
+        aggression: 'extreme',
+        spacingCm: 25,
+        zones: ['eigener Bereich', 'bewegliche Zone'],
+        placement: 'Nicht fest einplanen wie eine Koralle: Anemonen wandern, bis Licht, Strömung und Fußspalte passen.',
+        goodWith: [],
+        avoidNear: ['acropora', 'montipora-platte', 'euphyllia', 'trachyphyllia', 'zoanthus'],
+        warnings: ['Wandert und kann Korallen vernesseln.', 'Pumpen sichern.', 'Nur mit großem Sicherheitsbereich einsetzen.']
+    },
+    {
+        id: 'gorgonie-photo',
+        name: 'Photosynthetische Gorgonie',
+        scientific: 'Gorgonia, Pinnigorgia, Plexaura spp.',
+        aliases: ['gorgonie', 'photosynthetische gorgonie', 'hornkoralle', 'fächergorgonie', 'fächer gorgonie', 'pinnigorgia', 'plexaura'],
+        type: 'Gorgonie',
+        light: 'medium',
+        flow: 'high',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['mittig', 'oben seitlich', 'strömungsreicher Bereich'],
+        placement: 'Gute, wechselnde Strömung, damit keine Beläge entstehen. Licht mittel bis hell.',
+        goodWith: ['sarcophyton', 'sinularia', 'acropora'],
+        avoidNear: ['euphyllia', 'galaxea', 'anemone'],
+        warnings: ['Nicht in tote Ecken stellen, Gewebe sollte frei umspült werden.']
+    },
+    {
+        id: 'nonphoto-gorgonie',
+        name: 'Nicht-photosynthetische Gorgonie',
+        scientific: 'Diodogorgia, Menella spp.',
+        aliases: ['nps gorgonie', 'nicht photosynthetische gorgonie', 'menella', 'azoox gorgonie', 'nichtphotosynthetische gorgonie', 'diodogorgia', 'futtergorgonie'],
+        type: 'Gorgonie',
+        light: 'low',
+        flow: 'high',
+        aggression: 'low',
+        spacingCm: 8,
+        zones: ['schattig', 'strömungsreich'],
+        placement: 'Schattig, stark und wechselnd beströmt. Nur mit gezielter Fütterung sinnvoll.',
+        goodWith: ['gorgonie-photo'],
+        avoidNear: ['euphyllia', 'galaxea'],
+        warnings: ['Anspruchsvoll wegen Fütterung und Nährstoffeintrag.', 'Nicht als Anfänger-Koralle empfehlen.']
+    }
 ];
 const AQUARIUM_FIELD_KEYS = [
     'implementationLog',
@@ -278,6 +649,7 @@ const AQUARIUM_FIELD_KEYS = [
     'dashboardSettings',
     'coralCatalog',
     'coralTransfers',
+    'coralPlacementSettings',
     'lightingPlanner'
 ];
 const AQUARIUM_FIELD_KEY_SET = new Set(AQUARIUM_FIELD_KEYS);
@@ -3352,6 +3724,7 @@ function createWarehouseData(source = {}) {
         },
         coralCatalog: source.coralCatalog || [],
         coralTransfers: source.coralTransfers || [],
+        coralPlacementSettings: source.coralPlacementSettings || { customProfiles: [] },
         warehouseEvents: source.warehouseEvents || [],
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -3516,6 +3889,7 @@ function createAquariumData(source = {}) {
         }),
         coralCatalog: cloneSerializable(source.coralCatalog || []),
         coralTransfers: cloneSerializable(source.coralTransfers || []),
+        coralPlacementSettings: cloneSerializable(source.coralPlacementSettings || { customProfiles: [] }),
         lightingPlanner: cloneSerializable(source.lightingPlanner || createDefaultLightingPlanner()),
         localUpdatedAt: source.localUpdatedAt || null
     };
@@ -3682,6 +4056,8 @@ function normalizeWarehouseData(data) {
     if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
     if (!db.coralCatalog) db.coralCatalog = [];
     if (!db.coralTransfers) db.coralTransfers = [];
+    if (!db.coralPlacementSettings) db.coralPlacementSettings = { customProfiles: [] };
+    if (!Array.isArray(db.coralPlacementSettings.customProfiles)) db.coralPlacementSettings.customProfiles = [];
     if (!db.lightingPlanner) db.lightingPlanner = createDefaultLightingPlanner();
     if (db.implementationLogMigrated === undefined) db.implementationLogMigrated = true;
     if (!db.warehouseEvents) db.warehouseEvents = [];
@@ -5873,6 +6249,517 @@ function getCoralPhotoList(coral = null) {
     return [];
 }
 
+function getCoralPlacementSettings() {
+    if (!db.coralPlacementSettings) db.coralPlacementSettings = { customProfiles: [] };
+    if (!Array.isArray(db.coralPlacementSettings.customProfiles)) db.coralPlacementSettings.customProfiles = [];
+    return db.coralPlacementSettings;
+}
+
+function getCoralPlacementProfiles() {
+    const custom = getCoralPlacementSettings().customProfiles.map(profile => ({
+        ...profile,
+        custom: true,
+        aliases: Array.isArray(profile.aliases) ? profile.aliases : []
+    }));
+    return [...CORAL_PLACEMENT_PROFILES, ...custom];
+}
+
+function getCoralLightLabel(value = '') {
+    const labels = {
+        low: 'niedrig',
+        'low-medium': 'niedrig bis mittel',
+        medium: 'mittel',
+        'medium-high': 'mittel bis hoch',
+        high: 'hoch'
+    };
+    return labels[value] || value || '-';
+}
+
+function getCoralFlowLabel(value = '') {
+    const labels = {
+        low: 'sanft',
+        'low-medium': 'sanft bis mittel',
+        medium: 'mittel wechselnd',
+        'medium-high': 'mittel bis stark turbulent',
+        high: 'stark turbulent'
+    };
+    return labels[value] || value || '-';
+}
+
+function getCoralAggressionLabel(value = '') {
+    const labels = {
+        low: 'friedlich',
+        medium: 'mäßig nesselnd',
+        high: 'stark nesselnd',
+        extreme: 'sehr stark / Kampftentakel',
+        chemical: 'chemische Konkurrenz'
+    };
+    return labels[value] || value || '-';
+}
+
+function getCoralRequirementRank(value = '') {
+    if (value === 'low') return 1;
+    if (value === 'low-medium') return 1.5;
+    if (value === 'medium') return 2;
+    if (value === 'medium-high') return 2.5;
+    if (value === 'high') return 3;
+    return 2;
+}
+
+function getCoralProfileSearchText(profile = {}) {
+    return normalizeSearchText([
+        profile.name,
+        profile.scientific,
+        profile.type,
+        ...(profile.aliases || [])
+    ].join(' '));
+}
+
+function getCoralProfileForCoral(coral = {}) {
+    const profiles = getCoralPlacementProfiles();
+    const candidates = [
+        coral.scientificName,
+        coral.tradeName,
+        coral.name,
+        coral.genus,
+        coral.speciesName,
+        coral.species
+    ].filter(Boolean).map(normalizeSearchText);
+    const exact = profiles.find(profile => {
+        const search = getCoralProfileSearchText(profile);
+        return candidates.some(candidate => candidate && (search.includes(candidate) || candidate.includes(normalizeSearchText(profile.name))));
+    });
+    if (exact) return exact;
+    const type = normalizeSearchText(coral.coralType || '');
+    if (type.includes('sps')) return profiles.find(profile => profile.id === 'montipora-digitat') || profiles[0];
+    if (type.includes('lps')) return profiles.find(profile => profile.id === 'caulastrea') || profiles[0];
+    if (type.includes('krusten')) return profiles.find(profile => profile.id === 'zoanthus') || profiles[0];
+    if (type.includes('scheiben')) return profiles.find(profile => profile.id === 'ricordea') || profiles[0];
+    if (type.includes('weich')) return profiles.find(profile => profile.id === 'sarcophyton') || profiles[0];
+    if (type.includes('anemone')) return profiles.find(profile => profile.id === 'anemone') || profiles[0];
+    if (type.includes('gorgonie')) return profiles.find(profile => profile.id === 'gorgonie-photo') || profiles[0];
+    return null;
+}
+
+function findCoralPlacementProfile(query = '') {
+    const normalized = normalizeSearchText(query);
+    if (!normalized) return null;
+    const owned = getCoralCatalog().find(coral => normalizeSearchText(getCoralDisplayName(coral)) === normalized || normalizeSearchText(coral.scientificName || '') === normalized);
+    if (owned) return {
+        ...getCoralProfileForCoral(owned),
+        name: getCoralDisplayName(owned),
+        scientific: owned.scientificName || owned.tradeName || '',
+        type: owned.coralType || getCoralProfileForCoral(owned)?.type || '',
+        ownedCoral: owned
+    };
+    const profiles = getCoralPlacementProfiles();
+    const directMatch = profiles.find(profile => normalizeSearchText(profile.name) === normalized || normalizeSearchText(profile.scientific) === normalized)
+        || profiles.find(profile => (profile.aliases || []).some(alias => normalizeSearchText(alias) === normalized))
+        || profiles.find(profile => getCoralProfileSearchText(profile).includes(normalized) || normalized.includes(normalizeSearchText(profile.name)));
+    if (directMatch) return directMatch;
+
+    const tokens = normalized.split(/\s+/).filter(token => token.length > 1);
+    if (!tokens.length) return null;
+    const ranked = profiles.map(profile => {
+        const search = getCoralProfileSearchText(profile);
+        const matched = tokens.filter(token => search.includes(token)).length;
+        const coverage = matched / tokens.length;
+        const name = normalizeSearchText(profile.name);
+        const bonus = tokens.some(token => name.startsWith(token)) ? 0.12 : 0;
+        return { profile, matched, score: coverage + bonus };
+    }).filter(entry => entry.matched > 0)
+        .sort((a, b) => b.score - a.score || b.matched - a.matched || a.profile.name.localeCompare(b.profile.name, 'de'));
+    const best = ranked[0];
+    return best && (best.score >= 0.67 || (tokens.length === 1 && best.matched === 1)) ? best.profile : null;
+}
+
+function renderCoralPlacementOptions() {
+    const datalist = document.getElementById('coralPlacementOptions');
+    const ownedSelect = document.getElementById('coralPlacementOwned');
+    if (datalist) {
+        const profileOptions = getCoralPlacementProfiles().map(profile => `<option value="${escapeHtml(profile.name)}">${escapeHtml(profile.scientific || profile.type || '')}</option>`);
+        const ownedOptions = getCoralCatalog().map(coral => `<option value="${escapeHtml(getCoralDisplayName(coral))}">${escapeHtml(coral.scientificName || coral.coralType || 'Eigener Bestand')}</option>`);
+        datalist.innerHTML = [...ownedOptions, ...profileOptions].join('');
+    }
+    if (ownedSelect) {
+        const current = ownedSelect.value;
+        ownedSelect.innerHTML = '<option value="">Optional auswählen</option>' + getCoralCatalog()
+            .slice()
+            .sort((a, b) => getCoralDisplayName(a).localeCompare(getCoralDisplayName(b), 'de'))
+            .map(coral => `<option value="${escapeHtml(coral.id)}">${escapeHtml(getCoralDisplayName(coral))}</option>`)
+            .join('');
+        ownedSelect.value = getCoralCatalog().some(coral => coral.id === current) ? current : '';
+    }
+}
+
+function useOwnedCoralForPlacement() {
+    const id = document.getElementById('coralPlacementOwned')?.value || '';
+    const coral = getCoralById(id);
+    const query = document.getElementById('coralPlacementQuery');
+    if (query && coral) query.value = getCoralDisplayName(coral);
+    updateCoralPlacementAdvisor();
+}
+
+function getCoralCatalogSearchText(coral = {}) {
+    const profile = getCoralProfileForCoral(coral) || {};
+    return normalizeSearchText([
+        coral.name,
+        coral.species,
+        coral.color,
+        coral.tradeName,
+        coral.scientificName,
+        coral.genus,
+        coral.speciesName,
+        coral.coralType,
+        coral.growthForm,
+        profile.name,
+        profile.scientific,
+        profile.type,
+        ...(profile.aliases || [])
+    ].filter(Boolean).join(' '));
+}
+
+function getCoralPlacementContext() {
+    const settings = getCoralPlacementSettings();
+    const stored = settings.tankContext || {};
+    const fields = {
+        coralTankLength: stored.length,
+        coralTankWidth: stored.width,
+        coralTankHeight: stored.height,
+        coralLightSetup: stored.light,
+        coralPumpSetup: stored.pump
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const element = document.getElementById(id);
+        if (!element || element.dataset.coralContextReady === 'true') return;
+        if (value !== undefined && value !== null && value !== '') element.value = value;
+        element.dataset.coralContextReady = 'true';
+    });
+    const context = {
+        length: Math.max(20, parseFloat(document.getElementById('coralTankLength')?.value || '120') || 120),
+        width: Math.max(20, parseFloat(document.getElementById('coralTankWidth')?.value || '60') || 60),
+        height: Math.max(20, parseFloat(document.getElementById('coralTankHeight')?.value || '55') || 55),
+        light: document.getElementById('coralLightSetup')?.value || 'center',
+        pump: document.getElementById('coralPumpSetup')?.value || 'both-high'
+    };
+    if (JSON.stringify(stored) !== JSON.stringify(context)) {
+        settings.tankContext = { ...context };
+        clearTimeout(coralPlacementContextSaveTimer);
+        coralPlacementContextSaveTimer = setTimeout(() => saveDB(), 450);
+    }
+    return context;
+}
+
+function getCoralZoneScores(profile = {}, context = getCoralPlacementContext()) {
+    const lightNeed = getCoralRequirementRank(profile.light);
+    const flowNeed = getCoralRequirementRank(profile.flow);
+    const verticals = [
+        { key: 'oben', label: 'Oben', light: context.light === 'soft' ? 2 : 3 },
+        { key: 'mitte', label: 'Mitte', light: context.light === 'soft' ? 1.45 : 2.15 },
+        { key: 'unten', label: 'Unten', light: context.light === 'soft' ? 1 : 1.15 }
+    ];
+    const flowByPump = {
+        'left-high': [3, 2, 1.2],
+        'right-high': [1.2, 2, 3],
+        'both-high': [3, 2, 3],
+        gyre: [2.55, 2.35, 2.55],
+        soft: [1.25, 1.5, 1.25]
+    };
+    const flows = flowByPump[context.pump] || flowByPump['both-high'];
+    const horizontals = [
+        { key: 'links', label: 'Links', flow: flows[0], direct: ['left-high', 'both-high'].includes(context.pump) },
+        { key: 'mitte', label: 'Mitte', flow: flows[1], direct: false },
+        { key: 'rechts', label: 'Rechts', flow: flows[2], direct: ['right-high', 'both-high'].includes(context.pump) }
+    ];
+    return verticals.flatMap(vertical => horizontals.map(horizontal => {
+        let localLight = vertical.light;
+        if (context.light === 'center') localLight += horizontal.key === 'mitte' ? 0.35 : -0.25;
+        if (context.light === 'spot') localLight += horizontal.key === 'mitte' ? 0.55 : -0.55;
+        const verticalFlowLoss = vertical.key === 'oben' ? 0 : vertical.key === 'mitte' ? 0.25 : 0.55;
+        const localFlow = Math.max(1, horizontal.flow - verticalFlowLoss);
+        let score = 100 - Math.abs(localLight - lightNeed) * 25 - Math.abs(localFlow - flowNeed) * 25;
+        const warnings = [];
+        if (horizontal.direct && vertical.key === 'oben' && ['low', 'low-medium'].includes(profile.flow)) {
+            score -= 26;
+            warnings.push('Direkte Pumpenströmung vermeiden');
+        }
+        if (vertical.key === 'oben' && ['low', 'low-medium'].includes(profile.light)) {
+            score -= 18;
+            warnings.push('Langsam ans Licht gewöhnen');
+        }
+        if (vertical.key === 'unten' && profile.light === 'high') {
+            score -= 20;
+            warnings.push('Wahrscheinlich zu dunkel');
+        }
+        if ((profile.zones || []).some(zone => /sand|unten/i.test(zone)) && vertical.key === 'unten') score += 14;
+        if ((profile.zones || []).some(zone => /oben/i.test(zone)) && vertical.key === 'oben') score += 9;
+        if ((profile.zones || []).some(zone => /mitte/i.test(zone)) && vertical.key === 'mitte') score += 9;
+        if ((profile.zones || []).some(zone => /insel|kontroll|rand/i.test(zone)) && horizontal.key !== 'mitte') score += 8;
+        const zoneLabel = vertical.key === 'mitte'
+            ? (horizontal.key === 'mitte' ? 'Beckenmitte' : `Mittig ${horizontal.label.toLowerCase()}`)
+            : `${vertical.label} ${horizontal.key === 'mitte' ? 'mittig' : horizontal.label.toLowerCase()}`;
+        return {
+            key: `${vertical.key}-${horizontal.key}`,
+            vertical: vertical.key,
+            horizontal: horizontal.key,
+            label: zoneLabel,
+            score: Math.max(0, Math.min(100, Math.round(score))),
+            warnings
+        };
+    }));
+}
+
+function renderCoralPlacementMap(zones = [], context = getCoralPlacementContext()) {
+    const bestZone = [...zones].sort((a, b) => b.score - a.score)[0];
+    const qualityLabel = score => score >= 78 ? 'Sehr passend' : score >= 56 ? 'Bedingt passend' : 'Eher ungeeignet';
+    const hasLeftPump = ['left-high', 'both-high', 'gyre'].includes(context.pump);
+    const hasRightPump = ['right-high', 'both-high', 'gyre'].includes(context.pump);
+    const lightLabel = context.light === 'even' ? 'Flächige Beleuchtung' : context.light === 'soft' ? 'Sanfte Beleuchtung' : context.light === 'spot' ? 'Spot-Beleuchtung' : 'Zentrale Beleuchtung';
+    return `
+        <div class="coral-tank-map" aria-label="Vorderansicht des Aquariums mit neun möglichen Standorten">
+            <div class="coral-aquarium-title">
+                <div><strong>Aquarium</strong><span>Blick von vorne</span></div>
+                <small>${Math.round(context.length)} × ${Math.round(context.height)} cm</small>
+            </div>
+            <div class="coral-aquarium-light coral-aquarium-light-${escapeHtml(context.light)}"><span>${escapeHtml(lightLabel)}</span></div>
+            <div class="coral-aquarium-glass">
+                <div class="coral-waterline"><span>Wasseroberfläche</span></div>
+                ${hasLeftPump ? '<span class="coral-pump-marker is-left" title="Strömungspumpe links"><i></i><b>Pumpe</b></span>' : ''}
+                ${hasRightPump ? '<span class="coral-pump-marker is-right" title="Strömungspumpe rechts"><i></i><b>Pumpe</b></span>' : ''}
+                <div class="coral-zone-map">
+                    ${zones.map(zone => `
+                        <div class="coral-zone-cell ${zone.score >= 78 ? 'is-good' : zone.score >= 56 ? 'is-ok' : 'is-risk'} ${zone.key === bestZone?.key ? 'is-best' : ''}" title="${escapeHtml(zone.label)}: ${zone.score}% Modellwert">
+                            ${zone.key === bestZone?.key ? '<b class="coral-best-marker">Empfohlen</b>' : ''}
+                            <strong>${escapeHtml(zone.label)}</strong>
+                            <span>${qualityLabel(zone.score)}</span>
+                            ${zone.warnings.length ? `<small>${escapeHtml(zone.warnings[0])}</small>` : ''}
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="coral-substrate"><span>Sand / Bodengrund</span></div>
+            </div>
+            <div class="coral-tank-map-foot"><span>Linke Beckenseite</span><span>Rechte Beckenseite</span></div>
+            <div class="coral-zone-legend"><span class="is-good">Sehr passend</span><span class="is-ok">Bedingt</span><span class="is-risk">Ungeeignet</span></div>
+            <p class="coral-map-disclaimer">Schematische 2D-Einschätzung. Riffaufbau, Schatten, PAR und reale Verwirbelungen vor Ort prüfen.</p>
+        </div>
+    `;
+}
+
+function getCoralPlacementConfidence(bestZone, zones = []) {
+    const sorted = [...zones].sort((a, b) => b.score - a.score);
+    const distance = (sorted[0]?.score || 0) - (sorted[1]?.score || 0);
+    if ((bestZone?.score || 0) >= 82 && distance >= 8) return 'Klare Empfehlung';
+    if ((bestZone?.score || 0) >= 68) return 'Gute Orientierung';
+    return 'Vorsichtig testen';
+}
+
+function renderCoralPlacementPrimary(profile = {}, zones = [], context = {}) {
+    const bestZone = [...zones].sort((a, b) => b.score - a.score)[0];
+    if (!bestZone) return '';
+    const alternative = [...zones]
+        .sort((a, b) => b.score - a.score)
+        .find(zone => zone.key !== bestZone.key && zone.score >= 56);
+    const tankLabel = `${Math.round(context.length)} × ${Math.round(context.width)} × ${Math.round(context.height)} cm`;
+    return `
+        <div class="coral-primary-recommendation">
+            <div class="coral-primary-icon" aria-hidden="true"><span></span></div>
+            <div class="coral-primary-copy">
+                <span>${escapeHtml(getCoralPlacementConfidence(bestZone, zones))}</span>
+                <h3>${escapeHtml(bestZone.label)}</h3>
+                <p>${alternative ? `Alternative: ${escapeHtml(alternative.label)}. ` : ''}Auswertung für ${escapeHtml(tankLabel)}.</p>
+            </div>
+            <div class="coral-primary-facts">
+                <div><small>Licht</small><strong>${escapeHtml(getCoralLightLabel(profile.light))}</strong></div>
+                <div><small>Strömung</small><strong>${escapeHtml(getCoralFlowLabel(profile.flow))}</strong></div>
+                <div><small>Freiraum</small><strong>${escapeHtml(profile.spacingCm || 8)} cm</strong></div>
+            </div>
+        </div>
+    `;
+}
+
+function assessCoralCompatibility(profileA = null, profileB = null) {
+    if (!profileA || !profileB) return null;
+    const result = {
+        level: 'good',
+        title: 'Gut kombinierbar',
+        spacing: Math.max(profileA.spacingCm || 8, profileB.spacingCm || 8),
+        notes: []
+    };
+    const aAvoidsB = (profileA.avoidNear || []).includes(profileB.id) || (profileA.avoidNear || []).some(id => getCoralProfileSearchText(profileB).includes(id));
+    const bAvoidsA = (profileB.avoidNear || []).includes(profileA.id) || (profileB.avoidNear || []).some(id => getCoralProfileSearchText(profileA).includes(id));
+    const extreme = [profileA.aggression, profileB.aggression].includes('extreme');
+    const stronglyAggressive = [profileA.aggression, profileB.aggression].includes('high');
+    const chemical = [profileA.aggression, profileB.aggression].includes('chemical');
+    const overgrowth = [...(profileA.warnings || []), ...(profileB.warnings || [])].some(note => /überwuchs|überwachsen|ausbreit/i.test(note));
+    const lightMismatch = Math.abs(getCoralRequirementRank(profileA.light) - getCoralRequirementRank(profileB.light)) >= 1.5;
+    const flowMismatch = Math.abs(getCoralRequirementRank(profileA.flow) - getCoralRequirementRank(profileB.flow)) >= 1.5;
+    if (aAvoidsB || bAvoidsA || extreme) {
+        result.level = 'bad';
+        result.title = 'Nur mit großem Abstand';
+        result.spacing = Math.max(result.spacing, extreme ? 20 : 14);
+        result.notes.push('Mindestens Sicherheitsabstand einhalten und Wachstum einplanen.');
+    }
+    if (stronglyAggressive && result.level === 'good') {
+        result.level = 'caution';
+        result.title = 'Mit Abstand kombinieren';
+        result.notes.push('Nesselkontakt vermeiden und den Platzbedarf bei voller Expansion berücksichtigen.');
+    }
+    if (chemical && (profileA.type === 'SPS' || profileB.type === 'SPS')) {
+        result.level = result.level === 'bad' ? 'bad' : 'caution';
+        result.title = result.level === 'bad' ? result.title : 'Mit Vorsicht kombinieren';
+        result.notes.push('Weichkorallen können chemisch konkurrieren; Abstand, Aktivkohle und gute Wasserpflege helfen.');
+    }
+    if (overgrowth) {
+        result.level = result.level === 'bad' ? 'bad' : 'caution';
+        result.title = result.level === 'bad' ? result.title : 'Besser kontrollierbar platzieren';
+        result.notes.push('Überwuchs-Risiko: Inselstein, Rückwand oder leicht trennbare Fläche bevorzugen.');
+    }
+    if (lightMismatch || flowMismatch) {
+        result.level = result.level === 'bad' ? 'bad' : 'caution';
+        if (result.level !== 'bad') result.title = 'Nicht für dieselbe Haltungszone';
+        const mismatch = [lightMismatch ? 'Licht' : '', flowMismatch ? 'Strömung' : ''].filter(Boolean).join(' und ');
+        result.notes.push(`Die Anforderungen an ${mismatch} unterscheiden sich deutlich. Nicht unmittelbar auf derselben Höhe und Strömungsachse platzieren.`);
+    }
+    if (profileA.id === profileB.id && profileA.aggression !== 'extreme') {
+        result.notes.push('Gleiche oder sehr ähnliche Gruppen sind oft einfacher nebeneinander zu planen.');
+    }
+    if (!result.notes.length) result.notes.push('Trotzdem beobachten: Polypenbild, Gewebekontakt, Schatten und Wachstum können die Einschätzung ändern.');
+    return result;
+}
+
+function renderCoralCompatibility(profileA, profileB) {
+    const result = assessCoralCompatibility(profileA, profileB);
+    if (!result) return '<div class="coral-empty-state"><strong>Wähle zwei Korallen</strong><p>Dann wird Abstand, Risiko und passende Nachbarschaft bewertet.</p></div>';
+    return `
+        <div class="coral-compat-card is-${result.level}">
+            <span>${escapeHtml(result.title)}</span>
+            <strong>${escapeHtml(profileA.name)} + ${escapeHtml(profileB.name)}</strong>
+            <p>Empfohlener Mindestabstand: <b>${result.spacing} cm</b></p>
+            <ul>${result.notes.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul>
+        </div>
+    `;
+}
+
+function updateCoralCompatibilityAdvisor() {
+    const target = document.getElementById('coralCompatibilityResult');
+    if (!target) return;
+    const profileA = findCoralPlacementProfile(document.getElementById('coralCompatibilityA')?.value || '');
+    const profileB = findCoralPlacementProfile(document.getElementById('coralCompatibilityB')?.value || '');
+    target.innerHTML = renderCoralCompatibility(profileA, profileB);
+}
+
+function updateCoralPlacementAdvisor() {
+    renderCoralPlacementOptions();
+    const result = document.getElementById('coralPlacementResult');
+    const stockResult = document.getElementById('coralAdvisorOwnStockResult');
+    if (!result) return;
+    const query = document.getElementById('coralPlacementQuery')?.value || '';
+    const profile = findCoralPlacementProfile(query);
+    if (!profile) {
+        result.innerHTML = '<div class="coral-empty-state"><strong>Koralle suchen</strong><p>Tippe Gattung, Handelsnamen oder wähle eine Koralle aus deinem Bestand.</p></div>';
+        if (stockResult) stockResult.innerHTML = '';
+        updateCoralCompatibilityAdvisor();
+        return;
+    }
+    const context = getCoralPlacementContext();
+    const zones = getCoralZoneScores(profile, context);
+    result.innerHTML = `
+        <div class="coral-advice-summary">
+            <div>
+                <span>${escapeHtml(profile.type || 'Koralle')}</span>
+                <h4>${escapeHtml(profile.name)}</h4>
+                <p>${escapeHtml(profile.scientific || '')}</p>
+            </div>
+            <span class="coral-profile-label">${profile.ownedCoral ? 'Aus deinem Bestand' : 'Berater-Profil'}</span>
+        </div>
+        ${renderCoralPlacementPrimary(profile, zones, context)}
+        <div class="coral-recommendation-layout">
+            ${renderCoralPlacementMap(zones, context)}
+            <div class="coral-advice-text">
+                <div class="coral-advice-block">
+                    <span class="coral-advice-kicker">Warum dieser Standort?</span>
+                    <p>${escapeHtml(profile.placement || 'Mittelzone wählen und Reaktion beobachten.')}</p>
+                </div>
+                ${(profile.warnings || []).length ? `
+                    <div class="coral-advice-block coral-warning-block">
+                        <span class="coral-advice-kicker">Darauf achten</span>
+                        <ul>${profile.warnings.map(note => `<li>${escapeHtml(note)}</li>`).join('')}</ul>
+                    </div>
+                ` : ''}
+                <p class="coral-observation-note"><strong>Nach dem Einsetzen:</strong> Polypenbild, Gewebe und Farbe mehrere Tage beobachten. Bei Stress Licht oder Strömung schrittweise verändern.</p>
+            </div>
+        </div>
+    `;
+    if (stockResult) {
+        const owned = getCoralCatalog().filter(coral => getCoralDisplayName(coral) !== profile.name);
+        const matches = owned.map(coral => {
+            const otherProfile = getCoralProfileForCoral(coral);
+            const rating = assessCoralCompatibility(profile, otherProfile);
+            return { coral, rating };
+        }).filter(entry => entry.rating);
+        stockResult.innerHTML = matches.length ? `
+            <section class="coral-advisor-panel">
+                <h4>Passend zu deinem Bestand</h4>
+                <div class="coral-stock-compat-list">
+                    ${matches.map(({ coral, rating }) => `
+                        <div class="coral-stock-compat-row is-${rating.level}">
+                            <strong>${escapeHtml(getCoralDisplayName(coral))}</strong>
+                            <span>${escapeHtml(rating.title)} · Abstand ${escapeHtml(rating.spacing)} cm</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </section>
+        ` : '';
+    }
+    updateCoralCompatibilityAdvisor();
+}
+
+function saveCustomCoralPlacementProfile() {
+    const name = cleanIcpCell(document.getElementById('coralCustomProfileName')?.value || '');
+    if (!name) return alert('Bitte gib einen Namen oder eine Gattung ein.');
+    const profile = {
+        id: `custom-${normalizeSearchText(name).replace(/\s+/g, '-') || createWarehouseId()}`,
+        name,
+        scientific: name,
+        aliases: [name],
+        type: document.getElementById('coralCustomProfileType')?.value || 'LPS',
+        light: document.getElementById('coralCustomProfileLight')?.value || 'medium',
+        flow: document.getElementById('coralCustomProfileFlow')?.value || 'medium',
+        aggression: document.getElementById('coralCustomProfileAggression')?.value || 'medium',
+        spacingCm: parseFloat(document.getElementById('coralCustomProfileSpacing')?.value || '10') || 10,
+        zones: [],
+        placement: document.getElementById('coralCustomProfileNotes')?.value?.trim() || 'Nach eigenem Profil platzieren und Reaktion beobachten.',
+        goodWith: [],
+        avoidNear: [],
+        warnings: [document.getElementById('coralCustomProfileNotes')?.value?.trim()].filter(Boolean)
+    };
+    const settings = getCoralPlacementSettings();
+    settings.customProfiles = settings.customProfiles.filter(entry => entry.id !== profile.id && normalizeSearchText(entry.name) !== normalizeSearchText(profile.name));
+    settings.customProfiles.unshift(profile);
+    saveDB();
+    resetCustomCoralPlacementProfileForm();
+    updateCoralPlacementAdvisor();
+    showToast('Korallenprofil gespeichert', 'success', 2200);
+}
+
+function resetCustomCoralPlacementProfileForm() {
+    ['coralCustomProfileName', 'coralCustomProfileNotes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const defaults = {
+        coralCustomProfileType: 'LPS',
+        coralCustomProfileLight: 'medium',
+        coralCustomProfileFlow: 'medium',
+        coralCustomProfileAggression: 'medium',
+        coralCustomProfileSpacing: '10'
+    };
+    Object.entries(defaults).forEach(([id, value]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = value;
+    });
+}
+
 function getMotherCoralOptions(currentId = '') {
     return getCoralCatalog()
         .filter(entry => entry.id !== currentId)
@@ -6162,10 +7049,12 @@ function renderCoralTransfers() {
 
 function renderCoralCatalog() {
     renderAquariumWorkspacePanels();
+    updateCoralPlacementAdvisor();
     const list = document.getElementById('coralCatalogList');
     const stats = document.getElementById('coralLibraryStats');
     if (!list) return;
-    const search = (document.getElementById('coralSearch')?.value || '').trim().toLowerCase();
+    const searchRaw = (document.getElementById('coralSearch')?.value || '').trim();
+    const search = normalizeSearchText(searchRaw);
     const statusFilter = document.getElementById('coralStatusFilter')?.value || 'all';
     const filterStatus = document.getElementById('coralFilterStatus');
     const corals = getCoralCatalog()
@@ -6173,7 +7062,7 @@ function renderCoralCatalog() {
         .filter(entry => statusFilter === 'all' || entry.status === statusFilter)
         .filter(entry => {
             if (!search) return true;
-            return [entry.name, entry.species, entry.color, entry.tradeName, entry.scientificName, entry.genus, entry.speciesName].join(' ').toLowerCase().includes(search);
+            return getCoralCatalogSearchText(entry).includes(search);
         })
         .sort((a, b) => new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0));
     if (!coralUiState.editingId && !coralUiState.pendingPhotos.length) renderCoralPhotoPreview([]);
@@ -6186,7 +7075,7 @@ function renderCoralCatalog() {
         `;
     }
     if (filterStatus) {
-        const active = [search ? `Suche „${search}“` : '', statusFilter !== 'all' ? getCoralStatusLabel(statusFilter) : ''].filter(Boolean);
+        const active = [searchRaw ? `Suche „${searchRaw}“` : '', statusFilter !== 'all' ? getCoralStatusLabel(statusFilter) : ''].filter(Boolean);
         filterStatus.innerHTML = `<span><strong>${corals.length}</strong> ${corals.length === 1 ? 'Koralle' : 'Korallen'}</span>${active.length ? `<span class="status-badge status-info">${active.map(escapeHtml).join(' · ')}</span>` : '<span class="status-badge status-neutral">Gesamter Bestand</span>'}`;
     }
     renderCoralTransfers();
