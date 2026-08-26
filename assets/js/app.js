@@ -817,6 +817,7 @@ let persistSequence = Promise.resolve();
 let latestPersistAt = null;
 let latestSnapshotAt = null;
 let appBootstrapComplete = false;
+let pendingStartupTab = '';
 let startupStorageRecoveryCandidate = null;
 let lastPersistenceErrorAt = null;
 let lastPersistenceErrorMessage = '';
@@ -3941,7 +3942,7 @@ function createFreshAppState() {
 
 function migrateToWarehouseState(parsed) {
     if (parsed && parsed.warehouses && typeof parsed.warehouses === 'object') {
-        return parsed;
+        return normalizeProjectStateAfterRestore(parsed);
     }
 
     const record = {
@@ -3969,6 +3970,93 @@ function migrateToWarehouseState(parsed) {
             }
         }
     };
+}
+
+function extractLegacyAquariumDataFromWarehouses(state = {}) {
+    const legacy = {};
+    Object.values(state.warehouses || {}).some(warehouse => {
+        const data = warehouse?.data || {};
+        const hasAquariumData = AQUARIUM_FIELD_KEYS.some(key => data[key] !== undefined);
+        if (!hasAquariumData) return false;
+        AQUARIUM_FIELD_KEYS.forEach(key => {
+            if (data[key] !== undefined) legacy[key] = cloneSerializable(data[key]);
+        });
+        return true;
+    });
+    return legacy;
+}
+
+function stripAquariumFieldsFromWarehouseData(data = {}) {
+    const cleaned = cloneSerializable(data || {});
+    AQUARIUM_FIELD_KEYS.forEach(key => {
+        delete cleaned[key];
+    });
+    return cleaned;
+}
+
+function normalizeProjectStateAfterRestore(rawState = {}) {
+    const state = cloneSerializable(rawState || {});
+    const hadAquariums = state.aquariums && typeof state.aquariums === 'object' && Object.keys(state.aquariums).length > 0;
+    const legacyAquariumData = hadAquariums ? {} : extractLegacyAquariumDataFromWarehouses(state);
+
+    if (!state.warehouses || typeof state.warehouses !== 'object' || Array.isArray(state.warehouses)) {
+        state.warehouses = {};
+    }
+    Object.entries(state.warehouses).forEach(([id, warehouse]) => {
+        if (!warehouse || typeof warehouse !== 'object') {
+            state.warehouses[id] = createWarehouseRecord('Lager', {});
+            state.warehouses[id].id = id;
+            return;
+        }
+        warehouse.id = warehouse.id || id;
+        warehouse.name = warehouse.name || 'Lager';
+        warehouse.createdAt = warehouse.createdAt || new Date().toISOString();
+        warehouse.data = stripAquariumFieldsFromWarehouseData(warehouse.data || {});
+    });
+
+    if (!Object.keys(state.warehouses).length) {
+        const warehouse = createWarehouseRecord('Hauptlager', {});
+        warehouse.id = 'main';
+        state.warehouses.main = warehouse;
+        state.activeWarehouseId = 'main';
+    }
+
+    if (!state.aquariums || typeof state.aquariums !== 'object' || Array.isArray(state.aquariums) || !Object.keys(state.aquariums).length) {
+        state.aquariums = {
+            'aquarium-main': {
+                id: 'aquarium-main',
+                name: 'Hauptaquarium',
+                createdAt: new Date().toISOString(),
+                data: createAquariumData(legacyAquariumData)
+            }
+        };
+        state.activeAquariumId = 'aquarium-main';
+    } else {
+        Object.entries(state.aquariums).forEach(([id, aquarium]) => {
+            if (!aquarium || typeof aquarium !== 'object') {
+                state.aquariums[id] = createAquariumRecord('Aquarium', {});
+                state.aquariums[id].id = id;
+                return;
+            }
+            aquarium.id = aquarium.id || id;
+            aquarium.name = aquarium.name || 'Aquarium';
+            aquarium.createdAt = aquarium.createdAt || new Date().toISOString();
+            aquarium.data = normalizeAquariumData(aquarium.data || {});
+        });
+    }
+
+    if (!state.warehouses[state.activeWarehouseId]) {
+        state.activeWarehouseId = Object.keys(state.warehouses)[0] || 'main';
+    }
+    if (!state.aquariums[state.activeAquariumId]) {
+        state.activeAquariumId = Object.keys(state.aquariums)[0] || 'aquarium-main';
+    }
+    state.version = state.version || 1;
+    if (!Array.isArray(state.pendingDeletedRemoteIds)) state.pendingDeletedRemoteIds = [];
+    if (!state.communityMapProfileDraft) state.communityMapProfileDraft = {};
+    if (!state.hiddenSharedOwners) state.hiddenSharedOwners = {};
+    if (!state.knownSharedOwners) state.knownSharedOwners = {};
+    return state;
 }
 
 function getActiveWarehouse() {
@@ -4003,6 +4091,9 @@ function overlayActiveAquariumData() {
     const aquarium = getActiveAquarium();
     if (!aquarium) return;
     aquarium.data = normalizeAquariumData(aquarium.data);
+    AQUARIUM_FIELD_KEYS.forEach(key => {
+        delete db[key];
+    });
     AQUARIUM_FIELD_KEYS.forEach(key => {
         db[key] = cloneSerializable(aquarium.data[key]);
     });
@@ -4143,7 +4234,6 @@ async function initDB() {
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
     setDemoProfileActive(isDemoProfileActive());
-    appBootstrapComplete = true;
     const initialPersistOk = await persistAppStateNow(parsed ? 'init-load' : 'init-empty', false);
     await trimStoredSnapshots();
     if (initialPersistOk) {
@@ -7449,7 +7539,15 @@ function selectTab(tabId) {
     if (isUserMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
-    showTab(tabId);
+    if (!appBootstrapComplete) {
+        pendingStartupTab = APP_TAB_IDS.includes(tabId) ? tabId : getFirstVisibleTab();
+        try {
+            const nextHash = '#' + encodeURIComponent(pendingStartupTab);
+            if (window.location.hash !== nextHash) history.replaceState(null, '', nextHash);
+        } catch(e) {}
+        return;
+    }
+    showTab(tabId, 'push');
     setMenuOpenState(false, false);
 }
 
@@ -7504,7 +7602,7 @@ function refreshDesignMotionTargets(scope = document.querySelector('.tab-content
     }, 900);
 }
 
-function showTab(tabId) {
+function showTab(tabId, historyMode = 'replace') {
     if (isUserMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
@@ -7554,13 +7652,25 @@ function showTab(tabId) {
     try { localStorage.setItem(LAST_TAB_KEY, tabId); } catch(e) {}
     try {
         const nextHash = '#' + encodeURIComponent(tabId);
-        if (window.location.hash !== nextHash) history.replaceState(null, '', nextHash);
+        if (window.location.hash !== nextHash) {
+            if (historyMode === 'push') history.pushState(null, '', nextHash);
+            else history.replaceState(null, '', nextHash);
+        }
     } catch(e) {}
     saveDB(false);
     renderActiveTabContent(tabId);
     scheduleTextFitPass();
     window.requestAnimationFrame(() => refreshDesignMotionTargets(resolvedTab));
     scheduleActiveTabHealthCheck(tabId);
+}
+
+function resolveRouteTabFromHash() {
+    const hashTab = decodeURIComponent(window.location.hash.slice(1) || '');
+    if (APP_TAB_IDS.includes(hashTab) && !isUserMenuTabHidden(hashTab)) return hashTab;
+    let storedTab = '';
+    try { storedTab = localStorage.getItem(LAST_TAB_KEY) || ''; } catch(e) {}
+    if (APP_TAB_IDS.includes(storedTab) && !isUserMenuTabHidden(storedTab)) return storedTab;
+    return getFirstVisibleTab();
 }
 
 function renderActiveTabContent(tabId) {
@@ -20700,8 +20810,7 @@ function updateLiveConversion() {
 }
 
 
-// Hier wird sichergestellt, dass beim manuellen Öffnen der Einstellungen das Dropdown synchron ist
-document.addEventListener("DOMContentLoaded", () => {
+function runPostBootstrapDomSetup() {
     try {
         const themeSelect = document.getElementById('themeSelect');
         if(themeSelect && db?.theme) themeSelect.value = db.theme;
@@ -20713,11 +20822,10 @@ document.addEventListener("DOMContentLoaded", () => {
         toggleCustomProductUnitFields();
         initBulkProductSelect();
         renderOtpCooldownState();
-        setTimeout(() => autoSyncWarehousesOnStartup(), 900);
     } catch (err) {
-        console.warn('Early DOM setup skipped:', err);
+        console.warn('Post-bootstrap DOM setup skipped:', err);
     }
-});
+}
 
 function closeModal() {
     const modal = document.getElementById('modal');
@@ -23459,8 +23567,12 @@ async function bootstrapApplication() {
         const hashTab = decodeURIComponent(window.location.hash.slice(1));
         if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
     }
+    if (pendingStartupTab && APP_TAB_IDS.includes(pendingStartupTab)) startupTab = pendingStartupTab;
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
+    appBootstrapComplete = true;
     showTab(startupTab);
+    pendingStartupTab = '';
+    runPostBootstrapDomSetup();
     updateNotificationStatus();
     renderStorageSecurityStatus();
     renderAppUpdateStatus();
@@ -23473,9 +23585,10 @@ async function bootstrapApplication() {
     initTextFitGuard();
     initLiveUpdateChecks();
     initPwaInstallPrompt();
-    setTimeout(checkForAppUpdate, 2500);
+    setTimeout(() => checkForAppUpdate(false), 2500);
     setTimeout(() => refreshGoogleDrivePresence(false), 3200);
     setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
+    setTimeout(() => autoSyncWarehousesOnStartup(), 900);
     setTimeout(() => maybePromptForStorageRecovery(), 1300);
     setInterval(checkForAppUpdate, 30 * 60 * 1000);
     setInterval(() => refreshGoogleDrivePresence(false), 10 * 60 * 1000);
@@ -23534,8 +23647,21 @@ window.addEventListener('unhandledrejection', event => {
 });
 
 window.addEventListener('hashchange', () => {
-    const hashTab = decodeURIComponent(window.location.hash.slice(1));
-    if (APP_TAB_IDS.includes(hashTab)) showTab(isUserMenuTabHidden(hashTab) ? getFirstVisibleTab() : hashTab);
+    showTab(resolveRouteTabFromHash(), 'replace');
+});
+
+window.addEventListener('popstate', () => {
+    showTab(resolveRouteTabFromHash(), 'replace');
+});
+
+window.addEventListener('pageshow', () => {
+    if (!appBootstrapComplete) return;
+    const activeTab = document.querySelector('.tab-content.active');
+    if (!activeTab || !isTabRenderHealthy(activeTab.id, activeTab)) {
+        showTab(resolveRouteTabFromHash(), 'replace');
+    } else {
+        scheduleActiveTabHealthCheck(activeTab.id);
+    }
 });
 
 window.addEventListener('pagehide', () => {
