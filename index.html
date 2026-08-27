@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.83-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.102-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.83</span>
+                    <span class="version-badge">v3.4.102</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -838,6 +838,14 @@
                                 <div class="input-group">
                                     <label>Preset:</label>
                                     <select id="seaWaterPresetSelect" onchange="loadSeaWaterPreset(this.value)"></select>
+                                </div>
+                                <div class="input-group">
+                                    <label>NaCl Preisquelle:</label>
+                                    <select id="seaWaterNaclCostSource" onchange="updateSeaWaterNaclCostSource(this.value)"></select>
+                                </div>
+                                <div class="input-group" id="seaWaterNaclPowderPriceGroup">
+                                    <label>NaCl Pulverpreis pro kg:</label>
+                                    <input type="number" id="seaWaterNaclPowderPricePerKg" min="0" step="0.01" inputmode="decimal" placeholder="z.B. 2,76" oninput="updateNaclPowderPricePerKg(this.value)">
                                 </div>
                             </div>
                             <div class="btn-group calculator-actions">
@@ -1652,7 +1660,10 @@
                     <h2 id="settingsPageTitle">Einstellungen</h2>
                     <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
-                <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
+                <div class="settings-page-actions">
+                    <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
+                    <button type="button" class="btn-primary btn-animated settings-showcase-link" onclick="openTradeFairShowcase()">Messe-Übersicht</button>
+                </div>
             </section>
 
             <div class="card data-safety-card data-recovery-center-card">
@@ -1751,6 +1762,12 @@
                         </div>
                     </details>
                 </div>
+            </div>
+
+            <div class="card settings-card settings-card-showcase" id="tradeFairShowcaseSettingsCard">
+                <h3>Messe-Übersicht</h3>
+                <p class="hint">Animierte Präsentationsansicht mit den wichtigsten vorhandenen ReefTools-Funktionen für Vorführungen und Gespräche am Stand.</p>
+                <button type="button" class="btn-primary btn-animated" onclick="openTradeFairShowcase()">Messe-Übersicht öffnen</button>
             </div>
 
             <div class="card settings-card settings-card-local-devices">
@@ -1905,6 +1922,21 @@
                         <button onclick="resetShopLinksToPreset()" class="btn-secondary btn-animated">Preset zurücksetzen</button>
                     </div>
                     <div id="shop-links-settings-list"></div>
+                </details>
+            </div>
+
+            <div class="card settings-card settings-card-products">
+                <details id="product-prices-details">
+                    <summary class="settings-native-summary">
+                        <h3>Produktpreise</h3>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <p class="hint settings-detail-intro">Pflege Preise pro Gebinde. Diese Werte nutzt die App für Lagerwert, Rezeptkosten und den Meerwasser-Mischer.</p>
+                    <div class="settings-actions">
+                        <button onclick="saveProductPrices()" class="btn-in btn-animated">Preise speichern</button>
+                        <button onclick="resetProductPricesToPreset()" class="btn-secondary btn-animated">OSCI Preisbasis zurücksetzen</button>
+                    </div>
+                    <div id="product-prices-settings-list"></div>
                 </details>
             </div>
 
@@ -2142,6 +2174,15 @@
         </div>
     </div>
 
+    <div id="tradeFairShowcaseModal" class="trade-showcase-modal" role="dialog" aria-modal="true" aria-labelledby="tradeFairShowcaseTitle" aria-hidden="true" hidden>
+        <div class="trade-showcase-panel" tabindex="-1">
+            <button type="button" class="legal-modal-close trade-showcase-close" onclick="closeTradeFairShowcase()" aria-label="Messe-Übersicht schließen">
+                <span aria-hidden="true"></span>
+            </button>
+            <div id="tradeFairShowcaseContent" class="trade-showcase-content"></div>
+        </div>
+    </div>
+
     <div class="toast-container" aria-label="Mitteilungen" aria-live="polite" aria-relevant="additions" aria-atomic="false"></div>
 
     <div class="custom-cursor" id="customCursor" aria-hidden="true"></div>
@@ -2155,9 +2196,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.83-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.83-release"></script>
-    <script src="assets/js/app.js?v=3.4.83-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.102-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.102-release"></script>
+    <script src="assets/js/app.js?v=3.4.102-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

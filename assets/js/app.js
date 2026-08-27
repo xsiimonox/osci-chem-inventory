@@ -99,6 +99,28 @@ const macroRecipes = {
     ]
 };
 
+const macroRecipeSourceRecommendations = {
+    'KH-Tag': [
+        {
+            label: 'Natriumhydrogencarbonat',
+            use: 'KH Tag',
+            url: 'https://www.aquafair.de/product_info.php/products_id/304'
+        },
+        {
+            label: 'Natriumcarbonat',
+            use: 'KH Tag und KH Nacht',
+            url: 'https://www.aquafair.de/product_info.php/products_id/6888'
+        }
+    ],
+    'KH-Nacht': [
+        {
+            label: 'Natriumcarbonat',
+            use: 'KH Nacht',
+            url: 'https://www.aquafair.de/product_info.php/products_id/6888'
+        }
+    ]
+};
+
 const seaWaterRecipePer100L = [
     { label: 'Osmosewasser', amount: 86952.2, unit: 'ml', stock: false },
     { item: 'Natriumchlorid (NaCl)', amount: 8998.7, unit: 'ml' },
@@ -744,10 +766,61 @@ const shopLinksPreset = {
     "Molybd\u00e4n (Mo)": { 30: BASE+'trace-elements-molybdaen/?attribute_volumen=30ml', 100: BASE+'trace-elements-molybdaen/?attribute_volumen=100ml' },
 };
 
+const externalPriceProducts = {
+    "Natriumchlorid 25 kg (Diaclean)": {
+        cat: 'Externe Preisquellen',
+        sizeUnit: 'g',
+        sizes: [25000],
+        prices: { 25000: 69.00 },
+        links: { 25000: 'https://diacleanshop.com/natriumchlorid-25kg/lre-s-ch-1000-9' }
+    }
+};
+
+const naclPowderCostSourceId = '__nacl_powder_kg_price__';
+const naclPowderDefaultPricePerKg = 69 / 25;
+
+// Editierbare Preisbasis. Werte sind Startwerte aus dem oeffentlichen OSCI-Shop
+// und koennen in den Einstellungen je Produkt/Gebinde ueberschrieben werden.
+const shopPricePreset = {
+    "Natriumchlorid (NaCl)": { 5000: 15.00, 10000: 18.00 },
+    "Magnesiumchlorid (MgCl2)": { 1000: 11.50, 5000: 31.00 },
+    "Natriumsulfat (Na2SO4)": { 5000: 19.50 },
+    "Magnesiumsulfat (MgSO4)": { 1000: 9.50, 5000: 19.50 },
+    "Kaliumchlorid (KCl)": { 1000: 9.50 },
+    "Kaliumsulfat (K2SO4)": { 1000: 6.50, 5000: 15.00 },
+    "Kaliumbromid (KBr)": { 1000: 14.50, 5000: 49.00 },
+    "Strontiumchlorid (SrCl2)": { 100: 6.00, 1000: 14.50 },
+    "Calciumchlorid (CaCl2)": { 1000: 9.90, 5000: 29.50 },
+    "Natriumfluorid (NaF)": { 5000: 19.50 },
+    "Bor (B)": { 1000: 5.00, 5000: 9.50 },
+    "Calcium": { 5000: 20.00 },
+    "KH Nacht": { 5000: 12.00 },
+    "KH Tag": { 10000: 18.00 },
+    "Magnesium": { 5000: 15.00 },
+    "Kohlenstoff (C)": { 1000: 25.00 },
+    "Lanthan (La)": { 1000: 16.50 },
+    "Phosphor (P)": { 1000: 15.00 },
+    "Stickstoff (N)": { 1000: 9.50 },
+    "Fluor (F)": { 100: 11.50 },
+    "Iod (I)": { 30: 6.00 },
+    "Selen (Se)": { 100: 9.50 },
+    "Vanadium (V)": { 30: 8.50 },
+    "Barium (Ba)": { 30: 6.00 },
+    "Chrom (Cr)": { 30: 6.00 },
+    "Cobalt (Co)": { 1000: 11.50 },
+    "Eisen (Fe)": { 100: 9.50 },
+    "Kupfer (Cu)": { 30: 6.00 },
+    "Lithium (Li)": { 30: 6.00 },
+    "Zink (Zn)": { 100: 9.50 },
+    "Mangan (Mn)": { 30: 6.00 },
+    "Nickel (Ni)": { 1000: 11.50 },
+    "Molybd\u00e4n (Mo)": { 30: 6.00 }
+};
+
 // Returns the URL map {sizeMl: url} for an item (db overrides preset)
 function getShopUrlMap(itemName) {
     const fromDb = db.shopLinks && db.shopLinks[itemName];
-    const fromPreset = shopLinksPreset[itemName];
+    const fromPreset = shopLinksPreset[itemName] || externalPriceProducts[itemName]?.links;
     // Merge: db overrides preset per size
     if (fromDb && typeof fromDb === 'object' && !fromDb.slug) {
         if (fromPreset) return Object.assign({}, fromPreset, fromDb);
@@ -756,6 +829,220 @@ function getShopUrlMap(itemName) {
     // Legacy slug format migration
     if (fromDb && (typeof fromDb === 'string' || fromDb.slug)) return fromPreset || null;
     return fromPreset || null;
+}
+
+function getProductPriceMap(itemName) {
+    const preset = shopPricePreset[itemName] || externalPriceProducts[itemName]?.prices || {};
+    const custom = db?.productPrices?.[itemName] || {};
+    return { ...preset, ...custom };
+}
+
+function getPricingUnit(itemName) {
+    if (itemName === naclPowderCostSourceId) return 'kg';
+    return externalPriceProducts[itemName]?.sizeUnit || getItemUnit(itemName);
+}
+
+function getProductSizesForPricing(itemName) {
+    const cat = findCat(itemName);
+    const catalogSizes = cat && catalog[cat] && catalog[cat][itemName] ? catalog[cat][itemName] : [];
+    const customProduct = (db.customProducts || []).find(product => product.name === itemName);
+    const customSizes = customProduct ? (customProduct.sizesOriginal || customProduct.sizes || []) : [];
+    const externalSizes = externalPriceProducts[itemName]?.sizes || [];
+    const priceMap = getProductPriceMap(itemName);
+    return Array.from(new Set([
+        ...catalogSizes.map(Number),
+        ...customSizes.map(Number),
+        ...externalSizes.map(Number),
+        ...Object.keys(priceMap).map(Number)
+    ].filter(value => Number.isFinite(value) && value > 0))).sort((a, b) => a - b);
+}
+
+function formatEuro(value, decimals = 2) {
+    const number = Number(value || 0);
+    return `${number.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })} €`;
+}
+
+function getBestUnitPrice(itemName) {
+    const priceMap = getProductPriceMap(itemName);
+    const options = Object.entries(priceMap)
+        .map(([size, price]) => ({ size: Number(size), price: Number(String(price).replace(',', '.')) }))
+        .filter(option => Number.isFinite(option.size) && option.size > 0 && Number.isFinite(option.price) && option.price > 0)
+        .map(option => ({ ...option, unitPrice: option.price / option.size }))
+        .sort((a, b) => a.unitPrice - b.unitPrice);
+    return options[0] || null;
+}
+
+function getUnitPriceForSize(itemName, selectedSize) {
+    const size = Number(selectedSize);
+    if (!Number.isFinite(size) || size <= 0) return null;
+    const priceMap = getProductPriceMap(itemName);
+    const rawPrice = priceMap[String(size)] ?? priceMap[size];
+    const price = Number(String(rawPrice ?? '').replace(',', '.'));
+    if (!Number.isFinite(price) || price <= 0) return null;
+    return { size, price, unitPrice: price / size };
+}
+
+function calculateProductCost(itemName, amount, selectedSize = null) {
+    const price = getUnitPriceForSize(itemName, selectedSize) || getBestUnitPrice(itemName);
+    if (!price || !(amount > 0)) {
+        return { item: itemName, amount, cost: null, unitPrice: null, size: null, price: null };
+    }
+    return {
+        item: itemName,
+        amount,
+        cost: amount * price.unitPrice,
+        unitPrice: price.unitPrice,
+        size: price.size,
+        price: price.price
+    };
+}
+
+function getSeaWaterNaclCostSource() {
+    const saved = db?.settings?.seaWaterNaclCostSource;
+    if (saved === 'Natriumchlorid 25 kg (Diaclean)') return naclPowderCostSourceId;
+    if (saved && (saved === 'Natriumchlorid (NaCl)' || saved === naclPowderCostSourceId || catalogHasItem(saved) || (db.customProducts || []).some(product => product.name === saved))) return saved;
+    return 'Natriumchlorid (NaCl)';
+}
+
+function getNaclPowderPricePerKg() {
+    const raw = db?.settings?.naclPowderPricePerKg;
+    const price = Number(String(raw ?? '').replace(',', '.'));
+    return Number.isFinite(price) && price > 0 ? price : naclPowderDefaultPricePerKg;
+}
+
+function getSeaWaterNaclCostOptions() {
+    const customOptions = (db.customProducts || [])
+        .filter(product => ['g', 'ml'].includes(product.sizeUnit || 'ml'))
+        .filter(product => {
+            const search = normalizeSearchText(`${product.name} ${product.cat}`);
+            return search.includes('nacl') || search.includes('natriumchlorid') || search.includes('salz');
+        })
+        .map(product => product.name);
+    return ['Natriumchlorid (NaCl)', naclPowderCostSourceId, ...customOptions.filter((name, index, list) => list.indexOf(name) === index)];
+}
+
+function updateSeaWaterNaclCostSource(value) {
+    if (!db.settings) db.settings = {};
+    db.settings.seaWaterNaclCostSource = value || 'Natriumchlorid (NaCl)';
+    saveDB(false);
+    renderSeaWaterMix();
+}
+
+function updateNaclPowderPricePerKg(value) {
+    if (!db.settings) db.settings = {};
+    const price = Number(String(value || '').replace(',', '.'));
+    if (Number.isFinite(price) && price > 0) db.settings.naclPowderPricePerKg = price;
+    else delete db.settings.naclPowderPricePerKg;
+    saveDB(false);
+    renderSeaWaterMix();
+}
+
+function getSeaWaterCostItemForEntry(entry) {
+    if (!entry.item) return null;
+    if (entry.item === 'Natriumchlorid (NaCl)') {
+        const source = getSeaWaterNaclCostSource();
+        return source === naclPowderCostSourceId ? null : source;
+    }
+    return entry.item;
+}
+
+function getSeaWaterPricePackageSettings() {
+    if (!db.settings) db.settings = {};
+    if (!db.settings.seaWaterPricePackages || typeof db.settings.seaWaterPricePackages !== 'object') db.settings.seaWaterPricePackages = {};
+    return db.settings.seaWaterPricePackages;
+}
+
+function getSeaWaterSelectedPackageSize(itemName) {
+    if (!itemName) return null;
+    const settings = db?.settings?.seaWaterPricePackages || {};
+    const size = Number(settings[itemName]);
+    return Number.isFinite(size) && size > 0 ? size : null;
+}
+
+function updateSeaWaterPricePackage(itemName, value) {
+    const settings = getSeaWaterPricePackageSettings();
+    const size = Number(value);
+    if (Number.isFinite(size) && size > 0) settings[itemName] = size;
+    else delete settings[itemName];
+    saveDB(false);
+    renderSeaWaterMix();
+}
+
+function renderSeaWaterPricePackageSelectors() {
+    const selectorRows = seaWaterRecipePer100L
+        .map(entry => {
+            const itemName = getSeaWaterCostItemForEntry(entry);
+            if (!itemName) return '';
+            const sizes = getProductSizesForPricing(itemName).filter(size => getUnitPriceForSize(itemName, size));
+            if (!sizes.length) return '';
+            const selected = getSeaWaterSelectedPackageSize(itemName);
+            const best = getBestUnitPrice(itemName);
+            const unit = getPricingUnit(itemName);
+            return `
+                <label>
+                    <span>${escapeHtml(entry.item === 'Natriumchlorid (NaCl)' && itemName !== entry.item ? `NaCl Preisquelle: ${itemName}` : itemName)}</span>
+                    <select onchange="updateSeaWaterPricePackage('${escapeJsString(itemName)}', this.value)">
+                        <option value="" ${selected ? '' : 'selected'}>Automatisch günstigstes Gebinde${best ? ` · ${formatItemAmount(itemName, best.size)} = ${formatEuro(best.price)}` : ''}</option>
+                        ${sizes.map(size => {
+                            const option = getUnitPriceForSize(itemName, size);
+                            const unitPrice = option ? formatEuro(option.unitPrice, unit === 'g' ? 4 : 4) : '';
+                            return `<option value="${size}" ${selected === size ? 'selected' : ''}>${formatItemAmount(itemName, size)} · ${formatEuro(option.price)} · ${unitPrice}/${getUnitLabel(unit)}</option>`;
+                        }).join('')}
+                    </select>
+                </label>
+            `;
+        })
+        .filter(Boolean)
+        .join('');
+    if (!selectorRows) return '';
+    return `
+        <details class="sea-water-package-settings">
+            <summary>
+                <span><strong>Gebindegrößen für Preisberechnung</strong><small>Optional je Komponente festlegen, falls du nicht mit dem automatisch günstigsten Gebinde rechnen möchtest.</small></span>
+                <span class="settings-accordion-hint" aria-hidden="true"></span>
+            </summary>
+            <div class="sea-water-package-grid">${selectorRows}</div>
+        </details>
+    `;
+}
+
+function getSeaWaterRecipeCost(entry, amount) {
+    if (!entry.item) return { cost: 0, sourceLabel: 'preislich vernachlässigt', sourceAmount: amount, ignored: true };
+    if (entry.item === 'Natriumchlorid (NaCl)') {
+        const source = getSeaWaterNaclCostSource();
+        if (source === naclPowderCostSourceId) {
+            const powderGrams = amount * (3050 / 10000);
+            const pricePerKg = getNaclPowderPricePerKg();
+            return {
+                item: 'NaCl Pulver',
+                amount: powderGrams,
+                cost: (powderGrams / 1000) * pricePerKg,
+                unitPrice: pricePerKg / 1000,
+                size: 1000,
+                price: pricePerKg,
+                sourceLabel: `NaCl Pulver · ${powderGrams.toFixed(1)} g Pulveräquivalent · ${formatEuro(pricePerKg)} / kg`
+            };
+        }
+        if (source !== entry.item) {
+            const sourceUnit = getPricingUnit(source);
+            const sourceAmount = sourceUnit === 'g' ? amount * (3050 / 10000) : amount;
+            const cost = calculateProductCost(source, sourceAmount, getSeaWaterSelectedPackageSize(source));
+            const priceBasis = cost.size && cost.price
+                ? ` · Preisbasis ${formatItemAmount(source, cost.size)} = ${formatEuro(cost.price)}`
+                : '';
+            return {
+                ...cost,
+                sourceLabel: sourceUnit === 'g'
+                    ? `${source} · ${sourceAmount.toFixed(1)} g Pulveräquivalent${priceBasis}`
+                    : `${source} · ${sourceAmount.toFixed(1)} ${getUnitLabel(sourceUnit)}${priceBasis}`
+            };
+        }
+    }
+    const cost = calculateProductCost(entry.item, amount, getSeaWaterSelectedPackageSize(entry.item));
+    const priceBasis = cost.size && cost.price
+        ? ` · Preisbasis ${formatItemAmount(entry.item, cost.size)} = ${formatEuro(cost.price)}`
+        : '';
+    return { ...cost, sourceLabel: `${entry.item} · ${formatItemAmount(entry.item, amount)}${priceBasis}` };
 }
 
 // Legacy compat shim
@@ -1617,6 +1904,196 @@ function openProjectSupportSettings() {
             });
         }, 120);
     });
+}
+
+function renderTradeFairShowcaseContent() {
+    const version = document.querySelector('.version-badge')?.innerText?.trim() || 'ReefTools';
+    const qrBadge = `
+        <a class="trade-showcase-scan-badge" href="https://reeftools.de/" target="_blank" rel="noopener noreferrer" aria-label="ReefTools kostenlos starten">
+            <span class="trade-showcase-qr-frame"><img src="assets/img/reeftools-qr.png" alt="QR-Code zu reeftools.de"></span>
+            <span><strong>Kostenlos starten</strong><small>reeftools.de</small></span>
+        </a>
+    `;
+    return `
+        <section class="trade-showcase-cinema" aria-label="Animierte ReefTools Messe-Präsentation">
+            <div class="trade-showcase-brandbar">
+                <div>
+                    <span class="trade-showcase-kicker">Reeftools.de</span>
+                    <h2 id="tradeFairShowcaseTitle">Reef.Storage&amp;Tools</h2>
+                </div>
+                <div class="trade-showcase-badges" aria-label="Produktmerkmale">
+                    <span>${escapeHtml(version)}</span>
+                    <span>PWA</span>
+                    <span>Cloud optional</span>
+                </div>
+            </div>
+
+            <div class="trade-showcase-slides" aria-live="off">
+                <article class="trade-showcase-slide trade-showcase-slide-hero" style="--slide-index: 0">
+                    ${qrBadge}
+                    <img src="assets/img/messe-showcase.png" alt="Meerwasseraquarium als Hintergrund der ReefTools Messeansicht">
+                    <div class="trade-showcase-hero-copy">
+                        <span>Eine App für den Alltag am Riff</span>
+                        <strong>Lager, Wasserwerte, Trace, Tools und Korallen in einem System.</strong>
+                    </div>
+                    <div class="trade-showcase-hero-stats">
+                        <span><b>33</b><small>Produkte</small></span>
+                        <span><b>ICP</b><small>Historie</small></span>
+                        <span><b>0 €</b><small>kostenlos nutzen</small></span>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 1">
+                    ${qrBadge}
+                    <div class="trade-showcase-slide-copy">
+                        <span>Dashboard</span>
+                        <h3>Der schnelle Blick vor dem Becken.</h3>
+                        <p>Bestand, ToDos, Wasserwerte und Trends sind sofort sichtbar, ohne sich durch Listen zu arbeiten.</p>
+                    </div>
+                    <div class="trade-showcase-device">
+                        <div class="trade-showcase-device-bar"><b>Übersicht</b><small>Heute</small></div>
+                        <div class="trade-showcase-metric-grid">
+                            <span><b>0</b><small>kritische Artikel</small></span>
+                            <span><b>2</b><small>ToDos fällig</small></span>
+                            <span><b>35.0</b><small>PSU stabil</small></span>
+                            <span><b>26</b><small>Korallen</small></span>
+                        </div>
+                        <svg class="trade-showcase-wide-chart" viewBox="0 0 520 150" role="img" aria-label="Animierte Messwertkurve">
+                            <path d="M20 112 C85 86 126 92 175 66 S276 32 341 52 S431 98 500 42" />
+                            <circle cx="175" cy="66" r="9"/><circle cx="341" cy="52" r="9"/><circle cx="500" cy="42" r="9"/>
+                        </svg>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 2">
+                    ${qrBadge}
+                    <div class="trade-showcase-slide-copy">
+                        <span>OSCI Workflow</span>
+                        <h3>C&amp;R, Trace und Lager sauber verbunden.</h3>
+                        <p>Rezepte rechnen Mengen, Gramm und Kosten. Beim Auslagern werden Bestände und Protokolle direkt gepflegt.</p>
+                    </div>
+                    <div class="trade-showcase-split-demo">
+                        <div class="trade-showcase-stock-demo">
+                            <strong>Lagerbestand</strong>
+                            <label>NaCl<i style="--level: 92%"></i><b>9.0 L</b></label>
+                            <label>MgSO4<i style="--level: 58%"></i><b>2.9 L</b></label>
+                            <label>CaCl2<i style="--level: 74%"></i><b>3.7 L</b></label>
+                        </div>
+                        <div class="trade-showcase-recipe-demo">
+                            <strong>Meerwasser aus C&amp;R</strong>
+                            <span>100 L Ansatz</span>
+                            <b>Preisbasis: große Gebinde</b>
+                            <small>NaCl · MgSO4 · MgCl2 · K2SO4 · Bor · KH-Tag</small>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 3">
+                    ${qrBadge}
+                    <div class="trade-showcase-slide-copy">
+                        <span>Tools</span>
+                        <h3>Rechner für echte Entscheidungen.</h3>
+                        <p>Salinität, Nutrition, Adsorber, Nettovolumen, Wasserwechsel und Dosierung bleiben kompakt erreichbar.</p>
+                    </div>
+                    <div class="trade-showcase-tool-wall">
+                        <span>Salzgehalt korrigieren</span>
+                        <span>Nettovolumen</span>
+                        <span>Nutrition Berater</span>
+                        <span>Adsorber Durchfluss</span>
+                        <span>Meerwasser anmischen</span>
+                        <span>KH / Ca Korrektur</span>
+                        <span>Verbrauch pro Tag</span>
+                        <span>Test-Korrektur</span>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 4">
+                    ${qrBadge}
+                    <div class="trade-showcase-slide-copy">
+                        <span>Analyse &amp; Pflege</span>
+                        <h3>ICP, Logbuch, ToDos und Korallenbestand.</h3>
+                        <p>Messverläufe, Erinnerungen und Koralleninfos helfen, Veränderungen nachvollziehbar zu machen.</p>
+                    </div>
+                    <div class="trade-showcase-analysis-demo">
+                        <div><b>ICP</b><small>Na, Ca, Sr, Iod und Spurenelemente als Verlauf</small></div>
+                        <div><b>Logbuch</b><small>Wartung, Wasserwechsel, Messwerte und Notizen</small></div>
+                        <div><b>Korallen</b><small>Fotos, Suche, Platzierung und Verträglichkeit</small></div>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 5">
+                    ${qrBadge}
+                    <div class="trade-showcase-slide-copy">
+                        <span>Web-App</span>
+                        <h3>Über reeftools.de nutzen und als App speichern.</h3>
+                        <p>ReefTools läuft direkt im Browser und bleibt generell 100% kostenlos. Auf Handy und Desktop kann die Seite als Web-App mit eigenem Icon installiert werden.</p>
+                    </div>
+                    <div class="trade-showcase-install-demo">
+                        <div class="trade-showcase-phone-card">
+                            <b>1</b><span>reeftools.de öffnen</span>
+                        </div>
+                        <div class="trade-showcase-phone-card">
+                            <b>2</b><span>Zum Home-Bildschirm hinzufügen</span>
+                        </div>
+                        <div class="trade-showcase-phone-card">
+                            <b>3</b><span>Wie eine App starten</span>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="trade-showcase-slide" style="--slide-index: 6">
+                    <div class="trade-showcase-slide-copy">
+                        <span>Starten</span>
+                        <h3>Direkt ausprobieren. Scannen, öffnen, loslegen.</h3>
+                        <p>Die Daten bleiben lokal im Browser. Wer möchte, nutzt ein optionales Google-Drive-Backup im eigenen Konto.</p>
+                    </div>
+                    <a class="trade-showcase-qr trade-showcase-final-qr" href="https://reeftools.de/" target="_blank" rel="noopener noreferrer" aria-label="ReefTools über QR-Code öffnen">
+                        <img src="assets/img/reeftools-qr.png" alt="QR-Code zu reeftools.de">
+                        <span><small>Scannen und kostenlos starten</small><strong>reeftools.de</strong></span>
+                    </a>
+                </article>
+            </div>
+
+            <div class="trade-showcase-progress" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+            </div>
+        </section>
+    `;
+}
+
+function openTradeFairShowcaseSettings() {
+    selectTab('einstellungen');
+    requestAnimationFrame(() => {
+        setTimeout(() => {
+            openSettingsCard(document.getElementById('tradeFairShowcaseSettingsCard'), {
+                fallbackGroup: 'System & Hilfe',
+                focusSelector: 'button'
+            });
+        }, 120);
+    });
+}
+
+function openTradeFairShowcase() {
+    const modal = document.getElementById('tradeFairShowcaseModal');
+    const content = document.getElementById('tradeFairShowcaseContent');
+    if (!modal || !content) return;
+    content.innerHTML = renderTradeFairShowcaseContent();
+    const closeButton = modal.querySelector('.trade-showcase-close');
+    if (closeButton) closeButton.onclick = closeTradeFairShowcase;
+    modal.hidden = false;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    acquireBodyScrollLock('trade-showcase');
+    window.setTimeout(() => closeButton?.focus(), 0);
+}
+
+function closeTradeFairShowcase() {
+    const modal = document.getElementById('tradeFairShowcaseModal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    releaseBodyScrollLock('trade-showcase');
 }
 
 function openFeatureVisibilitySettings() {
@@ -3697,6 +4174,7 @@ function createWarehouseData(source = {}) {
         customContainers: source.customContainers || {},
         hiddenProducts: source.hiddenProducts || {},
         shopLinks: source.shopLinks || {},
+        productPrices: source.productPrices || {},
         productPresets: source.productPresets || {},
         crSeaWaterPresets: source.crSeaWaterPresets || {},
         customSeaTracePresets: source.customSeaTracePresets || {},
@@ -4116,6 +4594,7 @@ function normalizeWarehouseData(data) {
     if (!db.customContainers) db.customContainers = {};
     if (!db.hiddenProducts) db.hiddenProducts = {};
     if (!db.shopLinks) db.shopLinks = {};
+    if (!db.productPrices) db.productPrices = {};
     if (!db.productPresets) db.productPresets = {};
     if (!db.crSeaWaterPresets) db.crSeaWaterPresets = {};
     if (!db.customSeaTracePresets) db.customSeaTracePresets = {};
@@ -8018,6 +8497,9 @@ function renderSettingsCardOnDemand(card, force = false) {
     if (targetCard.querySelector('#shop-links-settings-list')) {
         runSettingsRender('Shoplinks', renderShopLinkSettings);
     }
+    if (targetCard.querySelector('#product-prices-settings-list')) {
+        runSettingsRender('Produktpreise', renderProductPriceSettings);
+    }
     if (targetCard.classList.contains('settings-card-appearance')) {
         runSettingsRender('Cursor', applyCursorSettings);
         const themeSelect = document.getElementById('themeSelect');
@@ -8039,6 +8521,7 @@ function renderOpenSettingsCards() {
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
     if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud|demo-profil/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup, Demo-Profil und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download demo beispieldaten testprofil' };
+    if (/messe|showcase|präsentation|vorführung/.test(normalized)) return { group: 'System & Hilfe', hint: 'Animierte Funktionsübersicht für Vorführungen und Gespräche', keywords: 'messe showcase präsentation vorführung feature übersicht werbung stand demo' };
     if (/app installieren|pwa|home-bildschirm|startbildschirm/.test(normalized)) return { group: 'System & Hilfe', hint: 'ReefTools als App-Icon auf Handy oder Desktop hinzufügen', keywords: 'app installieren pwa android chrome iphone ipad home bildschirm startbildschirm desktop icon' };
     if (/app-update|app-updates|update|version/.test(normalized)) return { group: 'System & Hilfe', hint: 'Version prüfen, Cache aktualisieren und neue App-Stände laden', keywords: 'app update version aktualisieren cache neu laden release' };
     if (/projekt unterstützen|unterstützen|spenden|paypal|coffee/.test(normalized)) return { group: 'System & Hilfe', hint: 'Freiwillige Unterstützung für Betrieb, Tests und Weiterentwicklung', keywords: 'projekt unterstützen spenden paypal buy me coffee freiwillig' };
@@ -8049,7 +8532,7 @@ function getSettingsMeta(title) {
     if (/app|system|support/.test(normalized)) return { group: 'System & Hilfe', hint: 'Allgemeine App-Funktionen und Support', keywords: 'app system support hilfe' };
     if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
     if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
-    if (/eigene produkte|produktlisten|preset|shop-links/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen und Links', keywords: 'produkt eigene waren preset produktlisten shop link größe dichte stück gramm ml' };
+    if (/eigene produkte|produktlisten|preset|shop-links|produktpreise|preise/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen, Preise und Links', keywords: 'produkt eigene waren preset produktlisten shop link preis kosten größe dichte stück gramm ml' };
     if (/design|effekte|aussehen|farbschema/.test(normalized)) return { group: 'Aussehen', hint: 'Farben, Stil und Animationen', keywords: 'design theme farbe badman light girl mint effekt animation disco aussehen' };
     if (/reset|löschen/.test(normalized)) return { group: 'Zurücksetzen', hint: 'Daten gezielt löschen', keywords: 'reset löschen statistik protokoll lagerbestand daten' };
     return { group: 'Weitere', hint: 'Weitere Einstellungen', keywords: normalized };
@@ -18113,15 +18596,41 @@ function renderSeaWaterPresetSelect() {
     select.innerHTML = `<option value="">Preset wählen ...</option>${names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)} · ${presets[name]} L</option>`).join('')}`;
 }
 
+function renderSeaWaterNaclCostSourceSelect() {
+    const select = document.getElementById('seaWaterNaclCostSource');
+    if (!select) return;
+    const current = getSeaWaterNaclCostSource();
+    const options = getSeaWaterNaclCostOptions();
+    select.innerHTML = options.map(name => {
+        if (name === naclPowderCostSourceId) {
+            const pricePerKg = getNaclPowderPricePerKg();
+            return `<option value="${naclPowderCostSourceId}" ${name === current ? 'selected' : ''}>NaCl Pulver eigener kg-Preis · ${escapeHtml(formatEuro(pricePerKg))}/kg</option>`;
+        }
+        const unit = getPricingUnit(name);
+        const price = getBestUnitPrice(name);
+        const priceHint = price ? ` · ${formatEuro(price.unitPrice, unit === 'g' ? 4 : 4)}/${getUnitLabel(unit)}` : ' · kein Preis';
+        const label = name === 'Natriumchlorid (NaCl)' ? `OSCI C&R Natriumchlorid${priceHint}` : `${name}${priceHint}`;
+        return `<option value="${escapeHtml(name)}" ${name === current ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+    }).join('');
+    if (!options.includes(current)) select.value = 'Natriumchlorid (NaCl)';
+    const powderGroup = document.getElementById('seaWaterNaclPowderPriceGroup');
+    const powderInput = document.getElementById('seaWaterNaclPowderPricePerKg');
+    if (powderGroup) powderGroup.hidden = current !== naclPowderCostSourceId;
+    if (powderInput && document.activeElement !== powderInput) powderInput.value = getNaclPowderPricePerKg().toFixed(2);
+}
+
 function renderSeaWaterMix() {
     const result = document.getElementById('seaWaterMixResult');
     if (!result) return;
+    renderSeaWaterNaclCostSourceSelect();
     const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
     const scale = liters / 100;
     if (!liters) {
         result.innerHTML = '<p class="hint">Trage die gewünschte Meerwassermenge ein.</p>';
         return;
     }
+    let totalCost = 0;
+    let hasIncompleteCosts = false;
     const rows = seaWaterRecipePer100L.map(entry => {
         const amount = entry.amount * scale;
         const resolved = resolveRecipeItem(entry);
@@ -18129,18 +18638,27 @@ function renderSeaWaterMix() {
         const missing = resolved && stock < amount;
         const density = entry.item ? (densityFactors[entry.item] || 1) : 1;
         const grams = amount * density;
+        const cost = getSeaWaterRecipeCost(entry, amount);
+        if (cost.cost === null && !cost.ignored) hasIncompleteCosts = true;
+        else totalCost += cost.cost;
         const amountLabel = `${amount.toFixed(1)} ${entry.unit} · ${grams.toFixed(1)} g`;
         return `
             <div class="tool-row ${missing ? 'missing' : ''}">
                 <span>
                     <strong>${entry.item || entry.label}</strong>
-                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)} · Dichte ${density.toFixed(3)} g/ml` : 'nicht lagergeführt · ca. 1.000 g/ml'}</small>
+                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)} · Dichte ${density.toFixed(3)} g/ml` : 'nicht lagergeführt · ca. 1.000 g/ml'}${entry.item ? ` · Preis: ${escapeHtml(cost.sourceLabel || entry.item)}` : ''}</small>
                 </span>
-                <span>${amountLabel}</span>
+                <span>${amountLabel}${cost.cost !== null ? `<small class="cost-inline">${formatEuro(cost.cost)}</small>` : `<small class="cost-inline muted">kein Preis</small>`}</span>
             </div>
         `;
     }).join('');
     result.innerHTML = `
+        <div class="tool-result-summary sea-water-cost-summary">
+            <span><strong>${formatEuro(totalCost)}</strong><small>geschätzter Gesamtpreis${hasIncompleteCosts ? ' · unvollständig' : ''}</small></span>
+            <span><strong>${liters.toFixed(0)} L</strong><small>${formatEuro(totalCost / liters, 3)} / L</small></span>
+        </div>
+        <p class="hint sea-water-cost-note">Die Preis-pro-Liter-Ermittlung nutzt bei OSCI-Produkten automatisch die günstigste hinterlegte Gebindegröße, also in der Regel die großen Gebinde. Osmosewasser wird nicht berechnet.</p>
+        ${renderSeaWaterPricePackageSelectors()}
         <div class="tool-result">${rows}</div>
         <div class="tool-action-row calculator-actions">
             <button class="btn-primary btn-animated booking-action" onclick="bookSeaWaterMix()">Lagergeführte Zutaten auslagern</button>
@@ -18299,10 +18817,33 @@ function renderMacroRecipe() {
             </div>
         `;
     }).join('');
+    const recommendations = renderMacroRecipeSourceRecommendations(select.value);
     result.innerHTML = `
         <div class="tool-result">${rows}</div>
+        ${recommendations}
         <div class="tool-action-row calculator-actions">
             <button class="btn-primary btn-animated booking-action" onclick="bookMacroRecipe()">Lagergeführte Zutaten auslagern</button>
+        </div>
+    `;
+}
+
+function renderMacroRecipeSourceRecommendations(recipeName) {
+    const recommendations = macroRecipeSourceRecommendations[recipeName] || [];
+    if (!recommendations.length) return '';
+    return `
+        <div class="macro-source-recommendation">
+            <div class="macro-source-recommendation__head">
+                <strong>Empfehlung zum Selbstmischen</strong>
+                <small>Rohstoffe vor Bestellung bitte mit dem Rezept abgleichen.</small>
+            </div>
+            <div class="macro-source-recommendation__grid">
+                ${recommendations.map(entry => `
+                    <a class="macro-source-link" href="${escapeHtml(entry.url)}" target="_blank" rel="noopener">
+                        <span>${escapeHtml(entry.label)}</span>
+                        <small>${escapeHtml(entry.use)} · Aquafair öffnen</small>
+                    </a>
+                `).join('')}
+            </div>
         </div>
     `;
 }
@@ -21120,6 +21661,14 @@ function escapeHtml(value) {
         .replace(/'/g, '&#039;');
 }
 
+function escapeJsString(value) {
+    return String(value)
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, "\\'")
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r');
+}
+
 function escapeRegExp(value) {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -22893,6 +23442,91 @@ async function resetShopLinksToPreset() {
     alert('Preset wiederhergestellt.');
 }
 
+function getAllPricedItems() {
+    const allItems = [];
+    for (let cat in catalog) {
+        for (let item in catalog[cat]) {
+            if (!shouldShowCatalogProduct(cat, item)) continue;
+            allItems.push({ cat, item });
+        }
+    }
+    return allItems.sort((a, b) => a.cat.localeCompare(b.cat, 'de') || a.item.localeCompare(b.item, 'de'));
+}
+
+function renderProductPriceSettings() {
+    const container = document.getElementById('product-prices-settings-list');
+    if (!container) return;
+    const byCat = {};
+    getAllPricedItems().forEach(({ cat, item }) => {
+        if (!byCat[cat]) byCat[cat] = [];
+        byCat[cat].push(item);
+    });
+
+    const html = Object.entries(byCat).map(([cat, items]) => `
+        <section class="shop-link-category product-price-category">
+            <h4>${escapeHtml(cat)}</h4>
+            ${items.map(item => {
+                const sizes = getProductSizesForPricing(item);
+                const unit = getPricingUnit(item);
+                const priceMap = getProductPriceMap(item);
+                const safeId = item.replace(/[^a-zA-Z0-9]/g, '');
+                const rows = sizes.length ? sizes.map(size => {
+                    const priceValue = priceMap[size] ?? '';
+                    const label = unit === 'ml' && size >= 1000 ? `${size / 1000} L` : `${size} ${getUnitLabel(unit)}`;
+                    const perUnit = Number(priceValue) > 0 ? `<small>${formatEuro(Number(priceValue) / size, 4)} / ${getUnitLabel(unit)}</small>` : '<small>kein Preis hinterlegt</small>';
+                    return `
+                        <div class="shop-link-size-row product-price-row">
+                            <span>${escapeHtml(label)} ${perUnit}</span>
+                            <input type="number" step="0.01" min="0" id="price-${safeId}-${size}" data-item="${escapeHtml(item)}" data-size="${escapeHtml(size)}" value="${escapeHtml(priceValue)}" placeholder="Preis in €">
+                        </div>`;
+                }).join('') : `
+                    <div class="shop-link-size-row product-price-row">
+                        <span>Gebinde fehlt <small>Lege eine Behältergröße beim Produkt an.</small></span>
+                        <input type="number" disabled placeholder="-">
+                    </div>`;
+                return `
+                    <div class="shop-link-product">
+                        <strong>${escapeHtml(item)}</strong>
+                        ${rows}
+                    </div>`;
+            }).join('')}
+        </section>
+    `).join('');
+    container.innerHTML = html || '<p class="hint">Keine Produkte im Katalog.</p>';
+}
+
+function saveProductPrices() {
+    if (!db.productPrices) db.productPrices = {};
+    document.querySelectorAll('#product-prices-settings-list input[data-item][data-size]').forEach(input => {
+        const item = input.dataset.item;
+        const size = input.dataset.size;
+        const raw = String(input.value || '').replace(',', '.').trim();
+        const price = parseFloat(raw);
+        if (!db.productPrices[item]) db.productPrices[item] = {};
+        if (Number.isFinite(price) && price > 0) db.productPrices[item][size] = price;
+        else delete db.productPrices[item][size];
+        if (Object.keys(db.productPrices[item]).length === 0) delete db.productPrices[item];
+    });
+    saveDB();
+    renderProductPriceSettings();
+    renderSeaWaterMix();
+    showToast('Produktpreise gespeichert', 'success', 2200);
+}
+
+async function resetProductPricesToPreset() {
+    const confirmed = await appConfirm('Eigene Preisänderungen löschen und wieder die OSCI-Startwerte nutzen?', {
+        title: 'Produktpreise zurücksetzen',
+        type: 'warning',
+        confirmText: 'Zurücksetzen'
+    });
+    if (!confirmed) return;
+    db.productPrices = {};
+    saveDB();
+    renderProductPriceSettings();
+    renderSeaWaterMix();
+    showToast('Produktpreise zurückgesetzt', 'success', 2200);
+}
+
 // --- PRODUKT-PRESETS ---
 
 async function saveProductPreset() {
@@ -23244,14 +23878,18 @@ document.addEventListener('keydown', event => {
     const appDialog = document.getElementById('appDialog');
     const stockModal = document.getElementById('modal');
     const legalModal = document.getElementById('legalModal');
+    const tradeFairShowcaseModal = document.getElementById('tradeFairShowcaseModal');
     const activeDialog = appDialogState
         ? appDialog
-        : (legalModal?.classList.contains('is-open') ? legalModal : (stockModal?.style.display === 'flex' ? stockModal : null));
+        : (tradeFairShowcaseModal?.classList.contains('is-open') ? tradeFairShowcaseModal : (legalModal?.classList.contains('is-open') ? legalModal : (stockModal?.style.display === 'flex' ? stockModal : null)));
     if (!activeDialog) return;
     if (event.key === 'Escape') {
         if (appDialogState && appDialogState.allowEscape) {
             event.preventDefault();
             closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+        } else if (tradeFairShowcaseModal?.classList.contains('is-open')) {
+            event.preventDefault();
+            closeTradeFairShowcase();
         } else if (legalModal?.classList.contains('is-open')) {
             event.preventDefault();
             closeLegalModal();
@@ -23262,7 +23900,7 @@ document.addEventListener('keydown', event => {
         return;
     }
     if (event.key !== 'Tab') return;
-    const panel = activeDialog.querySelector('.app-dialog-panel, .modal-content, .legal-modal-panel');
+    const panel = activeDialog.querySelector('.app-dialog-panel, .modal-content, .legal-modal-panel, .trade-showcase-panel');
     const focusable = getDialogFocusableElements(panel);
     if (!focusable.length) {
         event.preventDefault();
@@ -23283,6 +23921,9 @@ document.addEventListener('keydown', event => {
 document.addEventListener('click', event => {
     if (event.target?.id === 'appDialog' && appDialogState?.closeOnBackdrop) {
         closeAppDialog(appDialogState.kind === 'confirm' ? false : null);
+    }
+    if (event.target?.id === 'tradeFairShowcaseModal') {
+        closeTradeFairShowcase();
     }
     if (event.target?.id === 'legalModal') {
         closeLegalModal();
@@ -23335,6 +23976,9 @@ Object.assign(window, {
     closeAppDialog,
     closeLegalModal,
     openLegalModal,
+    openTradeFairShowcase,
+    closeTradeFairShowcase,
+    openTradeFairShowcaseSettings,
     unlockWavePumpDemo,
     lockWavePumpDemo,
     renderWavePumpDemoSettings,
