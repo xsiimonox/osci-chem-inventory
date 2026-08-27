@@ -23,6 +23,13 @@ const crOrder = [
     { name: "Bor (B)", cat: "C&R Produkte" }
 ];
 
+const interchangeableStockProducts = [
+    [
+        { cat: 'C&R Produkte', item: 'Natriumfluorid (NaF)' },
+        { cat: 'Anionen', item: 'Fluor (F)' }
+    ]
+];
+
 const crPdfAliases = {
     "Natriumchlorid (NaCl)": ["NaCl", "Natriumchlorid"],
     "Magnesiumchlorid (MgCl2)": ["MgCl2", "Magnesiumchlorid"],
@@ -13509,6 +13516,7 @@ function renderTraceReusePlanResult(recipe = ensureTraceCalculatorState().latest
         </div>
         <div class="trace-reuse-actions">
             <button type="button" class="btn-secondary" onclick="applyTraceReusePlanToDraft()" ${hasUsableAdditions ? '' : 'disabled'}>Ergänzungen in Auslagerung übernehmen</button>
+            <button type="button" class="btn-secondary" onclick="exportTraceReusePlanPdf()" ${hasUsableAdditions ? '' : 'disabled'}>Weiterverwendungsplan PDF / Drucken</button>
         </div>
     `;
 }
@@ -13716,6 +13724,73 @@ function applyTraceReusePlanToDraft() {
         count ? 'success' : 'info',
         3600
     );
+}
+
+function exportTraceReusePlanPdf() {
+    const state = ensureTraceCalculatorState();
+    const recipe = state.latestRecipe || calculateTraceRecipe(getTraceCalculatorConfigFromUi());
+    const plans = calculateTraceReusePlan(recipe);
+    const usablePlans = plans.filter(plan => plan.status === 'ok' || plan.status === 'warning');
+    if (!usablePlans.length) {
+        alert('Bitte zuerst eine Restmenge oder Resttage eintragen, damit ein Weiterverwendungsplan berechnet werden kann.');
+        return;
+    }
+
+    const rows = [];
+    usablePlans.forEach(plan => {
+        const groupLabel = getTraceReuseGroupLabel(plan.group);
+        rows.push({
+            category: groupLabel,
+            item: `Osmosewasser für ${getTraceReuseGroupShort(plan.group)}`,
+            amountText: traceCalcFormatMlG(plan.osmoseMl || 0, plan.osmoseG || 0),
+            stockText: '-',
+            afterText: '-',
+            note: `Fertiges Endvolumen ${traceCalcFormatMl(plan.finalVolumeMl)} · Restlösung ${traceCalcFormatMl(plan.remainingMl)}`
+        });
+        [...(plan.rows || [])]
+            .sort((a, b) => a.symbol.localeCompare(b.symbol, 'de'))
+            .forEach(row => {
+                const category = row.group === 'kationen' ? 'Kationen' : 'Anionen';
+                const stock = getInventoryAmount(category, row.item);
+                const after = Math.max(0, stock - row.additionMl);
+                rows.push({
+                    category: groupLabel,
+                    item: `${row.symbol} · ${row.item.replace(` (${row.symbol})`, '')}`,
+                    amountText: `Hinzufügen ${traceCalcFormatMlG(row.additionMl, row.additionG)}`,
+                    stockText: formatItemAmount(row.item, stock),
+                    afterText: formatItemAmount(row.item, after),
+                    note: `Alt vorhanden ${traceCalcFormatMlG(row.existingAmount, row.existingGrams)} · Soll im Ansatz ${traceCalcFormatMl(row.targetAmountAtVolume)} · Danach ${traceCalcFormatMlG(row.targetAmountAtVolume, traceCalcElementGrams(row.item, row.targetAmountAtVolume))}`
+                });
+            });
+    });
+
+    const source = getTraceReuseSourceEntry();
+    const firstPlan = usablePlans[0];
+    const modeLabel = getTraceReuseMode() === 'keep-dose'
+        ? 'Tagesdosis beibehalten'
+        : 'Lösung optimal anpassen';
+    const kPlan = usablePlans.find(plan => plan.group === 'kationen');
+    const aPlan = usablePlans.find(plan => plan.group === 'anionen');
+    openRecipePrintDocument({
+        title: 'Trace Restmischung weiterverwenden',
+        subtitle: 'Druckbarer Plan zum Ergänzen oder Verdünnen einer laufenden K+ / A- Mischung. Dies ist nicht das normale Neurezept.',
+        meta: [
+            { label: 'Dokument', value: 'Weiterverwendungsplan' },
+            { label: 'Modus', value: modeLabel },
+            { label: 'Quelle', value: source ? formatTraceMixtureDate(source) : 'keine Historie' },
+            { label: 'K+ Rest', value: kPlan ? traceCalcFormatMl(kPlan.remainingMl) : '-' },
+            { label: 'A- Rest', value: aPlan ? traceCalcFormatMl(aPlan.remainingMl) : '-' },
+            { label: 'Alte Tagesdosis', value: firstPlan ? traceCalcFormatMl(firstPlan.oldDailyDoseMl) : '-' },
+            { label: 'Neue K+ Tagesdosis', value: kPlan ? traceCalcFormatMl(kPlan.newDailyDoseMl) : '-' },
+            { label: 'Neue A- Tagesdosis', value: aPlan ? traceCalcFormatMl(aPlan.newDailyDoseMl) : '-' }
+        ],
+        rows,
+        notes: [
+            'Dieser Ausdruck beschreibt ausschließlich die Weiterverwendung einer bereits laufenden Trace-Mischung.',
+            'Alt vorhanden + Hinzufügen = Soll im fertigen Ansatz. Die Spalte „Bestand danach“ zeigt den Lagerbestand nach Auslagerung der Ergänzungen.',
+            'Der Rechner geht davon aus, dass die vorhandenen Lösungen optimal gemischt sind und sich nichts abgesetzt oder ausgefallen ist. Alte Lösungen sollten maximal einmal ergänzt werden.'
+        ]
+    });
 }
 
 function renderTraceCalculatorExpertControls(force = false) {
@@ -15116,6 +15191,9 @@ function renderTraceCalculator() {
             <div class="trace-recipe-split">
                 ${renderTraceRecipeTable(recipe, 'kationen')}
                 ${renderTraceRecipeTable(recipe, 'anionen')}
+            </div>
+            <div class="tool-action-row calculator-actions">
+                <button class="btn-secondary btn-animated" onclick="exportTraceRecipePdf()">Trace-Rezept als PDF / Drucken</button>
             </div>
             ${renderTraceReusePlanner(recipe)}
         </div>
@@ -17888,7 +17966,7 @@ function bookNutritionDose() {
     if (!resolved) return alert(`${rule.product} ist nicht lagergeführt.`);
     if (!totalMl) return alert(`Bitte erst ${rule.isDirectDose ? 'die Aquariumgröße eintragen.' : 'Aquariumgröße und Zieländerung eintragen.'}`);
     if (!confirm(`${totalMl.toFixed(2)} ml ${rule.product} auslagern?`)) return;
-    executeQueueWithConflictHandling([{ ...resolved, amount: totalMl }], 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock([{ ...resolved, amount: totalMl }]), 0);
 }
 
 function getNutritionCarbonStartDose(no3Status, po4Status) {
@@ -19006,7 +19084,7 @@ function queueCustomCrPlanStep(planId, stepId) {
         .filter(Boolean);
     if (!queue.length) return alert('Dieser Schritt enthält keine lagergeführten Mengen.');
     if (!confirm(`Schritt ${step.index} wirklich auslagern? Ergebnis bitte vorher prüfen.`)) return;
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
 function toggleCustomCrPlanStepDone(planId, stepId) {
@@ -19126,7 +19204,7 @@ function bookCustomCRAdjustment() {
     if (!queue.length) return alert('Dieser Ausgleich enthält keine lagergeführten Mengen.');
     const stepLabel = plan.steps.length > 1 ? `Schritt 1 von ${plan.steps.length}` : 'diesen Ausgleich';
     if (!confirm(`C&R ${stepLabel} für ${planner.tankLiters.toFixed(0)} L auslagern? Ergebnis bitte vorher prüfen.`)) return;
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
 function getSeaWaterScale() {
@@ -19276,7 +19354,7 @@ function bookSeaWaterMix() {
         .filter(Boolean);
     if (queue.length === 0) return alert('Dieses Rezept enthält keine lagergeführten Zutaten.');
     if (!confirm(`${liters} L Meerwasser anmischen und ${queue.length} lagergeführte Zutat(en) auslagern?`)) return;
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
 function renderNaclSolutionCalculator() {
@@ -19408,7 +19486,234 @@ function bookMacroRecipe() {
         .filter(Boolean);
     if (queue.length === 0) return alert('Dieses Rezept enthält keine lagergeführten Zutaten.');
     if (!confirm(`${select.value} für ${liters} L anmischen und ${queue.length} lagergeführte Zutat(en) auslagern?`)) return;
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
+}
+
+function formatRecipeAmountForPrint(itemName, amount, unit = 'ml') {
+    const numeric = Number(amount) || 0;
+    if (unit === 'ml' && itemName) {
+        const grams = numeric * (densityFactors[itemName] || 1);
+        return `${numeric.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ml / ${grams.toLocaleString('de-DE', { maximumFractionDigits: 2 })} g`;
+    }
+    return `${numeric.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ${unit}`;
+}
+
+function buildRecipePrintRows(entries) {
+    return entries.map(entry => {
+        const item = entry.item || entry.label;
+        const resolved = entry.resolved || resolveRecipeItem(entry);
+        const amount = Number(entry.amount) || 0;
+        const stock = resolved ? getInventoryAmount(resolved.cat, resolved.item) : null;
+        const after = resolved ? Math.max(0, stock - amount) : null;
+        return {
+            category: resolved?.cat || entry.category || 'nicht lagergeführt',
+            item,
+            amount,
+            unit: entry.unit || 'ml',
+            amountText: entry.amountText || formatRecipeAmountForPrint(entry.item, amount, entry.unit || 'ml'),
+            stockText: resolved ? formatItemAmount(resolved.item, stock) : '-',
+            afterText: resolved ? formatItemAmount(resolved.item, after) : '-',
+            note: entry.note || (resolved ? '' : 'nicht lagergeführt')
+        };
+    });
+}
+
+function buildRecipePrintFilename(title, date = new Date()) {
+    const pad = number => String(number).padStart(2, '0');
+    const stamp = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}`;
+    const safeTitle = String(title || 'Rezept')
+        .replace(/&/g, ' und ')
+        .replace(/[^\p{L}\p{N}]+/gu, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 70) || 'Rezept';
+    return `ReefTools_${safeTitle}_${stamp}`;
+}
+
+function buildRecipePrintDocument({ title, subtitle = '', meta = [], rows = [], notes = [], autoPrint = false }) {
+    const createdAt = new Date();
+    const documentTitle = buildRecipePrintFilename(title, createdAt);
+    const htmlRows = rows.length
+        ? rows.map(row => `
+            <tr>
+                <td>${escapeHtml(row.category)}</td>
+                <td><strong>${escapeHtml(row.item)}</strong>${row.note ? `<small>${escapeHtml(row.note)}</small>` : ''}</td>
+                <td>${escapeHtml(row.amountText)}</td>
+                <td>${escapeHtml(row.stockText)}</td>
+                <td>${escapeHtml(row.afterText)}</td>
+            </tr>
+        `).join('')
+        : '<tr><td colspan="5" class="empty">Keine Rezeptdaten vorhanden.</td></tr>';
+    const metaHtml = meta
+        .filter(entry => entry && entry.value !== undefined && entry.value !== null && String(entry.value).trim() !== '')
+        .map(entry => `<div class="pill"><strong>${escapeHtml(entry.value)}</strong><span>${escapeHtml(entry.label)}</span></div>`)
+        .join('');
+    const noteHtml = notes.length
+        ? `<div class="notes">${notes.map(note => `<p>${escapeHtml(note)}</p>`).join('')}</div>`
+        : '';
+
+    return `
+        <!doctype html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <title>${escapeHtml(documentTitle)}</title>
+            <style>
+                *{box-sizing:border-box}
+                body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:22px;color:#0f172a;background:#fff}
+                .actions{display:flex;gap:10px;margin-bottom:16px}
+                button{border:0;border-radius:12px;background:#0f172a;color:#fff;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
+                h1{font-size:24px;line-height:1.1;margin:0 0 4px}
+                .subtitle{color:#475569;margin:0 0 14px;font-size:13px}
+                .meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px}
+                .pill{border:1px solid #dbe6ee;border-radius:12px;padding:8px 10px;background:#f8fafc;min-height:50px}
+                .pill strong{display:block;font-size:16px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+                .pill span{display:block;font-size:11px;color:#64748b;margin-top:2px}
+                table{width:100%;border-collapse:collapse;font-size:11px}
+                th,td{text-align:left;border-bottom:1px solid #e2e8f0;padding:7px 8px;vertical-align:top}
+                th{background:#ecfeff;color:#0e7490;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+                td strong{display:block}
+                td small{display:block;color:#64748b;margin-top:2px}
+                .notes{margin-top:14px;border:1px solid #dbe6ee;border-radius:12px;padding:10px 12px;background:#f8fafc;color:#334155;font-size:11px}
+                .notes p{margin:4px 0}
+                .footer{margin-top:14px;color:#64748b;font-size:10px;text-align:right}
+                .empty{text-align:center;color:#64748b}
+                @page{size:A4;margin:12mm}
+                @media print{body{margin:0}.actions{display:none}h1{font-size:21px}.meta{grid-template-columns:repeat(4,1fr)}table{font-size:10px}th,td{padding:5px 6px}.notes{font-size:10px}}
+            </style>
+            ${autoPrint ? `
+                <script>
+                    window.addEventListener('load', () => {
+                        window.setTimeout(() => window.print(), 350);
+                    });
+                </script>
+            ` : ''}
+        </head>
+        <body>
+            <div class="actions"><button onclick="window.print()">Als PDF sichern / drucken</button></div>
+            <h1>${escapeHtml(title)}</h1>
+            ${subtitle ? `<p class="subtitle">${escapeHtml(subtitle)}</p>` : ''}
+            ${metaHtml ? `<div class="meta">${metaHtml}</div>` : ''}
+            <table>
+                <thead>
+                    <tr><th>Kategorie</th><th>Produkt</th><th>Menge</th><th>Bestand jetzt</th><th>Bestand danach</th></tr>
+                </thead>
+                <tbody>${htmlRows}</tbody>
+            </table>
+            ${noteHtml}
+            <div class="footer">ReefTools · ${createdAt.toLocaleString('de-DE')}</div>
+        </body>
+        </html>
+    `;
+}
+
+function openRecipePrintDocument(config) {
+    const title = config?.title || 'Rezept';
+    const confirmed = confirm(`${title} als PDF vorbereiten?\n\nDanach öffnet sich der Druck-/PDF-sichern-Dialog.`);
+    if (!confirmed) return;
+    const report = window.open('', '_blank');
+    if (!report) {
+        alert('Popup wurde blockiert. Bitte Popups für diese App erlauben.');
+        return;
+    }
+    report.document.write(buildRecipePrintDocument({ ...config, autoPrint: true }));
+    report.document.close();
+}
+
+function exportCRPasteRecipePdf() {
+    const rows = parseCRPasteAmounts(document.getElementById('cr-paste-area')?.value || '')
+        .filter(row => row.amount > 0)
+        .map(row => ({ ...row, resolved: { cat: row.cat, item: row.item } }));
+    if (!rows.length) return alert('Bitte zuerst eine C&R Liste einfügen.');
+    const totalMl = rows.reduce((sum, row) => sum + row.amount, 0);
+    openRecipePrintDocument({
+        title: 'C&R Auslagerung',
+        subtitle: 'Druckbare Übersicht der eingefügten C&R Mengen inklusive aktuellem Lagerbestand.',
+        meta: [
+            { label: 'Positionen', value: rows.length },
+            { label: 'Gesamtmenge', value: `${totalMl.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ml` },
+            { label: 'Lager', value: getActiveWarehouse()?.name || 'Lager' }
+        ],
+        rows: buildRecipePrintRows(rows),
+        notes: ['NaF und Fluor (F) werden bei der Bestandsprüfung als identische Ersatzprodukte berücksichtigt.']
+    });
+}
+
+function exportSeaWaterRecipePdf() {
+    const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
+    if (!liters) return alert('Bitte zuerst die gewünschte Meerwassermenge eintragen.');
+    const scale = liters / 100;
+    const rows = seaWaterRecipePer100L.map(entry => ({
+        ...entry,
+        amount: entry.amount * scale
+    }));
+    openRecipePrintDocument({
+        title: 'Meerwasser aus C&R anmischen',
+        subtitle: 'Kompakte Rezeptkarte mit ml/g-Mengen und Lagerbeständen.',
+        meta: [
+            { label: 'Zielmenge', value: `${liters.toLocaleString('de-DE', { maximumFractionDigits: 1 })} L` },
+            { label: 'Rezeptbasis', value: '100 L Meerwasser' },
+            { label: 'Spurenelemente', value: 'K+ / A- optional' },
+            { label: 'Lager', value: getActiveWarehouse()?.name || 'Lager' }
+        ],
+        rows: buildRecipePrintRows(rows),
+        notes: [
+            'Osmosewasser wird im Lager und in der Preisberechnung nicht berücksichtigt.',
+            'Das angesetzte Meerwasser enthält nahezu keine Spurenelemente. Optional je 1 ml K+ und A- pro 100 L hinzugeben.'
+        ]
+    });
+}
+
+function exportMacroRecipePdf() {
+    const select = document.getElementById('macroRecipeSelect');
+    const liters = Math.max(0.1, parseFloat(document.getElementById('macroRecipeLiters')?.value) || 1);
+    const recipeName = select?.value || 'Makro-Rezept';
+    const rows = (macroRecipes[recipeName] || []).map(entry => ({
+        ...entry,
+        amount: entry.amount * liters
+    }));
+    if (!rows.length) return alert('Bitte zuerst ein Makro-Rezept auswählen.');
+    openRecipePrintDocument({
+        title: `Makro-Element ${recipeName}`,
+        subtitle: 'Druckbare Rezeptkarte für das Anmischen inklusive Bestand vorher und danach.',
+        meta: [
+            { label: 'Zielmenge', value: `${liters.toLocaleString('de-DE', { maximumFractionDigits: 1 })} L` },
+            { label: 'Rezept', value: recipeName },
+            { label: 'Lager', value: getActiveWarehouse()?.name || 'Lager' }
+        ],
+        rows: buildRecipePrintRows(rows)
+    });
+}
+
+function exportTraceRecipePdf() {
+    const state = ensureTraceCalculatorState();
+    const recipe = state.latestRecipe || calculateTraceRecipe(getTraceCalculatorConfigFromUi());
+    if (!recipe || !Array.isArray(recipe.rows) || !recipe.rows.length) return alert('Bitte zuerst eine Trace-Mischung berechnen.');
+    const rows = recipe.rows
+        .filter(row => row.amount > 0)
+        .map(row => ({
+            category: row.group === 'kationen' ? 'Kationen K+' : 'Anionen A-',
+            item: row.item,
+            amount: row.amount,
+            unit: 'ml',
+            resolved: { cat: row.group === 'kationen' ? 'Kationen' : 'Anionen', item: row.item }
+        }));
+    const totals = recipe.totals || {};
+    openRecipePrintDocument({
+        title: 'Trace Mischung K+ / A-',
+        subtitle: 'Kompakte Rezeptkarte fuer Anionen- und Kationen-Mischungen inklusive Osmoseanteil.',
+        meta: [
+            { label: 'Kationen K+', value: traceCalcFormatMlG(totals.kationen?.volumeMl || 0, totals.kationen?.volumeG || 0) },
+            { label: 'Anionen A-', value: traceCalcFormatMlG(totals.anionen?.volumeMl || 0, totals.anionen?.volumeG || 0) },
+            { label: 'Laufzeit', value: `${traceCalcFormatValue(recipe.config?.days, 0)} Tage` },
+            { label: 'Täglich je Lösung', value: traceCalcFormatMl(recipe.config?.dailyDoseMl || 0) }
+        ],
+        rows: buildRecipePrintRows(rows),
+        notes: [
+            `K+ Osmoseanteil: ${traceCalcFormatMl(totals.kationen?.osmoseMl || 0)}.`,
+            `A- Osmoseanteil: ${traceCalcFormatMl(totals.anionen?.osmoseMl || 0)}.`,
+            'Trace-Mischungen vor dem Ansetzen fachlich prüfen.'
+        ]
+    });
 }
 
 function formatDateTimeLocal(value) {
@@ -22412,6 +22717,75 @@ function formatCRPreferredAmountHtml(itemName, amountMl) {
     };
 }
 
+function getInventoryAmount(cat, item) {
+    return (db.inventory?.[cat]?.[item]) || 0;
+}
+
+function getInterchangeableStockOptions(cat, item) {
+    const group = interchangeableStockProducts.find(options => options.some(option => option.cat === cat && option.item === item));
+    if (!group) return [{ cat, item, isRequested: true }];
+    const requested = group.find(option => option.cat === cat && option.item === item) || { cat, item };
+    return [
+        { ...requested, isRequested: true },
+        ...group
+            .filter(option => option.cat !== requested.cat || option.item !== requested.item)
+            .map(option => ({ ...option, isRequested: false }))
+    ];
+}
+
+function getInterchangeableStockResolution(cat, item, amount) {
+    const required = Math.max(0, Number(amount) || 0);
+    const options = getInterchangeableStockOptions(cat, item).map(option => ({
+        ...option,
+        stock: getInventoryAmount(option.cat, option.item)
+    }));
+    let remaining = required;
+    const entries = [];
+    options.forEach(option => {
+        if (remaining <= 0) return;
+        const used = Math.min(option.stock, remaining);
+        if (used > 0) {
+            entries.push({
+                cat: option.cat,
+                item: option.item,
+                amount: traceCalcRound ? traceCalcRound(used) : Number(used.toFixed(2)),
+                requestedCat: cat,
+                requestedItem: item,
+                usedAsReplacement: !option.isRequested
+            });
+            remaining = Math.max(0, remaining - used);
+        }
+    });
+    return {
+        requested: { cat, item },
+        options,
+        entries,
+        required,
+        totalAvailable: options.reduce((sum, option) => sum + option.stock, 0),
+        missing: Math.max(0, remaining),
+        usesReplacement: entries.some(entry => entry.usedAsReplacement),
+        hasAlternatives: options.length > 1
+    };
+}
+
+function expandQueueWithInterchangeableStock(queue) {
+    return (queue || []).flatMap(entry => {
+        const resolution = getInterchangeableStockResolution(entry.cat, entry.item, entry.amount);
+        if (!resolution.hasAlternatives || resolution.totalAvailable < entry.amount) return [entry];
+        return resolution.entries.length ? resolution.entries : [entry];
+    });
+}
+
+function renderInterchangeableStockHint(resolution, itemName) {
+    if (!resolution?.hasAlternatives) return '';
+    const replacementEntries = resolution.entries.filter(entry => entry.usedAsReplacement);
+    if (!replacementEntries.length) return '';
+    const replacements = replacementEntries
+        .map(entry => `${escapeHtml(entry.item)} ${formatCRPreferredAmountHtml(entry.item, entry.amount).plain}`)
+        .join(' · ');
+    return `<span class="cr-stock-alias"><strong>Ersatzprodukt erkannt</strong> · ${replacements} werden für ${escapeHtml(itemName)} genutzt.</span>`;
+}
+
 function previewCRPaste() {
     const pasteArea = document.getElementById('cr-paste-area');
     const previewContainer = document.getElementById('cr-preview-container');
@@ -22420,46 +22794,51 @@ function previewCRPaste() {
     if (!pasteArea || !previewContainer || !previewList) return;
 
     const text = pasteArea.value;
-    const matches = text.match(/([\d.]+)\s*ml/g);
+    const parsedRows = parseCRPasteAmounts(text);
 
     if (!text.trim()) {
         previewContainer.hidden = true;
         return;
     }
 
-    if (!matches || matches.length < crOrder.length) {
+    if (parsedRows.length < crOrder.length) {
         previewContainer.hidden = false;
         previewList.innerHTML = '<div class="workflow-message workflow-message--error" role="alert"><strong>Eingabe unvollständig</strong><span>Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span></div>';
         return;
     }
 
     let html = '<div class="cr-preview-list">';
-    for (let i = 0; i < crOrder.length; i++) {
-        let amountMl = parseFloat(matches[i].replace(/[^\d.]/g, ''));
-        let itemName = crOrder[i].name;
-        let cat = crOrder[i].cat;
-        let currentStock = (db.inventory[cat] && db.inventory[cat][itemName]) || 0;
+    parsedRows.forEach(row => {
+        let amountMl = row.amount;
+        let itemName = row.item;
+        let cat = row.cat;
+        const resolution = getInterchangeableStockResolution(cat, itemName, amountMl);
+        let currentStock = resolution.totalAvailable;
         
         if (amountMl > 0) {
             let stockWarning = '';
+            const requestedStock = getInventoryAmount(cat, itemName);
             const newStock = Math.max(0, currentStock - amountMl);
-            const newStockDisplay = formatCRPreferredAmountHtml(itemName, newStock);
+            const newRequestedStock = Math.max(0, requestedStock - amountMl);
+            const newStockDisplay = resolution.hasAlternatives
+                ? formatCRPreferredAmountHtml(itemName, newStock)
+                : formatCRPreferredAmountHtml(itemName, newRequestedStock);
             if (currentStock < amountMl) {
                 const missingDisplay = formatCRPreferredAmountHtml(itemName, amountMl - currentStock);
                 const stockDisplay = formatCRPreferredAmountHtml(itemName, currentStock);
-                stockWarning = `<span class="cr-stock-warning"><strong>Bestand reicht nicht</strong> · Fehlt: ${missingDisplay.plain} (Bestand: ${stockDisplay.plain})</span>`;
+                stockWarning = `<span class="cr-stock-warning"><strong>Bestand reicht nicht</strong> · Fehlt: ${missingDisplay.plain} (verfügbar inkl. Ersatz: ${stockDisplay.plain})</span>`;
             }
             html += `
                 <div class="cr-preview-row ${currentStock < amountMl ? 'missing' : ''}">
-                    <span class="cr-preview-product"><strong>${itemName}</strong>${stockWarning}</span>
+                    <span class="cr-preview-product"><strong>${itemName}</strong>${stockWarning}${renderInterchangeableStockHint(resolution, itemName)}</span>
                     <span class="cr-preview-amount">
                         ${formatCRPreferredAmountHtml(itemName, amountMl).html}
-                        <small>Neuer Bestand: ${newStockDisplay.plain}</small>
+                        <small>${resolution.hasAlternatives ? 'Neuer Gesamtbestand' : 'Neuer Bestand'}: ${newStockDisplay.plain}</small>
                     </span>
                 </div>
             `;
         }
-    }
+    });
     html += '</div>';
 
     previewList.innerHTML = html;
@@ -22468,15 +22847,24 @@ function previewCRPaste() {
 
 function processCRPaste() {
     const text = document.getElementById('cr-paste-area').value;
-    const matches = text.match(/([\d.]+)\s*ml/g);
-    if (!matches || matches.length < crOrder.length) return alert("Fehler: Format ungültig.");
+    const rows = parseCRPasteAmounts(text);
+    if (rows.length < crOrder.length) return alert("Fehler: Format ungültig.");
     
-    let queue = [];
-    for (let i = 0; i < crOrder.length; i++) {
-        let amount = parseFloat(matches[i].replace(/[^\d.]/g, ''));
-        if (amount > 0) queue.push({ cat: crOrder[i].cat, item: crOrder[i].name, amount });
-    }
-    executeQueueWithConflictHandling(queue, 0);
+    let queue = rows
+        .filter(row => row.amount > 0)
+        .map(row => ({ cat: row.cat, item: row.item, amount: row.amount }));
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
+}
+
+function parseCRPasteAmounts(text) {
+    const matches = String(text || '').match(/([0-9]+(?:[,.][0-9]+)?)\s*ml/gi);
+    if (!matches || matches.length < crOrder.length) return [];
+    return crOrder.map((entry, index) => ({
+        cat: entry.cat,
+        item: entry.name,
+        amount: parseFloat(String(matches[index]).replace(',', '.').replace(/[^\d.]/g, '')) || 0,
+        unit: 'ml'
+    }));
 }
 
 function escapeHtml(value) {
@@ -22767,13 +23155,13 @@ function getCRAdjustmentSummary(adjustment) {
         if (entry.amount <= 0) return;
         requiredCount++;
         totalRequired += entry.amount;
-        const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
-        if (stock < entry.amount) {
+        const resolution = getInterchangeableStockResolution(entry.cat, entry.item, entry.amount);
+        if (resolution.totalAvailable < entry.amount) {
             missing.push({
                 item: entry.item,
                 amount: entry.amount,
-                stock,
-                missing: entry.amount - stock
+                stock: resolution.totalAvailable,
+                missing: entry.amount - resolution.totalAvailable
             });
         }
     });
@@ -22889,7 +23277,8 @@ function renderCRPdfAdjustments() {
         const statusText = hasMissing ? `${summary.missing.length} Mangel` : 'genug Vorrat';
         const statusClass = hasMissing ? 'missing' : 'ready';
         const rows = adjustment.entries.map(entry => {
-            const stock = (db.inventory[entry.cat] && db.inventory[entry.cat][entry.item]) || 0;
+            const resolution = getInterchangeableStockResolution(entry.cat, entry.item, entry.amount);
+            const stock = resolution.totalAvailable;
             const isNeeded = entry.amount > 0;
             const isMissing = isNeeded && stock < entry.amount;
             const newStock = Math.max(0, stock - entry.amount);
@@ -22902,6 +23291,7 @@ function renderCRPdfAdjustments() {
                     <div>
                         <strong>${escapeHtml(entry.item)}</strong>
                         <small>Bestand: ${stockDisplay.plain} · Neu: ${newStockDisplay.plain}</small>
+                        ${renderInterchangeableStockHint(resolution, entry.item)}
                     </div>
                     <div class="cr-adjustment-amount">
                         ${amountDisplay.html}
@@ -23096,7 +23486,7 @@ function exportCRAdjustment(index) {
     }
     if (!confirm(message)) return;
 
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
 function auslagernMischung(typ) {
@@ -23110,7 +23500,7 @@ function auslagernMischung(typ) {
         if (amount > 0) queue.push({ cat: catName, item, amount });
     }
     if (queue.length === 0) return alert("Trage mindestens bei einem Element eine Menge ein.");
-    executeQueueWithConflictHandling(queue, 0);
+    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
 function executeQueueWithConflictHandling(queue, index) {
@@ -23135,13 +23525,13 @@ function executeQueueWithConflictHandling(queue, index) {
     if (stock - amount < 0) {
         showConflictModal(cat, item, amount, stock, () => {
             db.inventory[cat][item] = 0;
-            db.stats[item] += stock;
+            db.stats[item] = (db.stats[item] || 0) + stock;
             addLog(cat, item, 'out', stock);
             executeQueueWithConflictHandling(queue, index + 1);
         });
     } else {
         db.inventory[cat][item] -= amount;
-        db.stats[item] += amount;
+        db.stats[item] = (db.stats[item] || 0) + amount;
         addLog(cat, item, 'out', amount);
         executeQueueWithConflictHandling(queue, index + 1);
     }

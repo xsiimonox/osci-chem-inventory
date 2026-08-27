@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.116-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.122-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.116</span>
+                    <span class="version-badge">v3.4.122</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -138,6 +138,7 @@
 
                 <div class="workflow-actions">
                     <button class="btn-primary btn-animated booking-action" onclick="processCRPaste()">Automatisch auslagern</button>
+                    <button class="btn-secondary btn-animated" onclick="exportCRPasteRecipePdf()">PDF / Drucken</button>
                 </div>
             </div>
 
@@ -851,6 +852,7 @@
                             <div class="btn-group calculator-actions">
                                 <button class="btn-secondary btn-animated" onclick="saveSeaWaterPreset()">Preset speichern</button>
                                 <button class="btn-secondary btn-animated" onclick="deleteSeaWaterPreset()">Preset löschen</button>
+                                <button class="btn-secondary btn-animated" onclick="exportSeaWaterRecipePdf()">PDF / Drucken</button>
                             </div>
                             <div class="sea-water-trace-note" role="note" aria-label="Hinweis zu Spurenelementen">
                                 <div class="sea-water-trace-note__marker">!</div>
@@ -903,6 +905,9 @@
                                 <input type="number" id="macroRecipeLiters" min="0.1" step="0.1" value="1" oninput="renderMacroRecipe()">
                             </div>
                             <div id="macroRecipeResult"></div>
+                            <div class="tool-action-row calculator-actions">
+                                <button class="btn-secondary btn-animated" onclick="exportMacroRecipePdf()">PDF / Drucken</button>
+                            </div>
                         </div>
                     </div>
                 </details>
@@ -2333,9 +2338,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.116-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.116-release"></script>
-    <script src="assets/js/app.js?v=3.4.116-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.122-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.122-release"></script>
+    <script src="assets/js/app.js?v=3.4.122-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

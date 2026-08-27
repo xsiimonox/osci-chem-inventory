@@ -12065,6 +12065,13 @@ body.theme-badman.party-mode .card {
     line-height: 1.35;
 }
 
+.cr-stock-alias {
+    display: block;
+    color: var(--status-success);
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
 .cr-preview-amount {
     text-align: right;
     font-variant-numeric: tabular-nums;
