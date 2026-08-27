@@ -1140,6 +1140,7 @@ const cloudTransferVisualState = {
     mode: '',
     label: '',
     detail: '',
+    subtle: false,
     depth: 0
 };
 const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'icp', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
@@ -2124,12 +2125,15 @@ function renderGoogleDriveHeaderStatus() {
     const autoSync = settings.autoSync === true;
     const hasLocalChanges = connected && hasPendingGoogleDriveLocalChanges();
     let subtitle = knownAccount ? `offline · ${knownAccount}` : 'offline';
-    indicator.classList.remove('is-connected', 'is-warning', 'is-offline', 'is-unsynced', 'is-transferring');
+    indicator.classList.remove('is-connected', 'is-warning', 'is-offline', 'is-unsynced', 'is-transferring', 'is-auto-transferring');
     if (cloudTransferVisualState.active) {
-        subtitle = cloudTransferVisualState.mode === 'download'
-            ? 'Cloud Download läuft'
-            : 'Cloud Upload läuft';
+        subtitle = cloudTransferVisualState.subtle
+            ? 'Auto-Sync lädt hoch'
+            : (cloudTransferVisualState.mode === 'download'
+                ? 'Cloud Download läuft'
+                : 'Cloud Upload läuft');
         indicator.classList.add('is-transferring');
+        if (cloudTransferVisualState.subtle) indicator.classList.add('is-auto-transferring');
     } else if (connected) {
         subtitle = hasLocalChanges
             ? 'online · nicht synchronisiert'
@@ -3100,12 +3104,14 @@ function ensureCloudTransferOverlay() {
 function renderCloudTransferOverlay() {
     const overlay = ensureCloudTransferOverlay();
     const active = cloudTransferVisualState.active;
-    overlay.hidden = !active;
-    overlay.classList.toggle('is-visible', active);
-    if (!active) {
+    const showOverlay = active && !cloudTransferVisualState.subtle;
+    overlay.hidden = !showOverlay;
+    overlay.classList.toggle('is-visible', showOverlay);
+    if (!showOverlay) {
         overlay.innerHTML = '';
-        document.body.classList.remove('cloud-transfer-active');
-        document.body.removeAttribute('data-cloud-transfer-mode');
+        document.body.classList.toggle('cloud-transfer-active', false);
+        if (!active) document.body.removeAttribute('data-cloud-transfer-mode');
+        else document.body.dataset.cloudTransferMode = cloudTransferVisualState.mode === 'download' ? 'download' : 'upload';
         renderGoogleDriveHeaderStatus();
         return;
     }
@@ -3132,12 +3138,13 @@ function renderCloudTransferOverlay() {
     renderGoogleDriveHeaderStatus();
 }
 
-function beginCloudTransferVisual(mode = 'upload', detail = '') {
+function beginCloudTransferVisual(mode = 'upload', detail = '', options = {}) {
     cloudTransferVisualState.depth += 1;
     cloudTransferVisualState.active = true;
     cloudTransferVisualState.mode = mode === 'download' ? 'download' : 'upload';
     cloudTransferVisualState.label = cloudTransferVisualState.mode === 'download' ? 'Cloud Download läuft' : 'Cloud Upload läuft';
     cloudTransferVisualState.detail = detail;
+    cloudTransferVisualState.subtle = options.subtle === true;
     renderCloudTransferOverlay();
 }
 
@@ -3148,6 +3155,7 @@ function endCloudTransferVisual() {
     cloudTransferVisualState.mode = '';
     cloudTransferVisualState.label = '';
     cloudTransferVisualState.detail = '';
+    cloudTransferVisualState.subtle = false;
     renderCloudTransferOverlay();
 }
 
@@ -3156,7 +3164,8 @@ async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
         'upload',
         trigger === 'autosync'
             ? 'Auto-Sync speichert deine letzten Änderungen.'
-            : 'Dein aktueller Projektstand wird in Google Drive gesichert.'
+            : 'Dein aktueller Projektstand wird in Google Drive gesichert.',
+        { subtle: trigger === 'autosync' }
     );
     if (isDemoProfileActive()) {
         endCloudTransferVisual();

@@ -310,6 +310,16 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
 .header-sync-indicator.is-transferring .header-sync-dot {
     animation: cloudStatusPulse 1s ease-in-out infinite;
 }
+.header-sync-indicator.is-auto-transferring {
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--border-color));
+    background:
+        linear-gradient(90deg, color-mix(in srgb, var(--accent) 9%, transparent), transparent 62%),
+        color-mix(in srgb, var(--surface-raised) 78%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.header-sync-indicator.is-auto-transferring .header-sync-dot {
+    animation: cloudStatusPulseSoft 1.35s ease-in-out infinite;
+}
 .header-quick-sync-button.is-active {
     color: #fff;
     border-color: rgba(191,90,242,0.2);
@@ -505,6 +515,11 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     50% { transform: scale(1.24); opacity: 1; }
 }
 
+@keyframes cloudStatusPulseSoft {
+    0%, 100% { transform: scale(1); opacity: 0.58; }
+    50% { transform: scale(1.12); opacity: 0.92; }
+}
+
 @keyframes cloudTransferProgress {
     0% { transform: translateX(-110%); }
     100% { transform: translateX(250%); }
@@ -531,7 +546,8 @@ header h1 { margin: 0; font-size: 1.4rem; font-weight: 700; color: #fff; letter-
     .cloud-transfer-card::before,
     .cloud-transfer-progress i,
     .cloud-transfer-arrow,
-    .header-sync-indicator.is-transferring .header-sync-dot {
+    .header-sync-indicator.is-transferring .header-sync-dot,
+    .header-sync-indicator.is-auto-transferring .header-sync-dot {
         animation: none;
     }
 }
