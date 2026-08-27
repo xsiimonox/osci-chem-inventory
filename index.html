@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.107-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.112-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.107</span>
+                    <span class="version-badge">v3.4.112</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -1588,6 +1588,10 @@
                             <label for="coralColor">Farbe:</label>
                             <input type="text" id="coralColor" placeholder="z.B. blau mit grünen Polypen">
                         </div>
+                        <div class="input-group">
+                            <label for="coralPurchasePrice">Kaufpreis:</label>
+                            <input type="number" id="coralPurchasePrice" min="0" step="0.01" inputmode="decimal" placeholder="z.B. 49,90">
+                        </div>
                     </div>
                     <div class="input-group">
                         <label>Fotos:</label>
@@ -2196,9 +2200,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.107-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.107-release"></script>
-    <script src="assets/js/app.js?v=3.4.107-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.112-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.112-release"></script>
+    <script src="assets/js/app.js?v=3.4.112-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -2739,9 +2739,9 @@ function createDemoAquariumData() {
         psuCorrectionOffset: -0.2,
         toolSettings: { lastSection: 'wasserwerte-und-dosierung', favorites: ['salzgehalt-rechner', 'nutrition-rechner'], hidden: [] },
         coralCatalog: [
-            { id: 'demo-coral-001', scientificName: 'Acropora tenuis', genus: 'Acropora', speciesName: 'tenuis', tradeName: 'Blue Tenuis', coralType: 'SPS', growthForm: 'verzweigt', color: 'blau-grün, helle Polypen', status: 'bestand', createdAt: demoDate(80, 14, 0), updatedAt: demoDate(8, 14, 0) },
-            { id: 'demo-coral-002', scientificName: 'Euphyllia glabrescens', genus: 'Euphyllia', speciesName: 'glabrescens', tradeName: 'Torch Gold', coralType: 'LPS', growthForm: 'buschig', color: 'goldene Spitzen, grüne Basis', status: 'bestand', createdAt: demoDate(55, 14, 0), updatedAt: demoDate(5, 14, 0) },
-            { id: 'demo-coral-003', scientificName: 'Montipora capricornis', genus: 'Montipora', speciesName: 'capricornis', tradeName: 'Red Plating', coralType: 'SPS', growthForm: 'plating', color: 'rot/orange', status: 'ableger', motherCoralId: 'demo-coral-001', createdAt: demoDate(16, 14, 0), updatedAt: demoDate(2, 14, 0) }
+            { id: 'demo-coral-001', scientificName: 'Acropora tenuis', genus: 'Acropora', speciesName: 'tenuis', tradeName: 'Blue Tenuis', coralType: 'SPS', growthForm: 'verzweigt', color: 'blau-grün, helle Polypen', purchasePrice: 79.9, status: 'bestand', createdAt: demoDate(80, 14, 0), updatedAt: demoDate(8, 14, 0) },
+            { id: 'demo-coral-002', scientificName: 'Euphyllia glabrescens', genus: 'Euphyllia', speciesName: 'glabrescens', tradeName: 'Torch Gold', coralType: 'LPS', growthForm: 'buschig', color: 'goldene Spitzen, grüne Basis', purchasePrice: 129, status: 'bestand', createdAt: demoDate(55, 14, 0), updatedAt: demoDate(5, 14, 0) },
+            { id: 'demo-coral-003', scientificName: 'Montipora capricornis', genus: 'Montipora', speciesName: 'capricornis', tradeName: 'Red Plating', coralType: 'SPS', growthForm: 'plating', color: 'rot/orange', purchasePrice: 24.5, status: 'ableger', motherCoralId: 'demo-coral-001', createdAt: demoDate(16, 14, 0), updatedAt: demoDate(2, 14, 0) }
         ],
         coralTransfers: [
             { id: 'demo-transfer-001', coralId: 'demo-coral-old', recipientName: 'Max Mustermann', recipientContact: 'max@example.de', note: 'Ableger beim Vereinstreffen abgegeben.', transferredAt: demoDate(14, 19, 0), coralSnapshot: { tradeName: 'Green Slimer Ableger', scientificName: 'Acropora yongei', coralType: 'SPS', color: 'grün' } }
@@ -7496,6 +7496,25 @@ function updateCoralMotherFieldVisibility() {
     wrapper.classList.toggle('is-hidden', status !== 'ableger');
 }
 
+function parseCoralPurchasePrice(value) {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const parsed = Number(raw.replace(',', '.'));
+    if (!Number.isFinite(parsed) || parsed < 0) return '';
+    return Math.round(parsed * 100) / 100;
+}
+
+function formatCoralPurchasePrice(value) {
+    const parsed = parseCoralPurchasePrice(value);
+    if (parsed === '') return 'nicht hinterlegt';
+    return parsed.toLocaleString('de-DE', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: parsed % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2
+    });
+}
+
 function getCoralFormData() {
     const scientificName = (document.getElementById('coralScientificName')?.value || '').trim();
     const tradeName = (document.getElementById('coralTradeName')?.value || '').trim();
@@ -7512,6 +7531,7 @@ function getCoralFormData() {
         addedAt: '',
         growthForm: document.getElementById('coralGrowthForm')?.value || '',
         color: (document.getElementById('coralColor')?.value || '').trim(),
+        purchasePrice: parseCoralPurchasePrice(document.getElementById('coralPurchasePrice')?.value || ''),
         note: ''
     };
 }
@@ -7524,7 +7544,8 @@ function applyCoralFormData(data = {}) {
         coralType: data.coralType || '',
         coralTradeName: data.tradeName || '',
         coralGrowthForm: data.growthForm || '',
-        coralColor: data.color || ''
+        coralColor: data.color || '',
+        coralPurchasePrice: data.purchasePrice === 0 || data.purchasePrice ? String(data.purchasePrice).replace('.', ',') : ''
     };
     Object.entries(map).forEach(([id, value]) => {
         const el = document.getElementById(id);
@@ -7536,7 +7557,7 @@ function resetCoralForm() {
     coralUiState.editingId = null;
     coralUiState.pendingPhotos = [];
     coralUiState.photosCleared = false;
-    ['coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralTradeName', 'coralColor', 'coralSearch'].forEach(id => {
+    ['coralScientificName', 'coralGenus', 'coralSpeciesName', 'coralTradeName', 'coralColor', 'coralPurchasePrice', 'coralSearch'].forEach(id => {
         const el = document.getElementById(id);
         if (el && id !== 'coralSearch') el.value = '';
     });
@@ -7814,6 +7835,7 @@ function renderCoralCatalog() {
                     ${coral.coralType ? `<span><strong>Typ</strong><small>${escapeHtml(coral.coralType)}</small></span>` : ''}
                     ${coral.growthForm ? `<span><strong>Wuchsform</strong><small>${escapeHtml(coral.growthForm)}</small></span>` : ''}
                     ${coral.color ? `<span><strong>Farbe</strong><small>${escapeHtml(coral.color)}</small></span>` : ''}
+                    <span><strong>Kaufpreis</strong><small>${escapeHtml(formatCoralPurchasePrice(coral.purchasePrice))}</small></span>
                     <span><strong>Fotos</strong><small>${getCoralPhotoList(coral).length || 0}</small></span>
                 </div>
                 <div class="btn-group coral-card-actions">
@@ -12593,13 +12615,17 @@ function ensureTraceCalculatorState() {
         db.traceCalculator.reusePlan = {
             kationenRemainingMl: '',
             anionenRemainingMl: '',
-            mode: 'keep-dose'
+            kationenRemainingDays: '',
+            anionenRemainingDays: '',
+            mode: 'optimize-solution'
         };
     }
     if (db.traceCalculator.reusePlan.kationenRemainingMl === undefined) db.traceCalculator.reusePlan.kationenRemainingMl = '';
     if (db.traceCalculator.reusePlan.anionenRemainingMl === undefined) db.traceCalculator.reusePlan.anionenRemainingMl = '';
+    if (db.traceCalculator.reusePlan.kationenRemainingDays === undefined) db.traceCalculator.reusePlan.kationenRemainingDays = '';
+    if (db.traceCalculator.reusePlan.anionenRemainingDays === undefined) db.traceCalculator.reusePlan.anionenRemainingDays = '';
     if (!['keep-dose', 'optimize-solution'].includes(db.traceCalculator.reusePlan.mode)) {
-        db.traceCalculator.reusePlan.mode = 'keep-dose';
+        db.traceCalculator.reusePlan.mode = 'optimize-solution';
     }
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
@@ -13043,17 +13069,34 @@ function getTraceReuseGroupShort(group) {
 
 function getTraceReuseRemainingValue(group) {
     const state = ensureTraceCalculatorState();
-    const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
-    return state.reusePlan?.[key] ?? '';
+    const mlKey = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
+    const mlValue = String(state.reusePlan?.[mlKey] ?? '').trim();
+    if (mlValue !== '') return mlValue;
+    const days = traceCalcNumber(state.reusePlan?.[daysKey], null);
+    if (days === null || days < 0) return '';
+    const source = getTraceReuseSourceEntry();
+    const dailyDose = traceCalcNumber(source?.config?.dailyDoseMl, state.config?.dailyDoseMl || traceCalculatorBase.dailyDoseMl);
+    return traceCalcRound(days * dailyDose).toFixed(2);
 }
 
 function getTraceReuseMode() {
     const state = ensureTraceCalculatorState();
-    return state.reusePlan?.mode === 'optimize-solution' ? 'optimize-solution' : 'keep-dose';
+    return state.reusePlan?.mode === 'keep-dose' ? 'keep-dose' : 'optimize-solution';
 }
 
 function getTraceReuseSourceEntry() {
     return getTraceCalculatorLatestHistory();
+}
+
+function getTraceReuseEstimatedRemainingDays(source = getTraceReuseSourceEntry()) {
+    const totalDays = traceCalcNumber(source?.config?.days, null);
+    if (!source?.mixtureDate || totalDays === null) return null;
+    const start = new Date(`${source.mixtureDate}T00:00:00`);
+    const today = new Date(`${getTodayDateInputValue()}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(today.getTime())) return null;
+    const elapsedDays = Math.max(0, Math.floor((today.getTime() - start.getTime()) / 86400000));
+    return Math.max(0, traceCalcRound(totalDays - elapsedDays));
 }
 
 function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
@@ -13266,7 +13309,7 @@ function renderTraceReuseGroupPlan(plan) {
             </section>
         `;
     }
-    const additions = plan.rows.filter(row => row.additionMl > 0.000001);
+    const balanceRows = [...plan.rows].sort((a, b) => a.symbol.localeCompare(b.symbol, 'de'));
     return `
         <section class="trace-reuse-card trace-reuse-card-${plan.status}">
             <div class="trace-reuse-card-head">
@@ -13285,13 +13328,21 @@ function renderTraceReuseGroupPlan(plan) {
             </div>
             ${warningHtml}
             <div class="trace-reuse-additions">
-                ${additions.length ? additions.map(row => `
+                <div class="trace-reuse-balance-head">
+                    <span>Element</span>
+                    <span>Rest</span>
+                    <span>Ziel</span>
+                    <span>Dazu</span>
+                </div>
+                ${balanceRows.length ? balanceRows.map(row => `
                     <span>
                         <strong>${escapeHtml(row.symbol)}</strong>
                         <small>${escapeHtml(row.item.replace(` (${row.symbol})`, ''))}</small>
-                        <em>${traceCalcFormatMlG(row.additionMl, row.additionG)}</em>
+                        <em><small>Rest</small>${traceCalcFormatMlG(row.existingAmount, row.existingGrams)}</em>
+                        <em><small>Ziel</small>${traceCalcFormatMl(row.targetAmountAtVolume)}</em>
+                        <em class="${row.additionMl > 0.000001 ? 'trace-reuse-addition-needed' : 'trace-reuse-addition-none'}"><small>Dazu</small>${traceCalcFormatMlG(row.additionMl, row.additionG)}</em>
                     </span>
-                `).join('') : '<p class="hint">Keine Elementzugabe nötig.</p>'}
+                `).join('') : '<p class="hint">Keine Elementdaten vorhanden.</p>'}
             </div>
         </section>
     `;
@@ -13313,6 +13364,11 @@ function renderTraceReusePlanResult(recipe = ensureTraceCalculatorState().latest
 function renderTraceReusePlanner(recipe) {
     const state = ensureTraceCalculatorState();
     const source = getTraceReuseSourceEntry();
+    const estimatedDays = getTraceReuseEstimatedRemainingDays(source);
+    const sourceDailyDose = traceCalcNumber(source?.config?.dailyDoseMl, state.config?.dailyDoseMl || traceCalculatorBase.dailyDoseMl);
+    const estimatedHint = estimatedDays !== null
+        ? `Aus Datum geschätzt: ${traceCalcFormatValue(estimatedDays, 1)} Tage · ca. ${traceCalcFormatMl(estimatedDays * sourceDailyDose)} je Lösung`
+        : 'Resttage können alternativ manuell eingetragen werden.';
     return `
         <details class="trace-reuse-panel">
             <summary>
@@ -13324,6 +13380,10 @@ function renderTraceReusePlanner(recipe) {
             </summary>
             <div class="trace-reuse-body">
                 <p class="hint">Nutze das, wenn K+ oder A- noch im Dosierbehälter vorhanden ist und nach einer neuen ICP angepasst werden soll. Als Zusammensetzung der Restlösung wird die aktuellste aktive Trace-Mischung aus der Historie verwendet.</p>
+                <div class="trace-reuse-safety-note" role="note">
+                    <strong>Wichtiger Hinweis</strong>
+                    <span>Der Rechner geht davon aus, dass die vorhandenen Lösungen optimal gemischt sind und sich nichts abgesetzt oder ausgefallen ist. Durch das Weiterverwenden alter Lösungen können sich Ungenauigkeiten addieren. Lösungen sollten maximal einmal ergänzt und danach neu angesetzt werden.</span>
+                </div>
                 <div class="trace-reuse-mode-grid" role="radiogroup" aria-label="Weiterverwendung Modus">
                     <label class="trace-reuse-mode-card ${getTraceReuseMode() === 'keep-dose' ? 'is-active' : ''}">
                         <input type="radio" name="traceReuseMode" value="keep-dose" ${getTraceReuseMode() === 'keep-dose' ? 'checked' : ''} onchange="updateTraceReuseMode(this.value)">
@@ -13342,13 +13402,25 @@ function renderTraceReusePlanner(recipe) {
                 </div>
                 <div class="trace-reuse-inputs">
                     <label class="input-group" for="traceReuseKationenRemaining">
-                        <span>Restmenge Kationen K+</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingMl ?? ''))}" oninput="updateTraceReuseRemaining('kationen', this.value)"><span>ml</span></div>
+                        <span>Restmenge Kationen K+ in ml</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('kationen', this.value)"><span>ml</span></div>
                     </label>
                     <label class="input-group" for="traceReuseAnionenRemaining">
-                        <span>Restmenge Anionen A-</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingMl ?? ''))}" oninput="updateTraceReuseRemaining('anionen', this.value)"><span>ml</span></div>
+                        <span>Restmenge Anionen A- in ml</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('anionen', this.value)"><span>ml</span></div>
                     </label>
+                    <label class="input-group" for="traceReuseKationenDays">
+                        <span>Resttage Kationen K+</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('kationen', this.value)"><span>Tage</span></div>
+                    </label>
+                    <label class="input-group" for="traceReuseAnionenDays">
+                        <span>Resttage Anionen A-</span>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('anionen', this.value)"><span>Tage</span></div>
+                    </label>
+                </div>
+                <div class="trace-reuse-date-helper">
+                    <span>${escapeHtml(estimatedHint)}</span>
+                    <button type="button" class="btn-secondary" onclick="applyTraceReuseEstimatedDays()" ${estimatedDays !== null ? '' : 'disabled'}>Resttage aus Datum übernehmen</button>
                 </div>
                 <div id="traceReusePlanResult">
                     ${renderTraceReusePlanResult(recipe)}
@@ -13362,27 +13434,68 @@ function updateTraceReuseMode(value) {
     const state = ensureTraceCalculatorState();
     state.reusePlan.mode = value === 'optimize-solution' ? 'optimize-solution' : 'keep-dose';
     saveDB(false);
-    const result = document.getElementById('traceReusePlanResult');
-    if (result) {
-        result.innerHTML = renderTraceReusePlanResult(state.latestRecipe || calculateTraceRecipe());
-    }
+    refreshTraceReusePlanResult();
     document.querySelectorAll('.trace-reuse-mode-card').forEach(card => {
         const input = card.querySelector('input[name="traceReuseMode"]');
         card.classList.toggle('is-active', input?.value === state.reusePlan.mode);
     });
 }
 
-function updateTraceReuseRemaining(group, value) {
+function refreshTraceReusePlanResult() {
     const state = ensureTraceCalculatorState();
-    const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
-    const raw = String(value ?? '').replace(',', '.').trim();
-    const parsed = traceCalcNumber(raw, null);
-    state.reusePlan[key] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
-    saveDB(false);
     const result = document.getElementById('traceReusePlanResult');
     if (result) {
         result.innerHTML = renderTraceReusePlanResult(state.latestRecipe || calculateTraceRecipe());
     }
+}
+
+function updateTraceReuseRemaining(group, value) {
+    const state = ensureTraceCalculatorState();
+    const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
+    const raw = String(value ?? '').replace(',', '.').trim();
+    const parsed = traceCalcNumber(raw, null);
+    state.reusePlan[key] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
+    if (state.reusePlan[key] !== '') state.reusePlan[daysKey] = '';
+    saveDB(false);
+    refreshTraceReusePlanResult();
+}
+
+function updateTraceReuseRemainingDays(group, value) {
+    const state = ensureTraceCalculatorState();
+    const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
+    const mlKey = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    const raw = String(value ?? '').replace(',', '.').trim();
+    const parsed = traceCalcNumber(raw, null);
+    state.reusePlan[daysKey] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
+    if (state.reusePlan[daysKey] !== '') state.reusePlan[mlKey] = '';
+    saveDB(false);
+    refreshTraceReusePlanResult();
+}
+
+function applyTraceReuseEstimatedDays() {
+    const state = ensureTraceCalculatorState();
+    const estimatedDays = getTraceReuseEstimatedRemainingDays();
+    if (estimatedDays === null) {
+        showToast('Resttage konnten aus Datum und Laufzeit nicht geschätzt werden.', 'warning');
+        return;
+    }
+    const value = String(estimatedDays);
+    state.reusePlan.kationenRemainingDays = value;
+    state.reusePlan.anionenRemainingDays = value;
+    state.reusePlan.kationenRemainingMl = '';
+    state.reusePlan.anionenRemainingMl = '';
+    saveDB(false);
+    const kDays = document.getElementById('traceReuseKationenDays');
+    const aDays = document.getElementById('traceReuseAnionenDays');
+    const kMl = document.getElementById('traceReuseKationenRemaining');
+    const aMl = document.getElementById('traceReuseAnionenRemaining');
+    if (kDays) kDays.value = value;
+    if (aDays) aDays.value = value;
+    if (kMl) kMl.value = '';
+    if (aMl) aMl.value = '';
+    refreshTraceReusePlanResult();
+    showToast('Resttage aus Datum übernommen.', 'success', 2200);
 }
 
 function applyTraceReusePlanToDraft() {
@@ -15136,6 +15249,8 @@ window.editTraceHistoryEntry = editTraceHistoryEntry;
 window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
 window.updateTraceReuseMode = updateTraceReuseMode;
 window.updateTraceReuseRemaining = updateTraceReuseRemaining;
+window.updateTraceReuseRemainingDays = updateTraceReuseRemainingDays;
+window.applyTraceReuseEstimatedDays = applyTraceReuseEstimatedDays;
 window.applyTraceReusePlanToDraft = applyTraceReusePlanToDraft;
 
 function setupPriority4CalculatorUI() {
