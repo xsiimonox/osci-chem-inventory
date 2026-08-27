@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v34115-release';
+const CACHE_NAME = 'reef-storage-tools-cache-v34116-release';
 const ASSETS = [
   './',
   './index.html',

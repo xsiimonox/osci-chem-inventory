@@ -2714,7 +2714,9 @@ function createDemoTraceCalculatorState() {
         grams: Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)])),
         totals: getTraceTotalsFromAmounts(amounts, config),
         includeInCalculation: extra.includeInCalculation ?? true,
-        isInitial: Boolean(extra.isInitial)
+        isInitial: Boolean(extra.isInitial),
+        isStartMixture: Boolean(extra.isStartMixture),
+        label: extra.label || ''
     });
     return {
         config,
@@ -2729,9 +2731,15 @@ function createDemoTraceCalculatorState() {
         },
         latestRecipe: null,
         history: [
-            makeEntry('demo-trace-calc-001', 70, baseAmounts, { includeInCalculation: false, isInitial: true }),
+            makeEntry('demo-trace-calc-001', 70, baseAmounts, {
+                includeInCalculation: false,
+                isInitial: true,
+                isStartMixture: true,
+                label: 'Startmischung'
+            }),
             makeEntry('demo-trace-calc-002', 28, latestAmounts, {
                 includeInCalculation: true,
+                label: 'Aktuell laufende Mischung',
                 icp: {
                     'Cobalt (Co)': 0.8,
                     'Nickel (Ni)': 3.6,
@@ -12731,6 +12739,7 @@ function ensureTraceCalculatorState() {
     if (db.traceCalculator.reusePlan.anionenRemainingMl === undefined) db.traceCalculator.reusePlan.anionenRemainingMl = '';
     if (db.traceCalculator.reusePlan.kationenRemainingDays === undefined) db.traceCalculator.reusePlan.kationenRemainingDays = '';
     if (db.traceCalculator.reusePlan.anionenRemainingDays === undefined) db.traceCalculator.reusePlan.anionenRemainingDays = '';
+    normalizeTraceReusePlanMutualExclusion(db.traceCalculator.reusePlan);
     if (!['keep-dose', 'optimize-solution'].includes(db.traceCalculator.reusePlan.mode)) {
         db.traceCalculator.reusePlan.mode = 'optimize-solution';
     }
@@ -13174,8 +13183,37 @@ function getTraceReuseGroupShort(group) {
     return group === 'kationen' ? 'K+' : 'A-';
 }
 
+function normalizeTraceReusePlanMutualExclusion(reusePlan = {}) {
+    ['kationen', 'anionen'].forEach(group => {
+        const mlKey = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+        const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
+        const hasMl = String(reusePlan[mlKey] ?? '').trim() !== '';
+        const hasDays = String(reusePlan[daysKey] ?? '').trim() !== '';
+        if (hasMl && hasDays) reusePlan[daysKey] = '';
+    });
+    return reusePlan;
+}
+
+function getTraceReuseInputState(group) {
+    const state = ensureTraceCalculatorState();
+    normalizeTraceReusePlanMutualExclusion(state.reusePlan);
+    const mlKey = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
+    const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
+    const hasMl = String(state.reusePlan?.[mlKey] ?? '').trim() !== '';
+    const hasDays = String(state.reusePlan?.[daysKey] ?? '').trim() !== '';
+    return {
+        mlKey,
+        daysKey,
+        hasMl,
+        hasDays,
+        mlDisabled: hasDays,
+        daysDisabled: hasMl
+    };
+}
+
 function getTraceReuseRemainingValue(group) {
     const state = ensureTraceCalculatorState();
+    normalizeTraceReusePlanMutualExclusion(state.reusePlan);
     const mlKey = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
     const daysKey = group === 'kationen' ? 'kationenRemainingDays' : 'anionenRemainingDays';
     const mlValue = String(state.reusePlan?.[mlKey] ?? '').trim();
@@ -13477,9 +13515,12 @@ function renderTraceReusePlanResult(recipe = ensureTraceCalculatorState().latest
 
 function renderTraceReusePlanner(recipe) {
     const state = ensureTraceCalculatorState();
+    normalizeTraceReusePlanMutualExclusion(state.reusePlan);
     const source = getTraceReuseSourceEntry();
     const estimatedDays = getTraceReuseEstimatedRemainingDays(source);
     const sourceDailyDose = traceCalcNumber(source?.config?.dailyDoseMl, state.config?.dailyDoseMl || traceCalculatorBase.dailyDoseMl);
+    const kationReuseInput = getTraceReuseInputState('kationen');
+    const anionReuseInput = getTraceReuseInputState('anionen');
     const estimatedHint = estimatedDays !== null
         ? `Aus Datum geschätzt: ${traceCalcFormatValue(estimatedDays, 1)} Tage · ca. ${traceCalcFormatMl(estimatedDays * sourceDailyDose)} je Lösung`
         : 'Resttage können alternativ manuell eingetragen werden.';
@@ -13515,21 +13556,25 @@ function renderTraceReusePlanner(recipe) {
                     </label>
                 </div>
                 <div class="trace-reuse-inputs">
-                    <label class="input-group" for="traceReuseKationenRemaining">
+                    <label class="input-group trace-reuse-choice ${kationReuseInput.mlDisabled ? 'trace-reuse-choice-disabled' : ''}" for="traceReuseKationenRemaining">
                         <span>Restmenge Kationen K+ in ml</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('kationen', this.value)"><span>ml</span></div>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('kationen', this.value)" ${kationReuseInput.mlDisabled ? 'disabled' : ''}><span>ml</span></div>
+                        ${kationReuseInput.mlDisabled ? '<small>Resttage sind aktiv. Resttage leeren, um ml direkt einzutragen.</small>' : ''}
                     </label>
-                    <label class="input-group" for="traceReuseAnionenRemaining">
+                    <label class="input-group trace-reuse-choice ${anionReuseInput.mlDisabled ? 'trace-reuse-choice-disabled' : ''}" for="traceReuseAnionenRemaining">
                         <span>Restmenge Anionen A- in ml</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('anionen', this.value)"><span>ml</span></div>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenRemaining" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingMl ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcRound(estimatedDays * sourceDailyDose).toFixed(2) : ''}" oninput="updateTraceReuseRemaining('anionen', this.value)" ${anionReuseInput.mlDisabled ? 'disabled' : ''}><span>ml</span></div>
+                        ${anionReuseInput.mlDisabled ? '<small>Resttage sind aktiv. Resttage leeren, um ml direkt einzutragen.</small>' : ''}
                     </label>
-                    <label class="input-group" for="traceReuseKationenDays">
+                    <label class="input-group trace-reuse-choice ${kationReuseInput.daysDisabled ? 'trace-reuse-choice-disabled' : ''}" for="traceReuseKationenDays">
                         <span>Resttage Kationen K+</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('kationen', this.value)"><span>Tage</span></div>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseKationenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.kationenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('kationen', this.value)" ${kationReuseInput.daysDisabled ? 'disabled' : ''}><span>Tage</span></div>
+                        ${kationReuseInput.daysDisabled ? '<small>Restmenge ist aktiv. Restmenge leeren, um Tage einzutragen.</small>' : ''}
                     </label>
-                    <label class="input-group" for="traceReuseAnionenDays">
+                    <label class="input-group trace-reuse-choice ${anionReuseInput.daysDisabled ? 'trace-reuse-choice-disabled' : ''}" for="traceReuseAnionenDays">
                         <span>Resttage Anionen A-</span>
-                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('anionen', this.value)"><span>Tage</span></div>
+                        <div class="trace-input-with-unit"><input type="number" id="traceReuseAnionenDays" min="0" step="0.1" inputmode="decimal" value="${escapeHtml(String(state.reusePlan.anionenRemainingDays ?? ''))}" placeholder="${estimatedDays !== null ? traceCalcFormatValue(estimatedDays, 1) : ''}" oninput="updateTraceReuseRemainingDays('anionen', this.value)" ${anionReuseInput.daysDisabled ? 'disabled' : ''}><span>Tage</span></div>
+                        ${anionReuseInput.daysDisabled ? '<small>Restmenge ist aktiv. Restmenge leeren, um Tage einzutragen.</small>' : ''}
                     </label>
                 </div>
                 <div class="trace-reuse-date-helper">
@@ -13563,6 +13608,25 @@ function refreshTraceReusePlanResult() {
     }
 }
 
+function syncTraceReuseChoiceInputs(group) {
+    const state = ensureTraceCalculatorState();
+    normalizeTraceReusePlanMutualExclusion(state.reusePlan);
+    const isKation = group === 'kationen';
+    const mlId = isKation ? 'traceReuseKationenRemaining' : 'traceReuseAnionenRemaining';
+    const daysId = isKation ? 'traceReuseKationenDays' : 'traceReuseAnionenDays';
+    const mlInput = document.getElementById(mlId);
+    const daysInput = document.getElementById(daysId);
+    const { mlDisabled, daysDisabled } = getTraceReuseInputState(group);
+    [
+        [mlInput, mlDisabled],
+        [daysInput, daysDisabled]
+    ].forEach(([input, disabled]) => {
+        if (!input) return;
+        input.disabled = disabled;
+        input.closest('.trace-reuse-choice')?.classList.toggle('trace-reuse-choice-disabled', disabled);
+    });
+}
+
 function updateTraceReuseRemaining(group, value) {
     const state = ensureTraceCalculatorState();
     const key = group === 'kationen' ? 'kationenRemainingMl' : 'anionenRemainingMl';
@@ -13570,8 +13634,13 @@ function updateTraceReuseRemaining(group, value) {
     const raw = String(value ?? '').replace(',', '.').trim();
     const parsed = traceCalcNumber(raw, null);
     state.reusePlan[key] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
-    if (state.reusePlan[key] !== '') state.reusePlan[daysKey] = '';
+    if (state.reusePlan[key] !== '') {
+        state.reusePlan[daysKey] = '';
+        const daysInput = document.getElementById(group === 'kationen' ? 'traceReuseKationenDays' : 'traceReuseAnionenDays');
+        if (daysInput) daysInput.value = '';
+    }
     saveDB(false);
+    syncTraceReuseChoiceInputs(group);
     refreshTraceReusePlanResult();
 }
 
@@ -13582,8 +13651,13 @@ function updateTraceReuseRemainingDays(group, value) {
     const raw = String(value ?? '').replace(',', '.').trim();
     const parsed = traceCalcNumber(raw, null);
     state.reusePlan[daysKey] = raw === '' || parsed === null || parsed < 0 ? '' : raw;
-    if (state.reusePlan[daysKey] !== '') state.reusePlan[mlKey] = '';
+    if (state.reusePlan[daysKey] !== '') {
+        state.reusePlan[mlKey] = '';
+        const mlInput = document.getElementById(group === 'kationen' ? 'traceReuseKationenRemaining' : 'traceReuseAnionenRemaining');
+        if (mlInput) mlInput.value = '';
+    }
     saveDB(false);
+    syncTraceReuseChoiceInputs(group);
     refreshTraceReusePlanResult();
 }
 
