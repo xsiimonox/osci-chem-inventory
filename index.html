@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.102-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.106-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.102</span>
+                    <span class="version-badge">v3.4.106</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -39,7 +39,7 @@
                         </span>
                     </button>
                     <div class="header-sync-actions-wrap">
-                        <button type="button" id="cloudQuickSyncButton" class="header-quick-sync-button" onclick="toggleCloudQuickSyncMenu()" aria-label="Schnell Sync öffnen" aria-expanded="false">
+                        <button type="button" id="cloudQuickSyncButton" class="header-quick-sync-button" onclick="openCloudQuickSyncChoice()" aria-label="Cloud Sync Auswahl öffnen">
                             Sync
                         </button>
                         <div id="cloudQuickSyncMenu" class="header-quick-sync-menu" hidden>
@@ -2196,9 +2196,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.102-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.102-release"></script>
-    <script src="assets/js/app.js?v=3.4.102-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.106-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.106-release"></script>
+    <script src="assets/js/app.js?v=3.4.106-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

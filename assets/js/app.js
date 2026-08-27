@@ -1135,6 +1135,13 @@ const googleDriveMonitorState = {
     newerRemote: false,
     message: ''
 };
+const cloudTransferVisualState = {
+    active: false,
+    mode: '',
+    label: '',
+    detail: '',
+    depth: 0
+};
 const APP_TAB_IDS = ['uebersicht', 'lager', 'cr-export', 'trace-export', 'tools', 'logbuch', 'icp', 'statistik', 'log', 'korallen', 'masseneingang', 'nachbestellen', 'einstellungen'];
 const CR_PDF_IMPORT_ENABLED = false;
 const CR_PDF_MAINTENANCE_MESSAGE = 'PDF-Import wegen Wartungsarbeiten deaktiviert.';
@@ -2117,8 +2124,13 @@ function renderGoogleDriveHeaderStatus() {
     const autoSync = settings.autoSync === true;
     const hasLocalChanges = connected && hasPendingGoogleDriveLocalChanges();
     let subtitle = knownAccount ? `offline · ${knownAccount}` : 'offline';
-    indicator.classList.remove('is-connected', 'is-warning', 'is-offline', 'is-unsynced');
-    if (connected) {
+    indicator.classList.remove('is-connected', 'is-warning', 'is-offline', 'is-unsynced', 'is-transferring');
+    if (cloudTransferVisualState.active) {
+        subtitle = cloudTransferVisualState.mode === 'download'
+            ? 'Cloud Download läuft'
+            : 'Cloud Upload läuft';
+        indicator.classList.add('is-transferring');
+    } else if (connected) {
         subtitle = hasLocalChanges
             ? 'online · nicht synchronisiert'
             : (autoSync ? 'online · Auto-Sync aktiv' : 'online · manuell');
@@ -2129,7 +2141,7 @@ function renderGoogleDriveHeaderStatus() {
     } else {
         indicator.classList.add('is-offline');
     }
-    if (googleDriveMonitorState.newerRemote) {
+    if (!cloudTransferVisualState.active && googleDriveMonitorState.newerRemote) {
         subtitle = hasPendingGoogleDriveLocalChanges()
             ? 'online · neuerer Cloud-Stand'
             : 'online · Cloud-Update bereit';
@@ -2269,6 +2281,41 @@ function closeCloudQuickSyncMenu() {
         button.classList.remove('is-active');
         button.setAttribute('aria-expanded', 'false');
     }
+}
+
+async function openCloudQuickSyncChoice() {
+    closeCloudQuickSyncMenu();
+    if (googleDriveMonitorState.busyAction) {
+        await appAlert('Cloud Sync läuft bereits. Bitte warte kurz, bis der aktuelle Vorgang abgeschlossen ist.', {
+            title: 'Sync läuft',
+            type: 'info'
+        });
+        return;
+    }
+    const action = await showAppDialog({
+        kind: 'prompt',
+        type: 'info',
+        title: 'Cloud Sync',
+        eyebrow: 'Upload oder Download',
+        html: `
+            <p>Was möchtest du mit deinem Cloud-Stand machen?</p>
+            <p><strong>Download</strong> ersetzt den lokalen Stand dieses Geräts durch den Stand aus Google Drive. <strong>Upload</strong> speichert den aktuellen lokalen Stand in Google Drive.</p>
+        `,
+        confirmText: 'Ausführen',
+        cancelText: 'Abbrechen',
+        fields: [{
+            name: 'action',
+            label: 'Aktion auswählen',
+            value: 'download',
+            options: [
+                { value: 'download', label: 'Cloud-Stand herunterladen' },
+                { value: 'upload', label: 'Aktuellen Stand hochladen' }
+            ],
+            description: 'Wähle Download, wenn du diesen Browser auf den Cloud-Stand bringen willst. Wähle Upload, wenn dieser Browser der neueste Stand ist.'
+        }]
+    });
+    if (!action) return;
+    await runCloudQuickAction(action);
 }
 
 async function runCloudQuickAction(action) {
@@ -3037,75 +3084,158 @@ function buildGoogleDriveMultipartBody(metadata, content) {
     return { boundary, body };
 }
 
+function ensureCloudTransferOverlay() {
+    let overlay = document.getElementById('cloudTransferOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'cloudTransferOverlay';
+    overlay.className = 'cloud-transfer-overlay';
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-atomic', 'true');
+    overlay.hidden = true;
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function renderCloudTransferOverlay() {
+    const overlay = ensureCloudTransferOverlay();
+    const active = cloudTransferVisualState.active;
+    overlay.hidden = !active;
+    overlay.classList.toggle('is-visible', active);
+    if (!active) {
+        overlay.innerHTML = '';
+        document.body.classList.remove('cloud-transfer-active');
+        document.body.removeAttribute('data-cloud-transfer-mode');
+        renderGoogleDriveHeaderStatus();
+        return;
+    }
+    const mode = cloudTransferVisualState.mode === 'download' ? 'download' : 'upload';
+    const title = cloudTransferVisualState.label || (mode === 'download' ? 'Cloud Download läuft' : 'Cloud Upload läuft');
+    const detail = cloudTransferVisualState.detail || (mode === 'download'
+        ? 'Der Cloud-Stand wird geladen und lokal eingespielt.'
+        : 'Dein aktueller Stand wird sicher in Google Drive gespeichert.');
+    document.body.classList.add('cloud-transfer-active');
+    document.body.dataset.cloudTransferMode = mode;
+    overlay.innerHTML = `
+        <div class="cloud-transfer-card cloud-transfer-${mode}">
+            <div class="cloud-transfer-orb" aria-hidden="true">
+                <span class="cloud-transfer-cloud"></span>
+                <span class="cloud-transfer-arrow"></span>
+            </div>
+            <div class="cloud-transfer-copy">
+                <strong>${escapeHtml(title)}</strong>
+                <small>${escapeHtml(detail)}</small>
+                <span class="cloud-transfer-progress" aria-hidden="true"><i></i></span>
+            </div>
+        </div>
+    `;
+    renderGoogleDriveHeaderStatus();
+}
+
+function beginCloudTransferVisual(mode = 'upload', detail = '') {
+    cloudTransferVisualState.depth += 1;
+    cloudTransferVisualState.active = true;
+    cloudTransferVisualState.mode = mode === 'download' ? 'download' : 'upload';
+    cloudTransferVisualState.label = cloudTransferVisualState.mode === 'download' ? 'Cloud Download läuft' : 'Cloud Upload läuft';
+    cloudTransferVisualState.detail = detail;
+    renderCloudTransferOverlay();
+}
+
+function endCloudTransferVisual() {
+    cloudTransferVisualState.depth = Math.max(0, cloudTransferVisualState.depth - 1);
+    if (cloudTransferVisualState.depth > 0) return;
+    cloudTransferVisualState.active = false;
+    cloudTransferVisualState.mode = '';
+    cloudTransferVisualState.label = '';
+    cloudTransferVisualState.detail = '';
+    renderCloudTransferOverlay();
+}
+
 async function uploadProjectBackupToGoogleDrive(trigger = 'manual') {
+    beginCloudTransferVisual(
+        'upload',
+        trigger === 'autosync'
+            ? 'Auto-Sync speichert deine letzten Änderungen.'
+            : 'Dein aktueller Projektstand wird in Google Drive gesichert.'
+    );
     if (isDemoProfileActive()) {
+        endCloudTransferVisual();
         throw new Error('Demo-Profil aktiv. Cloud-Upload ist pausiert, damit keine Beispiel-Daten deine echten Backups überschreiben.');
     }
-    if (!isGoogleDriveConfigured()) throw new Error('Google Drive Sync ist noch nicht eingerichtet.');
-    const payload = buildProjectBackupPayload();
-    const fileId = await findGoogleDriveBackupFileId();
-    const metadata = fileId ? { modifiedTime: new Date().toISOString() } : { name: GOOGLE_DRIVE_FILE_NAME, parents: ['appDataFolder'] };
-    const { boundary, body } = buildGoogleDriveMultipartBody(metadata, payload);
-    const method = fileId ? 'PATCH' : 'POST';
-    const url = fileId
-        ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=multipart`
-        : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
-    const response = await googleDriveFetch(url, {
-        method,
-        headers: {
-            'Content-Type': `multipart/related; boundary=${boundary}`
-        },
-        body
-    });
-    const saved = await response.json();
-    const lastSyncAt = new Date().toISOString();
-    storeGoogleDriveSyncSettings({
-        fileId: saved.id || fileId || '',
-        lastSyncAt
-    });
-    googleDriveMonitorState.remoteModifiedAt = lastSyncAt;
-    googleDriveMonitorState.newerRemote = false;
-    googleDriveMonitorState.lastCheckedAt = lastSyncAt;
-    googleDriveMonitorState.message = trigger === 'autosync'
-        ? 'Automatisch in Google Drive aktualisiert.'
-        : 'Cloud-Stand erfolgreich aktualisiert.';
-    renderGoogleDriveSyncCard();
-    return { saved, lastSyncAt, trigger };
+    try {
+        if (!isGoogleDriveConfigured()) throw new Error('Google Drive Sync ist noch nicht eingerichtet.');
+        const payload = buildProjectBackupPayload();
+        const fileId = await findGoogleDriveBackupFileId();
+        const metadata = fileId ? { modifiedTime: new Date().toISOString() } : { name: GOOGLE_DRIVE_FILE_NAME, parents: ['appDataFolder'] };
+        const { boundary, body } = buildGoogleDriveMultipartBody(metadata, payload);
+        const method = fileId ? 'PATCH' : 'POST';
+        const url = fileId
+            ? `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=multipart`
+            : 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+        const response = await googleDriveFetch(url, {
+            method,
+            headers: {
+                'Content-Type': `multipart/related; boundary=${boundary}`
+            },
+            body
+        });
+        const saved = await response.json();
+        const lastSyncAt = new Date().toISOString();
+        storeGoogleDriveSyncSettings({
+            fileId: saved.id || fileId || '',
+            lastSyncAt
+        });
+        googleDriveMonitorState.remoteModifiedAt = lastSyncAt;
+        googleDriveMonitorState.newerRemote = false;
+        googleDriveMonitorState.lastCheckedAt = lastSyncAt;
+        googleDriveMonitorState.message = trigger === 'autosync'
+            ? 'Automatisch in Google Drive aktualisiert.'
+            : 'Cloud-Stand erfolgreich aktualisiert.';
+        renderGoogleDriveSyncCard();
+        return { saved, lastSyncAt, trigger };
+    } finally {
+        endCloudTransferVisual();
+    }
 }
 
 async function restoreProjectBackupFromGoogleDrive() {
-    const fileId = await findGoogleDriveBackupFileId();
-    if (!fileId) throw new Error('In deiner Google Cloud wurde noch kein ReefTools Backup gefunden.');
-    const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
-    const parsed = await response.json();
-    if (!parsed || parsed.type !== 'osci_project_backup' || !parsed.data) {
-        throw new Error('Die Google-Backup-Datei hat kein gültiges ReefTools Projektformat.');
+    beginCloudTransferVisual('download', 'Der Cloud-Stand wird heruntergeladen und geprüft.');
+    try {
+        const fileId = await findGoogleDriveBackupFileId();
+        if (!fileId) throw new Error('In deiner Google Cloud wurde noch kein ReefTools Backup gefunden.');
+        const response = await googleDriveFetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`);
+        const parsed = await response.json();
+        if (!parsed || parsed.type !== 'osci_project_backup' || !parsed.data) {
+            throw new Error('Die Google-Backup-Datei hat kein gültiges ReefTools Projektformat.');
+        }
+        const validation = validateProjectBackupPayload(parsed);
+        if (!validation.ok) {
+            throw new Error(`Cloud-Backup ist unvollständig oder beschädigt.\n${formatBackupValidationMessage(validation)}`);
+        }
+        appState = migrateToWarehouseState(parsed.data);
+        setDemoProfileActive(false);
+        await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
+        activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
+        activeAquariumId = parsed.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+        appState.activeWarehouseId = activeWarehouseId;
+        appState.activeAquariumId = activeAquariumId;
+        const active = getActiveWarehouse();
+        if (active) db = normalizeWarehouseData(active.data);
+        overlayActiveAquariumData();
+        const persisted = await persistAppStateNow('google-drive-restore', true);
+        if (!persisted) throw new Error('Cloud-Stand wurde gelesen, konnte aber auf diesem Gerät nicht sicher gespeichert werden.');
+        applyTheme(db.theme || 'default', false);
+        renderCurrentWarehouseViews();
+        const restoredAt = new Date().toISOString();
+        storeGoogleDriveSyncSettings({ lastRestoreAt: restoredAt, fileId, lastSyncAt: parsed.exportedAt || restoredAt });
+        googleDriveMonitorState.remoteModifiedAt = parsed.exportedAt || restoredAt;
+        googleDriveMonitorState.newerRemote = false;
+        googleDriveMonitorState.lastCheckedAt = restoredAt;
+        googleDriveMonitorState.message = 'Cloud-Stand auf dieses Geraet geladen.';
+        renderGoogleDriveSyncCard();
+    } finally {
+        endCloudTransferVisual();
     }
-    const validation = validateProjectBackupPayload(parsed);
-    if (!validation.ok) {
-        throw new Error(`Cloud-Backup ist unvollständig oder beschädigt.\n${formatBackupValidationMessage(validation)}`);
-    }
-    appState = migrateToWarehouseState(parsed.data);
-    setDemoProfileActive(false);
-    await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
-    activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
-    activeAquariumId = parsed.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
-    appState.activeWarehouseId = activeWarehouseId;
-    appState.activeAquariumId = activeAquariumId;
-    const active = getActiveWarehouse();
-    if (active) db = normalizeWarehouseData(active.data);
-    overlayActiveAquariumData();
-    const persisted = await persistAppStateNow('google-drive-restore', true);
-    if (!persisted) throw new Error('Cloud-Stand wurde gelesen, konnte aber auf diesem Gerät nicht sicher gespeichert werden.');
-    applyTheme(db.theme || 'default', false);
-    renderCurrentWarehouseViews();
-    const restoredAt = new Date().toISOString();
-    storeGoogleDriveSyncSettings({ lastRestoreAt: restoredAt, fileId, lastSyncAt: parsed.exportedAt || restoredAt });
-    googleDriveMonitorState.remoteModifiedAt = parsed.exportedAt || restoredAt;
-    googleDriveMonitorState.newerRemote = false;
-    googleDriveMonitorState.lastCheckedAt = restoredAt;
-    googleDriveMonitorState.message = 'Cloud-Stand auf dieses Geraet geladen.';
-    renderGoogleDriveSyncCard();
 }
 
 function scheduleGoogleDriveAutoSync() {
@@ -3477,8 +3607,11 @@ Object.assign(window, {
     renderGoogleDriveSyncCard,
     openGoogleDriveSyncSettings,
     checkGoogleDriveRemoteChanges,
+    beginCloudTransferVisual,
+    endCloudTransferVisual,
     toggleGoogleDriveReconnectReminder,
     toggleCloudQuickSyncMenu,
+    openCloudQuickSyncChoice,
     closeCloudQuickSyncMenu,
     runCloudQuickAction,
     reconnectGoogleDriveFromPrompt,
@@ -12450,8 +12583,14 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator.reusePlan || typeof db.traceCalculator.reusePlan !== 'object') {
         db.traceCalculator.reusePlan = {
             kationenRemainingMl: '',
-            anionenRemainingMl: ''
+            anionenRemainingMl: '',
+            mode: 'keep-dose'
         };
+    }
+    if (db.traceCalculator.reusePlan.kationenRemainingMl === undefined) db.traceCalculator.reusePlan.kationenRemainingMl = '';
+    if (db.traceCalculator.reusePlan.anionenRemainingMl === undefined) db.traceCalculator.reusePlan.anionenRemainingMl = '';
+    if (!['keep-dose', 'optimize-solution'].includes(db.traceCalculator.reusePlan.mode)) {
+        db.traceCalculator.reusePlan.mode = 'keep-dose';
     }
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
@@ -12899,17 +13038,25 @@ function getTraceReuseRemainingValue(group) {
     return state.reusePlan?.[key] ?? '';
 }
 
+function getTraceReuseMode() {
+    const state = ensureTraceCalculatorState();
+    return state.reusePlan?.mode === 'optimize-solution' ? 'optimize-solution' : 'keep-dose';
+}
+
 function getTraceReuseSourceEntry() {
     return getTraceCalculatorLatestHistory();
 }
 
 function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
     const source = getTraceReuseSourceEntry();
+    const reuseMode = getTraceReuseMode();
     const remainingMl = traceCalcNumber(remainingMlRaw, null);
     const groupRows = recipe.rows.filter(row => row.group === group);
     const targetVolumeMl = traceCalcNumber(recipe.totals?.[group]?.volumeMl, 0);
     const sourceVolumeMl = traceCalcNumber(source?.totals?.[group]?.volumeMl, 0);
     const bottleMaxMl = traceCalcNumber(recipe.config?.bottleMaxMl, 0);
+    const targetDays = Math.max(1, traceCalcNumber(recipe.config?.days, traceCalculatorBase.days));
+    const oldDailyDoseMl = traceCalcNumber(source?.config?.dailyDoseMl, recipe.config?.dailyDoseMl || traceCalculatorBase.dailyDoseMl);
 
     if (!source) {
         return { group, status: 'missing-source', source: null, remainingMl, rows: [], warnings: ['Bitte zuerst die aktuell laufende Mischung in der Historie speichern.'] };
@@ -12960,7 +13107,15 @@ function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
         const additionsMl = traceCalcRound(rows.reduce((sum, row) => sum + row.additionMl, 0));
         const additionsG = traceCalcRound(rows.reduce((sum, row) => sum + row.additionG, 0));
         const osmoseMl = traceCalcRound(finalVolume - remainingMl - additionsMl);
-        return { rows, additionsMl, additionsG, osmoseMl, finalVolumeMl: traceCalcRound(finalVolume) };
+        return {
+            rows,
+            additionsMl,
+            additionsG,
+            osmoseMl,
+            finalVolumeMl: traceCalcRound(finalVolume),
+            oldDailyDoseMl,
+            newDailyDoseMl: traceCalcRound(finalVolume / targetDays)
+        };
     };
 
     const isFeasible = finalVolume => {
@@ -12970,12 +13125,41 @@ function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
         return calculateForVolume(finalVolume).osmoseMl >= -0.000001;
     };
 
-    let finalVolume = Math.max(targetVolumeMl, remainingMl);
+    let finalVolume = reuseMode === 'keep-dose' ? targetVolumeMl : Math.max(targetVolumeMl, remainingMl);
     concentrationRows.forEach(row => {
         if (row.targetConcentration > 0) {
             finalVolume = Math.max(finalVolume, row.existingAmount / row.targetConcentration);
         }
     });
+
+    if (reuseMode === 'keep-dose') {
+        finalVolume = targetVolumeMl;
+        if (!isFeasible(finalVolume)) {
+            const neededVolume = Math.max(
+                targetVolumeMl,
+                remainingMl,
+                ...concentrationRows
+                    .filter(row => row.targetConcentration > 0)
+                    .map(row => row.existingAmount / row.targetConcentration)
+            );
+            return {
+                group,
+                status: 'impossible',
+                source,
+                remainingMl,
+                sourceVolumeMl,
+                targetVolumeMl,
+                finalVolumeMl: traceCalcRound(targetVolumeMl),
+                oldDailyDoseMl,
+                newDailyDoseMl: traceCalcRound(targetVolumeMl / targetDays),
+                rows: concentrationRows,
+                warnings: [
+                    `Mit gleicher Tagesdosis passt die Restlösung nicht sauber in ${traceCalcFormatMl(targetVolumeMl)} Zielvolumen.`,
+                    `Voraussichtlich wären mindestens ${traceCalcFormatMl(neededVolume)} Endvolumen nötig. Nutze dafür den Modus „Lösung optimal anpassen“.`
+                ]
+            };
+        }
+    }
 
     if (!isFeasible(finalVolume)) {
         let upper = Math.max(finalVolume, targetVolumeMl, remainingMl, 1);
@@ -13010,8 +13194,11 @@ function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
     result.osmoseMl = Math.max(0, result.osmoseMl);
     const needsDilution = result.finalVolumeMl > targetVolumeMl + 0.01;
     const warnings = [];
-    if (needsDilution) {
+    if (reuseMode === 'optimize-solution' && needsDilution) {
         warnings.push(`Zielvolumen ${traceCalcFormatMl(targetVolumeMl)} reicht nicht. Für gleiche Konzentration wird auf ${traceCalcFormatMl(result.finalVolumeMl)} verdünnt.`);
+    }
+    if (reuseMode === 'keep-dose') {
+        warnings.push('Tagesdosis bleibt gleich. Stelle nur die berechneten Ergänzungen/Verdünnung her.');
     }
     if (bottleMaxMl > 0 && result.finalVolumeMl > bottleMaxMl + 0.000001) {
         warnings.push(`Benötigtes Endvolumen liegt über dem eingestellten Flaschenlimit von ${traceCalcFormatMl(bottleMaxMl)}.`);
@@ -13028,11 +13215,16 @@ function calculateTraceReuseGroupPlan(recipe, group, remainingMlRaw) {
         sourceVolumeMl,
         targetVolumeMl,
         finalVolumeMl: result.finalVolumeMl,
+        oldDailyDoseMl: result.oldDailyDoseMl,
+        newDailyDoseMl: reuseMode === 'keep-dose' ? traceCalcRound(targetVolumeMl / targetDays) : result.newDailyDoseMl,
         additionsMl: result.additionsMl,
         additionsG: result.additionsG,
         osmoseMl: traceCalcRound(result.osmoseMl),
         osmoseG: traceCalcRound(result.osmoseMl),
-        mode: needsDilution ? 'Verdünnen & ergänzen' : 'Ergänzen',
+        reuseMode,
+        mode: reuseMode === 'keep-dose'
+            ? 'Tagesdosis beibehalten'
+            : (needsDilution ? 'Lösung optimal anpassen' : 'Ergänzen'),
         rows: result.rows,
         warnings
     };
@@ -13055,6 +13247,12 @@ function renderTraceReuseGroupPlan(plan) {
                     <span class="trace-group-symbol" aria-hidden="true">${short}</span>
                     <span><strong>${label}</strong><small>${plan.status === 'empty-input' ? 'Restmenge offen' : 'Nicht berechenbar'}</small></span>
                 </div>
+                ${plan.oldDailyDoseMl !== undefined ? `
+                    <div class="trace-reuse-dose-strip">
+                        <span><small>Alte Tagesdosis</small><strong>${traceCalcFormatMl(plan.oldDailyDoseMl)}</strong></span>
+                        <span><small>Neue Tagesdosis</small><strong>${traceCalcFormatMl(plan.newDailyDoseMl)}</strong></span>
+                    </div>
+                ` : ''}
                 ${warningHtml}
             </section>
         `;
@@ -13071,6 +13269,10 @@ function renderTraceReuseGroupPlan(plan) {
                 <span><small>Endvolumen</small><strong>${traceCalcFormatMl(plan.finalVolumeMl)}</strong></span>
                 <span><small>Elemente dazu</small><strong>${traceCalcFormatMlG(plan.additionsMl, plan.additionsG)}</strong></span>
                 <span><small>Osmose dazu</small><strong>${traceCalcFormatMlG(plan.osmoseMl, plan.osmoseG)}</strong></span>
+            </div>
+            <div class="trace-reuse-dose-strip">
+                <span><small>Alte Tagesdosis</small><strong>${traceCalcFormatMl(plan.oldDailyDoseMl)}</strong></span>
+                <span><small>Neue Tagesdosis</small><strong>${traceCalcFormatMl(plan.newDailyDoseMl)}</strong></span>
             </div>
             ${warningHtml}
             <div class="trace-reuse-additions">
@@ -13113,6 +13315,22 @@ function renderTraceReusePlanner(recipe) {
             </summary>
             <div class="trace-reuse-body">
                 <p class="hint">Nutze das, wenn K+ oder A- noch im Dosierbehälter vorhanden ist und nach einer neuen ICP angepasst werden soll. Als Zusammensetzung der Restlösung wird die aktuellste aktive Trace-Mischung aus der Historie verwendet.</p>
+                <div class="trace-reuse-mode-grid" role="radiogroup" aria-label="Weiterverwendung Modus">
+                    <label class="trace-reuse-mode-card ${getTraceReuseMode() === 'keep-dose' ? 'is-active' : ''}">
+                        <input type="radio" name="traceReuseMode" value="keep-dose" ${getTraceReuseMode() === 'keep-dose' ? 'checked' : ''} onchange="updateTraceReuseMode(this.value)">
+                        <span>
+                            <strong>Tagesdosis beibehalten</strong>
+                            <small>Die Dosierpumpe bleibt gleich. Die Restlösung wird passend zum aktuellen Zielvolumen ergänzt.</small>
+                        </span>
+                    </label>
+                    <label class="trace-reuse-mode-card ${getTraceReuseMode() === 'optimize-solution' ? 'is-active' : ''}">
+                        <input type="radio" name="traceReuseMode" value="optimize-solution" ${getTraceReuseMode() === 'optimize-solution' ? 'checked' : ''} onchange="updateTraceReuseMode(this.value)">
+                        <span>
+                            <strong>Lösung optimal anpassen</strong>
+                            <small>Die Konzentration wird sauber passend gerechnet. Die neue ml/Tag-Dosis kann sich ändern.</small>
+                        </span>
+                    </label>
+                </div>
                 <div class="trace-reuse-inputs">
                     <label class="input-group" for="traceReuseKationenRemaining">
                         <span>Restmenge Kationen K+</span>
@@ -13129,6 +13347,20 @@ function renderTraceReusePlanner(recipe) {
             </div>
         </details>
     `;
+}
+
+function updateTraceReuseMode(value) {
+    const state = ensureTraceCalculatorState();
+    state.reusePlan.mode = value === 'optimize-solution' ? 'optimize-solution' : 'keep-dose';
+    saveDB(false);
+    const result = document.getElementById('traceReusePlanResult');
+    if (result) {
+        result.innerHTML = renderTraceReusePlanResult(state.latestRecipe || calculateTraceRecipe());
+    }
+    document.querySelectorAll('.trace-reuse-mode-card').forEach(card => {
+        const input = card.querySelector('input[name="traceReuseMode"]');
+        card.classList.toggle('is-active', input?.value === state.reusePlan.mode);
+    });
 }
 
 function updateTraceReuseRemaining(group, value) {
@@ -14893,6 +15125,7 @@ window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
 window.toggleTraceHistoryCalculation = toggleTraceHistoryCalculation;
 window.editTraceHistoryEntry = editTraceHistoryEntry;
 window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
+window.updateTraceReuseMode = updateTraceReuseMode;
 window.updateTraceReuseRemaining = updateTraceReuseRemaining;
 window.applyTraceReusePlanToDraft = applyTraceReusePlanToDraft;
 
