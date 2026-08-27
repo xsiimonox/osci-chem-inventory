@@ -654,6 +654,9 @@ const AQUARIUM_FIELD_KEYS = [
     'logBookEntries',
     'aquariumTodos',
     'dosingContainers',
+    'equipmentList',
+    'problemJournal',
+    'emergencyState',
     'measurementTypes',
     'measurementEntries',
     'icpReports',
@@ -1201,6 +1204,10 @@ const TOOL_SEARCH_KEYWORDS = {
     'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
     'c-und-r-natriumchlorid-aus-nacl-pulver': 'nacl natriumchlorid salz pulver lösung ansetzen mischen',
     'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen',
+    'stromkosten-rechner': 'kosten strom stromkosten watt kwh lampe pumpe heizer abschäumer verbrauch monat',
+    'futter-und-versorgungskosten': 'kosten futter versorgung verbrauch preis monat gebinde produkt',
+    'icp-aktionsplan': 'icp aktionsplan auffällige werte todo maßnahmen minimum maximum optimal',
+    'besatz-kompatibilitaet': 'besatz kompatibilität fische garnelen anemone schnecken wirbellose verträglich',
     'sangokai-a-z-assistent': 'wissen hilfe ratgeber nachschlagen frage pdf sangokai',
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
@@ -1220,6 +1227,10 @@ const TOOL_DEFINITIONS = [
     { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', osciOnly: true },
     { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', osciOnly: true },
     { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', osciOnly: true },
+    { id: 'stromkosten-rechner', label: 'Stromkosten-Rechner' },
+    { id: 'futter-und-versorgungskosten', label: 'Futter- & Versorgungskosten' },
+    { id: 'icp-aktionsplan', label: 'ICP-Aktionsplan' },
+    { id: 'besatz-kompatibilitaet', label: 'Besatz-Kompatibilität' },
     { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent' },
     { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen' }
 ];
@@ -2673,6 +2684,15 @@ function createDemoAquariumData() {
             { id: 'demo-todo-002', title: 'Osmosetank prüfen', category: 'Wartung', dueAt: demoDate(-1, 9, 0), intervalDays: 7, notifyEnabled: true, done: false, remindedAt: null, lastDoneAt: demoDate(6, 9, 0), createdAt: demoDate(70, 10, 0) },
             { id: 'demo-todo-003', title: 'Pumpen reinigen', category: 'Technik', dueAt: demoDate(-5, 11, 0), intervalDays: 30, notifyEnabled: false, done: false, remindedAt: null, lastDoneAt: demoDate(25, 11, 0), createdAt: demoDate(100, 10, 0) }
         ],
+        equipmentList: [
+            { id: 'demo-equipment-001', name: 'LED Hauptbeleuchtung', type: 'Lampe', serial: 'DEMO-LED-440', purchaseDate: '2025-03-12', warrantyMonths: 36, maintenanceIntervalDays: 90, note: 'Linsen und Lüfter regelmäßig staubfrei halten.', lastMaintenanceAt: demoDate(18, 12, 0), createdAt: demoDate(160, 12, 0), updatedAt: demoDate(18, 12, 0) },
+            { id: 'demo-equipment-002', name: 'Rückförderpumpe', type: 'Pumpe', serial: 'DEMO-RFP-01', purchaseDate: '2024-11-03', warrantyMonths: 24, maintenanceIntervalDays: 45, note: 'Laufrad auf Kalk und Schnecken prüfen.', lastMaintenanceAt: demoDate(28, 10, 0), createdAt: demoDate(200, 10, 0), updatedAt: demoDate(28, 10, 0) }
+        ],
+        problemJournal: [
+            { id: 'demo-problem-001', type: 'Cyanos', severity: 'beobachten', at: demoDate(21, 19, 0), action: 'Strömung leicht angepasst, PO4 eng kontrolliert.', description: 'Leichter Belag im Sandbereich vorne rechts.', status: 'offen', createdAt: demoDate(21, 19, 0) },
+            { id: 'demo-problem-002', type: 'Gewebeverlust', severity: 'mittel', at: demoDate(42, 20, 0), action: 'Ableger umgesetzt und Nachbarkoralle entfernt.', description: 'Eine Acropora zeigte an der Basis hellere Stellen.', status: 'erledigt', createdAt: demoDate(42, 20, 0) }
+        ],
+        emergencyState: {},
         dosingContainers: [
             { id: 'demo-dose-001', name: 'KH Tag', capacityMl: 5000, currentMl: 1620, tareG: 180, density: 1.08, usage: 74, usageUnit: 'day', warnHours: 72, lastFilledAt: demoDate(34, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) },
             { id: 'demo-dose-002', name: 'Calcium', capacityMl: 5000, currentMl: 3180, tareG: 180, density: 1.12, usage: 42, usageUnit: 'day', warnHours: 96, lastFilledAt: demoDate(20, 12, 0), lastAlertAt: 0, updatedAt: demoDate(1, 10, 0) },
@@ -4489,6 +4509,9 @@ function createAquariumData(source = {}) {
         logBookEntries: cloneSerializable(source.logBookEntries || []),
         aquariumTodos: cloneSerializable(source.aquariumTodos || []),
         dosingContainers: cloneSerializable(source.dosingContainers || []),
+        equipmentList: cloneSerializable(source.equipmentList || []),
+        problemJournal: cloneSerializable(source.problemJournal || []),
+        emergencyState: cloneSerializable(source.emergencyState || {}),
         measurementTypes: cloneSerializable(ensureDefaultMeasurementTypes(source.measurementTypes)),
         measurementEntries: cloneSerializable(source.measurementEntries || []),
         icpReports: cloneSerializable(source.icpReports || []),
@@ -4746,6 +4769,9 @@ function normalizeWarehouseData(data) {
     if (!db.logBookEntries) db.logBookEntries = [];
     if (!db.aquariumTodos) db.aquariumTodos = [];
     if (!db.dosingContainers) db.dosingContainers = [];
+    if (!Array.isArray(db.equipmentList)) db.equipmentList = [];
+    if (!Array.isArray(db.problemJournal)) db.problemJournal = [];
+    if (!db.emergencyState || typeof db.emergencyState !== 'object') db.emergencyState = {};
     db.measurementTypes = ensureDefaultMeasurementTypes(db.measurementTypes);
     if (!db.measurementEntries) db.measurementEntries = [];
     if (!Array.isArray(db.icpReports)) db.icpReports = [];
@@ -15257,7 +15283,8 @@ function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
         '#tools details[data-section-id="dosieren-und-messwerte"], ' +
         '#tools details[data-section-id="salinitaet-und-wasserwechsel"], ' +
-        '#tools details[data-section-id="c-und-r-und-mischen"]'
+        '#tools details[data-section-id="c-und-r-und-mischen"], ' +
+        '#tools details[data-section-id="kosten-planung-und-sicherheit"]'
     );
     scopedSections.forEach(section => {
         section.classList.add('calculator-section');
@@ -15272,7 +15299,8 @@ function setupPriority4CalculatorUI() {
     [
         'majorCorrectionResult', 'consumptionResult', 'testCorrectionResult', 'nutritionResult',
         'salinityResult', 'simpleSalinityResult', 'specificGravityResult', 'saltCorrectionResult',
-        'waterChangeResult', 'adsorberFlowResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
+        'waterChangeResult', 'adsorberFlowResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult',
+        'powerCostResult', 'supplyCostResult', 'icpActionPlanResult', 'livestockCompatibilityResult'
         , 'traceCalculatorResult', 'traceCalculatorHistory'
     ].forEach(id => {
         const result = document.getElementById(id);
@@ -15353,6 +15381,14 @@ function initToolSection(sectionId, force = false) {
             renderSavedCustomCrPlans();
         });
         runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
+        return;
+    }
+
+    if (sectionId === 'kosten-planung-und-sicherheit') {
+        runToolInit('Stromkosten', renderPowerCostCalculator);
+        runToolInit('Versorgungskosten', renderSupplyCostCalculator);
+        runToolInit('ICP-Aktionsplan', renderIcpActionPlan);
+        runToolInit('Besatz-Kompatibilität', renderLivestockCompatibility);
         return;
     }
 
@@ -15507,6 +15543,10 @@ function getToolTileVisual(toolId, title = '') {
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
         'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
         'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
+        'stromkosten-rechner': { icon: 'kW', subtitle: 'Technik-Kosten planen' },
+        'futter-und-versorgungskosten': { icon: '€', subtitle: 'Monatskosten sehen' },
+        'icp-aktionsplan': { icon: 'ICP', subtitle: 'ToDos aus ICP' },
+        'besatz-kompatibilitaet': { icon: 'OK', subtitle: 'Besatz pruefen' },
         'sangokai-a-z-assistent': { icon: 'AZ', subtitle: 'PDF Wissen suchen' },
         'hilfreiche-quellen': { icon: 'Q', subtitle: 'Links und Wissen' }
     };
@@ -15588,6 +15628,26 @@ const toolInfoTexts = {
         summary: 'Skaliert Rezepte für Makro-Elemente wie KH-Tag, KH-Nacht, Calcium und Magnesium.',
         details: 'Du wählst Rezept und Zielmenge. Lagergeführte C&R Bestandteile können anschließend direkt ausgelagert werden.',
         note: 'Beim Anmischen sauber arbeiten und Kanister eindeutig markieren.'
+    },
+    'stromkosten-rechner': {
+        summary: 'Berechnet Stromverbrauch und Kosten pro Monat oder Jahr.',
+        details: 'Du trägst Leistung in Watt, tägliche Laufzeit und deinen Strompreis ein. Geeignet für Lampen, Pumpen, Heizer, Abschäumer und UV-Anlagen.',
+        note: 'Bei regelbaren Geräten ist die echte Durchschnittsleistung oft niedriger als die Maximalleistung.'
+    },
+    'futter-und-versorgungskosten': {
+        summary: 'Rechnet Verbrauch, Gebindegröße und Preis auf Monatskosten hoch.',
+        details: 'Praktisch für Futter, Spurenelemente, Adsorber, Salz, Bakterienpräparate und andere Verbrauchsprodukte.',
+        note: 'Für sehr unregelmäßige Nutzung lieber einen realistischen Durchschnittswert eintragen.'
+    },
+    'icp-aktionsplan': {
+        summary: 'Erstellt aus der neuesten ICP eine Liste auffälliger Werte und kann ToDos erzeugen.',
+        details: 'Das Tool nutzt gespeicherte ICP-Werte, vergleicht Messwert, Minimum, Maximum und Optimalwert und erzeugt auf Wunsch Aufgaben im Logbuch.',
+        note: 'Die vorgeschlagenen ToDos sind Prüfpunkte. Maßnahmen bitte immer fachlich bewerten.'
+    },
+    'besatz-kompatibilitaet': {
+        summary: 'Gibt eine erste Verträglichkeits-Einschätzung für Fisch-, Wirbellosen-, Anemonen- und Korallengruppen.',
+        details: 'Du wählst zwei Besatzgruppen und das Beckenvolumen. Das Tool weist auf typische Risiken wie Revierstress, Räuber-Beute-Verhalten oder wandernde Anemonen hin.',
+        note: 'Die konkrete Art entscheidet. Vor dem Kauf immer artspezifisch nachschlagen.'
     }
 };
 
@@ -20632,6 +20692,9 @@ function renderLogBook() {
     renderLogBookCategories();
     renderLogBookEntries();
     renderAquariumTodos();
+    renderEquipmentList();
+    renderProblemJournal();
+    renderEmergencyChecklist();
     renderMeasurementTracker();
     renderDosingContainers();
     renderOsmoseTank();
@@ -20975,6 +21038,456 @@ function checkTodoReminders() {
         }
     });
     if (changed) saveDB(false);
+}
+
+function getWarrantyUntil(entry = {}) {
+    if (!entry.purchaseDate || !entry.warrantyMonths) return '';
+    const date = new Date(`${entry.purchaseDate}T12:00:00`);
+    if (Number.isNaN(date.getTime())) return '';
+    date.setMonth(date.getMonth() + (parseInt(entry.warrantyMonths, 10) || 0));
+    return date.toISOString();
+}
+
+function getNextEquipmentMaintenance(entry = {}) {
+    if (!entry.maintenanceIntervalDays) return '';
+    const base = entry.lastMaintenanceAt || entry.purchaseDate || entry.createdAt;
+    const date = new Date(base || Date.now());
+    if (Number.isNaN(date.getTime())) return '';
+    date.setDate(date.getDate() + (parseInt(entry.maintenanceIntervalDays, 10) || 0));
+    return date.toISOString();
+}
+
+function saveEquipmentEntry() {
+    if (!Array.isArray(db.equipmentList)) db.equipmentList = [];
+    const name = (document.getElementById('equipmentName')?.value || '').trim();
+    if (!name) return alert('Bitte einen Gerätenamen eintragen.');
+    const entry = {
+        id: createWarehouseId(),
+        name,
+        type: document.getElementById('equipmentType')?.value || 'Sonstiges',
+        serial: (document.getElementById('equipmentSerial')?.value || '').trim(),
+        purchaseDate: document.getElementById('equipmentPurchaseDate')?.value || '',
+        warrantyMonths: Math.max(0, parseInt(document.getElementById('equipmentWarrantyMonths')?.value || '0', 10) || 0),
+        maintenanceIntervalDays: Math.max(0, parseInt(document.getElementById('equipmentMaintenanceInterval')?.value || '0', 10) || 0),
+        note: (document.getElementById('equipmentNote')?.value || '').trim(),
+        lastMaintenanceAt: '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    db.equipmentList.unshift(entry);
+    if (entry.maintenanceIntervalDays > 0) {
+        db.aquariumTodos = db.aquariumTodos || [];
+        db.aquariumTodos.unshift({
+            id: createWarehouseId(),
+            title: `Wartung: ${entry.name}`,
+            category: 'Technik',
+            dueAt: getNextEquipmentMaintenance(entry) || new Date().toISOString(),
+            intervalDays: entry.maintenanceIntervalDays,
+            notifyEnabled: true,
+            done: false,
+            remindedAt: null,
+            lastDoneAt: null,
+            createdAt: new Date().toISOString()
+        });
+    }
+    ['equipmentName', 'equipmentSerial', 'equipmentPurchaseDate', 'equipmentMaintenanceInterval', 'equipmentNote'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    saveDB();
+    renderLogBook();
+    showToast('Gerät gespeichert', 'success', 1800);
+}
+
+function markEquipmentMaintained(id) {
+    const entry = (db.equipmentList || []).find(item => item.id === id);
+    if (!entry) return;
+    entry.lastMaintenanceAt = new Date().toISOString();
+    entry.updatedAt = new Date().toISOString();
+    if (!db.logBookCategories.includes('Technik')) db.logBookCategories.push('Technik');
+    db.logBookEntries.unshift({
+        id: createWarehouseId(),
+        category: 'Technik',
+        title: `Wartung erledigt: ${entry.name}`,
+        note: entry.note || '',
+        at: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+    });
+    saveDB();
+    renderLogBook();
+}
+
+function editEquipmentEntry(id) {
+    const entry = (db.equipmentList || []).find(item => item.id === id);
+    if (!entry) return;
+    const name = prompt('Gerätename:', entry.name || '');
+    if (name === null) return;
+    const serial = prompt('Seriennummer:', entry.serial || '');
+    if (serial === null) return;
+    const warranty = prompt('Garantie in Monaten:', String(entry.warrantyMonths || 0));
+    if (warranty === null) return;
+    const interval = prompt('Wartungsintervall in Tagen:', String(entry.maintenanceIntervalDays || 0));
+    if (interval === null) return;
+    entry.name = name.trim() || entry.name;
+    entry.serial = serial.trim();
+    entry.warrantyMonths = Math.max(0, parseInt(warranty, 10) || 0);
+    entry.maintenanceIntervalDays = Math.max(0, parseInt(interval, 10) || 0);
+    entry.updatedAt = new Date().toISOString();
+    saveDB();
+    renderLogBook();
+}
+
+function deleteEquipmentEntry(id) {
+    const entry = (db.equipmentList || []).find(item => item.id === id);
+    if (!entry || !confirm(`Gerät "${entry.name}" löschen?`)) return;
+    db.equipmentList = (db.equipmentList || []).filter(item => item.id !== id);
+    saveDB();
+    renderLogBook();
+}
+
+function renderEquipmentList() {
+    const container = document.getElementById('equipment-list');
+    if (!container) return;
+    const entries = db.equipmentList || [];
+    if (!entries.length) {
+        container.innerHTML = '<div class="logbook-empty-state"><strong>Noch keine Geräte</strong><p>Speichere deine Technik, damit Wartung, Garantie und Seriennummer nachvollziehbar bleiben.</p></div>';
+        return;
+    }
+    container.innerHTML = entries.map(entry => {
+        const warrantyUntil = getWarrantyUntil(entry);
+        const maintenance = getNextEquipmentMaintenance(entry);
+        const warrantyActive = warrantyUntil && new Date(warrantyUntil).getTime() >= Date.now();
+        return `
+            <article class="overview-row equipment-row">
+                <div>
+                    <strong>${escapeHtml(entry.name)}</strong>
+                    <small>${escapeHtml(entry.type || 'Gerät')} · SN: ${escapeHtml(entry.serial || '-')}</small>
+                    <small>Kauf: ${entry.purchaseDate ? new Date(`${entry.purchaseDate}T12:00:00`).toLocaleDateString('de-DE') : '-'} · Garantie: ${warrantyUntil ? `${formatWarehouseDate(warrantyUntil)} (${warrantyActive ? 'aktiv' : 'abgelaufen'})` : '-'}</small>
+                    <small>Letzte Wartung: ${entry.lastMaintenanceAt ? formatWarehouseDate(entry.lastMaintenanceAt) : 'noch nie'} · Nächste Wartung: ${maintenance ? formatWarehouseDate(maintenance) : '-'}</small>
+                </div>
+                <div class="logbook-actions">
+                    <button onclick="markEquipmentMaintained('${entry.id}')">Wartung erledigt</button>
+                    <button onclick="editEquipmentEntry('${entry.id}')">Bearbeiten</button>
+                    <button onclick="deleteEquipmentEntry('${entry.id}')" class="btn-out">Löschen</button>
+                </div>
+            </article>
+        `;
+    }).join('');
+}
+
+function saveProblemEntry() {
+    if (!Array.isArray(db.problemJournal)) db.problemJournal = [];
+    const type = document.getElementById('problemType')?.value || 'Sonstiges';
+    const severity = document.getElementById('problemSeverity')?.value || 'beobachten';
+    const at = document.getElementById('problemDate')?.value ? new Date(document.getElementById('problemDate').value).toISOString() : new Date().toISOString();
+    const action = (document.getElementById('problemAction')?.value || '').trim();
+    const description = (document.getElementById('problemDescription')?.value || '').trim();
+    if (!description && !action) return alert('Bitte Beschreibung oder Maßnahme eintragen.');
+    db.problemJournal.unshift({
+        id: createWarehouseId(),
+        type,
+        severity,
+        at,
+        action,
+        description,
+        status: 'offen',
+        createdAt: new Date().toISOString()
+    });
+    if (!db.logBookCategories.includes('Problem')) db.logBookCategories.push('Problem');
+    db.logBookEntries.unshift({
+        id: createWarehouseId(),
+        category: 'Problem',
+        title: `${type}: ${severity}`,
+        note: [description, action ? `Maßnahme: ${action}` : ''].filter(Boolean).join('\n'),
+        at,
+        createdAt: new Date().toISOString()
+    });
+    ['problemAction', 'problemDescription'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    saveDB();
+    renderLogBook();
+    showToast('Problem dokumentiert', 'success', 1800);
+}
+
+function toggleProblemResolved(id) {
+    const entry = (db.problemJournal || []).find(item => item.id === id);
+    if (!entry) return;
+    entry.status = entry.status === 'erledigt' ? 'offen' : 'erledigt';
+    entry.updatedAt = new Date().toISOString();
+    saveDB();
+    renderProblemJournal();
+}
+
+function deleteProblemEntry(id) {
+    const entry = (db.problemJournal || []).find(item => item.id === id);
+    if (!entry || !confirm(`Problem "${entry.type}" löschen?`)) return;
+    db.problemJournal = (db.problemJournal || []).filter(item => item.id !== id);
+    saveDB();
+    renderProblemJournal();
+}
+
+function renderProblemJournal() {
+    const container = document.getElementById('problem-journal-list');
+    if (!container) return;
+    const dateInput = document.getElementById('problemDate');
+    if (dateInput && !dateInput.value) dateInput.value = formatDateTimeLocal();
+    const entries = db.problemJournal || [];
+    if (!entries.length) {
+        container.innerHTML = '<div class="logbook-empty-state"><strong>Noch keine Probleme dokumentiert</strong><p>Wenn etwas auffällt, kannst du hier Ursache, Maßnahme und Verlauf sammeln.</p></div>';
+        return;
+    }
+    container.innerHTML = entries.slice(0, 30).map(entry => `
+        <article class="logbook-entry problem-row is-${escapeHtml(entry.severity || 'beobachten')}">
+            <div class="logbook-entry-content">
+                <div class="logbook-entry-meta">
+                    <time>${formatWarehouseDate(entry.at)}</time>
+                    <span class="status-badge status-${entry.severity === 'kritisch' ? 'danger' : entry.severity === 'mittel' ? 'warning' : 'neutral'}">${escapeHtml(entry.severity || 'beobachten')}</span>
+                    <span class="status-badge status-${entry.status === 'erledigt' ? 'success' : 'info'}">${escapeHtml(entry.status || 'offen')}</span>
+                </div>
+                <strong>${escapeHtml(entry.type || 'Problem')}</strong>
+                <p>${escapeHtml(entry.description || 'Keine Beschreibung')}</p>
+                ${entry.action ? `<small>Maßnahme: ${escapeHtml(entry.action)}</small>` : ''}
+            </div>
+            <div class="logbook-actions">
+                <button onclick="toggleProblemResolved('${entry.id}')">${entry.status === 'erledigt' ? 'Wieder öffnen' : 'Erledigt'}</button>
+                <button onclick="deleteProblemEntry('${entry.id}')" class="btn-out">Löschen</button>
+            </div>
+        </article>
+    `).join('');
+}
+
+const EMERGENCY_CHECKLISTS = {
+    power: {
+        title: 'Stromausfall',
+        steps: ['Ruhe bewahren und Ursache prüfen', 'Sauerstoff sichern: Strömung oder Luftheber mit Batterie/USV', 'Temperatur beobachten und Becken isolieren', 'Keine großen Fütterungen', 'Nach Stromrückkehr Technik einzeln prüfen']
+    },
+    pump: {
+        title: 'Pumpenausfall',
+        steps: ['Pumpe vom Strom trennen und Blockade prüfen', 'Ersatzpumpe oder Luftheber einsetzen', 'Oberflächenbewegung sicherstellen', 'Temperatur und Sauerstoff im Blick behalten', 'Defekte Pumpe im Logbuch dokumentieren']
+    },
+    dosing: {
+        title: 'Dosierfehler / Überdosierung',
+        steps: ['Dosierpumpe sofort stoppen', 'Betroffenen Wert messen', 'Bei kritischer Abweichung Wasserwechsel vorbereiten', 'Aktivkohle/Filterung nach Bedarf einsetzen', 'Dosierplan erst nach Ursachenprüfung wieder aktivieren']
+    },
+    temperature: {
+        title: 'Temperaturproblem',
+        steps: ['Temperatur mit zweitem Thermometer prüfen', 'Heizer/Lüfter/Kühlung kontrollieren', 'Langsam korrigieren, keine Schocks erzeugen', 'Lichtleistung bei Überhitzung reduzieren', 'Tiere beobachten und Verlauf dokumentieren']
+    },
+    leak: {
+        title: 'Wasseraustritt',
+        steps: ['Strom an betroffenen Geräten sichern', 'Leckquelle lokalisieren', 'Wasserstand stabilisieren', 'Notbehälter/Handtücher bereitlegen', 'Nach Ursache suchen: Schlauch, Verschraubung, Überlauf, Technikbecken']
+    }
+};
+
+function toggleEmergencyStep(scenario, index, checked) {
+    if (!db.emergencyState) db.emergencyState = {};
+    if (!Array.isArray(db.emergencyState[scenario])) db.emergencyState[scenario] = [];
+    db.emergencyState[scenario][index] = Boolean(checked);
+    saveDB();
+    renderEmergencyChecklist();
+}
+
+function resetEmergencyChecklist() {
+    const scenario = document.getElementById('emergencyScenario')?.value || 'power';
+    if (!db.emergencyState) db.emergencyState = {};
+    db.emergencyState[scenario] = [];
+    saveDB();
+    renderEmergencyChecklist();
+}
+
+function renderEmergencyChecklist() {
+    const container = document.getElementById('emergency-checklist');
+    if (!container) return;
+    const scenario = document.getElementById('emergencyScenario')?.value || 'power';
+    const checklist = EMERGENCY_CHECKLISTS[scenario] || EMERGENCY_CHECKLISTS.power;
+    const state = db.emergencyState?.[scenario] || [];
+    const done = checklist.steps.filter((_, index) => state[index]).length;
+    container.innerHTML = `
+        <div class="tool-result emergency-result">
+            <div class="tool-row"><span>${escapeHtml(checklist.title)}</span><strong>${done}/${checklist.steps.length} erledigt</strong></div>
+            <div class="emergency-step-list">
+                ${checklist.steps.map((step, index) => `
+                    <label class="logbook-checkbox emergency-step">
+                        <input type="checkbox" ${state[index] ? 'checked' : ''} onchange="toggleEmergencyStep('${scenario}', ${index}, this.checked)">
+                        <span>${escapeHtml(step)}</span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function renderPowerCostCalculator() {
+    const result = document.getElementById('powerCostResult');
+    if (!result) return;
+    const watts = Math.max(0, parseFloat(document.getElementById('powerWatts')?.value) || 0);
+    const hours = Math.min(24, Math.max(0, parseFloat(document.getElementById('powerHours')?.value) || 0));
+    const price = Math.max(0, parseFloat(document.getElementById('powerPrice')?.value) || 0);
+    const kwhDay = (watts * hours) / 1000;
+    const month = kwhDay * 30.4375 * price;
+    const year = kwhDay * 365 * price;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row"><span>Verbrauch pro Tag</span><strong>${kwhDay.toFixed(2)} kWh</strong></div>
+            <div class="tool-row"><span>Kosten pro Monat</span><strong>${formatEuro(month)}</strong></div>
+            <div class="tool-row"><span>Kosten pro Jahr</span><strong>${formatEuro(year)}</strong></div>
+        </div>
+    `;
+}
+
+function renderSupplyCostCalculator() {
+    const result = document.getElementById('supplyCostResult');
+    if (!result) return;
+    const daily = Math.max(0, parseFloat(document.getElementById('supplyDailyAmount')?.value) || 0);
+    const packageAmount = Math.max(0.0001, parseFloat(document.getElementById('supplyPackageAmount')?.value) || 0.0001);
+    const unit = document.getElementById('supplyUnit')?.value || 'ml';
+    const price = Math.max(0, parseFloat(document.getElementById('supplyPackagePrice')?.value) || 0);
+    const pricePerUnit = price / packageAmount;
+    const monthAmount = daily * 30.4375;
+    const monthCost = monthAmount * pricePerUnit;
+    const lastsDays = daily > 0 ? packageAmount / daily : Infinity;
+    result.innerHTML = `
+        <div class="tool-result">
+            <div class="tool-row"><span>Preis pro ${escapeHtml(unit)}</span><strong>${formatEuro(pricePerUnit)}</strong></div>
+            <div class="tool-row"><span>Monatsverbrauch</span><strong>${monthAmount.toFixed(1)} ${escapeHtml(unit)}</strong></div>
+            <div class="tool-row"><span>Monatskosten</span><strong>${formatEuro(monthCost)}</strong></div>
+            <div class="tool-row"><span>Gebinde reicht ca.</span><strong>${Number.isFinite(lastsDays) ? `${Math.floor(lastsDays)} Tage` : 'unbegrenzt'}</strong></div>
+        </div>
+    `;
+}
+
+function getLatestIcpReport() {
+    return getIcpReportsSorted(true)[0] || null;
+}
+
+function getIcpActionPlanRows(mode = 'out') {
+    const latest = getLatestIcpReport();
+    if (!latest) return [];
+    return sortIcpValues(latest.values || [])
+        .map(value => {
+            if (!Number.isFinite(value.value)) return null;
+            const status = getIcpValueStatus(value);
+            const optimalDiff = Number.isFinite(value.optimal) ? value.value - value.optimal : null;
+            const outside = status.key === 'low' || status.key === 'high';
+            if (mode === 'out' && !outside) return null;
+            if (mode === 'all' && optimalDiff === null) return null;
+            return {
+                key: value.key,
+                label: value.name || value.symbol || value.key,
+                value,
+                status,
+                optimalDiff,
+                title: outside
+                    ? `${value.name || value.key} ${status.key === 'low' ? 'zu niedrig' : 'zu hoch'}`
+                    : `${value.name || value.key} vom Optimalwert abweichend`
+            };
+        })
+        .filter(Boolean);
+}
+
+function addIcpActionPlanTodo(key) {
+    const mode = document.getElementById('icpActionPlanMode')?.value || 'out';
+    const row = getIcpActionPlanRows(mode).find(item => item.key === key);
+    if (!row) return;
+    const report = getLatestIcpReport();
+    if (!db.logBookCategories.includes('ICP')) db.logBookCategories.push('ICP');
+    db.aquariumTodos.unshift({
+        id: createWarehouseId(),
+        title: `ICP prüfen: ${row.title}`,
+        category: 'ICP',
+        dueAt: new Date().toISOString(),
+        intervalDays: 0,
+        notifyEnabled: true,
+        done: false,
+        remindedAt: null,
+        lastDoneAt: null,
+        createdAt: new Date().toISOString(),
+        source: { type: 'icp-action-plan', reportId: report?.id || '', valueKey: key }
+    });
+    saveDB();
+    renderIcpActionPlan();
+    showToast('ToDo aus ICP erstellt', 'success', 1800);
+}
+
+function addAllIcpActionPlanTodos() {
+    const rows = getIcpActionPlanRows(document.getElementById('icpActionPlanMode')?.value || 'out');
+    rows.forEach(row => addIcpActionPlanTodo(row.key));
+}
+
+function renderIcpActionPlan() {
+    const result = document.getElementById('icpActionPlanResult');
+    if (!result) return;
+    const latest = getLatestIcpReport();
+    if (!latest) {
+        result.innerHTML = '<div class="tool-result"><strong>Noch keine ICP gespeichert</strong><p class="hint">Importiere zuerst eine ICP im ICP-Bereich. Danach kann dieses Tool auffällige Werte auflisten.</p></div>';
+        return;
+    }
+    const mode = document.getElementById('icpActionPlanMode')?.value || 'out';
+    const rows = getIcpActionPlanRows(mode);
+    result.innerHTML = `
+        <div class="tool-result icp-action-plan-result">
+            <div class="tool-row"><span>Basis</span><strong>${escapeHtml(latest.name || 'ICP')} · ${formatWarehouseDate(latest.date || latest.createdAt)}</strong></div>
+            ${rows.length ? `
+                <div class="icp-action-list">
+                    ${rows.slice(0, 18).map(row => `
+                        <div class="overview-row">
+                            <div>
+                                <strong>${escapeHtml(row.title)}</strong>
+                                <small>Messwert: ${escapeHtml(formatIcpNumber(row.value.value, row.value.unit))} · Optimal: ${Number.isFinite(row.value.optimal) ? escapeHtml(formatIcpNumber(row.value.optimal, row.value.unit)) : '-'}</small>
+                            </div>
+                            <button type="button" onclick="addIcpActionPlanTodo('${escapeHtml(row.key)}')">ToDo erstellen</button>
+                        </div>
+                    `).join('')}
+                </div>
+                <button type="button" class="btn-secondary btn-animated" onclick="addAllIcpActionPlanTodos()">Alle als ToDos übernehmen</button>
+            ` : '<p class="hint">Keine auffälligen numerischen Werte für den gewählten Umfang gefunden.</p>'}
+        </div>
+    `;
+}
+
+const LIVESTOCK_COMPATIBILITY_RULES = {
+    'predatory-fish|shrimp': ['risk', 'Räuberische Fische können Garnelen oder kleine Krebse als Futter ansehen. Nur sehr vorsichtig und artspezifisch prüfen.'],
+    'predatory-fish|snail': ['caution', 'Schnecken und Einsiedler sind je nach Räuberart gefährdet. Größe und Art genau prüfen.'],
+    'predatory-fish|peaceful-fish': ['caution', 'Friedliche oder kleine Fische können unter Stress geraten oder gefressen werden.'],
+    'territorial-fish|peaceful-fish': ['caution', 'Territoriale Fische können friedliche Tiere bedrängen. Struktur, Reviergröße und Reihenfolge beim Einsetzen beachten.'],
+    'territorial-fish|territorial-fish': ['risk', 'Zwei territoriale Tiere können Revierkämpfe auslösen. Nur mit viel Platz und Verstecken.'],
+    'anemone|coral': ['caution', 'Anemonen können wandern und Korallen vernesseln. Abstand einplanen und empfindliche Korallen schützen.'],
+    'anemone|shrimp': ['ok', 'Viele Garnelen können mit Anemonen funktionieren, artspezifische Symbiosen und Fressrisiken trotzdem prüfen.'],
+    'coral|snail': ['ok', 'Schnecken und Einsiedler sind meist gute Putztrupp-Ergänzungen. Umwerf-Risiko bei lockeren Ablegern beachten.'],
+    'coral|shrimp': ['ok', 'Meist gut kombinierbar. Einige Garnelen können LPS/Futter stehlen oder empfindliche Korallen stören.']
+};
+
+function getLivestockCompatibilityRule(a, b) {
+    const direct = LIVESTOCK_COMPATIBILITY_RULES[`${a}|${b}`] || LIVESTOCK_COMPATIBILITY_RULES[`${b}|${a}`];
+    if (direct) return direct;
+    if (a === b) return ['ok', 'Gleiche Gruppen können funktionieren, entscheidend sind Art, Revierverhalten, Größe und Beckenstruktur.'];
+    return ['ok', 'Keine harte Warnung in der Basisregel. Bitte trotzdem konkrete Art, Endgröße, Futteransprüche und Verhalten prüfen.'];
+}
+
+function renderLivestockCompatibility() {
+    const result = document.getElementById('livestockCompatibilityResult');
+    if (!result) return;
+    const a = document.getElementById('stockTypeA')?.value || 'peaceful-fish';
+    const b = document.getElementById('stockTypeB')?.value || 'coral';
+    const liters = Math.max(0, parseFloat(document.getElementById('stockTankLiters')?.value) || 0);
+    const [level, message] = getLivestockCompatibilityRule(a, b);
+    const smallTankWarning = liters && liters < 200 && (a.includes('fish') || b.includes('fish'))
+        ? '<li>Bei kleinen Becken steigt das Risiko für Revierstress deutlich. Endgröße und Schwimmraum prüfen.</li>'
+        : '';
+    const levelLabel = level === 'risk' ? 'Risiko' : level === 'caution' ? 'Vorsicht' : 'meist möglich';
+    result.innerHTML = `
+        <div class="tool-result livestock-compatibility-result is-${level}">
+            <div class="tool-row"><span>Einschätzung</span><strong>${levelLabel}</strong></div>
+            <p>${escapeHtml(message)}</p>
+            <ul>
+                ${smallTankWarning}
+                <li>Immer die konkrete Art nachschlagen, besonders Endgröße, Aggression, Futter und Revierverhalten.</li>
+                <li>Neue Tiere langsam eingewöhnen und Verhalten in den ersten Tagen eng beobachten.</li>
+            </ul>
+        </div>
+    `;
 }
 
 function clampNumber(value, min, max, fallback) {

@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.112-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.113-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.112</span>
+                    <span class="version-badge">v3.4.113</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -907,6 +907,121 @@
                     </div>
                 </details>
 
+                <details class="tool-section" data-section-id="kosten-planung-und-sicherheit">
+                    <summary class="tool-section-summary">
+                        <span><strong>Kosten, Planung &amp; Sicherheit</strong><small>Stromkosten, Versorgungskosten, ICP-Aktionsplan, Besatz-Kompatibilität und Notfallhilfe</small></span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="tool-card-grid">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="stromkosten-rechner">
+                            <h3>Stromkosten-Rechner <button type="button" class="tool-inline-fav" data-tool-id="stromkosten-rechner">☆ Fav</button></h3>
+                            <p class="hint">Berechnet Monatskosten für Lampen, Pumpen, Heizer oder andere Technik.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label for="powerDeviceName">Gerät:</label>
+                                    <input type="text" id="powerDeviceName" placeholder="z.B. Hauptlampe">
+                                </div>
+                                <div class="input-group">
+                                    <label for="powerWatts">Leistung (W):</label>
+                                    <input type="number" id="powerWatts" min="0" step="1" value="100" oninput="renderPowerCostCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label for="powerHours">Stunden pro Tag:</label>
+                                    <input type="number" id="powerHours" min="0" max="24" step="0.1" value="10" oninput="renderPowerCostCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label for="powerPrice">Strompreis €/kWh:</label>
+                                    <input type="number" id="powerPrice" min="0" step="0.01" value="0.35" oninput="renderPowerCostCalculator()">
+                                </div>
+                            </div>
+                            <div id="powerCostResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="futter-und-versorgungskosten">
+                            <h3>Futter- &amp; Versorgungskosten <button type="button" class="tool-inline-fav" data-tool-id="futter-und-versorgungskosten">☆ Fav</button></h3>
+                            <p class="hint">Rechnet Verbrauch und Preis auf Monatskosten hoch.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label for="supplyCostName">Produkt:</label>
+                                    <input type="text" id="supplyCostName" placeholder="z.B. Frostfutter, Spurenelemente">
+                                </div>
+                                <div class="input-group">
+                                    <label for="supplyDailyAmount">Verbrauch pro Tag:</label>
+                                    <input type="number" id="supplyDailyAmount" min="0" step="0.01" value="10" oninput="renderSupplyCostCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label for="supplyPackageAmount">Gebinde enthält:</label>
+                                    <input type="number" id="supplyPackageAmount" min="0.01" step="0.01" value="1000" oninput="renderSupplyCostCalculator()">
+                                </div>
+                                <div class="input-group">
+                                    <label for="supplyUnit">Einheit:</label>
+                                    <select id="supplyUnit" onchange="renderSupplyCostCalculator()">
+                                        <option value="ml">ml</option>
+                                        <option value="g">g</option>
+                                        <option value="Stück">Stück</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="supplyPackagePrice">Gebindepreis (€):</label>
+                                    <input type="number" id="supplyPackagePrice" min="0" step="0.01" value="19.90" oninput="renderSupplyCostCalculator()">
+                                </div>
+                            </div>
+                            <div id="supplyCostResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="icp-aktionsplan">
+                            <h3>ICP-Aktionsplan <button type="button" class="tool-inline-fav" data-tool-id="icp-aktionsplan">☆ Fav</button></h3>
+                            <p class="hint">Erstellt aus der neuesten gespeicherten ICP eine prüfbare Liste auffälliger Werte und kann daraus ToDos erzeugen.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label for="icpActionPlanMode">Umfang:</label>
+                                    <select id="icpActionPlanMode" onchange="renderIcpActionPlan()">
+                                        <option value="out">Nur außerhalb Min/Max</option>
+                                        <option value="all">Alle numerischen Abweichungen zum Optimalwert</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="icpActionPlanResult"></div>
+                        </div>
+
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed" data-tool-id="besatz-kompatibilitaet">
+                            <h3>Besatz-Kompatibilität <button type="button" class="tool-inline-fav" data-tool-id="besatz-kompatibilitaet">☆ Fav</button></h3>
+                            <p class="hint">Erste Orientierung für Fische, Garnelen, Anemonen und Wirbellose. Ersetzt keine artspezifische Recherche.</p>
+                            <div class="tool-grid">
+                                <div class="input-group">
+                                    <label for="stockTypeA">Tier A:</label>
+                                    <select id="stockTypeA" onchange="renderLivestockCompatibility()">
+                                        <option value="peaceful-fish">friedlicher Fisch</option>
+                                        <option value="territorial-fish">territorialer Fisch</option>
+                                        <option value="predatory-fish">räuberischer Fisch</option>
+                                        <option value="shrimp">Garnele/Krebs</option>
+                                        <option value="anemone">Anemone</option>
+                                        <option value="snail">Schnecke/Einsiedler</option>
+                                        <option value="coral">Koralle</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="stockTypeB">Tier B:</label>
+                                    <select id="stockTypeB" onchange="renderLivestockCompatibility()">
+                                        <option value="coral">Koralle</option>
+                                        <option value="peaceful-fish">friedlicher Fisch</option>
+                                        <option value="territorial-fish">territorialer Fisch</option>
+                                        <option value="predatory-fish">räuberischer Fisch</option>
+                                        <option value="shrimp">Garnele/Krebs</option>
+                                        <option value="anemone">Anemone</option>
+                                        <option value="snail">Schnecke/Einsiedler</option>
+                                    </select>
+                                </div>
+                                <div class="input-group">
+                                    <label for="stockTankLiters">Beckenvolumen (L):</label>
+                                    <input type="number" id="stockTankLiters" min="1" step="1" value="300" oninput="renderLivestockCompatibility()">
+                                </div>
+                            </div>
+                            <div id="livestockCompatibilityResult"></div>
+                        </div>
+                    </div>
+                </details>
+
                 <details class="tool-section" data-section-id="sangokai-a-z">
                     <summary class="tool-section-summary">
                         <span><strong>Wissen &amp; Nachschlagen</strong><small>Sangokai A-Z durchsuchen und Antworten fachlich gegenprüfen</small></span>
@@ -1125,6 +1240,111 @@
                 </details>
             </div>
 
+            <div class="card logbook-card logbook-equipment-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Geräteverwaltung</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <p class="hint">Lampen, Pumpen, Abschäumer, Heizer und andere Technik mit Kaufdatum, Seriennummer, Garantie und Wartung dokumentieren.</p>
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label for="equipmentName">Gerät:</label>
+                                <input type="text" id="equipmentName" placeholder="z.B. Strömungspumpe links">
+                            </div>
+                            <div class="input-group">
+                                <label for="equipmentType">Typ:</label>
+                                <select id="equipmentType">
+                                    <option>Lampe</option>
+                                    <option>Pumpe</option>
+                                    <option>Abschäumer</option>
+                                    <option>Heizer</option>
+                                    <option>Dosierpumpe</option>
+                                    <option>Filter</option>
+                                    <option>Sonstiges</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="equipmentSerial">Seriennummer:</label>
+                                <input type="text" id="equipmentSerial" placeholder="Optional">
+                            </div>
+                            <div class="input-group">
+                                <label for="equipmentPurchaseDate">Kaufdatum:</label>
+                                <input type="date" id="equipmentPurchaseDate">
+                            </div>
+                            <div class="input-group">
+                                <label for="equipmentWarrantyMonths">Garantie (Monate):</label>
+                                <input type="number" id="equipmentWarrantyMonths" min="0" step="1" value="24">
+                            </div>
+                            <div class="input-group">
+                                <label for="equipmentMaintenanceInterval">Wartung alle Tage:</label>
+                                <input type="number" id="equipmentMaintenanceInterval" min="0" step="1" placeholder="z.B. 30">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="equipmentNote">Notiz:</label>
+                            <input type="text" id="equipmentNote" placeholder="Standort, Ersatzteile, Reinigungs-Hinweise">
+                        </div>
+                        <div class="btn-group logbook-form-actions">
+                            <button class="btn-primary btn-animated" onclick="saveEquipmentEntry()">Gerät speichern</button>
+                        </div>
+                        <div id="equipment-list"></div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="card logbook-card logbook-problem-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Problem-Tagebuch</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <p class="hint">Cyanos, Dinos, Algen, Gewebeverlust, Polypenbild oder andere Auffälligkeiten mit Maßnahme und Verlauf festhalten.</p>
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label for="problemType">Problem:</label>
+                                <select id="problemType">
+                                    <option>Cyanos</option>
+                                    <option>Dinos</option>
+                                    <option>Algen</option>
+                                    <option>Gewebeverlust</option>
+                                    <option>Koralle geschlossen</option>
+                                    <option>Fisch auffällig</option>
+                                    <option>Technikproblem</option>
+                                    <option>Sonstiges</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="problemSeverity">Stufe:</label>
+                                <select id="problemSeverity">
+                                    <option value="beobachten">beobachten</option>
+                                    <option value="mittel">mittel</option>
+                                    <option value="kritisch">kritisch</option>
+                                </select>
+                            </div>
+                            <div class="input-group">
+                                <label for="problemDate">Datum:</label>
+                                <input type="datetime-local" id="problemDate">
+                            </div>
+                            <div class="input-group">
+                                <label for="problemAction">Maßnahme:</label>
+                                <input type="text" id="problemAction" placeholder="z.B. Adsorber gedrosselt, Wasserwechsel geplant">
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="problemDescription">Beschreibung:</label>
+                            <textarea id="problemDescription" placeholder="Was ist sichtbar? Seit wann? Welche Werte oder Änderungen gab es?"></textarea>
+                        </div>
+                        <div class="btn-group logbook-form-actions">
+                            <button class="btn-primary btn-animated" onclick="saveProblemEntry()">Problem speichern</button>
+                        </div>
+                        <div id="problem-journal-list"></div>
+                    </div>
+                </details>
+            </div>
+
             <div class="card logbook-card logbook-todo-card">
                 <details class="logbook-card-details">
                     <summary class="logbook-summary">
@@ -1174,6 +1394,34 @@
                             <button class="btn-in btn-animated" onclick="enableStockNotifications()">Push aktivieren</button>
                         </div>
                         <div id="aquarium-todo-list"></div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="card logbook-card logbook-emergency-card">
+                <details class="logbook-card-details">
+                    <summary class="logbook-summary">
+                        <span>Notfallmodus</span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="logbook-card-body">
+                        <p class="hint">Kurze Checklisten für typische Notfälle. Erledigte Punkte werden lokal gespeichert und können jederzeit zurückgesetzt werden.</p>
+                        <div class="tool-grid">
+                            <div class="input-group">
+                                <label for="emergencyScenario">Notfall auswählen:</label>
+                                <select id="emergencyScenario" onchange="renderEmergencyChecklist()">
+                                    <option value="power">Stromausfall</option>
+                                    <option value="pump">Pumpenausfall</option>
+                                    <option value="dosing">Dosierfehler / Überdosierung</option>
+                                    <option value="temperature">Temperaturproblem</option>
+                                    <option value="leak">Wasseraustritt</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="emergency-checklist"></div>
+                        <div class="btn-group logbook-form-actions">
+                            <button class="btn-secondary btn-animated" onclick="resetEmergencyChecklist()">Checkliste zurücksetzen</button>
+                        </div>
                     </div>
                 </details>
             </div>
@@ -2200,9 +2448,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.112-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.112-release"></script>
-    <script src="assets/js/app.js?v=3.4.112-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.113-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.113-release"></script>
+    <script src="assets/js/app.js?v=3.4.113-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
