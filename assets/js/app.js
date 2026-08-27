@@ -1204,10 +1204,6 @@ const TOOL_SEARCH_KEYWORDS = {
     'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
     'c-und-r-natriumchlorid-aus-nacl-pulver': 'nacl natriumchlorid salz pulver lösung ansetzen mischen',
     'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen',
-    'stromkosten-rechner': 'kosten strom stromkosten watt kwh lampe pumpe heizer abschäumer verbrauch monat',
-    'futter-und-versorgungskosten': 'kosten futter versorgung verbrauch preis monat gebinde produkt',
-    'icp-aktionsplan': 'icp aktionsplan auffällige werte todo maßnahmen minimum maximum optimal',
-    'besatz-kompatibilitaet': 'besatz kompatibilität fische garnelen anemone schnecken wirbellose verträglich',
     'sangokai-a-z-assistent': 'wissen hilfe ratgeber nachschlagen frage pdf sangokai',
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
@@ -1227,10 +1223,6 @@ const TOOL_DEFINITIONS = [
     { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', osciOnly: true },
     { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', osciOnly: true },
     { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', osciOnly: true },
-    { id: 'stromkosten-rechner', label: 'Stromkosten-Rechner' },
-    { id: 'futter-und-versorgungskosten', label: 'Futter- & Versorgungskosten' },
-    { id: 'icp-aktionsplan', label: 'ICP-Aktionsplan' },
-    { id: 'besatz-kompatibilitaet', label: 'Besatz-Kompatibilität' },
     { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent' },
     { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen' }
 ];
@@ -2670,6 +2662,94 @@ function createDemoIcpReports() {
     ];
 }
 
+function createDemoTraceCalculatorState() {
+    const config = {
+        tankLiters: 440,
+        interval: 'monthly',
+        stocking: 'normal',
+        days: 40,
+        dailyDoseMl: 5,
+        bottleMaxMl: 450,
+        expertMode: false,
+        elementChangeLimits: {},
+        expertPresets: [],
+        selectedExpertPresetId: '',
+        dynamicLimitMinPercent: '',
+        dynamicLimitMaxPercent: ''
+    };
+    const baseAmounts = {
+        'Cobalt (Co)': 30,
+        'Nickel (Ni)': 15,
+        'Eisen (Fe)': 4,
+        'Mangan (Mn)': 0.5,
+        'Kupfer (Cu)': 1,
+        'Chrom (Cr)': 0.4,
+        'Zink (Zn)': 2,
+        'Fluor (F)': 90,
+        'Iod (I)': 1.2,
+        'Vanadium (V)': 0.8,
+        'Selen (Se)': 1.5
+    };
+    const latestAmounts = {
+        'Cobalt (Co)': 33,
+        'Nickel (Ni)': 18,
+        'Eisen (Fe)': 5,
+        'Mangan (Mn)': 0.7,
+        'Kupfer (Cu)': 1.2,
+        'Chrom (Cr)': 0.5,
+        'Zink (Zn)': 2.6,
+        'Fluor (F)': 86,
+        'Iod (I)': 1.6,
+        'Vanadium (V)': 1.1,
+        'Selen (Se)': 1.9
+    };
+    const makeEntry = (id, daysAgo, amounts, extra = {}) => normalizeTraceCalculatorHistoryEntry({
+        id,
+        source: extra.source || 'traceCalculator',
+        createdAt: new Date(demoDate(daysAgo, 8, 10)).getTime(),
+        mixtureDate: demoDate(daysAgo, 8, 0).slice(0, 10),
+        config,
+        icp: extra.icp || {},
+        amounts,
+        grams: Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)])),
+        totals: getTraceTotalsFromAmounts(amounts, config),
+        includeInCalculation: extra.includeInCalculation ?? true,
+        isInitial: Boolean(extra.isInitial)
+    });
+    return {
+        config,
+        currentMixtureDate: getTodayDateInputValue(),
+        icp: {},
+        reusePlan: {
+            kationenRemainingMl: '',
+            anionenRemainingMl: '',
+            kationenRemainingDays: '12',
+            anionenRemainingDays: '12',
+            mode: 'optimize-solution'
+        },
+        latestRecipe: null,
+        history: [
+            makeEntry('demo-trace-calc-001', 70, baseAmounts, { includeInCalculation: false, isInitial: true }),
+            makeEntry('demo-trace-calc-002', 28, latestAmounts, {
+                includeInCalculation: true,
+                icp: {
+                    'Cobalt (Co)': 0.8,
+                    'Nickel (Ni)': 3.6,
+                    'Eisen (Fe)': 0.7,
+                    'Mangan (Mn)': 0.25,
+                    'Kupfer (Cu)': 3.2,
+                    'Chrom (Cr)': 0.8,
+                    'Zink (Zn)': 3.5,
+                    'Fluor (F)': 1.1,
+                    'Iod (I)': 58,
+                    'Vanadium (V)': 3.6,
+                    'Selen (Se)': 3.1
+                }
+            })
+        ]
+    };
+}
+
 function createDemoAquariumData() {
     return createAquariumData({
         logBookCategories: ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges'],
@@ -2757,6 +2837,7 @@ function createDemoAquariumData() {
         },
         majorCorrectionSettings: { tankLiters: 440, strengths: { KH: 0.05, Ca: 1 } },
         psuCorrectionOffset: -0.2,
+        traceCalculator: createDemoTraceCalculatorState(),
         toolSettings: { lastSection: 'wasserwerte-und-dosierung', favorites: ['salzgehalt-rechner', 'nutrition-rechner'], hidden: [] },
         coralCatalog: [
             { id: 'demo-coral-001', scientificName: 'Acropora tenuis', genus: 'Acropora', speciesName: 'tenuis', tradeName: 'Blue Tenuis', coralType: 'SPS', growthForm: 'verzweigt', color: 'blau-grün, helle Polypen', purchasePrice: 79.9, status: 'bestand', createdAt: demoDate(80, 14, 0), updatedAt: demoDate(8, 14, 0) },
@@ -13343,10 +13424,10 @@ function renderTraceReuseGroupPlan(plan) {
                 <span><strong>${label}</strong><small>${escapeHtml(plan.mode)} · Quelle ${formatTraceMixtureDate(plan.source)}</small></span>
             </div>
             <div class="trace-reuse-summary">
-                <span><small>Restlösung</small><strong>${traceCalcFormatMl(plan.remainingMl)}</strong></span>
-                <span><small>Endvolumen</small><strong>${traceCalcFormatMl(plan.finalVolumeMl)}</strong></span>
-                <span><small>Elemente dazu</small><strong>${traceCalcFormatMlG(plan.additionsMl, plan.additionsG)}</strong></span>
-                <span><small>Osmose dazu</small><strong>${traceCalcFormatMlG(plan.osmoseMl, plan.osmoseG)}</strong></span>
+                <span><small>Alte Restlösung</small><strong>${traceCalcFormatMl(plan.remainingMl)}</strong></span>
+                <span><small>Fertiges Endvolumen</small><strong>${traceCalcFormatMl(plan.finalVolumeMl)}</strong></span>
+                <span><small>Elemente hinzufügen</small><strong>${traceCalcFormatMlG(plan.additionsMl, plan.additionsG)}</strong></span>
+                <span><small>Osmose hinzufügen</small><strong>${traceCalcFormatMlG(plan.osmoseMl, plan.osmoseG)}</strong></span>
             </div>
             <div class="trace-reuse-dose-strip">
                 <span><small>Alte Tagesdosis</small><strong>${traceCalcFormatMl(plan.oldDailyDoseMl)}</strong></span>
@@ -13354,19 +13435,26 @@ function renderTraceReuseGroupPlan(plan) {
             </div>
             ${warningHtml}
             <div class="trace-reuse-additions">
+                <div class="trace-reuse-equation-note">
+                    <strong>So liest du die Tabelle</strong>
+                    <span>Alt vorhanden + Hinzufügen = Soll im fertigen Ansatz. Die Spalte „Danach“ zeigt die geplante Gesamtmenge nach dem Ergänzen.</span>
+                </div>
                 <div class="trace-reuse-balance-head">
                     <span>Element</span>
-                    <span>Rest</span>
-                    <span>Ziel</span>
-                    <span>Dazu</span>
+                    <span>Name</span>
+                    <span>Alt vorhanden</span>
+                    <span>Soll im Ansatz</span>
+                    <span>Hinzufügen</span>
+                    <span>Danach</span>
                 </div>
                 ${balanceRows.length ? balanceRows.map(row => `
                     <span>
                         <strong>${escapeHtml(row.symbol)}</strong>
                         <small>${escapeHtml(row.item.replace(` (${row.symbol})`, ''))}</small>
-                        <em><small>Rest</small>${traceCalcFormatMlG(row.existingAmount, row.existingGrams)}</em>
-                        <em><small>Ziel</small>${traceCalcFormatMl(row.targetAmountAtVolume)}</em>
-                        <em class="${row.additionMl > 0.000001 ? 'trace-reuse-addition-needed' : 'trace-reuse-addition-none'}"><small>Dazu</small>${traceCalcFormatMlG(row.additionMl, row.additionG)}</em>
+                        <em><small>Alt vorhanden</small>${traceCalcFormatMlG(row.existingAmount, row.existingGrams)}</em>
+                        <em><small>Soll im Ansatz</small>${traceCalcFormatMl(row.targetAmountAtVolume)}</em>
+                        <em class="${row.additionMl > 0.000001 ? 'trace-reuse-addition-needed' : 'trace-reuse-addition-none'}"><small>Hinzufügen</small>${traceCalcFormatMlG(row.additionMl, row.additionG)}</em>
+                        <em><small>Danach</small>${traceCalcFormatMlG(row.targetAmountAtVolume, traceCalcElementGrams(row.item, row.targetAmountAtVolume))}</em>
                     </span>
                 `).join('') : '<p class="hint">Keine Elementdaten vorhanden.</p>'}
             </div>
@@ -15283,8 +15371,7 @@ function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
         '#tools details[data-section-id="dosieren-und-messwerte"], ' +
         '#tools details[data-section-id="salinitaet-und-wasserwechsel"], ' +
-        '#tools details[data-section-id="c-und-r-und-mischen"], ' +
-        '#tools details[data-section-id="kosten-planung-und-sicherheit"]'
+        '#tools details[data-section-id="c-und-r-und-mischen"]'
     );
     scopedSections.forEach(section => {
         section.classList.add('calculator-section');
@@ -15299,8 +15386,7 @@ function setupPriority4CalculatorUI() {
     [
         'majorCorrectionResult', 'consumptionResult', 'testCorrectionResult', 'nutritionResult',
         'salinityResult', 'simpleSalinityResult', 'specificGravityResult', 'saltCorrectionResult',
-        'waterChangeResult', 'adsorberFlowResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult',
-        'powerCostResult', 'supplyCostResult', 'icpActionPlanResult', 'livestockCompatibilityResult'
+        'waterChangeResult', 'adsorberFlowResult', 'seaWaterMixResult', 'naclSolutionResult', 'macroRecipeResult'
         , 'traceCalculatorResult', 'traceCalculatorHistory'
     ].forEach(id => {
         const result = document.getElementById(id);
@@ -15381,14 +15467,6 @@ function initToolSection(sectionId, force = false) {
             renderSavedCustomCrPlans();
         });
         runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
-        return;
-    }
-
-    if (sectionId === 'kosten-planung-und-sicherheit') {
-        runToolInit('Stromkosten', renderPowerCostCalculator);
-        runToolInit('Versorgungskosten', renderSupplyCostCalculator);
-        runToolInit('ICP-Aktionsplan', renderIcpActionPlan);
-        runToolInit('Besatz-Kompatibilität', renderLivestockCompatibility);
         return;
     }
 
@@ -15543,10 +15621,6 @@ function getToolTileVisual(toolId, title = '') {
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
         'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
         'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
-        'stromkosten-rechner': { icon: 'kW', subtitle: 'Technik-Kosten planen' },
-        'futter-und-versorgungskosten': { icon: '€', subtitle: 'Monatskosten sehen' },
-        'icp-aktionsplan': { icon: 'ICP', subtitle: 'ToDos aus ICP' },
-        'besatz-kompatibilitaet': { icon: 'OK', subtitle: 'Besatz pruefen' },
         'sangokai-a-z-assistent': { icon: 'AZ', subtitle: 'PDF Wissen suchen' },
         'hilfreiche-quellen': { icon: 'Q', subtitle: 'Links und Wissen' }
     };
@@ -15628,26 +15702,6 @@ const toolInfoTexts = {
         summary: 'Skaliert Rezepte für Makro-Elemente wie KH-Tag, KH-Nacht, Calcium und Magnesium.',
         details: 'Du wählst Rezept und Zielmenge. Lagergeführte C&R Bestandteile können anschließend direkt ausgelagert werden.',
         note: 'Beim Anmischen sauber arbeiten und Kanister eindeutig markieren.'
-    },
-    'stromkosten-rechner': {
-        summary: 'Berechnet Stromverbrauch und Kosten pro Monat oder Jahr.',
-        details: 'Du trägst Leistung in Watt, tägliche Laufzeit und deinen Strompreis ein. Geeignet für Lampen, Pumpen, Heizer, Abschäumer und UV-Anlagen.',
-        note: 'Bei regelbaren Geräten ist die echte Durchschnittsleistung oft niedriger als die Maximalleistung.'
-    },
-    'futter-und-versorgungskosten': {
-        summary: 'Rechnet Verbrauch, Gebindegröße und Preis auf Monatskosten hoch.',
-        details: 'Praktisch für Futter, Spurenelemente, Adsorber, Salz, Bakterienpräparate und andere Verbrauchsprodukte.',
-        note: 'Für sehr unregelmäßige Nutzung lieber einen realistischen Durchschnittswert eintragen.'
-    },
-    'icp-aktionsplan': {
-        summary: 'Erstellt aus der neuesten ICP eine Liste auffälliger Werte und kann ToDos erzeugen.',
-        details: 'Das Tool nutzt gespeicherte ICP-Werte, vergleicht Messwert, Minimum, Maximum und Optimalwert und erzeugt auf Wunsch Aufgaben im Logbuch.',
-        note: 'Die vorgeschlagenen ToDos sind Prüfpunkte. Maßnahmen bitte immer fachlich bewerten.'
-    },
-    'besatz-kompatibilitaet': {
-        summary: 'Gibt eine erste Verträglichkeits-Einschätzung für Fisch-, Wirbellosen-, Anemonen- und Korallengruppen.',
-        details: 'Du wählst zwei Besatzgruppen und das Beckenvolumen. Das Tool weist auf typische Risiken wie Revierstress, Räuber-Beute-Verhalten oder wandernde Anemonen hin.',
-        note: 'Die konkrete Art entscheidet. Vor dem Kauf immer artspezifisch nachschlagen.'
     }
 };
 
@@ -21315,177 +21369,6 @@ function renderEmergencyChecklist() {
                     </label>
                 `).join('')}
             </div>
-        </div>
-    `;
-}
-
-function renderPowerCostCalculator() {
-    const result = document.getElementById('powerCostResult');
-    if (!result) return;
-    const watts = Math.max(0, parseFloat(document.getElementById('powerWatts')?.value) || 0);
-    const hours = Math.min(24, Math.max(0, parseFloat(document.getElementById('powerHours')?.value) || 0));
-    const price = Math.max(0, parseFloat(document.getElementById('powerPrice')?.value) || 0);
-    const kwhDay = (watts * hours) / 1000;
-    const month = kwhDay * 30.4375 * price;
-    const year = kwhDay * 365 * price;
-    result.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row"><span>Verbrauch pro Tag</span><strong>${kwhDay.toFixed(2)} kWh</strong></div>
-            <div class="tool-row"><span>Kosten pro Monat</span><strong>${formatEuro(month)}</strong></div>
-            <div class="tool-row"><span>Kosten pro Jahr</span><strong>${formatEuro(year)}</strong></div>
-        </div>
-    `;
-}
-
-function renderSupplyCostCalculator() {
-    const result = document.getElementById('supplyCostResult');
-    if (!result) return;
-    const daily = Math.max(0, parseFloat(document.getElementById('supplyDailyAmount')?.value) || 0);
-    const packageAmount = Math.max(0.0001, parseFloat(document.getElementById('supplyPackageAmount')?.value) || 0.0001);
-    const unit = document.getElementById('supplyUnit')?.value || 'ml';
-    const price = Math.max(0, parseFloat(document.getElementById('supplyPackagePrice')?.value) || 0);
-    const pricePerUnit = price / packageAmount;
-    const monthAmount = daily * 30.4375;
-    const monthCost = monthAmount * pricePerUnit;
-    const lastsDays = daily > 0 ? packageAmount / daily : Infinity;
-    result.innerHTML = `
-        <div class="tool-result">
-            <div class="tool-row"><span>Preis pro ${escapeHtml(unit)}</span><strong>${formatEuro(pricePerUnit)}</strong></div>
-            <div class="tool-row"><span>Monatsverbrauch</span><strong>${monthAmount.toFixed(1)} ${escapeHtml(unit)}</strong></div>
-            <div class="tool-row"><span>Monatskosten</span><strong>${formatEuro(monthCost)}</strong></div>
-            <div class="tool-row"><span>Gebinde reicht ca.</span><strong>${Number.isFinite(lastsDays) ? `${Math.floor(lastsDays)} Tage` : 'unbegrenzt'}</strong></div>
-        </div>
-    `;
-}
-
-function getLatestIcpReport() {
-    return getIcpReportsSorted(true)[0] || null;
-}
-
-function getIcpActionPlanRows(mode = 'out') {
-    const latest = getLatestIcpReport();
-    if (!latest) return [];
-    return sortIcpValues(latest.values || [])
-        .map(value => {
-            if (!Number.isFinite(value.value)) return null;
-            const status = getIcpValueStatus(value);
-            const optimalDiff = Number.isFinite(value.optimal) ? value.value - value.optimal : null;
-            const outside = status.key === 'low' || status.key === 'high';
-            if (mode === 'out' && !outside) return null;
-            if (mode === 'all' && optimalDiff === null) return null;
-            return {
-                key: value.key,
-                label: value.name || value.symbol || value.key,
-                value,
-                status,
-                optimalDiff,
-                title: outside
-                    ? `${value.name || value.key} ${status.key === 'low' ? 'zu niedrig' : 'zu hoch'}`
-                    : `${value.name || value.key} vom Optimalwert abweichend`
-            };
-        })
-        .filter(Boolean);
-}
-
-function addIcpActionPlanTodo(key) {
-    const mode = document.getElementById('icpActionPlanMode')?.value || 'out';
-    const row = getIcpActionPlanRows(mode).find(item => item.key === key);
-    if (!row) return;
-    const report = getLatestIcpReport();
-    if (!db.logBookCategories.includes('ICP')) db.logBookCategories.push('ICP');
-    db.aquariumTodos.unshift({
-        id: createWarehouseId(),
-        title: `ICP prüfen: ${row.title}`,
-        category: 'ICP',
-        dueAt: new Date().toISOString(),
-        intervalDays: 0,
-        notifyEnabled: true,
-        done: false,
-        remindedAt: null,
-        lastDoneAt: null,
-        createdAt: new Date().toISOString(),
-        source: { type: 'icp-action-plan', reportId: report?.id || '', valueKey: key }
-    });
-    saveDB();
-    renderIcpActionPlan();
-    showToast('ToDo aus ICP erstellt', 'success', 1800);
-}
-
-function addAllIcpActionPlanTodos() {
-    const rows = getIcpActionPlanRows(document.getElementById('icpActionPlanMode')?.value || 'out');
-    rows.forEach(row => addIcpActionPlanTodo(row.key));
-}
-
-function renderIcpActionPlan() {
-    const result = document.getElementById('icpActionPlanResult');
-    if (!result) return;
-    const latest = getLatestIcpReport();
-    if (!latest) {
-        result.innerHTML = '<div class="tool-result"><strong>Noch keine ICP gespeichert</strong><p class="hint">Importiere zuerst eine ICP im ICP-Bereich. Danach kann dieses Tool auffällige Werte auflisten.</p></div>';
-        return;
-    }
-    const mode = document.getElementById('icpActionPlanMode')?.value || 'out';
-    const rows = getIcpActionPlanRows(mode);
-    result.innerHTML = `
-        <div class="tool-result icp-action-plan-result">
-            <div class="tool-row"><span>Basis</span><strong>${escapeHtml(latest.name || 'ICP')} · ${formatWarehouseDate(latest.date || latest.createdAt)}</strong></div>
-            ${rows.length ? `
-                <div class="icp-action-list">
-                    ${rows.slice(0, 18).map(row => `
-                        <div class="overview-row">
-                            <div>
-                                <strong>${escapeHtml(row.title)}</strong>
-                                <small>Messwert: ${escapeHtml(formatIcpNumber(row.value.value, row.value.unit))} · Optimal: ${Number.isFinite(row.value.optimal) ? escapeHtml(formatIcpNumber(row.value.optimal, row.value.unit)) : '-'}</small>
-                            </div>
-                            <button type="button" onclick="addIcpActionPlanTodo('${escapeHtml(row.key)}')">ToDo erstellen</button>
-                        </div>
-                    `).join('')}
-                </div>
-                <button type="button" class="btn-secondary btn-animated" onclick="addAllIcpActionPlanTodos()">Alle als ToDos übernehmen</button>
-            ` : '<p class="hint">Keine auffälligen numerischen Werte für den gewählten Umfang gefunden.</p>'}
-        </div>
-    `;
-}
-
-const LIVESTOCK_COMPATIBILITY_RULES = {
-    'predatory-fish|shrimp': ['risk', 'Räuberische Fische können Garnelen oder kleine Krebse als Futter ansehen. Nur sehr vorsichtig und artspezifisch prüfen.'],
-    'predatory-fish|snail': ['caution', 'Schnecken und Einsiedler sind je nach Räuberart gefährdet. Größe und Art genau prüfen.'],
-    'predatory-fish|peaceful-fish': ['caution', 'Friedliche oder kleine Fische können unter Stress geraten oder gefressen werden.'],
-    'territorial-fish|peaceful-fish': ['caution', 'Territoriale Fische können friedliche Tiere bedrängen. Struktur, Reviergröße und Reihenfolge beim Einsetzen beachten.'],
-    'territorial-fish|territorial-fish': ['risk', 'Zwei territoriale Tiere können Revierkämpfe auslösen. Nur mit viel Platz und Verstecken.'],
-    'anemone|coral': ['caution', 'Anemonen können wandern und Korallen vernesseln. Abstand einplanen und empfindliche Korallen schützen.'],
-    'anemone|shrimp': ['ok', 'Viele Garnelen können mit Anemonen funktionieren, artspezifische Symbiosen und Fressrisiken trotzdem prüfen.'],
-    'coral|snail': ['ok', 'Schnecken und Einsiedler sind meist gute Putztrupp-Ergänzungen. Umwerf-Risiko bei lockeren Ablegern beachten.'],
-    'coral|shrimp': ['ok', 'Meist gut kombinierbar. Einige Garnelen können LPS/Futter stehlen oder empfindliche Korallen stören.']
-};
-
-function getLivestockCompatibilityRule(a, b) {
-    const direct = LIVESTOCK_COMPATIBILITY_RULES[`${a}|${b}`] || LIVESTOCK_COMPATIBILITY_RULES[`${b}|${a}`];
-    if (direct) return direct;
-    if (a === b) return ['ok', 'Gleiche Gruppen können funktionieren, entscheidend sind Art, Revierverhalten, Größe und Beckenstruktur.'];
-    return ['ok', 'Keine harte Warnung in der Basisregel. Bitte trotzdem konkrete Art, Endgröße, Futteransprüche und Verhalten prüfen.'];
-}
-
-function renderLivestockCompatibility() {
-    const result = document.getElementById('livestockCompatibilityResult');
-    if (!result) return;
-    const a = document.getElementById('stockTypeA')?.value || 'peaceful-fish';
-    const b = document.getElementById('stockTypeB')?.value || 'coral';
-    const liters = Math.max(0, parseFloat(document.getElementById('stockTankLiters')?.value) || 0);
-    const [level, message] = getLivestockCompatibilityRule(a, b);
-    const smallTankWarning = liters && liters < 200 && (a.includes('fish') || b.includes('fish'))
-        ? '<li>Bei kleinen Becken steigt das Risiko für Revierstress deutlich. Endgröße und Schwimmraum prüfen.</li>'
-        : '';
-    const levelLabel = level === 'risk' ? 'Risiko' : level === 'caution' ? 'Vorsicht' : 'meist möglich';
-    result.innerHTML = `
-        <div class="tool-result livestock-compatibility-result is-${level}">
-            <div class="tool-row"><span>Einschätzung</span><strong>${levelLabel}</strong></div>
-            <p>${escapeHtml(message)}</p>
-            <ul>
-                ${smallTankWarning}
-                <li>Immer die konkrete Art nachschlagen, besonders Endgröße, Aggression, Futter und Revierverhalten.</li>
-                <li>Neue Tiere langsam eingewöhnen und Verhalten in den ersten Tagen eng beobachten.</li>
-            </ul>
         </div>
     `;
 }

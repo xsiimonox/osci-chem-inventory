@@ -10442,9 +10442,29 @@ body.theme-badman.party-mode .card {
     gap: 6px;
 }
 
+.trace-reuse-equation-note {
+    display: grid;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.trace-reuse-equation-note strong {
+    color: var(--text-primary);
+    font-size: 0.72rem;
+}
+
+.trace-reuse-equation-note span {
+    color: var(--text-secondary);
+    font-size: 0.66rem;
+    line-height: 1.35;
+}
+
 .trace-reuse-balance-head {
     display: grid;
-    grid-template-columns: 34px minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 34px minmax(0, 0.78fr) repeat(4, minmax(0, 1fr));
     gap: 8px;
     padding: 0 9px 2px;
     color: var(--text-secondary);
@@ -10456,7 +10476,7 @@ body.theme-badman.party-mode .card {
 
 .trace-reuse-additions > span {
     display: grid;
-    grid-template-columns: 34px minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 34px minmax(0, 0.78fr) repeat(4, minmax(0, 1fr));
     gap: 8px;
     align-items: stretch;
     min-width: 0;
@@ -10473,7 +10493,7 @@ body.theme-badman.party-mode .card {
 .trace-reuse-additions small {
     overflow: hidden;
     color: var(--text-secondary);
-    font-size: 0.66rem;
+    font-size: 0.62rem;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -11476,13 +11496,15 @@ body.theme-badman.party-mode .card {
     }
 
     .trace-reuse-additions > span > em {
+        grid-column: span 1;
         padding: 7px 8px;
         border: 1px solid var(--workflow-border);
         border-radius: 8px;
         background: color-mix(in srgb, var(--surface-card) 66%, transparent);
     }
 
-    .trace-reuse-additions > span > em:nth-of-type(1) {
+    .trace-reuse-additions > span > em:nth-of-type(1),
+    .trace-reuse-additions > span > em:nth-of-type(4) {
         grid-column: 1 / -1;
     }
 
