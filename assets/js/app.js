@@ -1164,6 +1164,14 @@ const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
 const HIDDEN_MENU_TABS_KEY = 'osci_hidden_menu_tabs_v1';
 const OVERVIEW_ENABLED_KEY = 'reeftools_overview_enabled_v1';
 const OSCI_FEATURES_ENABLED_KEY = 'reeftools_osci_features_enabled_v1';
+const HIDDEN_LOGBOOK_FEATURES_KEY = 'reeftools_hidden_logbook_features_v1';
+const TOOL_SECTION_DEFINITIONS = [
+    { id: 'dosieren-und-messwerte', label: 'Dosierung, Verbrauch & Messen', hint: 'KH/Ca, Testabgleich, Nährstoffe und tägliche Dosierung' },
+    { id: 'salinitaet-und-wasserwechsel', label: 'Salinität & Wasserwechsel', hint: 'Salzgehalt, Nettovolumen, Wasserwechsel und Adsorber' },
+    { id: 'c-und-r-und-mischen', label: 'Mischen & Rezepte', hint: 'Meerwasser, C&R-Lösungen, Natriumchlorid und Makro-Elemente', osciOnly: true },
+    { id: 'sangokai-a-z', label: 'Sangokai A-Z', hint: 'Assistent und Originalquelle zum Nachschlagen' },
+    { id: 'community-und-hilfe', label: 'Hilfe & Quellen', hint: 'Anleitung, OSCI Motion Links, Meerwasser-Lexikon und Buchtipps' }
+];
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
     lager: 'Lager',
@@ -1215,23 +1223,23 @@ const TOOL_SEARCH_KEYWORDS = {
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
 const TOOL_DEFINITIONS = [
-    { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur' },
-    { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag' },
-    { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung' },
-    { id: 'test-korrekturfaktor', label: 'Test Korrekturfaktor' },
-    { id: 'hanna-phosphor-zu-phosphat', label: 'Hanna Phosphor zu Phosphat' },
-    { id: 'salifert-umrechner', label: 'Salifert Umrechner' },
-    { id: 'nutrition-rechner', label: 'Nutrition Rechner', osciOnly: true },
-    { id: 'salzgehalt-rechner', label: 'Salzgehalt Rechner' },
-    { id: 'salz-korrektur', label: 'Salzgehalt Korrigieren' },
-    { id: 'nettovolumen-berechnen', label: 'Nettovolumen Berechnen' },
-    { id: 'wasserwechsel-effekt', label: 'Wasserwechsel Effekt' },
-    { id: 'adsorber-durchfluss', label: 'Adsorber Durchfluss' },
-    { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', osciOnly: true },
-    { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', osciOnly: true },
-    { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', osciOnly: true },
-    { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent' },
-    { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen' }
+    { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur', sectionId: 'dosieren-und-messwerte' },
+    { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag', sectionId: 'dosieren-und-messwerte' },
+    { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung', sectionId: 'dosieren-und-messwerte' },
+    { id: 'test-korrekturfaktor', label: 'Test Korrekturfaktor', sectionId: 'dosieren-und-messwerte' },
+    { id: 'hanna-phosphor-zu-phosphat', label: 'Hanna Phosphor zu Phosphat', sectionId: 'dosieren-und-messwerte' },
+    { id: 'salifert-umrechner', label: 'Salifert Umrechner', sectionId: 'dosieren-und-messwerte' },
+    { id: 'nutrition-rechner', label: 'Nutrition Rechner', sectionId: 'dosieren-und-messwerte', osciOnly: true },
+    { id: 'salzgehalt-rechner', label: 'Salzgehalt Rechner', sectionId: 'salinitaet-und-wasserwechsel' },
+    { id: 'salz-korrektur', label: 'Salzgehalt Korrigieren', sectionId: 'salinitaet-und-wasserwechsel' },
+    { id: 'nettovolumen-berechnen', label: 'Nettovolumen Berechnen', sectionId: 'salinitaet-und-wasserwechsel' },
+    { id: 'wasserwechsel-effekt', label: 'Wasserwechsel Effekt', sectionId: 'salinitaet-und-wasserwechsel' },
+    { id: 'adsorber-durchfluss', label: 'Adsorber Durchfluss', sectionId: 'salinitaet-und-wasserwechsel' },
+    { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
+    { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', sectionId: 'c-und-r-und-mischen', osciOnly: true },
+    { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
+    { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent', sectionId: 'sangokai-a-z' },
+    { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen', sectionId: 'community-und-hilfe' }
 ];
 const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
 const OSCI_ONLY_TOOL_IDS = new Set(TOOL_DEFINITIONS.filter(tool => tool.osciOnly).map(tool => tool.id));
@@ -4115,10 +4123,45 @@ function isOsciFeaturesEnabled() {
     }
 }
 
+function getHiddenLogbookFeatures() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(HIDDEN_LOGBOOK_FEATURES_KEY) || '[]');
+        return Array.isArray(parsed)
+            ? [...new Set(parsed.filter(id => ['dosingContainers', 'osmoseTank'].includes(id)))]
+            : [];
+    } catch (err) {
+        return [];
+    }
+}
+
+function isLogbookFeatureVisible(featureId) {
+    return !getHiddenLogbookFeatures().includes(featureId);
+}
+
+function setLogbookFeatureVisible(featureId, visible) {
+    if (!['dosingContainers', 'osmoseTank'].includes(featureId)) return;
+    const hidden = getHiddenLogbookFeatures();
+    const next = visible
+        ? hidden.filter(id => id !== featureId)
+        : [...new Set([...hidden, featureId])];
+    localStorage.setItem(HIDDEN_LOGBOOK_FEATURES_KEY, JSON.stringify(next));
+    refreshFeatureVisibility();
+    const label = featureId === 'osmoseTank' ? 'Osmosetank' : 'Vorratsbehälter';
+    showToast(`${label} ${visible ? 'eingeblendet' : 'ausgeblendet'}. Daten bleiben erhalten.`, 'info');
+}
+
+function applyLogbookFeatureVisibility() {
+    const dosingCard = document.querySelector('.logbook-dosing-card');
+    const osmoseCard = document.querySelector('.logbook-osmose-card');
+    if (dosingCard) dosingCard.hidden = !isLogbookFeatureVisible('dosingContainers');
+    if (osmoseCard) osmoseCard.hidden = !isLogbookFeatureVisible('osmoseTank');
+}
+
 function refreshFeatureVisibility() {
     document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
     applyMenuOrder();
     applyToolVisibility();
+    applyLogbookFeatureVisibility();
     renderFeatureVisibilitySettings();
     renderToolVisibilitySettings();
     renderMenuOrderSettings();
@@ -4370,6 +4413,20 @@ function renderFeatureVisibilitySettings() {
                     <small>Blendet C&amp;R, Trace, Nutrition, OSCI-Rechner und OSCI-Produktkategorien im Lager gemeinsam ein oder aus. Bestehende Bestände bleiben gespeichert.</small>
                 </span>
             </label>
+            <label class="settings-toggle-row">
+                <input type="checkbox" id="dosingContainersVisibleToggle" ${isLogbookFeatureVisible('dosingContainers') ? 'checked' : ''} onchange="setLogbookFeatureVisible('dosingContainers', this.checked)">
+                <span>
+                    <span class="settings-toggle-title">Vorratsbehälter anzeigen</span>
+                    <small>Blendet den Dosierbehälter-Bereich im Logbuch und auf der Übersicht ein oder aus. Gespeicherte Behälter bleiben erhalten.</small>
+                </span>
+            </label>
+            <label class="settings-toggle-row">
+                <input type="checkbox" id="osmoseTankVisibleToggle" ${isLogbookFeatureVisible('osmoseTank') ? 'checked' : ''} onchange="setLogbookFeatureVisible('osmoseTank', this.checked)">
+                <span>
+                    <span class="settings-toggle-title">Osmosetank anzeigen</span>
+                    <small>Blendet Osmosetank-Verwaltung und Füllstandsanzeigen aus, wenn du sie aktuell nicht brauchst. Daten bleiben gespeichert.</small>
+                </span>
+            </label>
         </div>
     `;
 }
@@ -4378,19 +4435,36 @@ function renderToolVisibilitySettings() {
     const container = document.getElementById('tool-visibility-settings');
     if (!container) return;
     const hiddenTools = new Set(getHiddenToolIds());
+    const hiddenSections = new Set(getHiddenToolSectionIds());
     container.innerHTML = `
         <div class="tool-visibility-settings">
             <div class="tool-visibility-head">
+                <strong>Tool-Kategorien</strong>
+                <small>Blende ganze Bereiche aus, wenn du sie aktuell nicht brauchst. Daten und gespeicherte Werte bleiben erhalten.</small>
+            </div>
+            <div class="tool-visibility-grid tool-section-visibility-grid">
+                ${TOOL_SECTION_DEFINITIONS.map(section => {
+                    const osciDisabled = section.osciOnly && !isOsciFeaturesEnabled();
+                    return `
+                        <label class="tool-visibility-row ${osciDisabled ? 'is-disabled' : ''}">
+                            <span><strong>${escapeHtml(section.label)}</strong><small>${escapeHtml(section.hint)}</small></span>
+                            <input type="checkbox" ${hiddenSections.has(section.id) || osciDisabled ? '' : 'checked'} ${osciDisabled ? 'disabled' : ''} onchange="toggleToolSectionVisibility('${section.id}', this.checked)">
+                        </label>
+                    `;
+                }).join('')}
+            </div>
+            <div class="tool-visibility-head">
                 <strong>Einzelne Tools</strong>
-                <small>Deaktivierte Tools verschwinden aus Kategorien, Suche und Favoriten. Die Berechnungen und gespeicherten Daten bleiben erhalten.</small>
+                <small>Optional feinjustieren: einzelne Rechner ausblenden, ohne direkt die ganze Kategorie zu deaktivieren.</small>
             </div>
             <div class="tool-visibility-grid">
                 ${TOOL_DEFINITIONS.map(tool => {
+                    const sectionHidden = isToolSectionHidden(tool.sectionId);
                     const osciDisabled = tool.osciOnly && !isOsciFeaturesEnabled();
                     return `
-                        <label class="tool-visibility-row ${osciDisabled ? 'is-disabled' : ''}">
-                            <span><strong>${escapeHtml(tool.label)}</strong>${tool.osciOnly ? '<small>OSCI Motion</small>' : ''}</span>
-                            <input type="checkbox" ${hiddenTools.has(tool.id) || osciDisabled ? '' : 'checked'} ${osciDisabled ? 'disabled' : ''} onchange="toggleToolVisibility('${tool.id}', this.checked)">
+                        <label class="tool-visibility-row ${osciDisabled || sectionHidden ? 'is-disabled' : ''}">
+                            <span><strong>${escapeHtml(tool.label)}</strong><small>${escapeHtml(getToolSectionLabel(tool.sectionId))}${tool.osciOnly ? ' · OSCI Motion' : ''}${sectionHidden ? ' · Kategorie ausgeblendet' : ''}</small></span>
+                            <input type="checkbox" ${hiddenTools.has(tool.id) || osciDisabled || sectionHidden ? '' : 'checked'} ${osciDisabled || sectionHidden ? 'disabled' : ''} onchange="toggleToolVisibility('${tool.id}', this.checked)">
                         </label>
                     `;
                 }).join('')}
@@ -6539,6 +6613,8 @@ function renderCurrentWarehouseViews() {
     safeRender('Logbuch', renderLogBook);
     safeRender('Korallen', renderCoralCatalog);
     safeRender('Vorratsbehälter', renderDosingContainers);
+    safeRender('Osmosetank', renderOsmoseTank);
+    safeRender('Logbuch-Sichtbarkeit', applyLogbookFeatureVisibility);
     safeRender('Wareneingang', initBulkProductSelect);
     safeRender('Benachrichtigungen', updateNotificationStatus);
     safeRender('Tab-Rechte', updateTabAccessState);
@@ -6815,6 +6891,8 @@ function renderDashboard() {
     const aquarium = getActiveAquarium();
     const settings = getDashboardRenderSettings();
     const isEditing = Boolean(dashboardEditDraft);
+    const showOsmoseFeature = isLogbookFeatureVisible('osmoseTank');
+    const showDosingFeature = isLogbookFeatureVisible('dosingContainers');
     container.classList.toggle('dashboard-edit-active', isEditing);
     const alerts = getStockAlerts();
     const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
@@ -6910,9 +6988,9 @@ function renderDashboard() {
             <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('corals')" ${isEditing ? 'disabled' : ''}>
                 <span>Korallen</span><strong>${coralCount}</strong><small>Bestand dokumentiert</small>
             </button>
-            <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('osmose')" ${isEditing ? 'disabled' : ''}>
+            ${showOsmoseFeature ? `<button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('osmose')" ${isEditing ? 'disabled' : ''}>
                 <span>Osmose</span><strong><b>${(parseFloat(osmose.currentLiters) || 0).toFixed(1)}</b> <i>L</i></strong><small>von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} L</small>
-            </button>
+            </button>` : ''}
             <button type="button" class="dashboard-tile dashboard-widget dashboard-widget--metric" onclick="openDashboardDestination('products')" ${isEditing ? 'disabled' : ''}>
                 <span>Produkte</span><strong>${activeProducts}</strong><small>sichtbar</small>
             </button>
@@ -6938,8 +7016,8 @@ function renderDashboard() {
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.stock ? 'checked' : ''} onchange="toggleDashboardWidget('stock', this.checked)"><span>Bestand</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.todos ? 'checked' : ''} onchange="toggleDashboardWidget('todos', this.checked)"><span>ToDos</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.tests ? 'checked' : ''} onchange="toggleDashboardWidget('tests', this.checked)"><span>Wassertests</span></label>
-                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.osmose ? 'checked' : ''} onchange="toggleDashboardWidget('osmose', this.checked)"><span>Osmose</span></label>
-                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.dosing ? 'checked' : ''} onchange="toggleDashboardWidget('dosing', this.checked)"><span>Vorratsbehälter</span></label>
+                        ${showOsmoseFeature ? `<label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.osmose ? 'checked' : ''} onchange="toggleDashboardWidget('osmose', this.checked)"><span>Osmose</span></label>` : ''}
+                        ${showDosingFeature ? `<label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.dosing ? 'checked' : ''} onchange="toggleDashboardWidget('dosing', this.checked)"><span>Vorratsbehälter</span></label>` : ''}
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.measurements ? 'checked' : ''} onchange="toggleDashboardWidget('measurements', this.checked)"><span>Diagramme</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.logs ? 'checked' : ''} onchange="toggleDashboardWidget('logs', this.checked)"><span>Letzte Aktionen</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.corals ? 'checked' : ''} onchange="toggleDashboardWidget('corals', this.checked)"><span>Korallen</span></label>
@@ -6996,14 +7074,14 @@ function renderDashboard() {
                 </div>
                 <div class="dashboard-widget-actions"><button type="button" class="btn btn-secondary" onclick="openDashboardDestination('protocol')">Protokoll</button><button type="button" class="btn btn-secondary" onclick="openDashboardDestination('logbook-entry')">Logbuch</button></div>
             </article>` : ''}
-            ${settings.widgets.osmose ? `
+            ${showOsmoseFeature && settings.widgets.osmose ? `
             <article class="dashboard-panel dashboard-widget dashboard-widget--status">
                 <div class="dashboard-widget-head"><h3>Osmosevorrat</h3></div>
                 <p class="hint">${(parseFloat(osmose.currentLiters) || 0).toFixed(1)} von ${(parseFloat(osmose.capacityLiters) || 0).toFixed(1)} Litern verfügbar.</p>
                 <progress class="dashboard-progress" max="100" value="${Math.max(0, Math.min(100, ((parseFloat(osmose.currentLiters) || 0) / Math.max(1, parseFloat(osmose.capacityLiters) || 1)) * 100))}" aria-label="Osmosefüllstand in Prozent"></progress>
                 <button type="button" class="btn btn-secondary dashboard-widget-open" onclick="openDashboardDestination('osmose')">Osmosetank öffnen</button>
             </article>` : ''}
-            ${settings.widgets.dosing ? `
+            ${showDosingFeature && settings.widgets.dosing ? `
             <article class="dashboard-panel dashboard-widget dashboard-widget--list">
                 <div class="dashboard-widget-head"><h3>Vorratsbehälter</h3>${dosingCritical.length ? `<span class="status-badge status-badge--warning">${dosingCritical.length} knapp</span>` : '<span class="status-badge status-badge--success">Stabil</span>'}</div>
                 ${dosingCritical.length ? dosingCritical.slice(0, 3).map(entry => `
@@ -8466,6 +8544,7 @@ function renderActiveTabContent(tabId) {
             setupSettingsAccordions();
             renderOpenSettingsCards();
         }
+        applyLogbookFeatureVisibility();
     } catch (err) {
         console.error(`Render failed for tab ${tabId}:`, err);
         renderTabErrorFallback(tabId, err);
@@ -15656,11 +15735,45 @@ function initTools() {
 }
 
 function getToolSettings() {
-    if (!db.toolSettings) db.toolSettings = { lastSection: '', favorites: [], hidden: [] };
+    if (!db.toolSettings) db.toolSettings = { lastSection: '', favorites: [], hidden: [], hiddenSections: [] };
     if (!Array.isArray(db.toolSettings.favorites)) db.toolSettings.favorites = [];
     if (!Array.isArray(db.toolSettings.hidden)) db.toolSettings.hidden = [];
+    if (!Array.isArray(db.toolSettings.hiddenSections)) db.toolSettings.hiddenSections = [];
     if (!db.toolSettings.lastSection) db.toolSettings.lastSection = '';
     return db.toolSettings;
+}
+
+function getToolSectionLabel(sectionId) {
+    return TOOL_SECTION_DEFINITIONS.find(section => section.id === sectionId)?.label || 'Tools';
+}
+
+function getHiddenToolSectionIds() {
+    const validIds = new Set(TOOL_SECTION_DEFINITIONS.map(section => section.id));
+    return getToolSettings().hiddenSections.filter(id => validIds.has(id));
+}
+
+function isToolSectionHidden(sectionId) {
+    const section = TOOL_SECTION_DEFINITIONS.find(entry => entry.id === sectionId);
+    return getHiddenToolSectionIds().includes(sectionId)
+        || Boolean(section?.osciOnly && !isOsciFeaturesEnabled());
+}
+
+function toggleToolSectionVisibility(sectionId, visible) {
+    if (!TOOL_SECTION_DEFINITIONS.some(section => section.id === sectionId)) return;
+    const settings = getToolSettings();
+    settings.hiddenSections = visible
+        ? settings.hiddenSections.filter(id => id !== sectionId)
+        : [...new Set([...settings.hiddenSections, sectionId])];
+    if (!visible) {
+        const sectionToolIds = TOOL_DEFINITIONS
+            .filter(tool => tool.sectionId === sectionId)
+            .map(tool => tool.id);
+        settings.favorites = settings.favorites.filter(id => !sectionToolIds.includes(id));
+    }
+    saveDB();
+    applyToolVisibility();
+    renderToolVisibilitySettings();
+    renderToolFavorites();
 }
 
 function getHiddenToolIds() {
@@ -15669,7 +15782,9 @@ function getHiddenToolIds() {
 }
 
 function isToolHidden(toolId) {
+    const tool = TOOL_DEFINITIONS.find(entry => entry.id === toolId);
     return getHiddenToolIds().includes(toolId)
+        || isToolSectionHidden(tool?.sectionId)
         || (!isOsciFeaturesEnabled() && OSCI_ONLY_TOOL_IDS.has(toolId));
 }
 
@@ -15692,9 +15807,10 @@ function applyToolVisibility() {
         card.classList.toggle('tool-user-hidden', isToolHidden(card.dataset.toolId));
     });
     document.querySelectorAll('#tools .tool-section').forEach(section => {
+        const sectionId = section.dataset.sectionId || '';
         const visibleCards = Array.from(section.querySelectorAll('.tool-card-grid > .card[data-tool-id]'))
             .filter(card => !card.classList.contains('tool-user-hidden'));
-        section.classList.toggle('tool-section-user-hidden', visibleCards.length === 0);
+        section.classList.toggle('tool-section-user-hidden', isToolSectionHidden(sectionId) || visibleCards.length === 0);
     });
     const searchInput = document.getElementById('toolSearchInput');
     if (searchInput) filterTools(searchInput.value || '');
@@ -21131,6 +21247,7 @@ function renderLogBook() {
     renderMeasurementTracker();
     renderDosingContainers();
     renderOsmoseTank();
+    applyLogbookFeatureVisibility();
 }
 
 function addLogBookCategory() {
