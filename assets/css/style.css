@@ -5226,6 +5226,123 @@ body.demo-profile-active :where(.card, .inventory-card, .dashboard-widget, .tool
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
+.n-ratio-inline-note,
+.n-ratio-tracker-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--surface-raised) 72%, transparent);
+}
+
+.n-ratio-inline-note {
+    display: grid;
+    gap: 4px;
+    padding: 12px;
+    margin-top: 12px;
+}
+
+.n-ratio-inline-note strong,
+.n-ratio-tracker-head strong {
+    color: var(--text-primary);
+}
+
+.n-ratio-inline-note span,
+.n-ratio-tracker-head small,
+.n-ratio-footnote {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.n-ratio-tracker-card {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    overflow: hidden;
+}
+
+.n-ratio-tracker-card.is-good {
+    border-color: color-mix(in srgb, var(--success) 42%, var(--border));
+}
+
+.n-ratio-tracker-card.is-watch {
+    border-color: color-mix(in srgb, var(--warning) 46%, var(--border));
+}
+
+.n-ratio-tracker-card.is-alert {
+    border-color: color-mix(in srgb, var(--danger) 46%, var(--border));
+}
+
+.n-ratio-tracker-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.n-ratio-tracker-head > div {
+    min-width: 0;
+}
+
+.n-ratio-kicker {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--secondary);
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.n-ratio-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.n-ratio-summary-grid > div {
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface-card) 76%, transparent);
+}
+
+.n-ratio-summary-grid strong,
+.n-ratio-summary-grid span {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.n-ratio-summary-grid strong {
+    color: var(--secondary);
+    font-size: 0.94rem;
+}
+
+.n-ratio-summary-grid span {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 0.7rem;
+}
+
+.n-ratio-chart-scroll .measurement-chart.compact {
+    min-width: 420px;
+    height: 170px;
+}
+
+.n-ratio-target-line {
+    stroke: color-mix(in srgb, var(--success) 72%, white);
+    stroke-width: 2;
+    stroke-dasharray: 7 7;
+}
+
+.n-ratio-footnote {
+    margin: 0;
+}
+
 .community-map-card-shell {
     display: grid;
     gap: 14px;
@@ -6473,6 +6590,18 @@ body.theme-light .nav-links button.active {
 
     .measurement-stats {
         grid-template-columns: 1fr;
+    }
+
+    .n-ratio-tracker-head {
+        display: grid;
+    }
+
+    .n-ratio-tracker-head button {
+        width: 100%;
+    }
+
+    .n-ratio-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .measurement-chart {
@@ -8078,6 +8207,10 @@ body.theme-light .nav-links button.active {
 
 .tool-tile-card.tool-tile-collapsed > h3 .tool-info-button {
     margin-left: auto;
+}
+
+.tool-tile-card.tool-tile-collapsed > h3 .tool-link-button {
+    flex: 0 0 auto;
 }
 
 .tool-tile-card.tool-tile-collapsed > .hint {
@@ -22484,6 +22617,46 @@ progress.mini-progress::-moz-progress-bar {
     border-color: color-mix(in srgb, var(--accent) 34%, var(--border-color)) !important;
     background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)) !important;
     color: var(--accent) !important;
+}
+
+#tools .tool-link-button {
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--secondary) 34%, var(--border-color));
+    background: color-mix(in srgb, var(--secondary) 9%, var(--surface-raised));
+    color: var(--secondary);
+    font-size: 0.92rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+
+#tools .tool-link-button:hover,
+#tools .tool-link-button:focus-visible {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--secondary) 62%, var(--border-color));
+    background: color-mix(in srgb, var(--secondary) 16%, var(--surface-raised));
+    outline: none;
+}
+
+#tools .tool-deeplink-highlight {
+    animation: toolDeeplinkPulse 1.8s ease;
+}
+
+@keyframes toolDeeplinkPulse {
+    0%, 100% {
+        box-shadow: inset 0 3px 0 color-mix(in srgb, var(--accent) 70%, transparent), var(--shadow-md);
+    }
+    24%, 72% {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 28%, transparent), 0 18px 44px color-mix(in srgb, var(--accent) 18%, transparent);
+        border-color: color-mix(in srgb, var(--accent) 72%, var(--border-color));
+    }
 }
 
 .logbook-hero,

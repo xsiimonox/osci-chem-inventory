@@ -8448,6 +8448,7 @@ function refreshDesignMotionTargets(scope = document.querySelector('.tab-content
 }
 
 function showTab(tabId, historyMode = 'replace') {
+    const route = getRouteFromHash();
     if (isUserMenuTabHidden(tabId)) {
         tabId = getFirstVisibleTab();
     }
@@ -8496,7 +8497,9 @@ function showTab(tabId, historyMode = 'replace') {
     db.lastTab = tabId;
     try { localStorage.setItem(LAST_TAB_KEY, tabId); } catch(e) {}
     try {
-        const nextHash = '#' + encodeURIComponent(tabId);
+        const nextHash = tabId === 'tools' && route.tabId === 'tools' && route.toolId
+            ? getToolRouteHash(route.toolId)
+            : '#' + encodeURIComponent(tabId);
         if (window.location.hash !== nextHash) {
             if (historyMode === 'push') history.pushState(null, '', nextHash);
             else history.replaceState(null, '', nextHash);
@@ -8504,14 +8507,27 @@ function showTab(tabId, historyMode = 'replace') {
     } catch(e) {}
     saveDB(false);
     renderActiveTabContent(tabId);
+    if (tabId === 'tools') {
+        openToolFromRoute(route.toolId);
+    }
     scheduleTextFitPass();
     window.requestAnimationFrame(() => refreshDesignMotionTargets(resolvedTab));
     scheduleActiveTabHealthCheck(tabId);
 }
 
+function getRouteFromHash() {
+    const rawHash = decodeURIComponent(window.location.hash.slice(1) || '').trim();
+    const [tabId = '', toolId = ''] = rawHash.split('/').map(part => part.trim()).filter(Boolean);
+    return { tabId, toolId };
+}
+
+function getToolRouteHash(toolId = '') {
+    return toolId ? `#tools/${encodeURIComponent(toolId)}` : '#tools';
+}
+
 function resolveRouteTabFromHash() {
-    const hashTab = decodeURIComponent(window.location.hash.slice(1) || '');
-    if (APP_TAB_IDS.includes(hashTab) && !isUserMenuTabHidden(hashTab)) return hashTab;
+    const route = getRouteFromHash();
+    if (APP_TAB_IDS.includes(route.tabId) && !isUserMenuTabHidden(route.tabId)) return route.tabId;
     let storedTab = '';
     try { storedTab = localStorage.getItem(LAST_TAB_KEY) || ''; } catch(e) {}
     if (APP_TAB_IDS.includes(storedTab) && !isUserMenuTabHidden(storedTab)) return storedTab;
@@ -15877,7 +15893,19 @@ function loadOsciTnbMonitor() {
     showToast('OSCI Motion N-Ratio Monitor wird geladen...', 'info', 2200);
 }
 
-Object.assign(window, { loadOsciTnbMonitor });
+function openNRatioLogbook() {
+    selectTab('logbuch');
+    window.setTimeout(() => {
+        const details = document.getElementById('measurementDetails');
+        if (details) details.open = true;
+        const typeSelect = document.getElementById('measurementType');
+        if (typeSelect) typeSelect.value = 'NO3';
+        renderMeasurementTracker('NO3');
+        document.getElementById('measurementValue')?.focus();
+    }, 80);
+}
+
+Object.assign(window, { loadOsciTnbMonitor, openNRatioLogbook });
 
 function initTools() {
     initializedToolSections.forEach(sectionId => {
@@ -16032,6 +16060,14 @@ function getToolCardTitle(card) {
         || card?.querySelector('h3')?.childNodes?.[0]?.textContent?.trim()
         || card?.querySelector('h3')?.textContent?.trim()
         || '';
+}
+
+function getCanonicalToolId(card, title = null) {
+    const titleEl = title || card?.querySelector('h3');
+    return card?.dataset.toolId
+        || titleEl?.querySelector('.tool-inline-fav')?.dataset.toolId
+        || card?.querySelector('.tool-inline-fav')?.dataset.toolId
+        || slugifyToolTitle(getToolCardTitle(card));
 }
 
 function getToolTileVisual(toolId, title = '') {
@@ -16196,6 +16232,52 @@ function ensureToolInfoButton(card, toolId, toolTitle) {
     title.appendChild(button);
 }
 
+function ensureToolLinkButton(card, toolId, toolTitle) {
+    const title = card?.querySelector('h3');
+    if (!title || title.querySelector('.tool-link-button')) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'tool-link-button';
+    button.dataset.toolId = toolId;
+    button.setAttribute('aria-label', `Link zu ${toolTitle} kopieren`);
+    button.setAttribute('title', `Link zu ${toolTitle} kopieren`);
+    button.textContent = '↗';
+    button.addEventListener('pointerdown', event => event.stopPropagation());
+    button.addEventListener('click', event => copyToolLink(event, toolId, toolTitle));
+    title.appendChild(button);
+}
+
+function getToolShareUrl(toolId) {
+    const basePath = `${window.location.origin}${window.location.pathname}`;
+    return `${basePath}${getToolRouteHash(toolId)}`;
+}
+
+async function copyToolLink(event, toolId, toolTitle = 'Tool') {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    if (!toolId) return;
+    const url = getToolShareUrl(toolId);
+    try {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(url);
+        } else {
+            const input = document.createElement('input');
+            input.value = url;
+            input.setAttribute('readonly', '');
+            input.style.position = 'fixed';
+            input.style.left = '-9999px';
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            input.remove();
+        }
+        showToast(`Link zu ${toolTitle} kopiert`, 'success', 2200);
+    } catch (err) {
+        console.warn('Tool-Link konnte nicht kopiert werden:', err);
+        showToast(url, 'info', 5200);
+    }
+}
+
 function showToolInfo(event, toolId) {
     event?.preventDefault?.();
     event?.stopPropagation?.();
@@ -16232,7 +16314,7 @@ function setupToolTiles() {
         const title = card.querySelector('h3');
         if (!title) return;
         const toolTitle = getToolCardTitle(card);
-        const toolId = card.dataset.toolId || slugifyToolTitle(toolTitle);
+        const toolId = getCanonicalToolId(card, title);
         const visual = getToolTileVisual(toolId, toolTitle);
         card.dataset.toolId = toolId;
         card.dataset.toolIcon = visual.icon;
@@ -16242,6 +16324,7 @@ function setupToolTiles() {
         ensureToolTitleTextSpan(title);
         ensureToolToggleButton(card, title, toolTitle);
         ensureToolInfoButton(card, toolId, toolTitle);
+        ensureToolLinkButton(card, toolId, toolTitle);
         const hint = card.querySelector('.hint');
         if (hint && !hint.dataset.originalText) {
             hint.dataset.originalText = hint.textContent.trim();
@@ -16261,6 +16344,16 @@ function setupToolTiles() {
         applyToolReviewBadge(card, toolTitle);
         card.classList.add('tool-tile-collapsed');
         title.querySelector('.tool-tile-toggle')?.setAttribute('aria-expanded', 'false');
+    });
+
+    document.querySelectorAll('#tools .resource-tools-card[data-tool-id]').forEach(card => {
+        const title = card.querySelector('h3');
+        const toolId = getCanonicalToolId(card, title);
+        const toolTitle = getToolCardTitle(card);
+        card.dataset.toolId = toolId;
+        ensureToolTitleTextSpan(title);
+        ensureToolInfoButton(card, toolId, toolTitle);
+        ensureToolLinkButton(card, toolId, toolTitle);
     });
 }
 
@@ -16356,16 +16449,47 @@ function removeToolFavorite(toolId) {
 }
 
 function openToolFavorite(toolId) {
-    if (isToolHidden(toolId)) return;
-    const card = document.querySelector(`#tools .tool-compact-card[data-tool-id="${toolId}"]`);
-    if (!card) return;
+    openToolById(toolId, { updateHash: true, highlight: true });
+}
+
+function openToolById(toolId, options = {}) {
+    if (!toolId) return false;
+    const tool = TOOL_DEFINITIONS.find(entry => entry.id === toolId);
+    if (!tool) {
+        showToast('Dieses Tool wurde nicht gefunden.', 'warning', 2800);
+        return false;
+    }
+    if (isToolHidden(toolId)) {
+        showToast(`${tool.label} ist aktuell ausgeblendet. Du kannst es in den Einstellungen wieder einblenden.`, 'warning', 4200);
+        return false;
+    }
+    const card = document.querySelector(`#tools [data-tool-id="${toolId}"]`);
+    if (!card) return false;
     const section = card.closest('.tool-section');
     const search = document.getElementById('toolSearchInput');
     if (search) search.value = '';
     filterTools('');
     if (section) openToolSection(section.dataset.sectionId || '');
-    if (card.classList.contains('tool-tile-collapsed')) toggleToolTile(card);
+    if (card.classList.contains('tool-tile-card') && card.classList.contains('tool-tile-collapsed')) {
+        toggleToolTile(card, { updateHash: false });
+    }
+    if (options.updateHash) {
+        try { history.replaceState(null, '', getToolRouteHash(toolId)); } catch(e) {}
+    }
+    card.classList.remove('tool-deeplink-highlight');
     card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (options.highlight) {
+        window.requestAnimationFrame(() => {
+            card.classList.add('tool-deeplink-highlight');
+            window.setTimeout(() => card.classList.remove('tool-deeplink-highlight'), 1800);
+        });
+    }
+    return true;
+}
+
+function openToolFromRoute(toolId) {
+    if (!toolId) return;
+    window.requestAnimationFrame(() => openToolById(toolId, { updateHash: false, highlight: true }));
 }
 
 function openToolSection(sectionId) {
@@ -16388,7 +16512,9 @@ Object.assign(window, {
     toggleToolFavoriteFromButton,
     removeToolFavorite,
     openToolFavorite,
+    openToolById,
     openToolSection,
+    copyToolLink,
     showToolInfo,
     filterTools,
     clearToolSearch
@@ -16434,7 +16560,7 @@ function clearToolSearch() {
     filterTools('');
 }
 
-function toggleToolTile(card) {
+function toggleToolTile(card, options = {}) {
     const willOpen = card.classList.contains('tool-tile-collapsed');
     const section = card.closest('.tool-section');
     if (willOpen && section) initToolSection(section.dataset.sectionId || '');
@@ -16448,6 +16574,13 @@ function toggleToolTile(card) {
     const toggle = card.querySelector('.tool-tile-toggle');
     toggle?.setAttribute('aria-expanded', String(willOpen));
     toggle?.setAttribute('aria-label', `${getToolCardTitle(card)} ${willOpen ? 'schließen' : 'öffnen'}`);
+    if (options.updateHash !== false && document.body.dataset.activeTab === 'tools') {
+        try {
+            const toolId = card.dataset.toolId || '';
+            const nextHash = willOpen && toolId ? getToolRouteHash(toolId) : '#tools';
+            if (window.location.hash !== nextHash) history.replaceState(null, '', nextHash);
+        } catch(e) {}
+    }
 }
 
 const SANGOKAI_SEARCH_STOPWORDS = new Set([
@@ -20903,6 +21036,7 @@ function getDefaultMeasurementTypes() {
         { id: 'MG', label: 'MG', unit: 'mg/l' },
         { id: 'PO4', label: 'PO4', unit: 'mg/l' },
         { id: 'NO3', label: 'NO3', unit: 'mg/l' },
+        { id: 'TNB', label: 'TNb', unit: 'mg/l' },
         { id: SALINITY_MEASUREMENT_TYPE_ID, label: 'Salzgehalt', unit: 'PSU', multiUnit: true }
     ];
 }
@@ -21029,6 +21163,7 @@ function getMeasurementOptimalMeta(typeId, unit = '') {
         MG: { value: '1350', step: '1' },
         PO4: { value: '0.05', step: '0.001' },
         NO3: { value: '5', step: '0.1' },
+        TNB: { value: '2', step: '0.01' },
         [SALINITY_MEASUREMENT_TYPE_ID]: salinityUnit === 'kg/l'
             ? { value: '1.0230', step: '0.0001' }
             : salinityUnit === 'SG'
@@ -21273,6 +21408,7 @@ function renderMeasurementTracker(forceTypeId = null) {
                     <button class="btn-out btn-animated" onclick="deleteMeasurementType('${currentType}')">Messwert-Art löschen</button>
                 </div>
             </div>
+            ${renderNRatioTrackerHtml()}
         `;
         return;
     }
@@ -21411,8 +21547,141 @@ function renderMeasurementTracker(forceTypeId = null) {
                 `).join('')}
             </div>
             ${measurementUiState.editingEntryId ? '<p class="measurement-editing-status" role="status">Bearbeitungsmodus aktiv. Änderungen überschreiben ausschließlich den geladenen Messwert.</p>' : ''}
+            ${renderNRatioTrackerHtml()}
         </div>
     `;
+}
+
+function getNRatioPoints() {
+    const entries = getMeasurementEntries()
+        .filter(entry => ['NO3', 'TNB'].includes(entry.typeId))
+        .slice()
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+    let latestNo3 = null;
+    let latestTnb = null;
+    const points = [];
+    entries.forEach(entry => {
+        if (entry.typeId === 'NO3') latestNo3 = entry;
+        if (entry.typeId === 'TNB') latestTnb = entry;
+        if (!latestNo3 || !latestTnb || latestNo3.value <= 0 || latestTnb.value <= 0) return;
+        const dateMs = new Date(entry.at).getTime();
+        if (!Number.isFinite(dateMs)) return;
+        const ratio = latestTnb.value / latestNo3.value;
+        const previous = points[points.length - 1];
+        if (previous && previous.no3Id === latestNo3.id && previous.tnbId === latestTnb.id) return;
+        points.push({
+            id: `${latestNo3.id}-${latestTnb.id}-${dateMs}`,
+            at: entry.at,
+            value: ratio,
+            no3: latestNo3.value,
+            tnb: latestTnb.value,
+            no3Date: latestNo3.at,
+            tnbDate: latestTnb.at,
+            no3Id: latestNo3.id,
+            tnbId: latestTnb.id
+        });
+    });
+    return points;
+}
+
+function renderNRatioMiniChart(points) {
+    if (!points.length) return '';
+    const width = 420;
+    const height = 170;
+    const padL = 38;
+    const padR = 16;
+    const padT = 18;
+    const padB = 32;
+    const values = points.map(point => point.value);
+    const minValue = Math.min(...values, 3);
+    const maxValue = Math.max(...values, 3);
+    const spread = Math.max(0.1, maxValue - minValue);
+    const usableW = width - padL - padR;
+    const usableH = height - padT - padB;
+    const yForValue = value => padT + usableH - (((value - minValue) / spread) * usableH);
+    const chartPoints = points.map((point, index) => ({
+        ...point,
+        x: points.length === 1 ? width / 2 : padL + (usableW * index) / (points.length - 1),
+        y: yForValue(point.value)
+    }));
+    const path = chartPoints.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+    const targetY = yForValue(3);
+    return `
+        <div class="measurement-chart-scroll n-ratio-chart-scroll" tabindex="0" aria-label="N-Ratio Verlauf horizontal ansehen">
+            <svg class="measurement-chart compact n-ratio-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="NO3 zu TNb Ratio Verlauf">
+                <line x1="${padL}" y1="${targetY.toFixed(2)}" x2="${width - padR}" y2="${targetY.toFixed(2)}" class="n-ratio-target-line"></line>
+                <text x="${padL + 4}" y="${Math.max(12, targetY - 6).toFixed(2)}" class="measurement-y-label">Ziel 1:3</text>
+                <line x1="${padL}" y1="${height - padB}" x2="${width - padR}" y2="${height - padB}" class="measurement-axis"></line>
+                <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height - padB}" class="measurement-axis"></line>
+                <path d="${path}" class="measurement-line n-ratio-line"></path>
+                ${chartPoints.map(point => `
+                    <g class="measurement-point-group">
+                        <circle cx="${point.x}" cy="${point.y}" r="10" class="measurement-point-halo"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="6.4" class="measurement-point-ring"></circle>
+                        <circle cx="${point.x}" cy="${point.y}" r="4" class="measurement-point"></circle>
+                    </g>
+                `).join('')}
+                ${chartPoints.filter((_, index) => index === 0 || index === chartPoints.length - 1).map(point => `
+                    <text x="${point.x}" y="${height - 10}" text-anchor="middle" class="measurement-label">${escapeHtml(new Date(point.at).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }))}</text>
+                `).join('')}
+            </svg>
+        </div>
+    `;
+}
+
+function renderNRatioTrackerHtml() {
+    const points = getNRatioPoints();
+    const latest = points[points.length - 1] || null;
+    const previous = points[points.length - 2] || null;
+    const trend = latest && previous ? latest.value - previous.value : 0;
+    const trendLabel = !latest || !previous
+        ? 'noch kein Trend'
+        : trend > 0.05
+            ? 'TNb-Anteil steigt'
+            : trend < -0.05
+                ? 'TNb-Anteil sinkt'
+                : 'stabil';
+    const distance = latest ? latest.value - 3 : null;
+    const statusClass = latest
+        ? Math.abs(distance) <= 0.3 ? 'is-good' : Math.abs(distance) <= 0.8 ? 'is-watch' : 'is-alert'
+        : 'is-empty';
+    return `
+        <section class="n-ratio-tracker-card ${statusClass}">
+            <div class="n-ratio-tracker-head">
+                <div>
+                    <span class="n-ratio-kicker">NO3 / TNb Tracking</span>
+                    <strong>N-Ratio Entwicklung</strong>
+                    <small>Aus den im Logbuch gespeicherten NO3- und TNb-Messwerten. Orientierung: NO3 : TNb = 1 : 3.</small>
+                </div>
+                <button type="button" class="btn-secondary btn-animated" onclick="prepareNRatioMeasurementInput()">NO3 / TNb eintragen</button>
+            </div>
+            ${latest ? `
+                <div class="n-ratio-summary-grid">
+                    <div><strong>1 : ${formatMeasurementNumber(latest.value, '')}</strong><span>aktuelle Ratio</span></div>
+                    <div><strong>${formatMeasurementNumber(latest.no3, 'mg/l')} NO3</strong><span>letzter Nitratwert</span></div>
+                    <div><strong>${formatMeasurementNumber(latest.tnb, 'mg/l')} TNb</strong><span>letzter TNb-Wert</span></div>
+                    <div><strong>${escapeHtml(trendLabel)}</strong><span>Richtung</span></div>
+                </div>
+                ${renderNRatioMiniChart(points.slice(-12))}
+                <p class="n-ratio-footnote">Bewertungshilfe: Werte nahe 1 : 3 liegen im gewünschten Verhältnis. Der Verlauf ersetzt keine fachliche Interpretation einzelner Nährstoffwerte.</p>
+            ` : `
+                <div class="measurement-empty n-ratio-empty">
+                    <strong>Noch keine Ratio berechenbar</strong>
+                    <p>Speichere mindestens einen NO3-Wert und einen TNb-Wert im Logbuch. Danach zeigt ReefTools automatisch die Entwicklung.</p>
+                </div>
+            `}
+        </section>
+    `;
+}
+
+function prepareNRatioMeasurementInput() {
+    const typeSelect = document.getElementById('measurementType');
+    const details = document.getElementById('measurementDetails');
+    if (details) details.open = true;
+    if (typeSelect) typeSelect.value = 'NO3';
+    renderMeasurementTracker('NO3');
+    document.getElementById('measurementValue')?.focus();
+    showToast('Speichere zuerst NO3, danach TNb als Messwert-Art auswählen und speichern.', 'info', 4200);
 }
 
 function openLogBookEntryForm() {
@@ -25810,8 +26079,8 @@ async function bootstrapApplication() {
     let startupTab = db.lastTab || 'uebersicht';
     try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
     if (window.location.hash) {
-        const hashTab = decodeURIComponent(window.location.hash.slice(1));
-        if (APP_TAB_IDS.includes(hashTab)) startupTab = hashTab;
+        const route = getRouteFromHash();
+        if (APP_TAB_IDS.includes(route.tabId)) startupTab = route.tabId;
     }
     if (pendingStartupTab && APP_TAB_IDS.includes(pendingStartupTab)) startupTab = pendingStartupTab;
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
