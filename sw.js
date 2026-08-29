@@ -1,36 +1,22 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v34127-release';
-const ASSETS = [
+const CACHE_NAME = 'reef-storage-tools-cache-v34129-release';
+const CORE_ASSETS = [
   './',
   './index.html',
-  './anleitung.html',
   './assets/css/style.css',
   './assets/js/app.js',
   './assets/js/lighting-sim.js',
-  './assets/js/sangokai-data.js',
   './manifest.json',
   './version.json',
   './assets/img/icon.png',
   './assets/img/badman.svg',
   './privacy.html',
-  './impressum.html',
-  './ANLEITUNG.md',
-  './docs-assets/uebersicht.png',
-  './docs-assets/lager.png',
-  './docs-assets/trace.png',
-  './docs-assets/tools-dosierung.png',
-  './docs-assets/tools-salz-adsorber.png',
-  './docs-assets/tools-mischen.png',
-  './docs-assets/logbuch.png',
-  './docs-assets/korallen.png',
-  './docs-assets/wareneingang.png',
-  './docs-assets/einstellungen-cloud.png',
-  './wave/demo.html'
+  './impressum.html'
 ];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => Promise.allSettled(
-      ASSETS.map((asset) => cache.add(asset))
+      CORE_ASSETS.map((asset) => cache.add(asset))
     ))
   );
   self.skipWaiting();
@@ -65,16 +51,29 @@ self.addEventListener('fetch', (e) => {
           }
           return response;
         })
-        .catch(() => caches.match(e.request))
+        .catch(async () => {
+          const cached = await caches.match(e.request);
+          if (cached) return cached;
+          if (e.request.mode === 'navigate') return caches.match('./index.html');
+          return new Response('', { status: 503, statusText: 'Offline' });
+        })
     );
     return;
   }
 
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request).catch(() => {
-      if (e.request.mode === 'navigate') return caches.match('./index.html');
-      return new Response('', { status: 503, statusText: 'Offline' });
-    }))
+    caches.match(e.request).then((cached) => cached || fetch(e.request)
+      .then((response) => {
+        if (isSameOrigin && response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        if (e.request.mode === 'navigate') return caches.match('./index.html');
+        return new Response('', { status: 503, statusText: 'Offline' });
+      }))
   );
 });
 

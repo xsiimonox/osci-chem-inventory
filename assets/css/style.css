@@ -21546,6 +21546,58 @@ body.osci-features-hidden .osci-system-note {
     display: none !important;
 }
 
+.external-tool-note {
+    display: grid;
+    gap: 4px;
+    margin: 12px 0;
+    padding: 12px;
+    border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--border-color));
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--accent) 7%, var(--surface-card));
+}
+
+.external-tool-note strong {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.external-tool-note span {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.external-tool-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.external-tool-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
+.external-tool-frame-wrap {
+    margin-top: 14px;
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-color));
+    border-radius: 10px;
+    overflow: hidden;
+    background: #ffffff;
+    min-height: min(760px, 72vh);
+}
+
+.external-tool-frame-wrap iframe {
+    display: block;
+    width: 100%;
+    min-height: min(760px, 72vh);
+    border: 0;
+    background: #ffffff;
+}
+
 @media (max-width: 767px) {
     .custom-color-grid {
         grid-template-columns: 1fr;
@@ -21566,6 +21618,15 @@ body.osci-features-hidden .osci-system-note {
 
     .tool-visibility-row {
         min-height: 48px;
+    }
+
+    .external-tool-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .external-tool-frame-wrap,
+    .external-tool-frame-wrap iframe {
+        min-height: 70vh;
     }
 }
 

@@ -1211,6 +1211,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'hanna-phosphor-zu-phosphat': 'wasserwert wasserwerte hanna checker phosphor phosphat p po4 ppb umrechnen',
     'salifert-umrechner': 'wasserwert wasserwerte salifert spritze restwert calcium ca kh alkalinität test messen messung',
     'nutrition-rechner': 'wasserwert wasserwerte nährstoffe nutrition nitrat no3 phosphat po4 lanthan kohlenstoff stickstoff dosieren',
+    'n-ratio-monitor': 'wasserwert wasserwerte tnb n ratio monitor osci motion nitrat phosphat stickstoff nährstoffe verhältnis',
     'salzgehalt-rechner': 'wasserwert wasserwerte salinität salz dichte psu specific gravity leitwert temperatur refraktometer spindel messen messung',
     'salz-korrektur': 'wasserwert wasserwerte salinität salz dichte psu erhöhen senken korrigieren',
     'nettovolumen-berechnen': 'wasserwert wasserwerte nettovolumen wasservolumen volumen aufsalzen salzgehalt psu echte liter berechnen',
@@ -1230,6 +1231,7 @@ const TOOL_DEFINITIONS = [
     { id: 'hanna-phosphor-zu-phosphat', label: 'Hanna Phosphor zu Phosphat', sectionId: 'dosieren-und-messwerte' },
     { id: 'salifert-umrechner', label: 'Salifert Umrechner', sectionId: 'dosieren-und-messwerte' },
     { id: 'nutrition-rechner', label: 'Nutrition Rechner', sectionId: 'dosieren-und-messwerte', osciOnly: true },
+    { id: 'n-ratio-monitor', label: 'N-Ratio Monitor', sectionId: 'dosieren-und-messwerte', osciOnly: true },
     { id: 'salzgehalt-rechner', label: 'Salzgehalt Rechner', sectionId: 'salinitaet-und-wasserwechsel' },
     { id: 'salz-korrektur', label: 'Salzgehalt Korrigieren', sectionId: 'salinitaet-und-wasserwechsel' },
     { id: 'nettovolumen-berechnen', label: 'Nettovolumen Berechnen', sectionId: 'salinitaet-und-wasserwechsel' },
@@ -15866,6 +15868,17 @@ function initToolSection(sectionId, force = false) {
     }
 }
 
+function loadOsciTnbMonitor() {
+    const wrap = document.getElementById('osciTnbMonitorFrameWrap');
+    const frame = document.getElementById('osciTnbMonitorFrame');
+    if (!wrap || !frame) return;
+    if (!frame.src) frame.src = 'https://osci-motion.de/tnb/';
+    wrap.hidden = false;
+    showToast('OSCI Motion N-Ratio Monitor wird geladen...', 'info', 2200);
+}
+
+Object.assign(window, { loadOsciTnbMonitor });
+
 function initTools() {
     initializedToolSections.forEach(sectionId => {
         if (!document.querySelector(`#tools .tool-section[data-section-id="${sectionId}"]`)) {
@@ -16080,6 +16093,11 @@ const toolInfoTexts = {
         summary: 'Hilft bei Nitrat, Phosphat, Lanthan und Kohlenstoff nach Herstellerangaben.',
         details: 'Der Berater ordnet NO3/PO4 zu hoch oder zu niedrig ein. Der einfache Rechner berechnet konkrete Dosiermengen, wenn du das gewünschte Produkt schon kennst.',
         note: 'Nährstoffe langsam verändern und regelmäßig messen.'
+    },
+    'n-ratio-monitor': {
+        summary: 'Bindet den externen TNb/N-Ratio Monitor von OSCI Motion in ReefTools ein.',
+        details: 'Der Rechner selbst, seine Oberfläche und seine Logik kommen von osci-motion.de/tnb/. ReefTools lädt ihn erst nach Klick in eine eingebettete Ansicht und verändert die Berechnung nicht.',
+        note: 'Wenn die eingebettete Ansicht leer bleibt, blockiert der Browser oder die OSCI-Seite das Einbetten. Dann bitte den Button “Original öffnen” verwenden.'
     },
     'salzgehalt-rechner': {
         summary: 'Rechnet Dichte, Specific Gravity, Leitwert und PSU mit Temperaturbezug um.',
@@ -16562,6 +16580,33 @@ const SANGOKAI_SUBJECT_HINTS = [
     ['beleuchtung', ['beleuchtung', 'licht', 'led', 't5']]
 ];
 
+let sangokaiDataLoadPromise = null;
+
+function loadSangokaiData() {
+    if (window.SANGOKAI_AZ_DATA?.chunks?.length) return Promise.resolve(window.SANGOKAI_AZ_DATA);
+    if (sangokaiDataLoadPromise) return sangokaiDataLoadPromise;
+    sangokaiDataLoadPromise = new Promise((resolve, reject) => {
+        const existing = document.querySelector('script[data-sangokai-data="true"]');
+        if (existing) {
+            existing.addEventListener('load', () => resolve(window.SANGOKAI_AZ_DATA), { once: true });
+            existing.addEventListener('error', reject, { once: true });
+            return;
+        }
+        const script = document.createElement('script');
+        const versionLabel = (typeof getCurrentAppVersion === 'function' ? getCurrentAppVersion() : 'current').replace(/^v/, '');
+        script.src = `assets/js/sangokai-data.js?v=${encodeURIComponent(versionLabel)}-release`;
+        script.async = true;
+        script.dataset.sangokaiData = 'true';
+        script.onload = () => resolve(window.SANGOKAI_AZ_DATA);
+        script.onerror = () => reject(new Error('Sangokai A-Z Daten konnten nicht geladen werden.'));
+        document.head.appendChild(script);
+    }).catch(err => {
+        sangokaiDataLoadPromise = null;
+        throw err;
+    });
+    return sangokaiDataLoadPromise;
+}
+
 function normalizeSangokaiText(value = '') {
     return String(value)
         .toLowerCase()
@@ -16786,6 +16831,15 @@ function renderSangokaiAssistant(force = false) {
     const input = document.getElementById('sangokaiSearchInput');
     const sourceLabel = document.getElementById('sangokaiSourceLabel');
     if (!result || !input) return;
+    if (!window.SANGOKAI_AZ_DATA?.chunks?.length) {
+        result.innerHTML = '<p class="hint">Sangokai A-Z wird erst bei Bedarf geladen...</p>';
+        loadSangokaiData()
+            .then(() => renderSangokaiAssistant(force))
+            .catch(err => {
+                result.innerHTML = `<div class="workflow-message workflow-message--error"><strong>Sangokai A-Z nicht geladen</strong><span>${escapeHtml(err.message || 'Bitte Verbindung prüfen und erneut versuchen.')}</span></div>`;
+            });
+        return;
+    }
     if (sourceLabel && window.SANGOKAI_AZ_DATA?.source) sourceLabel.textContent = `Quelle: ${window.SANGOKAI_AZ_DATA.source}`;
     const query = input.value.trim();
     if (!query) {
@@ -25728,6 +25782,27 @@ document.addEventListener('keydown', (e) => {
 });
 
 // APP START
+function scheduleStartupTask(label, fn, delay = 0) {
+    const runner = () => {
+        const execute = () => {
+            try {
+                const result = fn();
+                if (result && typeof result.catch === 'function') {
+                    result.catch(err => console.warn(`Startup task failed: ${label}`, err));
+                }
+            } catch (err) {
+                console.warn(`Startup task failed: ${label}`, err);
+            }
+        };
+        if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(execute, { timeout: Math.max(1000, delay + 1000) });
+        } else {
+            execute();
+        }
+    };
+    window.setTimeout(runner, delay);
+}
+
 async function bootstrapApplication() {
     await initDB();
     renderLegacyDomainBanner();
@@ -25744,30 +25819,28 @@ async function bootstrapApplication() {
     showTab(startupTab);
     pendingStartupTab = '';
     runPostBootstrapDomSetup();
-    updateNotificationStatus();
-    renderStorageSecurityStatus();
-    renderAppUpdateStatus();
-    renderGoogleDriveSyncCard();
-    renderGoogleDriveHeaderStatus();
-    setTimeout(() => {
-        tryRestoreGoogleDriveSession();
-    }, 500);
     initCustomCursor();
     initTextFitGuard();
     initLiveUpdateChecks();
     initPwaInstallPrompt();
-    setTimeout(() => checkForAppUpdate(false), 2500);
-    setTimeout(() => refreshGoogleDrivePresence(false), 3200);
-    setTimeout(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4000);
-    setTimeout(() => autoSyncWarehousesOnStartup(), 900);
-    setTimeout(() => maybePromptForStorageRecovery(), 1300);
+    renderGoogleDriveHeaderStatus();
+    scheduleStartupTask('Benachrichtigungsstatus', updateNotificationStatus, 250);
+    scheduleStartupTask('Speicherstatus', renderStorageSecurityStatus, 350);
+    scheduleStartupTask('Update-Status', renderAppUpdateStatus, 450);
+    scheduleStartupTask('Google Drive Karte', renderGoogleDriveSyncCard, 550);
+    scheduleStartupTask('Google Drive Session', tryRestoreGoogleDriveSession, 900);
+    scheduleStartupTask('App Update prüfen', () => checkForAppUpdate(false), 2600);
+    scheduleStartupTask('Google Drive Status prüfen', () => refreshGoogleDrivePresence(false), 3300);
+    scheduleStartupTask('Cloud Änderungen prüfen', () => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 4200);
+    scheduleStartupTask('Start-Autosync', () => autoSyncWarehousesOnStartup(), 1400);
+    scheduleStartupTask('Speicherrettung prüfen', () => maybePromptForStorageRecovery(), 1800);
     setInterval(checkForAppUpdate, 30 * 60 * 1000);
     setInterval(() => refreshGoogleDrivePresence(false), 10 * 60 * 1000);
     setInterval(() => checkGoogleDriveRemoteChanges({ silent: true, autoRestore: true }), 5 * 60 * 1000);
-    setTimeout(() => checkAndNotifyStockAlerts('startup'), 1000);
-    setTimeout(checkTodoReminders, 1500);
-    setTimeout(() => checkOsmoseTankReminder('startup'), 2000);
-    setTimeout(() => checkDosingContainerReminders('startup'), 2300);
+    scheduleStartupTask('Lagerwarnungen', () => checkAndNotifyStockAlerts('startup'), 2200);
+    scheduleStartupTask('ToDo Erinnerungen', checkTodoReminders, 2600);
+    scheduleStartupTask('Osmosetank Erinnerung', () => checkOsmoseTankReminder('startup'), 3000);
+    scheduleStartupTask('Vorratsbehälter Erinnerung', () => checkDosingContainerReminders('startup'), 3400);
     setInterval(checkTodoReminders, 60 * 1000);
     setInterval(checkOsmoseTankReminder, 60 * 60 * 1000);
     setInterval(checkDosingContainerReminders, 60 * 60 * 1000);
