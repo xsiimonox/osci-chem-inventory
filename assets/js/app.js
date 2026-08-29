@@ -8951,43 +8951,115 @@ function normalizeSettingsGroupId(group) {
 }
 
 // --- DESIGN / THEME STEUERUNG ---
+const CUSTOM_THEME_COLORS_KEY = 'reeftools_custom_theme_colors_v1';
+
 function normalizeHexColor(value) {
     const color = String(value || '').trim();
     return /^#[0-9a-f]{6}$/i.test(color) ? color : '';
 }
 
+function getStoredCustomThemeColors() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(CUSTOM_THEME_COLORS_KEY) || '{}');
+        return {
+            primary: normalizeHexColor(parsed.primary),
+            secondary: normalizeHexColor(parsed.secondary)
+        };
+    } catch (err) {
+        return { primary: '', secondary: '' };
+    }
+}
+
+function storeCustomThemeColors(colors) {
+    try {
+        const primary = normalizeHexColor(colors?.primary);
+        const secondary = normalizeHexColor(colors?.secondary);
+        if (primary || secondary) {
+            localStorage.setItem(CUSTOM_THEME_COLORS_KEY, JSON.stringify({ primary, secondary }));
+        } else {
+            localStorage.removeItem(CUSTOM_THEME_COLORS_KEY);
+        }
+    } catch (err) {}
+}
+
 function getCustomThemeColors() {
     const settings = db?.settings || {};
+    const stored = getStoredCustomThemeColors();
     return {
-        primary: normalizeHexColor(settings.customPrimaryColor),
-        secondary: normalizeHexColor(settings.customSecondaryColor)
+        primary: normalizeHexColor(settings.customPrimaryColor) || stored.primary,
+        secondary: normalizeHexColor(settings.customSecondaryColor) || stored.secondary
     };
 }
 
-function setThemeColorVariables(target, colors) {
+const CUSTOM_THEME_VARIABLES = [
+    '--accent',
+    '--primary',
+    '--accent-strong',
+    '--secondary',
+    '--app-bg',
+    '--nav-bg',
+    '--surface-card',
+    '--surface-raised',
+    '--surface-overlay',
+    '--border-color',
+    '--bg',
+    '--card-bg',
+    '--border',
+    '--focus-ring'
+];
+
+function clearCustomThemeVariables(target) {
     if (!target?.style) return;
-    if (colors.primary) {
-        target.style.setProperty('--accent', colors.primary);
-        target.style.setProperty('--primary', colors.primary);
-        target.style.setProperty('--accent-strong', `color-mix(in srgb, ${colors.primary} 72%, #000)`);
-        target.style.setProperty('--focus-ring', `0 0 0 3px color-mix(in srgb, ${colors.primary} 38%, transparent)`);
+    CUSTOM_THEME_VARIABLES.forEach(variable => target.style.removeProperty(variable));
+}
+
+function getComputedThemeValue(name, fallback = '') {
+    return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
+}
+
+function readBaseThemeColors() {
+    return {
+        bg: getComputedThemeValue('--app-bg', '#07151b'),
+        nav: getComputedThemeValue('--nav-bg', '#0b2028'),
+        card: getComputedThemeValue('--surface-card', '#102a33'),
+        raised: getComputedThemeValue('--surface-raised', '#173740'),
+        overlay: getComputedThemeValue('--surface-overlay', '#173740'),
+        border: getComputedThemeValue('--border-color', '#2b4a53')
+    };
+}
+
+function setThemeColorVariables(target, colors, baseColors = readBaseThemeColors()) {
+    if (!target?.style) return;
+    clearCustomThemeVariables(target);
+    const primary = colors.primary || colors.secondary;
+    if (primary) {
+        const secondary = colors.secondary || primary;
+        target.style.setProperty('--accent', primary);
+        target.style.setProperty('--primary', primary);
+        target.style.setProperty('--accent-strong', `color-mix(in srgb, ${primary} 72%, #000)`);
+        target.style.setProperty('--secondary', secondary);
+        target.style.setProperty('--app-bg', `color-mix(in srgb, ${primary} 8%, ${baseColors.bg})`);
+        target.style.setProperty('--nav-bg', `color-mix(in srgb, ${primary} 12%, ${baseColors.nav})`);
+        target.style.setProperty('--surface-card', `color-mix(in srgb, ${primary} 8%, ${baseColors.card})`);
+        target.style.setProperty('--surface-raised', `color-mix(in srgb, ${secondary} 10%, ${baseColors.raised})`);
+        target.style.setProperty('--surface-overlay', `color-mix(in srgb, ${secondary} 12%, ${baseColors.overlay})`);
+        target.style.setProperty('--border-color', `color-mix(in srgb, ${primary} 26%, ${baseColors.border})`);
+        target.style.setProperty('--bg', 'var(--app-bg)');
+        target.style.setProperty('--card-bg', 'var(--surface-card)');
+        target.style.setProperty('--border', 'var(--border-color)');
+        target.style.setProperty('--focus-ring', `0 0 0 3px color-mix(in srgb, ${primary} 38%, transparent)`);
     } else {
-        target.style.removeProperty('--accent');
-        target.style.removeProperty('--primary');
-        target.style.removeProperty('--accent-strong');
-        target.style.removeProperty('--focus-ring');
-    }
-    if (colors.secondary) {
-        target.style.setProperty('--secondary', colors.secondary);
-    } else {
-        target.style.removeProperty('--secondary');
+        clearCustomThemeVariables(target);
     }
 }
 
 function applyCustomThemeColors() {
     const colors = getCustomThemeColors();
-    setThemeColorVariables(document.documentElement, colors);
-    setThemeColorVariables(document.body, colors);
+    clearCustomThemeVariables(document.documentElement);
+    clearCustomThemeVariables(document.body);
+    const baseColors = readBaseThemeColors();
+    setThemeColorVariables(document.documentElement, colors, baseColors);
+    setThemeColorVariables(document.body, colors, baseColors);
     document.body.classList.toggle('custom-theme-colors-active', Boolean(colors.primary || colors.secondary));
     syncCustomThemeColorInputs();
 }
@@ -9006,6 +9078,7 @@ function updateCustomThemeColors() {
     const secondary = normalizeHexColor(document.getElementById('customSecondaryColor')?.value);
     if (primary) db.settings.customPrimaryColor = primary;
     if (secondary) db.settings.customSecondaryColor = secondary;
+    storeCustomThemeColors({ primary, secondary });
     applyCustomThemeColors();
     saveDB(false);
 }
@@ -9014,6 +9087,7 @@ function resetCustomThemeColors() {
     if (!db.settings) db.settings = {};
     delete db.settings.customPrimaryColor;
     delete db.settings.customSecondaryColor;
+    storeCustomThemeColors({});
     applyCustomThemeColors();
     saveDB(false);
     showToast('Eigene Designfarben zurückgesetzt.', 'info');
