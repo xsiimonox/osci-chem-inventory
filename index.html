@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.124-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.126-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.124</span>
+                    <span class="version-badge">v3.4.126</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -2104,6 +2104,29 @@
                     </select>
                 </div>
 
+                <div class="custom-color-settings" aria-label="Eigene Designfarben">
+                    <div>
+                        <strong>Eigene Akzentfarben</strong>
+                        <p class="hint">Optional: Primär- und Sekundärfarbe für Buttons, Highlights, Diagramme und aktive Elemente festlegen.</p>
+                    </div>
+                    <div class="custom-color-grid">
+                        <label class="custom-color-picker" for="customPrimaryColor">
+                            <span>Primärfarbe</span>
+                            <input type="color" id="customPrimaryColor" value="#28b8c7" oninput="updateCustomThemeColors()">
+                        </label>
+                        <label class="custom-color-picker" for="customSecondaryColor">
+                            <span>Sekundärfarbe</span>
+                            <input type="color" id="customSecondaryColor" value="#6fd6df" oninput="updateCustomThemeColors()">
+                        </label>
+                    </div>
+                    <div class="custom-color-preview" aria-hidden="true">
+                        <span></span>
+                        <strong>Designvorschau</strong>
+                        <small>Akzent · Verlauf · Fokus</small>
+                    </div>
+                    <button type="button" class="btn-secondary btn-animated" onclick="resetCustomThemeColors()">Eigene Farben zurücksetzen</button>
+                </div>
+
                 <div class="input-group cursor-design-settings">
                     <label for="cursorStyleSelect">Maus-Cursor Design:</label>
                     <select id="cursorStyleSelect" onchange="updateCursorSettings()">
@@ -2338,9 +2361,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/sangokai-data.js?v=3.4.124-release"></script>
-    <script src="assets/js/lighting-sim.js?v=3.4.124-release"></script>
-    <script src="assets/js/app.js?v=3.4.124-release"></script>
+    <script src="assets/js/sangokai-data.js?v=3.4.126-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.126-release"></script>
+    <script src="assets/js/app.js?v=3.4.126-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -8869,6 +8869,7 @@ function renderSettingsCardOnDemand(card, force = false) {
         runSettingsRender('Cursor', applyCursorSettings);
         const themeSelect = document.getElementById('themeSelect');
         if (themeSelect && db?.theme) themeSelect.value = db.theme;
+        syncCustomThemeColorInputs();
     }
     scheduleTextFitPass(targetCard);
     scheduleActiveTabSelfCheck('einstellungen');
@@ -8950,6 +8951,74 @@ function normalizeSettingsGroupId(group) {
 }
 
 // --- DESIGN / THEME STEUERUNG ---
+function normalizeHexColor(value) {
+    const color = String(value || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color : '';
+}
+
+function getCustomThemeColors() {
+    const settings = db?.settings || {};
+    return {
+        primary: normalizeHexColor(settings.customPrimaryColor),
+        secondary: normalizeHexColor(settings.customSecondaryColor)
+    };
+}
+
+function setThemeColorVariables(target, colors) {
+    if (!target?.style) return;
+    if (colors.primary) {
+        target.style.setProperty('--accent', colors.primary);
+        target.style.setProperty('--primary', colors.primary);
+        target.style.setProperty('--accent-strong', `color-mix(in srgb, ${colors.primary} 72%, #000)`);
+        target.style.setProperty('--focus-ring', `0 0 0 3px color-mix(in srgb, ${colors.primary} 38%, transparent)`);
+    } else {
+        target.style.removeProperty('--accent');
+        target.style.removeProperty('--primary');
+        target.style.removeProperty('--accent-strong');
+        target.style.removeProperty('--focus-ring');
+    }
+    if (colors.secondary) {
+        target.style.setProperty('--secondary', colors.secondary);
+    } else {
+        target.style.removeProperty('--secondary');
+    }
+}
+
+function applyCustomThemeColors() {
+    const colors = getCustomThemeColors();
+    setThemeColorVariables(document.documentElement, colors);
+    setThemeColorVariables(document.body, colors);
+    document.body.classList.toggle('custom-theme-colors-active', Boolean(colors.primary || colors.secondary));
+    syncCustomThemeColorInputs();
+}
+
+function syncCustomThemeColorInputs() {
+    const colors = getCustomThemeColors();
+    const primaryInput = document.getElementById('customPrimaryColor');
+    const secondaryInput = document.getElementById('customSecondaryColor');
+    if (primaryInput) primaryInput.value = colors.primary || getComputedStyle(document.body).getPropertyValue('--accent').trim() || '#28b8c7';
+    if (secondaryInput) secondaryInput.value = colors.secondary || getComputedStyle(document.body).getPropertyValue('--secondary').trim() || '#6fd6df';
+}
+
+function updateCustomThemeColors() {
+    if (!db.settings) db.settings = {};
+    const primary = normalizeHexColor(document.getElementById('customPrimaryColor')?.value);
+    const secondary = normalizeHexColor(document.getElementById('customSecondaryColor')?.value);
+    if (primary) db.settings.customPrimaryColor = primary;
+    if (secondary) db.settings.customSecondaryColor = secondary;
+    applyCustomThemeColors();
+    saveDB(false);
+}
+
+function resetCustomThemeColors() {
+    if (!db.settings) db.settings = {};
+    delete db.settings.customPrimaryColor;
+    delete db.settings.customSecondaryColor;
+    applyCustomThemeColors();
+    saveDB(false);
+    showToast('Eigene Designfarben zurückgesetzt.', 'info');
+}
+
 function applyTheme(themeName, shouldSave = true) {
     // Alle alten Design-Klassen vom Body entfernen
     document.body.classList.remove('theme-girl', 'theme-mint', 'theme-badman', 'theme-light');
@@ -8969,6 +9038,7 @@ function applyTheme(themeName, shouldSave = true) {
         link.setAttribute('href', `${page}?theme=${encodeURIComponent(themeName)}`);
     });
     if (shouldSave) saveDB();
+    applyCustomThemeColors();
     
     // Dropdown-Auswahl im Menü synchronisieren, falls geladen
     const themeSelect = document.getElementById('themeSelect');
@@ -8978,6 +9048,12 @@ function applyTheme(themeName, shouldSave = true) {
 function getLegalModalThemeParam() {
     return encodeURIComponent(db.theme || 'default');
 }
+
+Object.assign(window, {
+    applyTheme,
+    updateCustomThemeColors,
+    resetCustomThemeColors
+});
 
 function openLegalModal(page = 'impressum') {
     const modal = document.getElementById('legalModal');
@@ -19621,6 +19697,7 @@ function buildRecipePrintRows(entries) {
         const amount = Number(entry.amount) || 0;
         const stock = resolved ? getInventoryAmount(resolved.cat, resolved.item) : null;
         const after = resolved ? Math.max(0, stock - amount) : null;
+        const missing = resolved && stock < amount;
         return {
             category: resolved?.cat || entry.category || 'nicht lagergeführt',
             item,
@@ -19629,6 +19706,8 @@ function buildRecipePrintRows(entries) {
             amountText: entry.amountText || formatRecipeAmountForPrint(entry.item, amount, entry.unit || 'ml'),
             stockText: resolved ? formatItemAmount(resolved.item, stock) : '-',
             afterText: resolved ? formatItemAmount(resolved.item, after) : '-',
+            statusText: resolved ? (missing ? 'Bestand prüfen' : 'ausreichend') : 'nicht lagergeführt',
+            status: resolved ? (missing ? 'missing' : 'ok') : 'neutral',
             note: entry.note || (resolved ? '' : 'nicht lagergeführt')
         };
     });
@@ -19648,24 +19727,35 @@ function buildRecipePrintFilename(title, date = new Date()) {
 function buildRecipePrintDocument({ title, subtitle = '', meta = [], rows = [], notes = [], autoPrint = false }) {
     const createdAt = new Date();
     const documentTitle = buildRecipePrintFilename(title, createdAt);
+    const groupedRows = rows.reduce((groups, row) => {
+        const category = row.category || 'Weitere';
+        if (!groups[category]) groups[category] = [];
+        groups[category].push(row);
+        return groups;
+    }, {});
     const htmlRows = rows.length
-        ? rows.map(row => `
-            <tr>
-                <td>${escapeHtml(row.category)}</td>
-                <td><strong>${escapeHtml(row.item)}</strong>${row.note ? `<small>${escapeHtml(row.note)}</small>` : ''}</td>
-                <td>${escapeHtml(row.amountText)}</td>
-                <td>${escapeHtml(row.stockText)}</td>
-                <td>${escapeHtml(row.afterText)}</td>
-            </tr>
+        ? Object.entries(groupedRows).map(([category, categoryRows]) => `
+            <tr class="group-row"><td colspan="5">${escapeHtml(category)}</td></tr>
+            ${categoryRows.map(row => `
+                <tr class="${row.status === 'missing' ? 'row-missing' : ''}">
+                    <td><span class="status status-${escapeHtml(row.status || 'neutral')}">${escapeHtml(row.statusText || 'ok')}</span></td>
+                    <td><strong>${escapeHtml(row.item)}</strong>${row.note ? `<small>${escapeHtml(row.note)}</small>` : ''}</td>
+                    <td class="amount-cell">${escapeHtml(row.amountText)}</td>
+                    <td>${escapeHtml(row.stockText)}</td>
+                    <td>${escapeHtml(row.afterText)}</td>
+                </tr>
+            `).join('')}
         `).join('')
         : '<tr><td colspan="5" class="empty">Keine Rezeptdaten vorhanden.</td></tr>';
     const metaHtml = meta
         .filter(entry => entry && entry.value !== undefined && entry.value !== null && String(entry.value).trim() !== '')
-        .map(entry => `<div class="pill"><strong>${escapeHtml(entry.value)}</strong><span>${escapeHtml(entry.label)}</span></div>`)
+        .map(entry => `<div class="pill"><span>${escapeHtml(entry.label)}</span><strong>${escapeHtml(entry.value)}</strong></div>`)
         .join('');
     const noteHtml = notes.length
         ? `<div class="notes">${notes.map(note => `<p>${escapeHtml(note)}</p>`).join('')}</div>`
         : '';
+    const missingCount = rows.filter(row => row.status === 'missing').length;
+    const totalPositions = rows.length;
 
     return `
         <!doctype html>
@@ -19675,26 +19765,42 @@ function buildRecipePrintDocument({ title, subtitle = '', meta = [], rows = [], 
             <title>${escapeHtml(documentTitle)}</title>
             <style>
                 *{box-sizing:border-box}
-                body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:22px;color:#0f172a;background:#fff}
-                .actions{display:flex;gap:10px;margin-bottom:16px}
-                button{border:0;border-radius:12px;background:#0f172a;color:#fff;padding:10px 14px;font:inherit;font-weight:700;cursor:pointer}
-                h1{font-size:24px;line-height:1.1;margin:0 0 4px}
-                .subtitle{color:#475569;margin:0 0 14px;font-size:13px}
-                .meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:0 0 16px}
-                .pill{border:1px solid #dbe6ee;border-radius:12px;padding:8px 10px;background:#f8fafc;min-height:50px}
-                .pill strong{display:block;font-size:16px;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-                .pill span{display:block;font-size:11px;color:#64748b;margin-top:2px}
-                table{width:100%;border-collapse:collapse;font-size:11px}
-                th,td{text-align:left;border-bottom:1px solid #e2e8f0;padding:7px 8px;vertical-align:top}
-                th{background:#ecfeff;color:#0e7490;font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+                body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;margin:18px;color:#102027;background:#eef7f8}
+                .page{min-height:calc(100vh - 36px);border:1px solid #c8dde2;border-radius:24px;background:#fff;overflow:hidden;box-shadow:0 24px 60px rgba(9,39,48,.16)}
+                .actions{display:flex;gap:10px;padding:14px 18px;background:#f6fbfc;border-bottom:1px solid #d9eaee}
+                button{border:0;border-radius:12px;background:#102027;color:#fff;padding:10px 14px;font:inherit;font-weight:800;cursor:pointer}
+                .hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:end;padding:22px 24px 18px;background:linear-gradient(135deg,#06242d,#0e5562 62%,#26c6d6);color:white}
+                .brand{display:inline-flex;align-items:center;gap:7px;font-size:11px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;opacity:.86}
+                .brand-dot{width:9px;height:9px;border-radius:50%;background:#72f7ff;box-shadow:0 0 18px rgba(114,247,255,.8)}
+                h1{font-size:27px;line-height:1.04;margin:8px 0 5px;letter-spacing:-.02em}
+                .subtitle{color:rgba(255,255,255,.82);margin:0;font-size:12px;max-width:66ch}
+                .doc-chip{border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);border-radius:16px;padding:10px 12px;min-width:160px;text-align:right;backdrop-filter:blur(12px)}
+                .doc-chip strong{display:block;font-size:14px}.doc-chip span{display:block;font-size:10px;opacity:.72;text-transform:uppercase;letter-spacing:.08em}
+                .meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;padding:14px 18px;background:#f8fcfd;border-bottom:1px solid #e1eef1}
+                .pill{border:1px solid #d7e8ec;border-radius:14px;padding:8px 10px;background:#fff;min-height:54px}
+                .pill strong{display:block;font-size:15px;color:#102027;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+                .pill span{display:block;font-size:9px;color:#64777f;text-transform:uppercase;letter-spacing:.08em;font-weight:800}
+                .content{padding:16px 18px 18px}
+                table{width:100%;border-collapse:separate;border-spacing:0;font-size:10.5px;border:1px solid #d8e8ec;border-radius:16px;overflow:hidden;background:white}
+                th,td{text-align:left;border-bottom:1px solid #e5eff2;padding:7px 8px;vertical-align:top}
+                th{background:#e7fbfe;color:#0b7382;font-size:9px;text-transform:uppercase;letter-spacing:.07em}
+                th:nth-child(1){width:96px}
+                th:nth-child(3),td.amount-cell{width:150px;font-weight:800;color:#0f5966}
+                th:nth-child(4),th:nth-child(5){width:126px}
+                tr:last-child td{border-bottom:0}
+                .group-row td{background:#f6fbfc;color:#294b55;font-weight:900;text-transform:uppercase;letter-spacing:.08em;font-size:9px;border-top:1px solid #d8e8ec;border-bottom:1px solid #d8e8ec;padding:6px 8px}
                 td strong{display:block}
                 td small{display:block;color:#64748b;margin-top:2px}
-                .notes{margin-top:14px;border:1px solid #dbe6ee;border-radius:12px;padding:10px 12px;background:#f8fafc;color:#334155;font-size:11px}
-                .notes p{margin:4px 0}
-                .footer{margin-top:14px;color:#64748b;font-size:10px;text-align:right}
+                .status{display:inline-flex;align-items:center;justify-content:center;min-width:76px;padding:4px 7px;border-radius:999px;background:#edf6f7;color:#47646c;font-size:8.5px;font-weight:900;text-transform:uppercase;letter-spacing:.04em}
+                .status-ok{background:#e8f8ef;color:#167448}.status-missing{background:#fff1f1;color:#b72e3a}.status-neutral{background:#edf3f5;color:#586c74}
+                .row-missing td{background:#fffafa}
+                .notes{display:grid;gap:4px;margin-top:12px;border:1px solid #d8e8ec;border-radius:16px;padding:10px 12px;background:#f8fcfd;color:#334155;font-size:10px}
+                .notes:before{content:"Hinweise";font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#0b7382;font-weight:900}
+                .notes p{margin:0}
+                .footer{display:flex;justify-content:space-between;gap:10px;margin-top:12px;color:#64777f;font-size:9px}
                 .empty{text-align:center;color:#64748b}
-                @page{size:A4;margin:12mm}
-                @media print{body{margin:0}.actions{display:none}h1{font-size:21px}.meta{grid-template-columns:repeat(4,1fr)}table{font-size:10px}th,td{padding:5px 6px}.notes{font-size:10px}}
+                @page{size:A4;margin:9mm}
+                @media print{body{margin:0;background:#fff}.page{min-height:auto;border:0;border-radius:0;box-shadow:none}.actions{display:none}.hero{padding:16px 18px 13px}h1{font-size:22px}.meta{grid-template-columns:repeat(4,1fr);padding:10px 12px}.pill{min-height:45px;padding:6px 8px}.pill strong{font-size:12px}table{font-size:9.3px}th,td{padding:4.5px 5px}.notes{font-size:9px;padding:7px 9px}.content{padding:12px}.doc-chip{padding:8px 10px}.footer{font-size:8.5px}}
             </style>
             ${autoPrint ? `
                 <script>
@@ -19705,18 +19811,28 @@ function buildRecipePrintDocument({ title, subtitle = '', meta = [], rows = [], 
             ` : ''}
         </head>
         <body>
-            <div class="actions"><button onclick="window.print()">Als PDF sichern / drucken</button></div>
-            <h1>${escapeHtml(title)}</h1>
-            ${subtitle ? `<p class="subtitle">${escapeHtml(subtitle)}</p>` : ''}
-            ${metaHtml ? `<div class="meta">${metaHtml}</div>` : ''}
-            <table>
-                <thead>
-                    <tr><th>Kategorie</th><th>Produkt</th><th>Menge</th><th>Bestand jetzt</th><th>Bestand danach</th></tr>
-                </thead>
-                <tbody>${htmlRows}</tbody>
-            </table>
-            ${noteHtml}
-            <div class="footer">ReefTools · ${createdAt.toLocaleString('de-DE')}</div>
+            <div class="page">
+                <div class="actions"><button onclick="window.print()">Als PDF sichern / drucken</button></div>
+                <header class="hero">
+                    <div>
+                        <div class="brand"><span class="brand-dot"></span> ReefTools Rezeptfolie</div>
+                        <h1>${escapeHtml(title)}</h1>
+                        ${subtitle ? `<p class="subtitle">${escapeHtml(subtitle)}</p>` : ''}
+                    </div>
+                    <div class="doc-chip"><span>Status</span><strong>${missingCount ? `${missingCount} prüfen` : 'bereit'}</strong></div>
+                </header>
+                ${metaHtml ? `<div class="meta">${metaHtml}</div>` : ''}
+                <main class="content">
+                    <table>
+                        <thead>
+                            <tr><th>Status</th><th>Komponente</th><th>Geplante Menge</th><th>Lagerbestand jetzt</th><th>Nach Auslagerung</th></tr>
+                        </thead>
+                        <tbody>${htmlRows}</tbody>
+                    </table>
+                    ${noteHtml}
+                    <div class="footer"><span>${totalPositions} Position(en) · ${missingCount ? `${missingCount} Bestand prüfen` : 'Bestände ausreichend oder nicht lagergeführt'}</span><span>ReefTools · ${createdAt.toLocaleString('de-DE')}</span></div>
+                </main>
+            </div>
         </body>
         </html>
     `;
@@ -19743,10 +19859,11 @@ function exportCRPasteRecipePdf() {
     const totalMl = rows.reduce((sum, row) => sum + row.amount, 0);
     openRecipePrintDocument({
         title: 'C&R Auslagerung',
-        subtitle: 'Druckbare Übersicht der eingefügten C&R Mengen inklusive aktuellem Lagerbestand.',
+        subtitle: 'Professionelle Arbeitsfolie für eingefügte C&R-Mengen inklusive Lagerbestand vor und nach der Auslagerung.',
         meta: [
             { label: 'Positionen', value: rows.length },
             { label: 'Gesamtmenge', value: `${totalMl.toLocaleString('de-DE', { maximumFractionDigits: 2 })} ml` },
+            { label: 'Vorgang', value: 'C&R Auslagerung' },
             { label: 'Lager', value: getActiveWarehouse()?.name || 'Lager' }
         ],
         rows: buildRecipePrintRows(rows),
@@ -19764,7 +19881,7 @@ function exportSeaWaterRecipePdf() {
     }));
     openRecipePrintDocument({
         title: 'Meerwasser aus C&R anmischen',
-        subtitle: 'Kompakte Rezeptkarte mit ml/g-Mengen und Lagerbeständen.',
+        subtitle: 'Rezeptfolie für natürliches Meerwasser aus C&R-Komponenten mit ml/g-Mengen, Bestandsprüfung und Spurenelement-Hinweis.',
         meta: [
             { label: 'Zielmenge', value: `${liters.toLocaleString('de-DE', { maximumFractionDigits: 1 })} L` },
             { label: 'Rezeptbasis', value: '100 L Meerwasser' },
@@ -19790,10 +19907,11 @@ function exportMacroRecipePdf() {
     if (!rows.length) return alert('Bitte zuerst ein Makro-Rezept auswählen.');
     openRecipePrintDocument({
         title: `Makro-Element ${recipeName}`,
-        subtitle: 'Druckbare Rezeptkarte für das Anmischen inklusive Bestand vorher und danach.',
+        subtitle: 'Arbeitsfolie für das Anmischen des Makro-Elements inklusive benötigter Mengen und Lagerbestand nach Auslagerung.',
         meta: [
             { label: 'Zielmenge', value: `${liters.toLocaleString('de-DE', { maximumFractionDigits: 1 })} L` },
             { label: 'Rezept', value: recipeName },
+            { label: 'Vorgang', value: 'Makro anmischen' },
             { label: 'Lager', value: getActiveWarehouse()?.name || 'Lager' }
         ],
         rows: buildRecipePrintRows(rows)
@@ -19815,9 +19933,10 @@ function exportTraceRecipePdf() {
         }));
     const totals = recipe.totals || {};
     openRecipePrintDocument({
-        title: 'Trace Mischung K+ / A-',
-        subtitle: 'Kompakte Rezeptkarte fuer Anionen- und Kationen-Mischungen inklusive Osmoseanteil.',
+        title: 'Trace Neumischung K+ / A-',
+        subtitle: 'Rezeptfolie für eine neue Anionen- und Kationen-Mischung inklusive Osmoseanteil, Tagesdosis und Lagerbeständen.',
         meta: [
+            { label: 'Dokument', value: 'Neumischung' },
             { label: 'Kationen K+', value: traceCalcFormatMlG(totals.kationen?.volumeMl || 0, totals.kationen?.volumeG || 0) },
             { label: 'Anionen A-', value: traceCalcFormatMlG(totals.anionen?.volumeMl || 0, totals.anionen?.volumeG || 0) },
             { label: 'Laufzeit', value: `${traceCalcFormatValue(recipe.config?.days, 0)} Tage` },
