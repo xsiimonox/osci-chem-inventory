@@ -1939,7 +1939,7 @@ function renderTradeFairShowcaseContent() {
     const qrBadge = `
         <a class="trade-showcase-scan-badge" href="https://reeftools.de/" target="_blank" rel="noopener noreferrer" aria-label="ReefTools kostenlos starten">
             <span class="trade-showcase-qr-frame"><img src="assets/img/reeftools-qr.png" alt="QR-Code zu reeftools.de"></span>
-            <span><strong>Kostenlos starten</strong><small>reeftools.de</small></span>
+            <span><strong>Scannen und kostenlos starten</strong><small>reeftools.de</small></span>
         </a>
     `;
     return `
@@ -1947,12 +1947,12 @@ function renderTradeFairShowcaseContent() {
             <div class="trade-showcase-brandbar">
                 <div>
                     <span class="trade-showcase-kicker">Reeftools.de</span>
-                    <h2 id="tradeFairShowcaseTitle">Reef.Storage&amp;Tools</h2>
+                    <h2 id="tradeFairShowcaseTitle">ReefTools</h2>
                 </div>
                 <div class="trade-showcase-badges" aria-label="Produktmerkmale">
                     <span>${escapeHtml(version)}</span>
-                    <span>PWA</span>
-                    <span>Cloud optional</span>
+                    <span>100% kostenlos</span>
+                    <span>als Web-App installierbar</span>
                 </div>
             </div>
 
@@ -1961,44 +1961,47 @@ function renderTradeFairShowcaseContent() {
                     ${qrBadge}
                     <img src="assets/img/messe-showcase.png" alt="Meerwasseraquarium als Hintergrund der ReefTools Messeansicht">
                     <div class="trade-showcase-hero-copy">
-                        <span>Eine App für den Alltag am Riff</span>
-                        <strong>Lager, Wasserwerte, Trace, Tools und Korallen in einem System.</strong>
+                        <span>Meerwasser verwalten, ohne Tabellenchaos</span>
+                        <strong>Eine Web-App für Lager, Wasserwerte, ICP, Tools und Korallen.</strong>
                     </div>
                     <div class="trade-showcase-hero-stats">
-                        <span><b>33</b><small>Produkte</small></span>
-                        <span><b>ICP</b><small>Historie</small></span>
-                        <span><b>0 €</b><small>kostenlos nutzen</small></span>
+                        <span><b>0 €</b><small>generell kostenlos</small></span>
+                        <span><b>PWA</b><small>Handy &amp; Desktop</small></span>
+                        <span><b>Demo</b><small>gefülltes Testprofil</small></span>
                     </div>
                 </article>
 
                 <article class="trade-showcase-slide" style="--slide-index: 1">
                     ${qrBadge}
                     <div class="trade-showcase-slide-copy">
-                        <span>Dashboard</span>
-                        <h3>Der schnelle Blick vor dem Becken.</h3>
-                        <p>Bestand, ToDos, Wasserwerte und Trends sind sofort sichtbar, ohne sich durch Listen zu arbeiten.</p>
+                        <span>Sofort vorführbar</span>
+                        <h3>Demo-Profil laden und direkt zeigen.</h3>
+                        <p>Ein komplett befülltes Beispielsystem macht die App verständlich, ohne echte Kundendaten zu öffnen.</p>
                     </div>
                     <div class="trade-showcase-device">
-                        <div class="trade-showcase-device-bar"><b>Übersicht</b><small>Heute</small></div>
+                        <div class="trade-showcase-device-bar"><b>Demo-Profil</b><small>Präsentation</small></div>
                         <div class="trade-showcase-metric-grid">
-                            <span><b>0</b><small>kritische Artikel</small></span>
-                            <span><b>2</b><small>ToDos fällig</small></span>
-                            <span><b>35.0</b><small>PSU stabil</small></span>
+                            <span><b>33</b><small>Lagerartikel</small></span>
                             <span><b>26</b><small>Korallen</small></span>
+                            <span><b>8</b><small>ICP-Verläufe</small></span>
+                            <span><b>12</b><small>ToDos &amp; Logs</small></span>
                         </div>
-                        <svg class="trade-showcase-wide-chart" viewBox="0 0 520 150" role="img" aria-label="Animierte Messwertkurve">
-                            <path d="M20 112 C85 86 126 92 175 66 S276 32 341 52 S431 98 500 42" />
-                            <circle cx="175" cy="66" r="9"/><circle cx="341" cy="52" r="9"/><circle cx="500" cy="42" r="9"/>
-                        </svg>
+                        <div class="trade-showcase-flow">
+                            <span>Demo laden</span>
+                            <i></i>
+                            <span>Workflow zeigen</span>
+                            <i></i>
+                            <span>Zurück zu eigenen Daten</span>
+                        </div>
                     </div>
                 </article>
 
                 <article class="trade-showcase-slide" style="--slide-index: 2">
                     ${qrBadge}
                     <div class="trade-showcase-slide-copy">
-                        <span>OSCI Workflow</span>
-                        <h3>C&amp;R, Trace und Lager sauber verbunden.</h3>
-                        <p>Rezepte rechnen Mengen, Gramm und Kosten. Beim Auslagern werden Bestände und Protokolle direkt gepflegt.</p>
+                        <span>Lager &amp; Rezepte</span>
+                        <h3>Aus Rezepten werden echte Lagerbewegungen.</h3>
+                        <p>C&amp;R und Trace berechnen Mengen, zeigen Restbestände und schreiben Buchungen sauber ins Protokoll.</p>
                     </div>
                     <div class="trade-showcase-split-demo">
                         <div class="trade-showcase-stock-demo">
@@ -2009,9 +2012,9 @@ function renderTradeFairShowcaseContent() {
                         </div>
                         <div class="trade-showcase-recipe-demo">
                             <strong>Meerwasser aus C&amp;R</strong>
-                            <span>100 L Ansatz</span>
-                            <b>Preisbasis: große Gebinde</b>
-                            <small>NaCl · MgSO4 · MgCl2 · K2SO4 · Bor · KH-Tag</small>
+                            <span>100 L</span>
+                            <b>PDF · Kosten · Auslagern</b>
+                            <small>NaCl, MgSO4, MgCl2, K2SO4, Bor und KH-Tag in einer kompakten Ansicht.</small>
                         </div>
                     </div>
                 </article>
@@ -2020,8 +2023,8 @@ function renderTradeFairShowcaseContent() {
                     ${qrBadge}
                     <div class="trade-showcase-slide-copy">
                         <span>Tools</span>
-                        <h3>Rechner für echte Entscheidungen.</h3>
-                        <p>Salinität, Nutrition, Adsorber, Nettovolumen, Wasserwechsel und Dosierung bleiben kompakt erreichbar.</p>
+                        <h3>Rechner, die man am Becken wirklich braucht.</h3>
+                        <p>Kompakte Tools für Salinität, Dosierung, Nutrition, Adsorber, Nettovolumen und Wasserwechsel.</p>
                     </div>
                     <div class="trade-showcase-tool-wall">
                         <span>Salzgehalt korrigieren</span>
@@ -2038,42 +2041,36 @@ function renderTradeFairShowcaseContent() {
                 <article class="trade-showcase-slide" style="--slide-index: 4">
                     ${qrBadge}
                     <div class="trade-showcase-slide-copy">
-                        <span>Analyse &amp; Pflege</span>
-                        <h3>ICP, Logbuch, ToDos und Korallenbestand.</h3>
-                        <p>Messverläufe, Erinnerungen und Koralleninfos helfen, Veränderungen nachvollziehbar zu machen.</p>
+                        <span>Analyse</span>
+                        <h3>Entwicklung sehen, nicht nur Einzelwerte.</h3>
+                        <p>ICP-Daten, Messwerte, NO3/TNb-Ratio, Trends und ToDos helfen beim Nachvollziehen von Veränderungen.</p>
                     </div>
                     <div class="trade-showcase-analysis-demo">
                         <div><b>ICP</b><small>Na, Ca, Sr, Iod und Spurenelemente als Verlauf</small></div>
-                        <div><b>Logbuch</b><small>Wartung, Wasserwechsel, Messwerte und Notizen</small></div>
-                        <div><b>Korallen</b><small>Fotos, Suche, Platzierung und Verträglichkeit</small></div>
+                        <div><b>Ratio</b><small>NO3 und TNb loggen, Zielentwicklung 1 : 3 beobachten</small></div>
+                        <div><b>Logbuch</b><small>Wartung, Wasserwechsel, Messwerte, Fotos und Notizen</small></div>
                     </div>
                 </article>
 
                 <article class="trade-showcase-slide" style="--slide-index: 5">
                     ${qrBadge}
                     <div class="trade-showcase-slide-copy">
-                        <span>Web-App</span>
-                        <h3>Über reeftools.de nutzen und als App speichern.</h3>
-                        <p>ReefTools läuft direkt im Browser und bleibt generell 100% kostenlos. Auf Handy und Desktop kann die Seite als Web-App mit eigenem Icon installiert werden.</p>
+                        <span>Korallen</span>
+                        <h3>Bestand dokumentieren und Platzierung planen.</h3>
+                        <p>Korallen mit Foto, Kaufpreis, Suche und Hinweisen zu Licht, Strömung und Verträglichkeit verwalten.</p>
                     </div>
-                    <div class="trade-showcase-install-demo">
-                        <div class="trade-showcase-phone-card">
-                            <b>1</b><span>reeftools.de öffnen</span>
-                        </div>
-                        <div class="trade-showcase-phone-card">
-                            <b>2</b><span>Zum Home-Bildschirm hinzufügen</span>
-                        </div>
-                        <div class="trade-showcase-phone-card">
-                            <b>3</b><span>Wie eine App starten</span>
-                        </div>
+                    <div class="trade-showcase-coral-demo">
+                        <div><b>SPS</b><span>oben · viel Licht · starke Strömung</span></div>
+                        <div><b>LPS</b><span>mittig bis unten · Abstand beachten</span></div>
+                        <div><b>Zoanthus</b><span>Inselplatzierung empfohlen</span></div>
                     </div>
                 </article>
 
                 <article class="trade-showcase-slide" style="--slide-index: 6">
                     <div class="trade-showcase-slide-copy">
                         <span>Starten</span>
-                        <h3>Direkt ausprobieren. Scannen, öffnen, loslegen.</h3>
-                        <p>Die Daten bleiben lokal im Browser. Wer möchte, nutzt ein optionales Google-Drive-Backup im eigenen Konto.</p>
+                        <h3>Scannen. Kostenlos testen. Als Web-App speichern.</h3>
+                        <p>ReefTools läuft über reeftools.de. Daten bleiben lokal im Browser, optional mit Google-Drive-Backup im eigenen Konto.</p>
                     </div>
                     <a class="trade-showcase-qr trade-showcase-final-qr" href="https://reeftools.de/" target="_blank" rel="noopener noreferrer" aria-label="ReefTools über QR-Code öffnen">
                         <img src="assets/img/reeftools-qr.png" alt="QR-Code zu reeftools.de">

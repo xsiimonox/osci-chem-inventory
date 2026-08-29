@@ -16221,8 +16221,9 @@ label:has(> input[type="radio"]) {
 .trade-showcase-panel {
     position: relative;
     width: min(1280px, calc(100vw - 28px), calc((100dvh - max(var(--space-4), var(--safe-top)) - max(var(--space-4), var(--safe-bottom)) - 8px) * 16 / 9));
+    height: min(720px, calc((100vw - 28px) * 9 / 16), calc(100dvh - max(var(--space-4), var(--safe-top)) - max(var(--space-4), var(--safe-bottom)) - 8px));
     aspect-ratio: 16 / 9;
-    max-height: min(91dvh, 720px);
+    max-height: none;
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--border-color));
     border-radius: clamp(18px, 3vw, 30px);
@@ -17199,6 +17200,104 @@ label:has(> input[type="radio"]) {
     font-size: clamp(1.05rem, 1.8vw, 1.8rem);
 }
 
+.trade-showcase-flow {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr) 42px minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(7px, 1vw, 13px);
+    margin-top: auto;
+}
+
+.trade-showcase-flow span,
+.trade-showcase-coral-demo div {
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-color));
+    border-radius: clamp(12px, 1.4vw, 18px);
+    background:
+        linear-gradient(180deg, color-mix(in srgb, white 10%, transparent), transparent),
+        color-mix(in srgb, var(--surface-card) 82%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 11%, transparent);
+}
+
+.trade-showcase-flow span {
+    display: grid;
+    place-items: center;
+    min-height: clamp(54px, 6vw, 82px);
+    padding: clamp(8px, 1.1vw, 15px);
+    color: var(--text-primary);
+    font-size: clamp(0.72rem, 1.15vw, 1.2rem);
+    font-weight: 930;
+    line-height: 1.12;
+    text-align: center;
+}
+
+.trade-showcase-flow i {
+    position: relative;
+    display: block;
+    height: 3px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 28%, transparent);
+    overflow: hidden;
+}
+
+.trade-showcase-flow i::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, var(--accent), #4fffc7);
+    animation: showcaseFlow 2.8s ease-in-out infinite;
+}
+
+.trade-showcase-coral-demo {
+    display: grid;
+    gap: clamp(10px, 1.35vw, 18px);
+    min-width: 0;
+}
+
+.trade-showcase-coral-demo div {
+    position: relative;
+    display: grid;
+    grid-template-columns: clamp(54px, 6vw, 82px) minmax(0, 1fr);
+    align-items: center;
+    gap: clamp(10px, 1.2vw, 16px);
+    min-width: 0;
+    padding: clamp(12px, 1.6vw, 22px);
+    overflow: hidden;
+}
+
+.trade-showcase-coral-demo div::before {
+    content: "";
+    position: absolute;
+    right: -18px;
+    top: 50%;
+    width: clamp(70px, 9vw, 120px);
+    aspect-ratio: 1;
+    border-radius: 42% 58% 52% 48%;
+    background: radial-gradient(circle at 35% 30%, white 0 4%, var(--accent) 8% 28%, color-mix(in srgb, var(--accent) 35%, #ff6fae));
+    opacity: 0.18;
+    transform: translateY(-50%);
+}
+
+.trade-showcase-coral-demo b {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--accent), #4fffc7);
+    color: color-mix(in srgb, var(--app-bg) 88%, black);
+    font-size: clamp(0.92rem, 1.55vw, 1.65rem);
+    line-height: 1;
+}
+
+.trade-showcase-coral-demo span {
+    position: relative;
+    color: var(--text-primary);
+    font-size: clamp(0.82rem, 1.3vw, 1.35rem);
+    font-weight: 880;
+    line-height: 1.22;
+}
+
 .trade-showcase-progress {
     position: relative;
     z-index: 3;
@@ -17275,6 +17374,12 @@ label:has(> input[type="radio"]) {
 @keyframes showcaseStockFill {
     0%, 15% { transform: scaleX(0.35); transform-origin: left center; }
     50%, 100% { transform: scaleX(1); transform-origin: left center; }
+}
+
+@keyframes showcaseFlow {
+    0% { transform: translateX(-100%); opacity: 0; }
+    18%, 78% { opacity: 1; }
+    100% { transform: translateX(100%); opacity: 0; }
 }
 
 @media (max-width: 620px) {
@@ -17378,7 +17483,8 @@ label:has(> input[type="radio"]) {
 
     .trade-showcase-split-demo,
     .trade-showcase-install-demo,
-    .trade-showcase-tool-wall {
+    .trade-showcase-tool-wall,
+    .trade-showcase-coral-demo {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 5px;
     }
@@ -17387,7 +17493,8 @@ label:has(> input[type="radio"]) {
     .trade-showcase-recipe-demo,
     .trade-showcase-analysis-demo div,
     .trade-showcase-phone-card,
-    .trade-showcase-tool-wall span {
+    .trade-showcase-tool-wall span,
+    .trade-showcase-coral-demo div {
         padding: 6px;
         border-radius: 8px;
     }
@@ -17400,7 +17507,38 @@ label:has(> input[type="radio"]) {
     .trade-showcase-recipe-demo strong,
     .trade-showcase-analysis-demo b,
     .trade-showcase-phone-card span,
-    .trade-showcase-tool-wall span {
+    .trade-showcase-tool-wall span,
+    .trade-showcase-coral-demo span {
+        font-size: 0.52rem;
+    }
+
+    .trade-showcase-coral-demo {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .trade-showcase-coral-demo div {
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 6px;
+    }
+
+    .trade-showcase-coral-demo b {
+        border-radius: 8px;
+        font-size: 0.54rem;
+    }
+
+    .trade-showcase-flow {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 5px;
+    }
+
+    .trade-showcase-flow i {
+        display: none;
+    }
+
+    .trade-showcase-flow span {
+        min-height: 28px;
+        padding: 5px;
+        border-radius: 8px;
         font-size: 0.52rem;
     }
 
