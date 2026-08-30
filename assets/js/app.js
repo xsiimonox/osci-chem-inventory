@@ -1021,6 +1021,141 @@ function renderSeaWaterPricePackageSelectors() {
     `;
 }
 
+function getSeaWaterPsuRecipeEntries() {
+    return seaWaterRecipePer100L
+        .filter(entry => entry.item)
+        .map(entry => {
+            const product = customCrProducts.find(item => item.item === entry.item);
+            if (!product || !Number.isFinite(parseFloat(product.psuRisePerMlPer100L))) return null;
+            return {
+                ...entry,
+                key: product.key,
+                psuRisePerMlPer100L: parseFloat(product.psuRisePerMlPer100L)
+            };
+        })
+        .filter(Boolean);
+}
+
+function getSeaWaterRecipeRawPsu(entries = getSeaWaterPsuRecipeEntries(), values = null) {
+    return entries.reduce((sum, entry) => {
+        const amount = values ? Math.max(0, parseFloat(values[entry.item]) || 0) : Math.max(0, parseFloat(entry.amount) || 0);
+        return sum + (amount * entry.psuRisePerMlPer100L);
+    }, 0);
+}
+
+function getSeaWaterPsuInputId(itemName) {
+    return `seaWaterPsu-${slugifyToolTitle(itemName)}`;
+}
+
+function readSeaWaterPsuRecipeValues() {
+    const values = {};
+    getSeaWaterPsuRecipeEntries().forEach(entry => {
+        const input = document.getElementById(getSeaWaterPsuInputId(entry.item));
+        values[entry.item] = Math.max(0, parseFloat(String(input?.value || '').replace(',', '.')) || 0);
+    });
+    return values;
+}
+
+function estimateSeaWaterRecipePsu(values, referencePsu) {
+    const entries = getSeaWaterPsuRecipeEntries();
+    const referenceRaw = getSeaWaterRecipeRawPsu(entries);
+    const recipeRaw = getSeaWaterRecipeRawPsu(entries, values);
+    if (!referenceRaw || !recipeRaw || !referencePsu) return 0;
+    return (recipeRaw / referenceRaw) * referencePsu;
+}
+
+function renderSeaWaterPsuRecipeGrid() {
+    const grid = document.getElementById('seaWaterPsuRecipeGrid');
+    if (!grid) return;
+    const entries = getSeaWaterPsuRecipeEntries();
+    grid.innerHTML = entries.map(entry => `
+        <label class="sea-water-psu-input">
+            <span>${escapeHtml(entry.item)}</span>
+            <input type="number" id="${getSeaWaterPsuInputId(entry.item)}" min="0" step="0.01" inputmode="decimal" value="${Number(entry.amount || 0).toFixed(2)}" oninput="renderSeaWaterRecipePsuCheck()">
+            <small>ml je 100 L · Original ${Number(entry.amount || 0).toFixed(2)} ml</small>
+        </label>
+    `).join('');
+}
+
+function renderSeaWaterRecipePsuCheck() {
+    const result = document.getElementById('seaWaterPsuCheckResult');
+    if (!result) return;
+    if (!document.getElementById(getSeaWaterPsuInputId(getSeaWaterPsuRecipeEntries()[0]?.item || ''))) {
+        renderSeaWaterPsuRecipeGrid();
+    }
+    const referencePsu = Math.max(0, parseFloat(document.getElementById('seaWaterPsuReference')?.value) || 34.5);
+    const tankPsu = Math.max(0, parseFloat(document.getElementById('seaWaterPsuTank')?.value) || referencePsu);
+    const values = readSeaWaterPsuRecipeValues();
+    const estimatedPsu = estimateSeaWaterRecipePsu(values, referencePsu);
+    const estimatedDensity = typeof densityKgLFromPsuTemp === 'function'
+        ? densityKgLFromPsuTemp(estimatedPsu, 25)
+        : null;
+    const referenceDelta = estimatedPsu - referencePsu;
+    const tankDelta = estimatedPsu - tankPsu;
+    const effectLabel = Math.abs(tankDelta) < 0.05
+        ? 'nahezu neutral'
+        : tankDelta > 0
+            ? 'würde die Salinität eher erhöhen'
+            : 'würde die Salinität eher senken';
+    const effectClass = Math.abs(tankDelta) < 0.05 ? 'neutral' : tankDelta > 0 ? 'high' : 'low';
+    const deviations = getSeaWaterPsuRecipeEntries()
+        .map(entry => {
+            const original = Number(entry.amount || 0);
+            const current = Number(values[entry.item] || 0);
+            const delta = current - original;
+            const percent = original ? (delta / original) * 100 : 0;
+            return { entry, original, current, delta, percent };
+        })
+        .filter(row => Math.abs(row.delta) > 0.009)
+        .sort((a, b) => Math.abs(b.percent) - Math.abs(a.percent))
+        .slice(0, 4);
+
+    result.innerHTML = `
+        <div class="sea-water-psu-result">
+            <div class="tool-result-summary sea-water-psu-summary">
+                <span><strong>${estimatedPsu.toFixed(2)} PSU</strong><small>geschätzte Rezeptur-Salinität</small></span>
+                <span><strong>${referenceDelta >= 0 ? '+' : ''}${referenceDelta.toFixed(2)} PSU</strong><small>gegen Ziel ${referencePsu.toFixed(1)} PSU</small></span>
+                ${estimatedDensity ? `<span><strong>${estimatedDensity.toFixed(4)}</strong><small>Dichte @ 25 °C</small></span>` : ''}
+            </div>
+            <div class="workflow-message sea-water-psu-effect sea-water-psu-effect--${effectClass}">
+                <strong>${effectLabel}</strong>
+                <span>Bei Austausch gleicher Menge gegen Beckenwasser mit ${tankPsu.toFixed(1)} PSU liegt die Mischung rechnerisch ${tankDelta >= 0 ? '+' : ''}${tankDelta.toFixed(2)} PSU daneben.</span>
+            </div>
+            ${deviations.length ? `
+                <div class="sea-water-psu-deviation-list">
+                    <strong>Größte Abweichungen zur Originalrezeptur</strong>
+                    ${deviations.map(row => `
+                        <div class="tool-row">
+                            <span><strong>${escapeHtml(row.entry.item)}</strong><small>Original ${row.original.toFixed(2)} ml je 100 L</small></span>
+                            <span>${row.current.toFixed(2)} ml <small>${row.delta >= 0 ? '+' : ''}${row.delta.toFixed(2)} ml · ${row.percent >= 0 ? '+' : ''}${row.percent.toFixed(1)}%</small></span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '<p class="hint">Die eingegebenen Mengen entsprechen der Originalrezeptur.</p>'}
+            <p class="hint">Hinweis: Das ist eine rechnerische Plausibilitätsprüfung auf Basis der hinterlegten C&amp;R-PSU-Näherungen. Eine echte Spindel- oder Leitwertmessung der fertigen Mischung ersetzt sie nicht.</p>
+        </div>
+    `;
+}
+
+function loadOriginalSeaWaterPsuRecipe() {
+    renderSeaWaterPsuRecipeGrid();
+    getSeaWaterPsuRecipeEntries().forEach(entry => {
+        const input = document.getElementById(getSeaWaterPsuInputId(entry.item));
+        if (input) input.value = Number(entry.amount || 0).toFixed(2);
+    });
+    renderSeaWaterRecipePsuCheck();
+    showToast('Originale C&R-Rezeptur geladen.', 'success');
+}
+
+function clearSeaWaterPsuRecipe() {
+    renderSeaWaterPsuRecipeGrid();
+    getSeaWaterPsuRecipeEntries().forEach(entry => {
+        const input = document.getElementById(getSeaWaterPsuInputId(entry.item));
+        if (input) input.value = '';
+    });
+    renderSeaWaterRecipePsuCheck();
+}
+
 function getSeaWaterRecipeCost(entry, amount) {
     if (!entry.item) return { cost: 0, sourceLabel: 'preislich vernachlässigt', sourceAmount: amount, ignored: true };
     if (entry.item === 'Natriumchlorid (NaCl)') {
@@ -4535,7 +4670,7 @@ function createWarehouseData(source = {}) {
         dashboardSettings: source.dashboardSettings || {
             widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
             range: '30',
-            pinnedMeasurements: ['KH', 'CA', 'PO4']
+            pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4']
         },
         coralCatalog: source.coralCatalog || [],
         coralTransfers: source.coralTransfers || [],
@@ -4703,7 +4838,7 @@ function createAquariumData(source = {}) {
         dashboardSettings: cloneSerializable(source.dashboardSettings || {
             widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
             range: '30',
-            pinnedMeasurements: ['KH', 'CA', 'PO4']
+            pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4']
         }),
         coralCatalog: cloneSerializable(source.coralCatalog || []),
         coralTransfers: cloneSerializable(source.coralTransfers || []),
@@ -4962,9 +5097,9 @@ function normalizeWarehouseData(data) {
     if (db.majorCorrectionSettings.strengths.Ca === undefined) db.majorCorrectionSettings.strengths.Ca = 1;
     if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = 100;
     if (db.psuCorrectionOffset === undefined) db.psuCorrectionOffset = 0;
-    if (!db.dashboardSettings) db.dashboardSettings = { widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true }, range: '30', pinnedMeasurements: ['KH', 'CA', 'PO4'] };
+    if (!db.dashboardSettings) db.dashboardSettings = { widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true }, range: '30', pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4'] };
     if (!db.dashboardSettings.widgets) db.dashboardSettings.widgets = { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true };
-    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements) || db.dashboardSettings.pinnedMeasurements.length === 0) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'PO4'];
+    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements) || db.dashboardSettings.pinnedMeasurements.length === 0) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'NO3', 'PO4'];
     if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
     if (!db.coralCatalog) db.coralCatalog = [];
     if (!db.coralTransfers) db.coralTransfers = [];
@@ -6612,6 +6747,7 @@ function renderCurrentWarehouseViews() {
     safeRender('Nachbestellen', renderNachbestellen);
     safeRender('Supabase', renderSupabaseSyncSettings);
     safeRender('Demo-Profil', renderDemoProfileSettings);
+    safeRender('Dashboard-Einstellungen', renderDashboardSettingsPanel);
     safeRender('Cursor', applyCursorSettings);
     safeRender('Aquarium-Auswahl', renderAquariumWorkspacePanels);
     safeRender('Logbuch', renderLogBook);
@@ -6642,11 +6778,11 @@ function getDashboardSettings() {
         db.dashboardSettings = {
             widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
             range: '30',
-            pinnedMeasurements: ['KH', 'CA', 'PO4']
+            pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4']
         };
     }
     if (!db.dashboardSettings.widgets) db.dashboardSettings.widgets = { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true };
-    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements)) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'PO4'];
+    if (!Array.isArray(db.dashboardSettings.pinnedMeasurements)) db.dashboardSettings.pinnedMeasurements = ['KH', 'CA', 'NO3', 'PO4'];
     if (!db.dashboardSettings.range) db.dashboardSettings.range = '30';
     return db.dashboardSettings;
 }
@@ -6679,9 +6815,10 @@ function resetDashboardEdit() {
     dashboardEditDraft = {
         widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
         range: '30',
-        pinnedMeasurements: ['KH', 'CA', 'PO4']
+        pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4']
     };
     renderDashboard();
+    renderDashboardSettingsPanel();
 }
 
 function applyDashboardEdit() {
@@ -6690,6 +6827,7 @@ function applyDashboardEdit() {
     dashboardEditDraft = null;
     saveDB(false);
     renderDashboard();
+    renderDashboardSettingsPanel();
     showToast('Dashboard-Einstellungen gespeichert.', 'success');
 }
 
@@ -6698,10 +6836,12 @@ function toggleDashboardWidget(widgetKey, checked) {
     settings.widgets[widgetKey] = checked !== false;
     if (dashboardEditDraft) {
         renderDashboard();
+        renderDashboardSettingsPanel();
         return;
     }
     saveDB(false);
     renderDashboard();
+    renderDashboardSettingsPanel();
 }
 
 function setDashboardRange(value) {
@@ -6709,10 +6849,12 @@ function setDashboardRange(value) {
     settings.range = value || '30';
     if (dashboardEditDraft) {
         renderDashboard();
+        renderDashboardSettingsPanel();
         return;
     }
     saveDB(false);
     renderDashboard();
+    renderDashboardSettingsPanel();
 }
 
 function toggleDashboardMeasurementPin(typeId, checked) {
@@ -6723,10 +6865,112 @@ function toggleDashboardMeasurementPin(typeId, checked) {
     settings.pinnedMeasurements = Array.from(set).slice(0, 6);
     if (dashboardEditDraft) {
         renderDashboard();
+        renderDashboardSettingsPanel();
         return;
     }
     saveDB(false);
     renderDashboard();
+    renderDashboardSettingsPanel();
+}
+
+function renderDashboardSettingsPanel() {
+    const container = document.getElementById('dashboard-settings-panel');
+    if (!container) return;
+    const settings = getDashboardSettings();
+    const widgetRows = [
+        ['stock', 'Kritische Produkte', 'Zeigt knappe Lagerartikel und führt direkt ins Lager.'],
+        ['todos', 'Nächste Aufgabe', 'Zeigt die nächste fällige Erinnerung aus dem Logbuch.'],
+        ['tests', 'Wassertest-Kachel', 'Zeigt den letzten gespeicherten Messzeitpunkt.'],
+        ['measurements', 'Messwert-Diagramme', 'Zeigt die ausgewählten Messwerte als Kurven.'],
+        ['logs', 'Letzte Buchung', 'Zeigt Protokoll und letzten Logbucheintrag.'],
+        ['corals', 'Korallen im Fokus', 'Zeigt den Korallenbestand und öffnet direkt den Korallenkatalog.']
+    ];
+    if (isLogbookFeatureVisible('osmoseTank')) widgetRows.splice(3, 0, ['osmose', 'Osmosevorrat', 'Zeigt den Osmosetank-Füllstand.']);
+    if (isLogbookFeatureVisible('dosingContainers')) widgetRows.splice(4, 0, ['dosing', 'Vorratsbehälter', 'Zeigt knappe Dosierbehälter.']);
+    const measurementTypes = getMeasurementTypes();
+    const pinned = new Set(settings.pinnedMeasurements || []);
+    const pinnedCount = pinned.size;
+    container.innerHTML = `
+        <div class="dashboard-settings-panel">
+            <label class="settings-toggle-row dashboard-overview-toggle">
+                <input type="checkbox" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
+                <span>
+                    <span class="settings-toggle-title">Übersicht im Menü anzeigen</span>
+                    <small>Wenn aktiv, erscheint die Startübersicht als eigener Menüpunkt.</small>
+                </span>
+            </label>
+
+            <div class="dashboard-settings-block">
+                <div class="dashboard-settings-head">
+                    <strong>Kacheln auf der Übersicht</strong>
+                    <small>„Korallen im Fokus“ kannst du hier gezielt ein- oder ausblenden.</small>
+                </div>
+                <div class="dashboard-settings-grid">
+                    ${widgetRows.map(([key, label, hint]) => `
+                        <label class="dashboard-setting-tile">
+                            <input type="checkbox" ${settings.widgets?.[key] ? 'checked' : ''} onchange="toggleDashboardWidget('${key}', this.checked)">
+                            <span>
+                                <strong>${escapeHtml(label)}</strong>
+                                <small>${escapeHtml(hint)}</small>
+                            </span>
+                        </label>
+                    `).join('')}
+                </div>
+            </div>
+
+            <div class="dashboard-settings-block">
+                <div class="dashboard-settings-head">
+                    <strong>Diagramme</strong>
+                    <small>Wähle bis zu 6 Messwerte. Diagramme erscheinen, sobald für den Wert Daten vorhanden sind.</small>
+                </div>
+                <div class="tool-grid dashboard-settings-range-grid">
+                    <div class="input-group">
+                        <label for="dashboardSettingsRangeSelect">Zeitraum:</label>
+                        <select id="dashboardSettingsRangeSelect" onchange="setDashboardRange(this.value)">
+                            <option value="14" ${settings.range === '14' ? 'selected' : ''}>14 Tage</option>
+                            <option value="30" ${settings.range === '30' ? 'selected' : ''}>30 Tage</option>
+                            <option value="90" ${settings.range === '90' ? 'selected' : ''}>90 Tage</option>
+                            <option value="365" ${settings.range === '365' ? 'selected' : ''}>1 Jahr</option>
+                            <option value="all" ${settings.range === 'all' ? 'selected' : ''}>Alles</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="dashboard-measurement-settings-grid">
+                    ${measurementTypes.map(type => {
+                        const count = getMeasurementEntriesForRange(type.id, settings.range).length;
+                        const checked = pinned.has(type.id);
+                        const disabled = !checked && pinnedCount >= 6;
+                        return `
+                            <label class="dashboard-measurement-setting ${count ? 'has-data' : 'no-data'}">
+                                <input type="checkbox" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''} onchange="toggleDashboardMeasurementPin('${type.id}', this.checked)">
+                                <span>
+                                    <strong>${escapeHtml(type.label)}</strong>
+                                    <small>${count ? `${count} Messung(en) im Zeitraum` : 'noch keine Messwerte im Zeitraum'}</small>
+                                </span>
+                            </label>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+
+            <div class="dashboard-settings-actions">
+                <button type="button" class="btn-secondary btn-animated" onclick="resetDashboardSettingsFromPanel()">Standard laden</button>
+                <button type="button" class="btn-primary btn-animated" onclick="setOverviewEnabled(true); selectTab('uebersicht')">Übersicht ansehen</button>
+            </div>
+        </div>
+    `;
+}
+
+function resetDashboardSettingsFromPanel() {
+    db.dashboardSettings = {
+        widgets: { stock: true, todos: true, tests: true, osmose: true, dosing: true, measurements: true, logs: true, corals: true },
+        range: '30',
+        pinnedMeasurements: ['KH', 'CA', 'NO3', 'PO4']
+    };
+    saveDB(false);
+    renderDashboardSettingsPanel();
+    renderDashboard();
+    showToast('Übersicht auf Standard gesetzt.', 'success');
 }
 
 function getMeasurementEntriesForRange(typeId, rangeValue = '30') {
@@ -8624,7 +8868,16 @@ function scheduleActiveTabSelfCheck(tabId = document.querySelector('.tab-content
 }
 
 Object.assign(window, {
-    scheduleActiveTabSelfCheck
+    scheduleActiveTabSelfCheck,
+    startDashboardEdit,
+    cancelDashboardEdit,
+    resetDashboardEdit,
+    applyDashboardEdit,
+    toggleDashboardWidget,
+    setDashboardRange,
+    toggleDashboardMeasurementPin,
+    renderDashboardSettingsPanel,
+    resetDashboardSettingsFromPanel
 });
 
 function revealRenderedTab(tab) {
@@ -8842,6 +9095,9 @@ function renderSettingsCardOnDemand(card, force = false) {
         runSettingsRender('Lokaler Speicher', renderStorageSecurityStatus);
         runSettingsRender('Demo-Profil', renderDemoProfileSettings);
         runSettingsRender('Google Drive', renderGoogleDriveSyncCard);
+    }
+    if (targetCard.classList.contains('settings-card-dashboard')) {
+        runSettingsRender('Dashboard-Einstellungen', renderDashboardSettingsPanel);
     }
     if (targetCard.classList.contains('settings-card-local-devices')) {
         runSettingsRender('Lokale Geräte', renderLocalDeviceSettings);
@@ -15859,6 +16115,7 @@ function initToolSection(sectionId, force = false) {
         runToolInit('Makro-Rezept', renderMacroRecipe);
         runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
         runToolInit('Meerwasser Mischung', renderSeaWaterMix);
+        runToolInit('Meerwasser PSU-Prüfung', renderSeaWaterRecipePsuCheck);
         runToolInit('C&R Sperre', syncCustomCRLockUI);
         runToolInit('C&R Rechner', () => {
             if (!isCustomCRUnlocked()) return;
@@ -16164,8 +16421,8 @@ const toolInfoTexts = {
     },
     'meerwasser-aus-c-und-r-anmischen': {
         summary: 'Skaliert das C&R Meerwasser-Rezept auf deine gewünschte Menge.',
-        details: 'Zeigt Osmosewasser, C&R Produkte, Makro KH-Tag sowie ml- und g-Werte. Presets können gespeichert und Produkte direkt ausgelagert werden.',
-        note: 'Spurenelemente K+ und A- können separat nach Herstellerangabe ergänzt werden.'
+        details: 'Zeigt Osmosewasser, C&R Produkte, Makro KH-Tag sowie ml- und g-Werte. Zusätzlich kannst du eine freie C&R-Rezeptur als PSU-Plausibilitätsprüfung kontrollieren.',
+        note: 'Der PSU-Check ist eine rechnerische Näherung. Die fertige Mischung trotzdem messen.'
     },
     'c-und-r-natriumchlorid-aus-nacl-pulver': {
         summary: 'Berechnet das Ansetzen von flüssigem C&R Natriumchlorid aus NaCl Pulver.',
@@ -25849,6 +26106,9 @@ Object.assign(window, {
     closeTradeFairShowcase,
     openTradeFairShowcaseSettings,
     fillCRDemoData,
+    renderSeaWaterRecipePsuCheck,
+    loadOriginalSeaWaterPsuRecipe,
+    clearSeaWaterPsuRecipe,
     unlockWavePumpDemo,
     lockWavePumpDemo,
     renderWavePumpDemoSettings,

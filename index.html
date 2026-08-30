@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.136-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.138-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.136</span>
+                    <span class="version-badge">v3.4.138</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -890,6 +890,30 @@
                                     <strong>1 ml je Lösung / 100 L</strong>
                                 </div>
                             </div>
+                            <details class="sea-water-psu-check">
+                                <summary>
+                                    <span><strong>Rezeptur / PSU prüfen</strong><small>Freie C&amp;R-Mengen eingeben und prüfen, ob die Mischung ungefähr die gewünschte Salinität erreicht.</small></span>
+                                    <span class="settings-accordion-hint" aria-hidden="true"></span>
+                                </summary>
+                                <div class="sea-water-psu-check__body">
+                                    <div class="tool-grid sea-water-psu-check__settings">
+                                        <div class="input-group">
+                                            <label>Referenz / Ziel-PSU:</label>
+                                            <input type="number" id="seaWaterPsuReference" min="1" step="0.1" value="34.5" oninput="renderSeaWaterRecipePsuCheck()">
+                                        </div>
+                                        <div class="input-group">
+                                            <label>Aktuelle Aquarium-PSU:</label>
+                                            <input type="number" id="seaWaterPsuTank" min="1" step="0.1" value="34.5" oninput="renderSeaWaterRecipePsuCheck()">
+                                        </div>
+                                    </div>
+                                    <div id="seaWaterPsuRecipeGrid" class="sea-water-psu-recipe-grid"></div>
+                                    <div class="btn-group calculator-actions">
+                                        <button type="button" class="btn-secondary btn-animated" onclick="loadOriginalSeaWaterPsuRecipe()">Originalrezeptur laden</button>
+                                        <button type="button" class="btn-secondary btn-animated" onclick="clearSeaWaterPsuRecipe()">Felder leeren</button>
+                                    </div>
+                                    <div id="seaWaterPsuCheckResult"></div>
+                                </div>
+                            </details>
                             <div id="seaWaterMixResult"></div>
                         </div>
 
@@ -1832,6 +1856,12 @@
                 </div>
             </section>
 
+            <div class="card settings-card settings-card-dashboard">
+                <h3>Übersicht anpassen</h3>
+                <p class="hint">Lege fest, welche Kacheln und Messwert-Diagramme auf der Startübersicht sichtbar sind. Diese Auswahl wird mit deinen Projektdaten gespeichert.</p>
+                <div id="dashboard-settings-panel"></div>
+            </div>
+
             <div class="card data-safety-card data-recovery-center-card">
                 <h3>Datensicherheit, Demo &amp; Backup</h3>
                 <p class="hint">Speicherschutz, Wiederherstellung, Demo-Profil, Datei-Backup und Google Drive sind hier gebündelt.</p>
@@ -2390,8 +2420,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.136-release"></script>
-    <script src="assets/js/app.js?v=3.4.136-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.138-release"></script>
+    <script src="assets/js/app.js?v=3.4.138-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
