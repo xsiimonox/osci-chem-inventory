@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.134-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.136-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.134</span>
+                    <span class="version-badge">v3.4.136</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -129,6 +129,9 @@
                     </select>
                 </div>
                 <label for="cr-paste-area" class="field-label">C&amp;R Daten:</label>
+                <div class="workflow-actions workflow-actions--compact">
+                    <button type="button" class="btn-secondary btn-animated" onclick="fillCRDemoData()">Demo-Daten eintragen</button>
+                </div>
                 <textarea id="cr-paste-area" placeholder="Beispiel: NaCl MgCl2 Na2SO4 MgSO4 KCl K2SO4 KBr SrCl2 CaCl2 NaF Bor (B)  4798.13 ml 25.24 ml 0 ml 714.26 ml 89.89 ml 0 ml 25.24 ml 1.91 ml 76.02 ml 0 ml 0 ml" oninput="previewCRPaste()"></textarea>
                 
                 <div id="cr-preview-container" class="workflow-preview" hidden>
@@ -2387,8 +2390,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.134-release"></script>
-    <script src="assets/js/app.js?v=3.4.134-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.136-release"></script>
+    <script src="assets/js/app.js?v=3.4.136-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -23,6 +23,11 @@ const crOrder = [
     { name: "Bor (B)", cat: "C&R Produkte" }
 ];
 
+const demoCRPasteExample = [
+    'NaCl MgCl2 Na2SO4 MgSO4 KCl K2SO4 KBr SrCl2 CaCl2 NaF Bor (B)',
+    '920.00 ml 145.00 ml 0 ml 190.00 ml 42.00 ml 0 ml 8.00 ml 12.50 ml 85.00 ml 0 ml 3.40 ml'
+].join('  ');
+
 const interchangeableStockProducts = [
     [
         { cat: 'C&R Produkte', item: 'Natriumfluorid (NaF)' },
@@ -23318,6 +23323,23 @@ function syncCRPreferredUnitUI() {
     if (select) select.value = getCRPreferredUnit();
 }
 
+async function fillCRDemoData() {
+    const pasteArea = document.getElementById('cr-paste-area');
+    if (!pasteArea) return;
+    if (pasteArea.value.trim() && pasteArea.value.trim() !== demoCRPasteExample) {
+        const confirmed = await appConfirm('Das aktuelle C&R-Feld wird durch Demo-Daten ersetzt. Fortfahren?', {
+            title: 'Demo-Daten eintragen',
+            confirmText: 'Eintragen',
+            cancelText: 'Abbrechen'
+        });
+        if (!confirmed) return;
+    }
+    pasteArea.value = demoCRPasteExample;
+    previewCRPaste();
+    pasteArea.focus();
+    showToast('C&R Demo-Daten eingetragen.', 'success');
+}
+
 function updateCRPreferredUnit(value) {
     if (!db.settings) db.settings = {};
     db.settings.crPreferredUnit = value === 'g' ? 'g' : 'ml';
@@ -25826,6 +25848,7 @@ Object.assign(window, {
     openTradeFairShowcase,
     closeTradeFairShowcase,
     openTradeFairShowcaseSettings,
+    fillCRDemoData,
     unlockWavePumpDemo,
     lockWavePumpDemo,
     renderWavePumpDemoSettings,
