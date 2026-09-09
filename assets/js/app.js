@@ -15963,7 +15963,10 @@ function saveAndBookTraceCalculatorMixture() {
         return;
     }
 
-    const shortages = queue.filter(position => {
+    const resolvedQueue = expandQueueWithInterchangeableStock(queue);
+    if (resolvedQueue === null) return;
+
+    const shortages = resolvedQueue.filter(position => {
         const stock = traceCalcNumber(db.inventory?.[position.cat]?.[position.item], 0);
         return stock + 0.0001 < position.amount;
     });
@@ -15971,8 +15974,9 @@ function saveAndBookTraceCalculatorMixture() {
     if (shortages.length) {
         const details = shortages.map(position => {
             const stockMl = traceCalcNumber(db.inventory?.[position.cat]?.[position.item], 0);
+            const requiredG = position.grams !== undefined ? position.grams : traceCalcElementGrams(position.item, position.amount);
             const stockG = traceCalcElementGrams(position.item, stockMl);
-            return `${position.item}: benötigt ${traceCalcFormatMlG(position.amount, position.grams)}, verfügbar ${traceCalcFormatMlG(stockMl, stockG)}`;
+            return `${position.item}: benötigt ${traceCalcFormatMlG(position.amount, requiredG)}, verfügbar ${traceCalcFormatMlG(stockMl, stockG)}`;
         }).join('\n');
         alert(`Nicht genügend Lagerbestand. Es wurde nichts gespeichert oder ausgelagert.\n\n${details}`);
         return;
@@ -15981,13 +15985,13 @@ function saveAndBookTraceCalculatorMixture() {
     const kationenTotal = payload.recipe.totals.kationen;
     const anionenTotal = payload.recipe.totals.anionen;
     const confirmed = confirm(
-        `Trace-Mischung speichern und ${queue.length} Warenpositionen auslagern?\n\n` +
+        `Trace-Mischung speichern und ${resolvedQueue.length} Warenpositionen auslagern?\n\n` +
         `Kationen: ${traceCalcFormatMlG(kationenTotal.elementsMl, kationenTotal.elementsG)}\n` +
         `Anionen: ${traceCalcFormatMlG(anionenTotal.elementsMl, anionenTotal.elementsG)}`
     );
     if (!confirmed) return;
 
-    const logs = queue.map(position => {
+    const logs = resolvedQueue.map(position => {
         db.inventory[position.cat][position.item] -= position.amount;
         db.stats[position.item] = (db.stats[position.item] || 0) + position.amount;
         return addLog(position.cat, position.item, 'out', position.amount);
@@ -16002,7 +16006,7 @@ function saveAndBookTraceCalculatorMixture() {
     refreshTraceCalculatorAfterSave();
     renderLager();
     checkAndNotifyStockAlerts();
-    showToast(`Trace-Mischung gespeichert und ${queue.length} Warenpositionen ausgelagert`, 'success');
+    showToast(`Trace-Mischung gespeichert und ${resolvedQueue.length} Warenpositionen ausgelagert`, 'success');
 }
 
 window.updateTraceCalculatorIcp = updateTraceCalculatorIcp;
@@ -23471,20 +23475,29 @@ function executeAction(mode = 'log') {
         let finalMl = convertInputToStoredAmount(item, unit, rawAmount, useTara, containerValue);
         if (finalMl === null || finalMl <= 0) return alert("Fehler: Nach Abzug des Behälters bleibt keine Restmenge übrig.");
 
+        const resolvedQueue = expandQueueWithInterchangeableStock([{ cat, item, amount: finalMl }]);
+        if (resolvedQueue === null) return;
+        if (resolvedQueue.length && (resolvedQueue.length > 1 || resolvedQueue[0].cat !== cat || resolvedQueue[0].item !== item)) {
+            const logs = [];
+            resolvedQueue.forEach(position => {
+                if (!db.inventory[position.cat]) db.inventory[position.cat] = {};
+                db.inventory[position.cat][position.item] = Math.max(0, (db.inventory[position.cat][position.item] || 0) - position.amount);
+                db.stats[position.item] = (db.stats[position.item] || 0) + position.amount;
+                logs.push(addLog(position.cat, position.item, 'out', position.amount));
+            });
+            saveDB();
+            closeModal();
+            renderLager();
+            showToast(`${item}: ${formatItemAmount(item, finalMl, 2)} ausgelagert, Ersatzprodukt berücksichtigt.`, 'success');
+            if (logs.length === 1) showBookingUndoToast(logs[0]);
+            checkAndNotifyStockAlerts();
+            return;
+        }
+
         if (stock - finalMl < 0) {
-            if (item === "Fluor (F)") {
-                let alt = db.inventory["C&R Produkte"]["Natriumfluorid (NaF)"] || 0;
-                alert(`Mangel an Fluor (F)!\nHinweis: Natriumfluorid (NaF) aus der C&R Serie ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
-                return;
-            } else if (item === "Natriumfluorid (NaF)") {
-                let alt = db.inventory["Anionen"]["Fluor (F)"] || 0;
-                alert(`Mangel an Natriumfluorid (NaF)!\nHinweis: Fluor (F) aus den Anionen ist identisch. Davon sind noch ${alt.toFixed(1)} ml verfügbar.`);
-                return;
-            }
-            
         showConflictModal(cat, item, finalMl, stock, () => {
                 db.inventory[cat][item] = 0;
-                db.stats[item] += stock;
+                db.stats[item] = (db.stats[item] || 0) + stock;
                 const log = addLog(cat, item, 'out', stock);
                 saveDB();
                 closeModal();
@@ -23495,7 +23508,7 @@ function executeAction(mode = 'log') {
             return;
         }
         db.inventory[cat][item] -= finalMl;
-        db.stats[item] += finalMl;
+        db.stats[item] = (db.stats[item] || 0) + finalMl;
         const log = addLog(cat, item, 'out', finalMl);
         saveDB();
         closeModal();
@@ -23677,12 +23690,46 @@ function getInterchangeableStockResolution(cat, item, amount) {
     };
 }
 
-function expandQueueWithInterchangeableStock(queue) {
-    return (queue || []).flatMap(entry => {
+function formatInterchangeableStockEntry(entry) {
+    return `${entry.item}: ${formatItemAmount(entry.item, entry.amount, 2)}`;
+}
+
+function confirmInterchangeableStockResolution(resolution) {
+    if (!resolution?.usesReplacement) return true;
+    const requestedStock = getInventoryAmount(resolution.requested.cat, resolution.requested.item);
+    if (requestedStock + 0.0001 >= resolution.required) return true;
+    const replacementLines = resolution.entries
+        .filter(entry => entry.usedAsReplacement)
+        .map(formatInterchangeableStockEntry)
+        .join('\n');
+    const requestedPart = resolution.entries.find(entry => !entry.usedAsReplacement);
+    const requestedLine = requestedPart
+        ? `${resolution.requested.item} wird zuerst auf ${formatItemAmount(resolution.requested.item, 0, 2)} reduziert.`
+        : `${resolution.requested.item} hat keinen nutzbaren Bestand.`;
+    return confirm(
+        `Für ${resolution.requested.item} reicht der direkte Lagerbestand nicht aus.\n\n` +
+        `${requestedLine}\n` +
+        `Der fehlende Rest kann mit identischem Ersatzprodukt gebucht werden:\n${replacementLines}\n\n` +
+        `Ersatzprodukt zusätzlich auslagern?`
+    );
+}
+
+function expandQueueWithInterchangeableStock(queue, options = {}) {
+    const shouldConfirm = options.confirm !== false;
+    if (!Array.isArray(queue)) return [];
+    const expanded = [];
+    for (const entry of queue) {
         const resolution = getInterchangeableStockResolution(entry.cat, entry.item, entry.amount);
-        if (!resolution.hasAlternatives || resolution.totalAvailable < entry.amount) return [entry];
-        return resolution.entries.length ? resolution.entries : [entry];
-    });
+        if (!resolution.hasAlternatives || resolution.totalAvailable + 0.0001 < entry.amount) {
+            expanded.push(entry);
+            continue;
+        }
+        if (resolution.usesReplacement && shouldConfirm && !confirmInterchangeableStockResolution(resolution)) {
+            return null;
+        }
+        expanded.push(...(resolution.entries.length ? resolution.entries : [entry]));
+    }
+    return expanded;
 }
 
 function renderInterchangeableStockHint(resolution, itemName) {
@@ -24414,6 +24461,7 @@ function auslagernMischung(typ) {
 
 function executeQueueWithConflictHandling(queue, index) {
     if (!requireWarehouseWriteAccess('Diese Lagerbuchung')) return;
+    if (!Array.isArray(queue)) return;
     if (index >= queue.length) {
         saveDB();
         const pasteArea = document.getElementById('cr-paste-area');
