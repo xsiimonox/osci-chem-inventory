@@ -20146,16 +20146,17 @@ progress.mini-progress::-moz-progress-bar {
 
 .icp-compare-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 1fr;
     gap: var(--space-3);
 }
 
 .icp-compare-card {
+    width: 100%;
     margin-bottom: 0;
 }
 
 .icp-compare-card .icp-chart-scroll .measurement-chart {
-    min-width: 520px;
+    min-width: 620px;
 }
 
 .icp-stat-grid {
@@ -20558,6 +20559,10 @@ progress.mini-progress::-moz-progress-bar {
     }
 
     .icp-chart-scroll .measurement-chart {
+        min-width: 430px;
+    }
+
+    .icp-compare-card .icp-chart-scroll .measurement-chart {
         min-width: 430px;
     }
 }
