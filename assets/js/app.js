@@ -1256,6 +1256,8 @@ let latestSnapshotAt = null;
 let appBootstrapComplete = false;
 let pendingStartupTab = '';
 let startupStorageRecoveryCandidate = null;
+const tabRenderRetryCounts = new Map();
+const tabRenderRetryTimers = new Map();
 let lastPersistenceErrorAt = null;
 let lastPersistenceErrorMessage = '';
 let lastStorageHealthCheck = null;
@@ -8809,10 +8811,33 @@ function renderActiveTabContent(tabId) {
             renderOpenSettingsCards();
         }
         applyLogbookFeatureVisibility();
+        tabRenderRetryCounts.delete(tabId);
     } catch (err) {
         console.error(`Render failed for tab ${tabId}:`, err);
-        renderTabErrorFallback(tabId, err);
+        scheduleTabRenderRetry(tabId, err);
     }
+}
+
+function scheduleTabRenderRetry(tabId, firstError) {
+    const attempts = tabRenderRetryCounts.get(tabId) || 0;
+    const existingTimer = tabRenderRetryTimers.get(tabId);
+    if (existingTimer) return;
+    if (attempts >= 1) {
+        tabRenderRetryCounts.delete(tabId);
+        renderTabErrorFallback(tabId, firstError);
+        return;
+    }
+
+    tabRenderRetryCounts.set(tabId, attempts + 1);
+    console.warn(`Render of ${tabId} failed; retrying once after app state settled.`);
+    const timer = window.setTimeout(() => {
+        tabRenderRetryTimers.delete(tabId);
+        const tab = document.getElementById(tabId);
+        if (!tab || !tab.classList.contains('active')) return;
+        renderActiveTabContent(tabId);
+        window.setTimeout(() => verifyActiveTabRendered(tabId), 180);
+    }, 120);
+    tabRenderRetryTimers.set(tabId, timer);
 }
 
 function renderTabErrorFallback(tabId, err) {

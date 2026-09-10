@@ -17163,25 +17163,27 @@ label:has(> input[type="radio"]) {
     right: clamp(16px, 1.7vw, 26px);
     z-index: 5;
     display: grid;
-    grid-template-columns: clamp(48px, 5.1vw, 70px) minmax(0, auto);
-    gap: clamp(9px, 1vw, 14px);
+    grid-template-columns: clamp(58px, 5.8vw, 78px) minmax(0, 1fr);
+    gap: clamp(10px, 1.05vw, 15px);
     align-items: center;
-    max-width: min(31%, 280px);
-    padding: clamp(6px, 0.78vw, 10px) clamp(10px, 1.1vw, 15px) clamp(6px, 0.78vw, 10px) clamp(6px, 0.78vw, 10px);
-    border: 1px solid color-mix(in srgb, var(--accent) 42%, white 12%);
-    border-radius: clamp(18px, 1.9vw, 28px);
+    width: min(36%, 360px);
+    min-height: clamp(78px, 7.2vw, 102px);
+    padding: clamp(8px, 0.9vw, 12px) clamp(13px, 1.25vw, 18px) clamp(8px, 0.9vw, 12px) clamp(8px, 0.9vw, 12px);
+    border: 1px solid color-mix(in srgb, var(--accent) 48%, white 14%);
+    border-radius: clamp(22px, 2.3vw, 34px);
     background:
-        radial-gradient(circle at 16% 18%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 42%),
-        linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04)),
-        rgba(2, 13, 20, 0.74);
+        radial-gradient(circle at 13% 20%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 44%),
+        linear-gradient(145deg, color-mix(in srgb, var(--surface-card) 74%, transparent), color-mix(in srgb, var(--surface-overlay) 88%, transparent)),
+        rgba(2, 13, 20, 0.82);
     color: white;
     text-decoration: none;
     box-shadow:
-        0 18px 44px rgba(0, 0, 0, 0.34),
-        0 0 28px color-mix(in srgb, var(--accent) 16%, transparent),
+        0 22px 54px rgba(0, 0, 0, 0.38),
+        0 0 34px color-mix(in srgb, var(--accent) 18%, transparent),
         inset 0 1px 0 rgba(255, 255, 255, 0.16);
     backdrop-filter: blur(18px) saturate(1.18);
     -webkit-backdrop-filter: blur(18px) saturate(1.18);
+    overflow: hidden;
 }
 
 .trade-showcase-scan-badge::before {
@@ -17199,13 +17201,15 @@ label:has(> input[type="radio"]) {
     place-items: center;
     aspect-ratio: 1;
     min-width: 0;
-    border-radius: 16px;
+    border-radius: clamp(16px, 1.7vw, 22px);
     background:
-        linear-gradient(135deg, white, color-mix(in srgb, white 92%, var(--accent)));
+        radial-gradient(circle at 25% 18%, color-mix(in srgb, var(--accent) 16%, white), white 44%),
+        linear-gradient(135deg, white, color-mix(in srgb, white 90%, var(--accent)));
     box-shadow:
-        0 10px 22px rgba(0, 0, 0, 0.3),
-        0 0 0 1px rgba(255, 255, 255, 0.54),
-        0 0 22px color-mix(in srgb, var(--accent) 18%, transparent);
+        0 12px 26px rgba(0, 0, 0, 0.34),
+        0 0 0 1px rgba(255, 255, 255, 0.64),
+        0 0 0 5px color-mix(in srgb, var(--accent) 12%, transparent),
+        0 0 28px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .trade-showcase-qr-frame::after {
@@ -17220,36 +17224,44 @@ label:has(> input[type="radio"]) {
 
 .trade-showcase-scan-badge img {
     display: block;
-    width: 88%;
+    width: 84%;
     aspect-ratio: 1;
     padding: 0;
     border: 0;
-    border-radius: 7px;
+    border-radius: 9px;
     background: white;
     box-shadow: none;
 }
 
-.trade-showcase-scan-badge span {
+.trade-showcase-scan-badge > span:last-child {
     display: grid;
-    gap: 3px;
+    align-content: center;
+    justify-items: start;
+    gap: 5px;
+    height: 100%;
     min-width: 0;
+    text-align: left;
 }
 
 .trade-showcase-scan-badge strong {
     color: white;
-    font-size: clamp(0.68rem, 0.9vw, 0.95rem);
+    max-width: 100%;
+    font-size: clamp(0.78rem, 1.02vw, 1.12rem);
     font-weight: 950;
-    line-height: 1.05;
-    white-space: nowrap;
+    line-height: 1.08;
+    white-space: normal;
+    overflow-wrap: normal;
+    word-break: normal;
 }
 
 .trade-showcase-scan-badge small {
     width: fit-content;
-    padding: 3px 7px;
+    padding: 4px 9px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--accent) 18%, transparent);
-    color: color-mix(in srgb, var(--accent) 78%, white);
-    font-size: clamp(0.48rem, 0.62vw, 0.64rem);
+    border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: color-mix(in srgb, var(--accent) 82%, white);
+    font-size: clamp(0.55rem, 0.7vw, 0.72rem);
     font-weight: 900;
     line-height: 1.08;
     white-space: nowrap;
@@ -17700,20 +17712,21 @@ label:has(> input[type="radio"]) {
     }
 
     .trade-showcase-scan-badge {
-        grid-template-columns: 32px minmax(0, auto);
-        gap: 5px;
-        max-width: 142px;
-        padding: 4px 7px 4px 4px;
-        border-radius: 12px;
+        grid-template-columns: 38px minmax(0, 1fr);
+        gap: 6px;
+        width: min(42%, 166px);
+        min-height: 52px;
+        padding: 5px 8px 5px 5px;
+        border-radius: 15px;
     }
 
     .trade-showcase-qr-frame {
-        border-radius: 8px;
+        border-radius: 10px;
     }
 
     .trade-showcase-qr-frame::after {
         inset: -3px;
-        border-radius: 10px;
+        border-radius: 12px;
     }
 
     .trade-showcase-scan-badge img {
@@ -17721,12 +17734,14 @@ label:has(> input[type="radio"]) {
     }
 
     .trade-showcase-scan-badge strong {
-        font-size: 0.42rem;
+        font-size: 0.48rem;
+        line-height: 1.08;
+        white-space: normal;
     }
 
     .trade-showcase-scan-badge small {
-        padding: 2px 4px;
-        font-size: 0.32rem;
+        padding: 2px 5px;
+        font-size: 0.35rem;
     }
 
     .trade-showcase-final-qr strong {
