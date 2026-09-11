@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.143-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.146-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.143</span>
+                    <span class="version-badge">v3.4.146</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="header-cloud-bar">
@@ -1471,15 +1471,25 @@
             <section class="card icp-import-card">
                 <div class="icp-card-head">
                     <div>
-                        <h3>ICP Import</h3>
-                        <p class="hint">Kopiere die Tabelle aus der ICP-Auswertung hier hinein. Reihenfolge: Wert, Messwert, Minimum, optimal, Maximum, Einheit, Differenz.</p>
+                        <h3>OSCI Lab Werte einfügen</h3>
+                        <p class="hint">Kopiere die Messwert-Tabelle direkt aus der Labor-Webseite und prüfe die Vorschau, bevor du sie speicherst.</p>
                     </div>
                     <span class="status-badge status-info">Aquariumgebunden</span>
+                </div>
+                <div class="icp-import-guide">
+                    <div>
+                        <strong>So klappt der Import zuverlässig</strong>
+                        <span>Im Laborportal die Tabelle von <b>Basiswerte</b> bis <b>Zirkonium</b> markieren, kopieren und hier einfügen. Nicht die PDF verwenden, wenn die Werte dort nur als Bild vorliegen.</span>
+                    </div>
+                    <div>
+                        <strong>Vor dem Speichern prüfen</strong>
+                        <span>ReefTools erkennt Datum, Analyse-ID, Volumen, Kategorien, Einheiten, Optimalwerte sowie <b>nn</b> und <b>nwb</b>. Auffälligkeiten erscheinen in der Vorschau.</span>
+                    </div>
                 </div>
                 <div class="icp-import-grid">
                     <div class="input-group">
                         <label for="icpReportName">Name</label>
-                        <input type="text" id="icpReportName" placeholder="z.B. ICP Juli">
+                        <input type="text" id="icpReportName" placeholder="automatisch oder z.B. ICP August">
                     </div>
                     <div class="input-group">
                         <label for="icpReportDate">Datum</label>
@@ -1487,9 +1497,9 @@
                     </div>
                 </div>
                 <div class="input-group">
-                    <label for="icpImportText">ICP Tabellen-Text</label>
-                    <textarea id="icpImportText" class="icp-import-textarea" placeholder="Basiswerte&#9;Messwert&#9;Minimum&#9;Referenz optimal&#9;Maximum&#9;Einheit&#9;Differenz"></textarea>
-                    <p class="hint icp-import-note"><strong>Hinweis:</strong> Die App sortiert automatisch in Basiswerte, Mengenelemente, essenzielle Spurenelemente und weitere Spurenelemente. <strong>nn</strong> bedeutet nicht nachweisbar, <strong>nwb</strong> bedeutet nachweisbar an der unteren Nachweisgrenze.</p>
+                    <label for="icpImportText">Kopierte OSCI-Lab-Tabelle</label>
+                    <textarea id="icpImportText" class="icp-import-textarea" oninput="previewIcpImport()" onpaste="window.setTimeout(previewIcpImport, 0)" placeholder="Hier die Tabelle aus der Labor-Webseite einfügen, z.B.&#10;Basiswerte&#9;Messwert&#9;Minimum&#9;Referenz optimal&#9;Maximum&#9;Einheit&#9;Differenz&#10;Salinität&#9;35.07&#9;34&#9;34.5&#9;35.5&#9;PSU&#9;+0.57"></textarea>
+                    <p class="hint icp-import-note"><strong>Hinweis:</strong> <strong>nn</strong> bedeutet nicht nachweisbar, <strong>nwb</strong> bedeutet nachweisbar an der unteren Nachweisgrenze. Werte aus Bild-PDFs können nicht sicher übernommen werden.</p>
                 </div>
                 <div class="button-row">
                     <button type="button" class="btn-primary btn-animated" onclick="saveIcpReportFromImport()">ICP speichern</button>
@@ -2420,8 +2430,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.143-release"></script>
-    <script src="assets/js/app.js?v=3.4.143-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.146-release"></script>
+    <script src="assets/js/app.js?v=3.4.146-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

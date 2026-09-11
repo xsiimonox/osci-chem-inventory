@@ -20079,6 +20079,36 @@ progress.mini-progress::-moz-progress-bar {
     gap: var(--space-3);
 }
 
+.icp-import-guide {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+}
+
+.icp-import-guide > div {
+    padding: var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-elevated) 68%, transparent);
+}
+
+.icp-import-guide strong,
+.icp-import-guide span {
+    display: block;
+}
+
+.icp-import-guide strong {
+    color: var(--text-primary);
+    margin-bottom: 5px;
+}
+
+.icp-import-guide span {
+    color: var(--text-secondary);
+    line-height: 1.45;
+    white-space: normal;
+}
+
 .icp-compare-shell {
     display: grid;
     grid-template-columns: minmax(0, 0.34fr) minmax(0, 0.66fr);
@@ -20213,11 +20243,105 @@ progress.mini-progress::-moz-progress-bar {
     display: flex;
     justify-content: space-between;
     gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-elevated) 70%, transparent);
     color: var(--text-secondary);
+}
+
+.icp-preview-summary.is-success {
+    border-color: color-mix(in srgb, var(--success) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--success) 10%, var(--surface-elevated));
+}
+
+.icp-preview-summary.is-warning {
+    border-color: color-mix(in srgb, var(--warning) 48%, var(--border-color));
+    background: color-mix(in srgb, var(--warning) 12%, var(--surface-elevated));
+}
+
+.icp-preview-summary.is-error {
+    border-color: color-mix(in srgb, var(--danger) 52%, var(--border-color));
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface-elevated));
 }
 
 .icp-preview-summary strong {
     color: var(--text-primary);
+}
+
+.icp-import-meta-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: var(--space-3);
+}
+
+.icp-import-meta-preview span {
+    display: grid;
+    gap: 2px;
+    min-width: 128px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-elevated) 74%, transparent);
+}
+
+.icp-import-meta-preview small {
+    color: var(--text-secondary);
+    font-size: 0.72rem;
+}
+
+.icp-import-meta-preview strong {
+    color: var(--primary);
+    font-size: 0.88rem;
+}
+
+.icp-import-check-list {
+    display: grid;
+    gap: 8px;
+    margin-top: var(--space-3);
+}
+
+.icp-import-check {
+    display: grid;
+    gap: 3px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--surface-elevated) 70%, transparent);
+}
+
+.icp-import-check.is-success {
+    margin-top: var(--space-3);
+    border-color: color-mix(in srgb, var(--success) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--success) 10%, var(--surface-elevated));
+}
+
+.icp-import-check.is-info {
+    border-color: color-mix(in srgb, var(--primary) 36%, var(--border-color));
+}
+
+.icp-import-check.is-warning {
+    border-color: color-mix(in srgb, var(--warning) 48%, var(--border-color));
+    background: color-mix(in srgb, var(--warning) 10%, var(--surface-elevated));
+}
+
+.icp-import-check.is-error {
+    border-color: color-mix(in srgb, var(--danger) 52%, var(--border-color));
+    background: color-mix(in srgb, var(--danger) 10%, var(--surface-elevated));
+}
+
+.icp-import-check strong {
+    color: var(--text-primary);
+    font-size: 0.86rem;
+}
+
+.icp-import-check span {
+    color: var(--text-secondary);
+    line-height: 1.4;
+    white-space: normal;
 }
 
 .icp-preview-groups {
@@ -20527,6 +20651,7 @@ progress.mini-progress::-moz-progress-bar {
 
 @media (max-width: 760px) {
     .icp-import-grid,
+    .icp-import-guide,
     .icp-control-grid,
     .icp-stat-grid,
     .icp-compare-shell,

@@ -8773,6 +8773,8 @@ function getToolRouteHash(toolId = '') {
     return toolId ? `#tools/${encodeURIComponent(toolId)}` : '#tools';
 }
 
+const TAB_RENDER_RETRY_DELAY_MS = 300;
+
 function resolveRouteTabFromHash() {
     const route = getRouteFromHash();
     if (APP_TAB_IDS.includes(route.tabId) && !isUserMenuTabHidden(route.tabId)) return route.tabId;
@@ -8836,7 +8838,7 @@ function scheduleTabRenderRetry(tabId, firstError) {
         if (!tab || !tab.classList.contains('active')) return;
         renderActiveTabContent(tabId);
         window.setTimeout(() => verifyActiveTabRendered(tabId), 180);
-    }, 120);
+    }, TAB_RENDER_RETRY_DELAY_MS);
     tabRenderRetryTimers.set(tabId, timer);
 }
 
@@ -20587,6 +20589,21 @@ function cleanIcpCell(value = '') {
         .trim();
 }
 
+function splitIcpImportLine(raw = '') {
+    const line = String(raw || '').trim();
+    if (!line) return [];
+    if (line.includes('\t')) {
+        return line.split('\t').map(cleanIcpCell);
+    }
+    return line.split(/\s{2,}/).map(cleanIcpCell).filter(cell => cell !== '');
+}
+
+function getIcpDiffCell(cells = []) {
+    if (cells.length >= 8) return cells[7] || '';
+    if (cells.length >= 7) return cells[6] || '';
+    return '';
+}
+
 function parseIcpNumber(value = '') {
     const cleaned = cleanIcpCell(value)
         .replace(/µ/g, 'u')
@@ -20671,13 +20688,37 @@ function getIcpValueStatus(entry) {
     return { key: 'ok', label: 'im Referenzbereich' };
 }
 
+function parseIcpImportMetadata(text = '') {
+    const source = String(text || '');
+    const dateMatch = source.match(/Auswertung\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4})/i);
+    const volumeMatch = source.match(/Volumen\s+in\s+Liter\s*:?\s*([0-9]+(?:[,.][0-9]+)?)/i);
+    const analysisMatch = source.match(/Analyse\s*ID\s*:?\s*([A-Za-z0-9-]+)/i);
+    const sampledMatch = source.match(/Probe\s+gezogen\s+am\s*:?\s*([0-9.:\s]+)/i);
+    const measuredMatch = source.match(/Probe\s+gemessen\s+am\s*:?\s*([0-9.:\s]+)/i);
+    return {
+        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : null,
+        volumeLiters: volumeMatch ? parseIcpNumber(volumeMatch[1]) : null,
+        analysisId: analysisMatch ? cleanIcpCell(analysisMatch[1]) : '',
+        sampledAtText: sampledMatch ? cleanIcpCell(sampledMatch[1]) : '',
+        measuredAtText: measuredMatch ? cleanIcpCell(measuredMatch[1]) : ''
+    };
+}
+
+function parseGermanDate(value = '') {
+    const match = String(value || '').match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (!match) return null;
+    const [, day, month, year] = match;
+    const date = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
 function parseIcpImportText(text = '') {
     const rows = [];
     let currentSection = 'Basiswerte';
     String(text || '').split(/\r?\n/).forEach(line => {
         const raw = line.trim();
         if (!raw) return;
-        const cells = raw.split(/\t+/).map(cleanIcpCell).filter(cell => cell !== '');
+        const cells = splitIcpImportLine(raw);
         if (cells.length < 2) return;
         const first = cells[0];
         if (ICP_SECTION_NAMES.has(first) && /messwert/i.test(cells[1] || '')) {
@@ -20694,7 +20735,7 @@ function parseIcpImportText(text = '') {
         const min = parseIcpNumber(cells[2] || '');
         const optimal = parseIcpNumber(cells[3] || '');
         const max = parseIcpNumber(cells[4] || '');
-        const diff = parseIcpNumber(cells[cells.length - 1] || '');
+        const diff = parseIcpNumber(getIcpDiffCell(cells));
         if (!name || (!rawValue && !unit)) return;
         const canonical = getIcpCanonicalInfo(name, symbol, currentSection);
         rows.push({
@@ -20714,6 +20755,53 @@ function parseIcpImportText(text = '') {
         });
     });
     return sortIcpValues(rows);
+}
+
+function analyzeIcpImportText(text = '', rows = parseIcpImportText(text)) {
+    const source = String(text || '');
+    const metadata = parseIcpImportMetadata(source);
+    const warnings = [];
+    const hasContent = source.trim().length > 0;
+    const hasTabs = /\t/.test(source);
+    const sectionsFound = ICP_SECTION_ORDER.filter(section => new RegExp(`(^|\\n)\\s*${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\t|\\s{2,})`, 'i').test(source));
+    const numeric = rows.filter(row => Number.isFinite(row.value)).length;
+    const qualitative = rows.length - numeric;
+    const duplicateKeys = rows
+        .map(row => row.key)
+        .filter((key, index, all) => key && all.indexOf(key) !== index);
+
+    if (!hasContent) {
+        warnings.push({ type: 'info', text: 'Füge zuerst die kopierte Tabelle aus dem OSCI-Laborportal ein.' });
+    } else if (!hasTabs && rows.length < 20) {
+        warnings.push({ type: 'warning', text: 'Es wurden kaum Tabellen-Spalten erkannt. Kopiere die Tabelle direkt von der Labor-Webseite, nicht aus der PDF oder einem Screenshot.' });
+    }
+    if (hasContent && rows.length < 10) {
+        warnings.push({ type: 'error', text: 'Zu wenige ICP-Werte erkannt. Dieser Import sollte nicht gespeichert werden.' });
+    } else if (hasContent && rows.length < 35) {
+        warnings.push({ type: 'warning', text: 'Es wurden weniger Werte als erwartet erkannt. Prüfe, ob du den kompletten Bereich bis Zirkonium kopiert hast.' });
+    }
+    if (hasContent && sectionsFound.length < 3) {
+        warnings.push({ type: 'warning', text: 'Nicht alle Kategorien wurden erkannt. Die Werte werden trotzdem anhand der Elementnamen einsortiert.' });
+    }
+    if (duplicateKeys.length) {
+        warnings.push({ type: 'warning', text: 'Einige Werte wurden doppelt erkannt. Prüfe die Vorschau vor dem Speichern.' });
+    }
+    if (hasContent && !metadata.reportDate) {
+        warnings.push({ type: 'info', text: 'Kein Auswertungsdatum erkannt. Trage das Datum oben manuell ein.' });
+    }
+    if (hasContent && !metadata.analysisId) {
+        warnings.push({ type: 'info', text: 'Keine Analyse-ID erkannt. Das ist okay, erleichtert aber später die Zuordnung.' });
+    }
+
+    return {
+        metadata,
+        rows,
+        numeric,
+        qualitative,
+        sectionsFound,
+        warnings,
+        quality: warnings.some(item => item.type === 'error') ? 'error' : warnings.some(item => item.type === 'warning') ? 'warning' : rows.length ? 'success' : 'idle'
+    };
 }
 
 function getIcpReportsSorted(desc = true) {
@@ -20764,15 +20852,22 @@ function formatIcpNumber(value, unit = '') {
 function previewIcpImport() {
     const preview = document.getElementById('icpImportPreview');
     if (!preview) return;
-    const rows = parseIcpImportText(document.getElementById('icpImportText')?.value || '');
-    const numeric = rows.filter(row => Number.isFinite(row.value)).length;
-    const nonNumeric = rows.length - numeric;
+    const sourceText = document.getElementById('icpImportText')?.value || '';
+    const rows = parseIcpImportText(sourceText);
+    const analysis = analyzeIcpImportText(sourceText, rows);
+    const dateInput = document.getElementById('icpReportDate');
+    const todayInputValue = new Date().toISOString().slice(0, 10);
+    if (dateInput && analysis.metadata.reportDate && (!dateInput.value || dateInput.value === todayInputValue)) {
+        dateInput.value = analysis.metadata.reportDate.slice(0, 10);
+    }
     preview.innerHTML = rows.length
         ? `
-            <div class="icp-preview-summary">
+            <div class="icp-preview-summary is-${analysis.quality}">
                 <strong>${rows.length} Werte erkannt</strong>
-                <span>${numeric} numerisch · ${nonNumeric} qualitativ/ohne Zahlenwert</span>
+                <span>${analysis.numeric} numerisch · ${analysis.qualitative} qualitativ/ohne Zahlenwert</span>
             </div>
+            ${renderIcpImportMetaPreview(analysis.metadata)}
+            ${renderIcpImportWarnings(analysis.warnings)}
             <div class="icp-preview-groups">
                 ${groupIcpValuesBySection(rows).map(([section, values]) => `
                     <div class="icp-preview-group">
@@ -20784,7 +20879,43 @@ function previewIcpImport() {
                 `).join('')}
             </div>
         `
-        : '<p class="hint">Noch keine ICP-Werte erkannt. Prüfe, ob die Tabelle mit Tabulatoren eingefügt wurde.</p>';
+        : `
+            <div class="icp-preview-summary is-${analysis.quality}">
+                <strong>Noch keine ICP-Werte erkannt</strong>
+                <span>Bitte Tabellenbereich aus dem OSCI-Laborportal einfügen</span>
+            </div>
+            ${renderIcpImportWarnings(analysis.warnings)}
+        `;
+}
+
+function renderIcpImportMetaPreview(metadata = {}) {
+    const items = [
+        metadata.analysisId ? ['Analyse-ID', metadata.analysisId] : null,
+        metadata.reportDate ? ['Auswertung', formatWarehouseDate(metadata.reportDate)] : null,
+        Number.isFinite(metadata.volumeLiters) ? ['Volumen', `${formatIcpNumber(metadata.volumeLiters, 'L')}`] : null,
+        metadata.sampledAtText ? ['Probe gezogen', metadata.sampledAtText] : null,
+        metadata.measuredAtText ? ['Probe gemessen', metadata.measuredAtText] : null
+    ].filter(Boolean);
+    if (!items.length) return '';
+    return `
+        <div class="icp-import-meta-preview">
+            ${items.map(([label, value]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></span>`).join('')}
+        </div>
+    `;
+}
+
+function renderIcpImportWarnings(warnings = []) {
+    if (!warnings.length) return '<div class="icp-import-check is-success"><strong>Import sieht gut aus</strong><span>Die Tabelle wurde plausibel erkannt. Bitte die Vorschau einmal fachlich gegenlesen.</span></div>';
+    return `
+        <div class="icp-import-check-list">
+            ${warnings.map(item => `
+                <div class="icp-import-check is-${escapeHtml(item.type)}">
+                    <strong>${item.type === 'error' ? 'Speichern nicht empfohlen' : item.type === 'warning' ? 'Bitte prüfen' : 'Hinweis'}</strong>
+                    <span>${escapeHtml(item.text)}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
 }
 
 function clearIcpImportForm() {
@@ -20836,10 +20967,19 @@ async function saveIcpReportFromImport() {
     const dateInput = document.getElementById('icpReportDate');
     const nameInput = document.getElementById('icpReportName');
     const textInput = document.getElementById('icpImportText');
-    const values = sortIcpValues(parseIcpImportText(textInput?.value || ''));
+    const sourceText = textInput?.value || '';
+    const values = sortIcpValues(parseIcpImportText(sourceText));
     if (values.length === 0) return alert('Bitte füge zuerst ICP-Tabellendaten ein.');
-    const date = dateInput?.value ? new Date(`${dateInput.value}T12:00:00`).toISOString() : new Date().toISOString();
-    const reportName = (nameInput?.value || '').trim() || `ICP ${new Date(date).toLocaleDateString('de-DE')}`;
+    const analysis = analyzeIcpImportText(sourceText, values);
+    if (analysis.warnings.some(item => item.type === 'error')) {
+        previewIcpImport();
+        return alert('Der ICP-Import ist unvollständig. Bitte kopiere die Tabelle direkt aus dem OSCI-Laborportal und prüfe die Vorschau.');
+    }
+    const date = dateInput?.value
+        ? new Date(`${dateInput.value}T12:00:00`).toISOString()
+        : analysis.metadata.reportDate || new Date().toISOString();
+    const reportName = (nameInput?.value || '').trim()
+        || (analysis.metadata.analysisId ? `ICP ${analysis.metadata.analysisId}` : `ICP ${new Date(date).toLocaleDateString('de-DE')}`);
     const confirmed = await confirmIcpDuplicateIfNeeded(reportName, date);
     if (!confirmed) return;
     const report = {
@@ -20847,6 +20987,8 @@ async function saveIcpReportFromImport() {
         name: reportName,
         date,
         values,
+        metadata: analysis.metadata,
+        source: 'osci-lab-paste',
         createdAt: new Date().toISOString()
     };
     ensureIcpReports().unshift(report);
