@@ -20740,8 +20740,11 @@ progress.mini-progress::-moz-progress-bar {
 
 .icp-report-actions .btn-secondary,
 .icp-report-actions .btn-out {
+    box-sizing: border-box;
     min-height: 42px;
+    min-width: 92px;
     padding-inline: 13px;
+    text-align: center;
     white-space: nowrap;
 }
 

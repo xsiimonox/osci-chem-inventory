@@ -20971,7 +20971,7 @@ function parseIcpImportMetadata(text = '') {
     const measuredDate = measuredMatch ? parseGermanDate(measuredMatch[1]) : null;
     const sampledDate = sampledMatch ? parseGermanDate(sampledMatch[1]) : null;
     return {
-        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : (measuredDate || sampledDate),
+        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : (sampledDate || measuredDate),
         volumeLiters: volumeMatch ? parseIcpNumber(volumeMatch[1]) : null,
         analysisId: analysisMatch ? cleanIcpCell(analysisMatch[1]) : '',
         sampledAtText: sampledMatch ? cleanIcpCell(sampledMatch[1]) : '',
@@ -21225,9 +21225,11 @@ function renderIcpImportWarnings(warnings = []) {
 
 function clearIcpImportForm() {
     const name = document.getElementById('icpReportName');
+    const date = document.getElementById('icpReportDate');
     const text = document.getElementById('icpImportText');
     const preview = document.getElementById('icpImportPreview');
     if (name) name.value = '';
+    if (date) date.value = '';
     if (text) text.value = '';
     if (preview) preview.innerHTML = '';
 }
