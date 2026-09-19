@@ -13388,10 +13388,11 @@ function normalizeTraceCalculatorHistoryEntry(entry) {
     if (!entry.id) entry.id = createWarehouseId();
     if (!entry.createdAt) entry.createdAt = Date.now();
     if (entry.includeInCalculation === undefined) entry.includeInCalculation = true;
-    if (entry.source === 'reefManager') {
+    if (entry.source === 'reefManager' && !entry.sourceIcpReportId) {
         entry.includeInCalculation = false;
         entry.calculationLocked = true;
     }
+    if (entry.source === 'reefManager' && entry.sourceIcpReportId) entry.calculationLocked = false;
     if (!entry.amounts || typeof entry.amounts !== 'object') entry.amounts = {};
     if (!entry.grams || typeof entry.grams !== 'object') entry.grams = {};
     if (!entry.config || typeof entry.config !== 'object') entry.config = {};
@@ -13430,7 +13431,7 @@ function isReefManagerTraceArchive(entry) {
 
 function canTraceHistoryEntryAffectCalculation(entry) {
     if (!entry || entry.includeInCalculation === false) return false;
-    if (isReefManagerTraceArchive(entry)) return false;
+    if (isReefManagerTraceArchive(entry) && !entry.sourceIcpReportId) return false;
     return true;
 }
 
@@ -13491,8 +13492,11 @@ function getTraceHistoryEntrySummary(entry) {
 }
 
 function getTraceHistoryEntryStatus(entry) {
-    if (isReefManagerTraceArchive(entry)) {
+    if (isReefManagerTraceArchive(entry) && !entry.sourceIcpReportId) {
         return { className: 'ignored', label: 'Archiv', note: 'nur Auslagerung/Doku' };
+    }
+    if (isReefManagerTraceArchive(entry) && entry.sourceIcpReportId && hasTraceCalculatorIcpValues(entry)) {
+        return { className: 'icp', label: 'Mit ICP', note: 'Reef Manager-Rezept zugeordnet' };
     }
     if (entry?.includeInCalculation === false && !isTraceStartMixture(entry)) {
         return { className: 'ignored', label: 'Ignoriert', note: 'fließt nicht ein' };
@@ -15541,7 +15545,7 @@ function renderTraceCalculatorHistory() {
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
                 ${renderTraceCalculatorHistoryChart(chartHistory)}
                 <div class="trace-history-list">
-                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Reef Manager Importe sind reine Archiv-Einträge</small></div>
+                    <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Reef Manager-Rezepte über „Bearbeiten“ einer ICP zuordnen</small></div>
                     ${history.map(entry => {
                         const status = getTraceHistoryEntryStatus(entry);
                         return `
@@ -15615,6 +15619,27 @@ function getTraceHistoryGroupTotalValue(entry, group, key) {
     return traceCalcNumber(entry?.totals?.[group]?.[key], null);
 }
 
+function getTraceIcpAssignmentOptions(selectedId = '') {
+    return [
+        { value: '', label: 'Keine ICP zugeordnet (nur Archiv)' },
+        ...getIcpReportsSorted(true).map(report => ({
+            value: report.id,
+            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`
+        }))
+    ].map(option => ({ ...option, selected: option.value === selectedId }));
+}
+
+function getTraceIcpValuesForHistoryEntry(report) {
+    const icp = {};
+    traceCalculatorElements.forEach(element => {
+        const value = getTraceIcpValueFromReport(report, element);
+        if (value && Number.isFinite(value.value) && value.value >= 0) {
+            icp[element.item] = String(value.value);
+        }
+    });
+    return icp;
+}
+
 async function editTraceHistoryEntry(id) {
     const state = ensureTraceCalculatorState();
     const entry = state.history.find(item => item.id === id);
@@ -15622,7 +15647,7 @@ async function editTraceHistoryEntry(id) {
     normalizeTraceCalculatorHistoryEntry(entry);
     const isReefManagerArchive = isReefManagerTraceArchive(entry);
     const fields = [
-        ...(!isReefManagerArchive ? [{
+        {
             name: 'includeInCalculation',
             label: 'In weitere Trace-Berechnung einfließen lassen?',
             value: entry.includeInCalculation === false ? 'no' : 'yes',
@@ -15630,7 +15655,13 @@ async function editTraceHistoryEntry(id) {
                 { value: 'yes', label: 'Ja, einbeziehen' },
                 { value: 'no', label: 'Nein, ignorieren' }
             ]
-        }] : []),
+        },
+        {
+            name: 'sourceIcpReportId',
+            label: 'Gespeicherte ICP zuordnen',
+            value: entry.sourceIcpReportId || '',
+            options: getTraceIcpAssignmentOptions(entry.sourceIcpReportId || '')
+        },
         {
             name: 'mixtureDate',
             label: 'Ansatzdatum',
@@ -15717,8 +15748,8 @@ async function editTraceHistoryEntry(id) {
         title: 'Trace-Historie bearbeiten',
         eyebrow: 'Historie & Analyse',
         message: isReefManagerArchive
-            ? 'Passe den Archiv-Eintrag an. Reef Manager Importe dienen nur zur Dokumentation und Auslagerung, nicht als Grundlage der Trace-Berechnung.'
-            : 'Passe den Historien-Eintrag an. Nur Einträge mit „Ja“ fließen in die nächste Trace-Berechnung ein.',
+            ? 'Ordne diesem Reef Manager-Rezept optional eine gespeicherte ICP zu. Erst danach kann es mit „Ja“ in die nächste Trace-Berechnung einfließen.'
+            : 'Passe den Historien-Eintrag an. Eine zugeordnete ICP dokumentiert den Messstand zum Rezept.',
         wide: true,
         confirmText: 'Speichern',
         cancelText: 'Abbrechen',
@@ -15733,8 +15764,15 @@ async function editTraceHistoryEntry(id) {
         await appAlert('Keine gültigen Elementmengen erkannt. Änderungen wurden nicht gespeichert.', { title: 'Bitte prüfen', type: 'warning' });
         return;
     }
-    entry.includeInCalculation = isReefManagerArchive ? false : values.includeInCalculation !== 'no';
-    if (isReefManagerArchive) entry.calculationLocked = true;
+    const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
+    const assignedIcp = assignedIcpReportId
+        ? getIcpReportsSorted(true).find(report => report.id === assignedIcpReportId)
+        : null;
+    entry.sourceIcpReportId = assignedIcpReportId;
+    if (assignedIcp) entry.icp = getTraceIcpValuesForHistoryEntry(assignedIcp);
+    else if (isReefManagerArchive) entry.icp = {};
+    entry.includeInCalculation = values.includeInCalculation !== 'no';
+    entry.calculationLocked = isReefManagerArchive && !assignedIcpReportId;
     entry.mixtureDate = String(values.mixtureDate || '').trim() || entry.mixtureDate || getTodayDateInputValue();
     entry.config = {
         ...(entry.config || {}),
@@ -16097,6 +16135,9 @@ function commitTraceCalculatorMixture(payload) {
 }
 
 function refreshTraceCalculatorAfterSave() {
+    const state = ensureTraceCalculatorState();
+    // Ein gespeicherter Ansatz ist abgeschlossen; der nächste neue Ansatz startet mit heute.
+    state.currentMixtureDate = getTodayDateInputValue();
     saveDB();
     renderTraceExportInputs();
     renderTraceCalculator();
