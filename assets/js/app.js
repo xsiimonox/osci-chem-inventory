@@ -13252,6 +13252,7 @@ function ensureTraceCalculatorState() {
             days: 40,
             dailyDoseMl: 5,
             bottleMaxMl: 450,
+            dailyDoseAuto: true,
             expertMode: false,
             elementChangeLimits: {},
             dynamicLimitMinPercent: '',
@@ -13266,6 +13267,7 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator.config.selectedExpertPresetId) db.traceCalculator.config.selectedExpertPresetId = '';
     if (db.traceCalculator.config.dynamicLimitMinPercent === undefined) db.traceCalculator.config.dynamicLimitMinPercent = '';
     if (db.traceCalculator.config.dynamicLimitMaxPercent === undefined) db.traceCalculator.config.dynamicLimitMaxPercent = '';
+    if (db.traceCalculator.config.dailyDoseAuto === undefined) db.traceCalculator.config.dailyDoseAuto = true;
     if (!db.traceCalculator.reusePlan || typeof db.traceCalculator.reusePlan !== 'object') {
         db.traceCalculator.reusePlan = {
             kationenRemainingMl: '',
@@ -13530,13 +13532,22 @@ function getTraceCalculatorConfigFromUi() {
         return parsed !== null && parsed >= minimum ? parsed : '';
     };
     state.currentMixtureDate = dateValue;
+    const days = readConfigNumber('traceCalcDays', saved.days || 40, 1);
+    const bottleMaxMl = readConfigNumber('traceCalcBottleMax', saved.bottleMaxMl || 450, 0.01);
+    const dailyDoseAuto = saved.dailyDoseAuto !== false;
+    const suggestedDailyDose = getTraceSuggestedDailyDose(days, bottleMaxMl);
+    if (dailyDoseAuto) {
+        const dailyDoseInput = document.getElementById('traceCalcDailyDose');
+        if (dailyDoseInput) dailyDoseInput.value = String(suggestedDailyDose);
+    }
     const config = {
         tankLiters: readConfigNumber('traceCalcTankLiters', saved.tankLiters || 500, 1),
         interval: document.getElementById('traceCalcInterval')?.value || saved.interval || 'monthly',
         stocking: document.getElementById('traceCalcStocking')?.value || saved.stocking || 'normal',
-        days: readConfigNumber('traceCalcDays', saved.days || 40, 1),
-        dailyDoseMl: readConfigNumber('traceCalcDailyDose', saved.dailyDoseMl || 5, 0.01),
-        bottleMaxMl: readConfigNumber('traceCalcBottleMax', saved.bottleMaxMl || 450, 0.01),
+        days,
+        dailyDoseMl: dailyDoseAuto ? suggestedDailyDose : readConfigNumber('traceCalcDailyDose', saved.dailyDoseMl || 5, 0.01),
+        bottleMaxMl,
+        dailyDoseAuto,
         expertMode: Boolean(saved.expertMode),
         elementChangeLimits: { ...(saved.elementChangeLimits || {}) },
         expertPresets: Array.isArray(saved.expertPresets) ? saved.expertPresets : [],
@@ -13567,10 +13578,56 @@ function syncTraceCalculatorConfigUi() {
             el.dataset.traceCalcSynced = 'true';
         }
     });
+    syncTraceCalculatorDailyDoseSuggestion();
+    const hint = document.getElementById('traceCalcDailyDoseHint');
+    if (hint && state.config.dailyDoseAuto === false) {
+        hint.textContent = 'Manuelle Tagesdosierung; Änderungen an Laufzeit oder Flaschenvolumen überschreiben sie nicht.';
+    }
 }
 
 function getTraceCalculatorScale(config) {
     return (config.tankLiters / traceCalculatorBase.liters) * (config.days / traceCalculatorBase.days);
+}
+
+function getTraceSuggestedDailyDose(days, bottleMaxMl) {
+    const runtime = Math.max(1, Math.floor(traceCalcNumber(days, 1)));
+    const volume = Math.max(0, traceCalcNumber(bottleMaxMl, 0));
+    if (volume <= 0) return 0.01;
+    return Math.max(0.01, Math.floor(volume / runtime));
+}
+
+function syncTraceCalculatorDailyDoseSuggestion() {
+    const state = ensureTraceCalculatorState();
+    if (state.config.dailyDoseAuto === false) return;
+    const days = document.getElementById('traceCalcDays')?.value ?? state.config.days;
+    const bottleMaxMl = document.getElementById('traceCalcBottleMax')?.value ?? state.config.bottleMaxMl;
+    const suggestion = getTraceSuggestedDailyDose(days, bottleMaxMl);
+    const input = document.getElementById('traceCalcDailyDose');
+    if (input) {
+        input.value = String(suggestion);
+        input.dataset.traceDoseAuto = 'true';
+    }
+    state.config.dailyDoseMl = suggestion;
+}
+
+function handleTraceCalculatorPlanningInput() {
+    syncTraceCalculatorDailyDoseSuggestion();
+    renderTraceCalculator();
+}
+
+function markTraceCalculatorDailyDoseManual() {
+    const state = ensureTraceCalculatorState();
+    state.config.dailyDoseAuto = false;
+    const hint = document.getElementById('traceCalcDailyDoseHint');
+    if (hint) hint.textContent = 'Manuelle Tagesdosierung; Änderungen an Laufzeit oder Flaschenvolumen überschreiben sie nicht.';
+    renderTraceCalculator();
+}
+
+function enableTraceCalculatorAutoDailyDose() {
+    const state = ensureTraceCalculatorState();
+    state.config.dailyDoseAuto = true;
+    syncTraceCalculatorDailyDoseSuggestion();
+    renderTraceCalculator();
 }
 
 function getTraceCalculatorBaseRecipe(config) {
@@ -15300,7 +15357,7 @@ function renderTraceCalculationGuide() {
                     <p><code>Osmosewasser = Zielvolumen − Summe aller Elementmengen</code></p>
                     <p>Kationen: Elemente ${traceCalcFormatMlG(recipe.totals.kationen.elementsMl, recipe.totals.kationen.elementsG)}, Osmosewasser ${traceCalcFormatMlG(recipe.totals.kationen.osmoseMl, recipe.totals.kationen.osmoseG)}.</p>
                     <p>Anionen: Elemente ${traceCalcFormatMlG(recipe.totals.anionen.elementsMl, recipe.totals.anionen.elementsG)}, Osmosewasser ${traceCalcFormatMlG(recipe.totals.anionen.osmoseMl, recipe.totals.anionen.osmoseG)}.</p>
-                    <p>Element-Grammwerte werden mit <code>ml × Produktdichte</code> berechnet. Für Osmosewasser werden ${traceCalcFormatValue(traceCalculatorRules.osmoseDensityGPerMl, 2)} g/ml angesetzt. Das maximale Flaschenvolumen von ${traceCalcFormatMl(config.bottleMaxMl)} ist eine Prüfgrenze: Es erzeugt eine Warnung, kürzt das berechnete Rezept aber nicht automatisch.</p>
+                    <p>Element-Grammwerte werden mit <code>ml × Produktdichte</code> berechnet. Für Osmosewasser werden ${traceCalcFormatValue(traceCalculatorRules.osmoseDensityGPerMl, 2)} g/ml angesetzt. Wenn die Tagesdosierung automatisch berechnet wird, schlägt ReefTools aus ${traceCalcFormatMl(config.bottleMaxMl)} und ${traceCalcFormatValue(config.days, 0)} Tagen die höchstmögliche volle ml-Zahl innerhalb des Flaschenvolumens vor. Eine manuelle Tagesdosierung bleibt bearbeitbar und wird nur geprüft.</p>
                 </div>
             </details>
 
@@ -16437,6 +16494,9 @@ function saveAndBookTraceCalculatorMixture() {
 }
 
 window.updateTraceCalculatorIcp = updateTraceCalculatorIcp;
+window.handleTraceCalculatorPlanningInput = handleTraceCalculatorPlanningInput;
+window.markTraceCalculatorDailyDoseManual = markTraceCalculatorDailyDoseManual;
+window.enableTraceCalculatorAutoDailyDose = enableTraceCalculatorAutoDailyDose;
 window.importTraceCalculatorIcpText = importTraceCalculatorIcpText;
 window.handleTraceCalculatorIcpPaste = handleTraceCalculatorIcpPaste;
 window.clearTraceCalculatorIcpImport = clearTraceCalculatorIcpImport;
