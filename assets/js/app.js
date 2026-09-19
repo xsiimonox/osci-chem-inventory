@@ -13488,6 +13488,7 @@ function getTraceTotalsFromAmounts(amounts = {}, config = {}) {
 function getTraceHistoryEntrySummary(entry) {
     if (isTraceStartMixture(entry)) return 'Startmischung';
     if (entry?.source === 'reefManager') return 'Reef Manager Import';
+    if (entry?.source === 'manual-history') return 'Manuell nachgetragen';
     return entry?.inventoryBooking ? 'Gespeichert & ausgelagert' : 'Manuell gespeichert';
 }
 
@@ -15516,7 +15517,7 @@ function renderTraceCalculatorHistory() {
             <div class="card workflow-card trace-history-block trace-history-empty">
                 <div class="trace-history-head">
                     <span><strong>Historie &amp; Analyse</strong><small>Vergleich der gespeicherten Mischungen</small></span>
-                    <span class="trace-history-count">0 Mischungen</span>
+                    <span class="trace-history-head-actions"><span class="trace-history-count">0 Mischungen</span><button type="button" class="btn-secondary" onclick="addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></span>
                 </div>
                 <p>Nach dem ersten Speichern erscheinen hier Verlauf, prozentuale Entwicklung und die Wirkung der Anpassungen.</p>
             </div>
@@ -15539,7 +15540,7 @@ function renderTraceCalculatorHistory() {
         <div class="card workflow-card trace-history-block">
             <div class="trace-history-head">
                 <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Berechnung nutzt ${calculationInfo} · letzter Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
-                <span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span>
+                <span class="trace-history-head-actions"><span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span><button type="button" class="btn-secondary" onclick="addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></span>
             </div>
             <div class="trace-history-content">
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
@@ -15638,6 +15639,173 @@ function getTraceIcpValuesForHistoryEntry(report) {
         }
     });
     return icp;
+}
+
+async function addManualTraceHistoryEntry() {
+    const state = ensureTraceCalculatorState();
+    const fields = [
+        {
+            name: 'mixtureDate',
+            label: 'Ansatzdatum',
+            type: 'date',
+            value: getTodayDateInputValue(),
+            required: true
+        },
+        {
+            name: 'tankLiters',
+            label: 'Aquariumvolumen in Litern',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(state.config?.tankLiters || 500),
+            required: true
+        },
+        {
+            name: 'days',
+            label: 'Laufzeit in Tagen',
+            type: 'number',
+            inputMode: 'numeric',
+            value: String(state.config?.days || 40),
+            required: true
+        },
+        {
+            name: 'dailyDoseMl',
+            label: 'Tagesdosierung je Lösung in ml',
+            type: 'number',
+            inputMode: 'decimal',
+            value: String(state.config?.dailyDoseMl || 5),
+            required: true
+        },
+        {
+            name: 'kationenVolumeMl',
+            label: 'Kationen Gesamtvolumen K+ (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            placeholder: 'z. B. 200'
+        },
+        {
+            name: 'kationenOsmoseMl',
+            label: 'Kationen Osmoseanteil K+ (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            placeholder: 'z. B. 100'
+        },
+        {
+            name: 'anionenVolumeMl',
+            label: 'Anionen Gesamtvolumen A- (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            placeholder: 'z. B. 200'
+        },
+        {
+            name: 'anionenOsmoseMl',
+            label: 'Anionen Osmoseanteil A- (ml)',
+            type: 'number',
+            inputMode: 'decimal',
+            placeholder: 'z. B. 100'
+        },
+        {
+            name: 'kationenAmounts',
+            label: 'Kationen K+ Elementmengen',
+            value: '',
+            multiline: true,
+            required: true,
+            description: 'Eine Zeile pro Element, z. B. Co 33,01'
+        },
+        {
+            name: 'anionenAmounts',
+            label: 'Anionen A- Elementmengen',
+            value: '',
+            multiline: true,
+            required: true,
+            description: 'Eine Zeile pro Element, z. B. F 32,18'
+        },
+        {
+            name: 'sourceIcpReportId',
+            label: 'Gespeicherte ICP zuordnen (optional)',
+            value: '',
+            options: getTraceIcpAssignmentOptions('')
+        },
+        {
+            name: 'includeInCalculation',
+            label: 'In weitere Trace-Berechnung einfließen lassen?',
+            value: 'yes',
+            options: [
+                { value: 'yes', label: 'Ja, einbeziehen' },
+                { value: 'no', label: 'Nein, nur dokumentieren' }
+            ]
+        }
+    ];
+    const values = await showAppDialog({
+        kind: 'prompt',
+        type: 'info',
+        title: 'Vergangene Mischung hinzufügen',
+        eyebrow: 'Trace-Historie',
+        message: 'Trage eine früher von Hand berechnete K+/A−-Mischung nach. Eine gespeicherte ICP kann optional zugeordnet werden.',
+        wide: true,
+        confirmText: 'Historie speichern',
+        cancelText: 'Abbrechen',
+        fields
+    });
+    if (!values) return;
+
+    const amounts = {
+        ...parseTraceHistoryAmountsText(values.kationenAmounts, 'kationen'),
+        ...parseTraceHistoryAmountsText(values.anionenAmounts, 'anionen')
+    };
+    const hasKationen = traceCalculatorElements.some(element => element.group === 'kationen' && amounts[element.item] !== undefined);
+    const hasAnionen = traceCalculatorElements.some(element => element.group === 'anionen' && amounts[element.item] !== undefined);
+    if (!hasKationen || !hasAnionen) {
+        await appAlert('Bitte mindestens ein Kationen- und ein Anionen-Element mit Menge eintragen.', { title: 'Mischung unvollständig', type: 'warning' });
+        return;
+    }
+
+    const config = {
+        ...state.config,
+        tankLiters: Math.max(1, traceCalcNumber(values.tankLiters, 500)),
+        days: Math.max(1, Math.round(traceCalcNumber(values.days, 40))),
+        dailyDoseMl: Math.max(0.01, traceCalcNumber(values.dailyDoseMl, 5))
+    };
+    const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
+    const assignedIcp = assignedIcpReportId
+        ? getIcpReportsSorted(true).find(report => report.id === assignedIcpReportId)
+        : null;
+    const calculatedTotals = getTraceTotalsFromAmounts(amounts, config);
+    const overrideTotal = (group, volumeKey, osmoseKey) => {
+        const volume = traceCalcNumber(values[volumeKey], null);
+        const osmose = traceCalcNumber(values[osmoseKey], null);
+        if (volume === null && osmose === null) return calculatedTotals[group];
+        const nextVolume = Math.max(0, volume ?? (osmose + calculatedTotals[group].elementsMl));
+        const nextOsmose = Math.max(0, osmose ?? (nextVolume - calculatedTotals[group].elementsMl));
+        return {
+            ...calculatedTotals[group],
+            volumeMl: traceCalcRound(nextVolume),
+            volumeG: traceCalcRound(calculatedTotals[group].elementsG + nextOsmose),
+            osmoseMl: traceCalcRound(nextOsmose),
+            osmoseG: traceCalcRound(nextOsmose)
+        };
+    };
+    const entry = normalizeTraceCalculatorHistoryEntry({
+        id: createWarehouseId(),
+        source: 'manual-history',
+        label: 'Manuell nachgetragen',
+        includeInCalculation: values.includeInCalculation !== 'no',
+        createdAt: Date.now(),
+        mixtureDate: String(values.mixtureDate || '').trim() || getTodayDateInputValue(),
+        config,
+        sourceIcpReportId: assignedIcpReportId,
+        icp: assignedIcp ? getTraceIcpValuesForHistoryEntry(assignedIcp) : {},
+        amounts,
+        grams: Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)])),
+        totals: {
+            kationen: overrideTotal('kationen', 'kationenVolumeMl', 'kationenOsmoseMl'),
+            anionen: overrideTotal('anionen', 'anionenVolumeMl', 'anionenOsmoseMl')
+        }
+    });
+    state.history.push(entry);
+    pruneTraceCalculatorHistory();
+    saveDB();
+    renderTraceCalculator();
+    showToast('Vergangene Mischung zur Historie hinzugefügt', 'success', 2800);
 }
 
 async function editTraceHistoryEntry(id) {
@@ -16227,6 +16395,7 @@ window.saveTraceCalculatorMixture = saveTraceCalculatorMixture;
 window.saveAndBookTraceCalculatorMixture = saveAndBookTraceCalculatorMixture;
 window.openTraceCalculationGuide = openTraceCalculationGuide;
 window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
+window.addManualTraceHistoryEntry = addManualTraceHistoryEntry;
 window.toggleTraceHistoryCalculation = toggleTraceHistoryCalculation;
 window.editTraceHistoryEntry = editTraceHistoryEntry;
 window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
