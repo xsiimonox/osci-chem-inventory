@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.158-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.160-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,9 +27,10 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.158</span>
+                    <span class="version-badge">v3.4.160</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
+                <div class="community-project-badge" role="note">Unabhängiges Community-Projekt · nicht von OSCI Motion</div>
                 <div class="header-cloud-bar">
                     <button type="button" id="googleDriveHeaderStatus" class="header-sync-indicator" onclick="openGoogleDriveSyncSettings()" aria-label="Cloud Status öffnen">
                         <span class="header-sync-dot" aria-hidden="true"></span>
@@ -2363,6 +2364,7 @@
 
     <footer class="app-footer">
     <p>© 2026 xsiimonox • <a href="anleitung.html" data-help-page="guide">Anleitung</a> • <a href="impressum.html" data-legal-page="impressum">Impressum</a> • <a href="privacy.html" data-legal-page="privacy">Datenschutzerklärung</a></p>
+    <small class="community-project-footer-note">ReefTools ist ein unabhängiges Community-Projekt und nicht OSCI Motion.</small>
     </footer>
 
     <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" aria-hidden="true">
@@ -2431,8 +2433,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.158-release"></script>
-    <script src="assets/js/app.js?v=3.4.158-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.160-release"></script>
+    <script src="assets/js/app.js?v=3.4.160-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
