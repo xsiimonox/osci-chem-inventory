@@ -8943,6 +8943,10 @@ body.theme-light .nav-links button.active {
     text-transform: uppercase;
 }
 
+.community-project-break {
+    display: none;
+}
+
 .community-project-footer-note {
     display: block;
     margin-top: 7px;
@@ -9002,6 +9006,10 @@ body.theme-light .nav-links button.active {
         white-space: normal;
         font-size: 0.56rem;
         line-height: 1.35;
+    }
+
+    .community-project-break {
+        display: block;
     }
 }
 
