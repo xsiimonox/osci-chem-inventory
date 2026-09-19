@@ -8870,6 +8870,7 @@ function renderTabErrorFallback(tabId, err) {
 function scheduleActiveTabHealthCheck(tabId) {
     window.requestAnimationFrame(() => {
         window.setTimeout(() => verifyActiveTabRendered(tabId), 180);
+        window.setTimeout(() => verifyActiveTabRendered(tabId), TAB_RENDER_RETRY_DELAY_MS);
         window.setTimeout(() => verifyActiveTabRendered(tabId), 950);
         window.setTimeout(() => verifyActiveTabRendered(tabId), 2200);
     });
@@ -13284,6 +13285,7 @@ function ensureTraceCalculatorState() {
     }
     if (!db.traceCalculator.currentMixtureDate) db.traceCalculator.currentMixtureDate = getTodayDateInputValue();
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
+    if (db.traceCalculator.selectedIcpReportId === undefined) db.traceCalculator.selectedIcpReportId = '';
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
     return db.traceCalculator;
 }
@@ -14523,6 +14525,143 @@ function renderTraceCalculatorIcpInputs() {
     container.dataset.traceCalcReady = 'true';
 }
 
+function getTraceIcpValueFromReport(report, element) {
+    const values = Array.isArray(report?.values) ? report.values : [];
+    const symbol = String(element?.symbol || '').trim().toLowerCase();
+    const item = normalizeSearchText(element?.item || '');
+    const match = values.find(value => {
+        const valueSymbol = String(value?.symbol || extractIcpSymbol(value?.name || '')).trim().toLowerCase();
+        const valueItem = normalizeSearchText(value?.name || value?.key || '');
+        return (symbol && valueSymbol === symbol) || (item && (valueItem === item || valueItem.includes(item) || item.includes(valueItem)));
+    }) || null;
+    if (!match) return null;
+    if (Number.isFinite(match.value)) return match;
+    const calculatedValue = parseIcpCalculationValue(match.rawValue || '');
+    return calculatedValue === null ? match : { ...match, value: calculatedValue };
+}
+
+function renderTraceStoredIcpPicker() {
+    const container = document.getElementById('traceCalcSavedIcp');
+    if (!container) return;
+    const state = ensureTraceCalculatorState();
+    const reports = getIcpReportsSorted(true);
+    if (!reports.length) {
+        container.innerHTML = `
+            <div class="trace-saved-icp-empty">
+                <strong>Noch keine gespeicherte ICP verfügbar</strong>
+                <span>Importiere eine ICP zuerst im Bereich „ICP“. Danach kannst du sie hier direkt für Trace verwenden.</span>
+            </div>
+        `;
+        return;
+    }
+
+    const selected = reports.find(report => report.id === state.selectedIcpReportId) || reports[0];
+    const matchedCount = selected
+        ? traceCalculatorElements.filter(element => {
+            const value = getTraceIcpValueFromReport(selected, element);
+            return value && Number.isFinite(value.value) && value.value >= 0;
+        }).length
+        : 0;
+    container.innerHTML = `
+        <div class="trace-saved-icp-head">
+            <div>
+                <strong>Gespeicherte ICP verwenden</strong>
+                <small>Nutze eine bereits importierte Analyse aus dem ICP-Bereich. Kein zweiter Import nötig.</small>
+            </div>
+            <span class="trace-icp-import-badge">${matchedCount}/${traceCalculatorElements.length} Trace-Werte</span>
+        </div>
+        <div class="trace-saved-icp-actions">
+            <label for="traceCalcSavedIcpSelect">ICP auswählen</label>
+            <select id="traceCalcSavedIcpSelect" onchange="previewTraceStoredIcp(this.value)">
+                ${reports.map(report => {
+                    const count = traceCalculatorElements.filter(element => {
+                        const value = getTraceIcpValueFromReport(report, element);
+                        return value && Number.isFinite(value.value) && value.value >= 0;
+                    }).length;
+                    return `<option value="${escapeHtml(report.id)}" ${report.id === selected?.id ? 'selected' : ''}>${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date || report.createdAt))} · ${count}/${traceCalculatorElements.length}</option>`;
+                }).join('')}
+            </select>
+            <button type="button" class="btn-secondary" onclick="useStoredIcpForTrace()">Für Trace übernehmen</button>
+        </div>
+        <div id="traceSavedIcpPreview" class="trace-saved-icp-preview">
+            ${selected ? renderTraceStoredIcpPreview(selected) : ''}
+        </div>
+    `;
+}
+
+function renderTraceStoredIcpPreview(report) {
+    if (!report) return '';
+    const missing = traceCalculatorElements
+        .filter(element => {
+            const value = getTraceIcpValueFromReport(report, element);
+            return !value || !Number.isFinite(value.value) || value.value < 0;
+        })
+        .map(element => element.symbol);
+    if (!missing.length) {
+        return '<div class="trace-saved-icp-complete"><span aria-hidden="true">✓</span><strong>Alle 11 Trace-Werte sind vorhanden</strong><small>Die ICP kann vollständig für die Berechnung übernommen werden.</small></div>';
+    }
+    return `
+        <div class="trace-saved-icp-missing">
+            <strong>Noch nicht für Trace verfügbar</strong>
+            <small>Diese Werte fehlen oder enthalten keine numerische Messung:</small>
+            <div class="trace-saved-icp-missing-list" aria-label="Fehlende Trace-Werte">
+                ${missing.map(symbol => `<span>${escapeHtml(symbol)}</span>`).join('')}
+            </div>
+        </div>
+    `;
+}
+
+function previewTraceStoredIcp(reportId) {
+    const state = ensureTraceCalculatorState();
+    state.selectedIcpReportId = reportId || '';
+    const report = getIcpReportsSorted(true).find(item => item.id === reportId);
+    const preview = document.getElementById('traceSavedIcpPreview');
+    if (preview) preview.innerHTML = renderTraceStoredIcpPreview(report);
+    const badge = document.querySelector('#traceCalcSavedIcp .trace-icp-import-badge');
+    if (badge && report) {
+        const count = traceCalculatorElements.filter(element => {
+            const value = getTraceIcpValueFromReport(report, element);
+            return value && Number.isFinite(value.value) && value.value >= 0;
+        }).length;
+        badge.textContent = `${count}/${traceCalculatorElements.length} Trace-Werte`;
+    }
+}
+
+async function useStoredIcpForTrace() {
+    const state = ensureTraceCalculatorState();
+    const select = document.getElementById('traceCalcSavedIcpSelect');
+    const reportId = select?.value || state.selectedIcpReportId || '';
+    const report = getIcpReportsSorted(true).find(item => item.id === reportId);
+    if (!report) {
+        await appAlert('Bitte wähle zuerst eine gespeicherte ICP aus.', { title: 'Keine ICP ausgewählt', type: 'warning' });
+        return;
+    }
+
+    state.selectedIcpReportId = report.id;
+    state.icp = {};
+    const missing = [];
+    traceCalculatorElements.forEach(element => {
+        const value = getTraceIcpValueFromReport(report, element);
+        if (value && Number.isFinite(value.value) && value.value >= 0) {
+            state.icp[element.item] = String(value.value);
+        } else {
+            missing.push(element.symbol);
+        }
+    });
+    const inputContainer = document.getElementById('traceCalcIcpInputs');
+    if (inputContainer) delete inputContainer.dataset.traceCalcReady;
+    saveDB();
+    renderTraceCalculator();
+    if (missing.length) {
+        await appAlert(`Die ICP wurde übernommen, aber diese Werte fehlen oder sind nicht numerisch: ${missing.join(', ')}. Ergänze sie manuell, bevor du die Mischung speicherst.`, {
+            title: 'ICP teilweise übernommen',
+            type: 'warning'
+        });
+    } else {
+        showToast(`ICP „${report.name || 'Analyse'}“ für Trace übernommen`, 'success', 2800);
+    }
+}
+
 function getTraceCalculatorIcpValidation() {
     const state = ensureTraceCalculatorState();
     const invalid = traceCalculatorElements.filter(element => {
@@ -15087,7 +15226,7 @@ function renderTraceCalculationGuide() {
                 <summary><span>2. ICP-Regeln für Erhöhung und Reduktion</span><small>Wann sich eine Menge ändert</small></summary>
                 <div class="trace-guide-section-body">
                     <p><strong>Ziel ist bei jedem Element immer der exakte Optimalwert.</strong> Minimum und Maximum dienen nur zur Einordnung und Warnung. Sie bilden keinen Bereich mehr, in dem die Mischung unverändert bleibt.</p>
-                    <p><strong>Copy-&amp;-Paste-Import:</strong> Aus jeder Zeile wird der erste Messwert direkt hinter dem Elementnamen übernommen. Bei <code>nwb</code> mit zwei Grenzwerten verwendet der Import deren arithmetischen Mittelwert; <code>nn</code> wird als 0 eingelesen. Die Übernahme erfolgt nur, wenn alle ${traceCalculatorElements.length} Elemente von Fluorid bis Zink erkannt wurden, damit keine alten Einzelwerte unbemerkt stehen bleiben.</p>
+                    <p><strong>Copy-&amp;-Paste-Import:</strong> Aus jeder Zeile wird der erste Messwert direkt hinter dem Elementnamen übernommen. Bei <code>nwb</code> mit zwei Grenzwerten verwendet der Import den höheren Wert; <code>nn</code> wird als 0 eingelesen. Die Übernahme erfolgt nur, wenn alle ${traceCalculatorElements.length} Elemente von Fluorid bis Zink erkannt wurden, damit keine alten Einzelwerte unbemerkt stehen bleiben.</p>
                     <p><strong>Kein ICP-Wert:</strong> Die Ausgangsmenge wird unverändert übernommen, weil keine Korrektur berechnet werden kann.</p>
                     <p><strong>Positiver ICP-Wert:</strong> Der Calculator nimmt eine lineare Beziehung zwischen eingesetzter Elementmenge und später gemessenem ICP-Wert an.</p>
                     <p><code>Ziel-Korrekturfaktor = Optimalwert / gemessener ICP-Wert</code><br><code>Erlaubter Faktor = Ziel-Korrekturfaktor begrenzt auf 1 ± Intervallgrenze</code><br><code>Neue Menge = Ausgangsmenge × erlaubter Faktor</code></p>
@@ -15689,6 +15828,7 @@ function renderTraceCalculator() {
     syncTraceCalculatorConfigUi();
     const config = getTraceCalculatorConfigFromUi();
     renderTraceCalculatorExpertControls();
+    renderTraceStoredIcpPicker();
     renderTraceCalculatorIcpInputs();
     const recipe = calculateTraceRecipe(config);
     state.latestRecipe = recipe;
@@ -15759,7 +15899,7 @@ function parseTraceCalculatorIcpCell(cell) {
         const maximum = Number(range[2].replace(',', '.'));
         if (!Number.isFinite(minimum) || !Number.isFinite(maximum)) return null;
         return {
-            value: (minimum + maximum) / 2,
+            value: maximum,
             method: 'nwb',
             minimum,
             maximum
@@ -15846,7 +15986,7 @@ function importTraceCalculatorIcpText(sourceText) {
         .filter(entry => entry.method !== 'numeric')
         .map(entry => entry.method === 'nn'
             ? `${entry.symbol}: nn = 0 ${entry.unit}`
-            : `${entry.symbol}: nwb ${traceCalcFormatValue(entry.minimum, 3)}-${traceCalcFormatValue(entry.maximum, 3)} = Mittelwert ${traceCalcFormatValue(entry.value, 3)} ${entry.unit}`)
+            : `${entry.symbol}: nwb ${traceCalcFormatValue(entry.minimum, 3)}-${traceCalcFormatValue(entry.maximum, 3)} = oberer Wert ${traceCalcFormatValue(entry.value, 3)} ${entry.unit}`)
         .join(' · ');
     setTraceCalculatorIcpImportStatus(
         'success',
@@ -16213,6 +16353,21 @@ function initTools() {
     document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
         initToolSection(section.dataset.sectionId || '');
     });
+    const route = getRouteFromHash();
+    const searchInput = document.getElementById('toolSearchInput');
+    const shouldRestoreLastSection = route.tabId === 'tools'
+        && !route.toolId
+        && !(searchInput?.value || '').trim();
+    if (shouldRestoreLastSection) {
+        const lastSection = getToolSettings().lastSection;
+        const section = lastSection
+            ? document.querySelector(`#tools .tool-section[data-section-id="${lastSection}"]:not(.tool-section-user-hidden)`)
+            : null;
+        if (section) {
+            section.open = true;
+            initToolSection(lastSection);
+        }
+    }
 }
 
 function getToolSettings() {
@@ -20389,26 +20544,40 @@ function buildRecipePrintDocument({ title, subtitle = '', meta = [], rows = [], 
     `;
 }
 
-function openRecipePrintDocument(config) {
+async function openRecipePrintDocument(config) {
     const title = config?.title || 'Rezept';
-    const confirmed = confirm(`${title} als PDF vorbereiten?\n\nDanach öffnet sich der Druck-/PDF-sichern-Dialog.`);
+    const confirmed = await appConfirm(`${title} als PDF vorbereiten?\n\nDanach öffnet sich der Druck-/PDF-sichern-Dialog.`, {
+        title: 'PDF vorbereiten',
+        type: 'info',
+        confirmText: 'PDF vorbereiten',
+        cancelText: 'Abbrechen'
+    });
     if (!confirmed) return;
     const report = window.open('', '_blank');
     if (!report) {
-        alert('Popup wurde blockiert. Bitte Popups für diese App erlauben.');
+        await appAlert('Popup wurde blockiert. Bitte Popups für diese App erlauben.', {
+            title: 'Popup blockiert',
+            type: 'warning'
+        });
         return;
     }
     report.document.write(buildRecipePrintDocument({ ...config, autoPrint: true }));
     report.document.close();
 }
 
-function exportCRPasteRecipePdf() {
+async function exportCRPasteRecipePdf() {
     const rows = parseCRPasteAmounts(document.getElementById('cr-paste-area')?.value || '')
         .filter(row => row.amount > 0)
         .map(row => ({ ...row, resolved: { cat: row.cat, item: row.item } }));
-    if (!rows.length) return alert('Bitte zuerst eine C&R Liste einfügen.');
+    if (!rows.length) {
+        await appAlert('Bitte zuerst eine C&R Liste einfügen.', {
+            title: 'Keine C&R Daten',
+            type: 'warning'
+        });
+        return;
+    }
     const totalMl = rows.reduce((sum, row) => sum + row.amount, 0);
-    openRecipePrintDocument({
+    await openRecipePrintDocument({
         title: 'C&R Auslagerung',
         subtitle: 'Professionelle Arbeitsfolie für eingefügte C&R-Mengen inklusive Lagerbestand vor und nach der Auslagerung.',
         meta: [
@@ -20422,15 +20591,21 @@ function exportCRPasteRecipePdf() {
     });
 }
 
-function exportSeaWaterRecipePdf() {
+async function exportSeaWaterRecipePdf() {
     const liters = Math.max(0, parseFloat(document.getElementById('seaWaterLiters')?.value) || 0);
-    if (!liters) return alert('Bitte zuerst die gewünschte Meerwassermenge eintragen.');
+    if (!liters) {
+        await appAlert('Bitte zuerst die gewünschte Meerwassermenge eintragen.', {
+            title: 'Zielmenge fehlt',
+            type: 'warning'
+        });
+        return;
+    }
     const scale = liters / 100;
     const rows = seaWaterRecipePer100L.map(entry => ({
         ...entry,
         amount: entry.amount * scale
     }));
-    openRecipePrintDocument({
+    await openRecipePrintDocument({
         title: 'Meerwasser aus C&R anmischen',
         subtitle: 'Rezeptfolie für natürliches Meerwasser aus C&R-Komponenten mit ml/g-Mengen, Bestandsprüfung und Spurenelement-Hinweis.',
         meta: [
@@ -20447,7 +20622,7 @@ function exportSeaWaterRecipePdf() {
     });
 }
 
-function exportMacroRecipePdf() {
+async function exportMacroRecipePdf() {
     const select = document.getElementById('macroRecipeSelect');
     const liters = Math.max(0.1, parseFloat(document.getElementById('macroRecipeLiters')?.value) || 1);
     const recipeName = select?.value || 'Makro-Rezept';
@@ -20455,8 +20630,14 @@ function exportMacroRecipePdf() {
         ...entry,
         amount: entry.amount * liters
     }));
-    if (!rows.length) return alert('Bitte zuerst ein Makro-Rezept auswählen.');
-    openRecipePrintDocument({
+    if (!rows.length) {
+        await appAlert('Bitte zuerst ein Makro-Rezept auswählen.', {
+            title: 'Rezept fehlt',
+            type: 'warning'
+        });
+        return;
+    }
+    await openRecipePrintDocument({
         title: `Makro-Element ${recipeName}`,
         subtitle: 'Arbeitsfolie für das Anmischen des Makro-Elements inklusive benötigter Mengen und Lagerbestand nach Auslagerung.',
         meta: [
@@ -20469,10 +20650,16 @@ function exportMacroRecipePdf() {
     });
 }
 
-function exportTraceRecipePdf() {
+async function exportTraceRecipePdf() {
     const state = ensureTraceCalculatorState();
     const recipe = state.latestRecipe || calculateTraceRecipe(getTraceCalculatorConfigFromUi());
-    if (!recipe || !Array.isArray(recipe.rows) || !recipe.rows.length) return alert('Bitte zuerst eine Trace-Mischung berechnen.');
+    if (!recipe || !Array.isArray(recipe.rows) || !recipe.rows.length) {
+        await appAlert('Bitte zuerst eine Trace-Mischung berechnen.', {
+            title: 'Trace-Mischung fehlt',
+            type: 'warning'
+        });
+        return;
+    }
     const rows = recipe.rows
         .filter(row => row.amount > 0)
         .map(row => ({
@@ -20483,7 +20670,7 @@ function exportTraceRecipePdf() {
             resolved: { cat: row.group === 'kationen' ? 'Kationen' : 'Anionen', item: row.item }
         }));
     const totals = recipe.totals || {};
-    openRecipePrintDocument({
+    await openRecipePrintDocument({
         title: 'Trace Neumischung K+ / A-',
         subtitle: 'Rezeptfolie für eine neue Anionen- und Kationen-Mischung inklusive Osmoseanteil, Tagesdosis und Lagerbeständen.',
         meta: [
@@ -20592,6 +20779,13 @@ function cleanIcpCell(value = '') {
 function splitIcpImportLine(raw = '') {
     const line = String(raw || '').trim();
     if (!line) return [];
+    if (line.includes('|')) {
+        return line
+            .replace(/^\|\s*/, '')
+            .replace(/\s*\|$/, '')
+            .split('|')
+            .map(cleanIcpCell);
+    }
     if (line.includes('\t')) {
         return line.split('\t').map(cleanIcpCell);
     }
@@ -20602,6 +20796,66 @@ function getIcpDiffCell(cells = []) {
     if (cells.length >= 8) return cells[7] || '';
     if (cells.length >= 7) return cells[6] || '';
     return '';
+}
+
+function isLikelyIcpHtmlSource(text = '') {
+    return /<\s*(table|thead|tbody|tr|td|th|div|html)\b/i.test(String(text || ''));
+}
+
+function htmlFragmentToText(value = '') {
+    return cleanIcpCell(String(value || '')
+        .replace(/<\s*br\s*\/?>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"'));
+}
+
+function normalizeIcpImportSource(text = '') {
+    const source = String(text || '');
+    if (!isLikelyIcpHtmlSource(source)) return source;
+
+    if (typeof DOMParser === 'undefined') {
+        return source
+            .replace(/<\s*br\s*\/?>/gi, '\n')
+            .replace(/<\/\s*(h1|h2|h3|p|tr|thead|tbody|table|div)\s*>/gi, '\n')
+            .replace(/<\/\s*(td|th)\s*>/gi, '\t')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/&nbsp;/gi, ' ')
+            .replace(/&amp;/gi, '&')
+            .replace(/&lt;/gi, '<')
+            .replace(/&gt;/gi, '>')
+            .replace(/&quot;/gi, '"');
+    }
+
+    const doc = new DOMParser().parseFromString(source, 'text/html');
+    const lines = [];
+    const details = doc.querySelector('.sample-details');
+    if (details) {
+        const headline = cleanIcpCell(details.querySelector('h1, h2, h3')?.textContent || '');
+        if (headline) lines.push(headline);
+        details.querySelectorAll('p').forEach(paragraph => {
+            htmlFragmentToText(paragraph.innerHTML)
+                .split(/\n+/)
+                .map(cleanIcpCell)
+                .filter(Boolean)
+                .forEach(line => lines.push(line));
+        });
+    }
+
+    const tableCandidates = [...doc.querySelectorAll('.sample-details-table table, .sample-details table, table.table')];
+    tableCandidates.forEach(table => {
+        const tableText = cleanIcpCell(table.textContent || '');
+        if (!/Messwert/i.test(tableText) || !/Referenz\s+optimal/i.test(tableText)) return;
+        table.querySelectorAll('tr').forEach(row => {
+            const cells = [...row.querySelectorAll('th, td')].map(cell => cleanIcpCell(cell.textContent || ''));
+            if (cells.length >= 2) lines.push(cells.join('\t'));
+        });
+    });
+
+    return lines.join('\n');
 }
 
 function parseIcpNumber(value = '') {
@@ -20615,6 +20869,21 @@ function parseIcpNumber(value = '') {
     if (!match) return null;
     const number = parseFloat(match[0].replace(/\s+/g, '').replace(',', '.').replace('~', ''));
     return Number.isFinite(number) ? number : null;
+}
+
+// For calculations, qualitative laboratory values need a deterministic rule:
+// nn is zero; nwb uses the upper end of the reported detection range.
+function parseIcpCalculationValue(value = '') {
+    const cleaned = cleanIcpCell(value);
+    if (!cleaned) return null;
+    if (/^nn\b/i.test(cleaned)) return 0;
+    if (/^nwb\b/i.test(cleaned)) {
+        const range = cleaned.match(/\bnwb\b[^\d+-]*([+-]?\d+(?:[.,]\d+)?)\s*[-\u2013\u2014]\s*([+-]?\d+(?:[.,]\d+)?)/i);
+        if (!range) return null;
+        const upper = Number(range[2].replace(',', '.'));
+        return Number.isFinite(upper) ? upper : null;
+    }
+    return parseIcpNumber(cleaned);
 }
 
 function normalizeIcpKey(name = '', symbol = '') {
@@ -20677,6 +20946,10 @@ function extractIcpSymbol(name = '') {
 }
 
 function getIcpValueStatus(entry) {
+    if (entry?.method === 'nn') return { key: 'unknown', label: 'nicht nachweisbar (Berechnung: 0)' };
+    if (entry?.method === 'nwb') {
+        return { key: 'unknown', label: `nwb (Berechnung: ${formatIcpNumber(entry.value, entry.unit)})` };
+    }
     if (!entry || entry.value === null || entry.value === undefined) {
         const raw = cleanIcpCell(entry?.rawValue || '');
         if (/^nn$/i.test(raw)) return { key: 'unknown', label: 'nicht nachweisbar' };
@@ -20689,14 +20962,16 @@ function getIcpValueStatus(entry) {
 }
 
 function parseIcpImportMetadata(text = '') {
-    const source = String(text || '');
+    const source = normalizeIcpImportSource(text).replace(/\*+/g, '');
     const dateMatch = source.match(/Auswertung\s+vom\s+(\d{1,2}\.\d{1,2}\.\d{4})/i);
     const volumeMatch = source.match(/Volumen\s+in\s+Liter\s*:?\s*([0-9]+(?:[,.][0-9]+)?)/i);
     const analysisMatch = source.match(/Analyse\s*ID\s*:?\s*([A-Za-z0-9-]+)/i);
     const sampledMatch = source.match(/Probe\s+gezogen\s+am\s*:?\s*([0-9.:\s]+)/i);
     const measuredMatch = source.match(/Probe\s+gemessen\s+am\s*:?\s*([0-9.:\s]+)/i);
+    const measuredDate = measuredMatch ? parseGermanDate(measuredMatch[1]) : null;
+    const sampledDate = sampledMatch ? parseGermanDate(sampledMatch[1]) : null;
     return {
-        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : null,
+        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : (measuredDate || sampledDate),
         volumeLiters: volumeMatch ? parseIcpNumber(volumeMatch[1]) : null,
         analysisId: analysisMatch ? cleanIcpCell(analysisMatch[1]) : '',
         sampledAtText: sampledMatch ? cleanIcpCell(sampledMatch[1]) : '',
@@ -20714,32 +20989,42 @@ function parseGermanDate(value = '') {
 
 function parseIcpImportText(text = '') {
     const rows = [];
+    const seenRows = new Set();
     let currentSection = 'Basiswerte';
-    String(text || '').split(/\r?\n/).forEach(line => {
+    normalizeIcpImportSource(text).split(/\r?\n/).forEach(line => {
         const raw = line.trim();
         if (!raw) return;
         const cells = splitIcpImportLine(raw);
         if (cells.length < 2) return;
+        if (cells.every(cell => /^:?-{2,}:?$/.test(cell))) return;
         const first = cells[0];
         if (ICP_SECTION_NAMES.has(first) && /messwert/i.test(cells[1] || '')) {
             currentSection = first;
             return;
         }
+        if (/^(Volumen in Liter|Analyse ID|Probe gezogen am|Probe gemessen am):?$/i.test(first)) return;
         if (/^(Basiswerte|Messwert|Minimum|Referenz optimal|Maximum|Einheit|Referenzlinie|Differenz)$/i.test(first)) return;
         if (/messwert/i.test(cells[1] || '') && /minimum/i.test(cells[2] || '')) return;
         const name = first;
         const rawValue = cells[1] || '';
         const unit = cells[5] || '';
         const symbol = extractIcpSymbol(name);
-        const value = parseIcpNumber(rawValue);
+        const value = parseIcpCalculationValue(rawValue);
+        const method = /^nn\b/i.test(rawValue)
+            ? 'nn'
+            : /^nwb\b/i.test(rawValue) ? 'nwb' : 'numeric';
         const min = parseIcpNumber(cells[2] || '');
         const optimal = parseIcpNumber(cells[3] || '');
         const max = parseIcpNumber(cells[4] || '');
         const diff = parseIcpNumber(getIcpDiffCell(cells));
         if (!name || (!rawValue && !unit)) return;
         const canonical = getIcpCanonicalInfo(name, symbol, currentSection);
+        const key = normalizeIcpKey(name, symbol);
+        const seenKey = `${canonical.section}|${key}|${rawValue}|${unit}`;
+        if (seenRows.has(seenKey)) return;
+        seenRows.add(seenKey);
         rows.push({
-            key: normalizeIcpKey(name, symbol),
+            key,
             section: canonical.section,
             name,
             symbol,
@@ -20750,6 +21035,7 @@ function parseIcpImportText(text = '') {
             max,
             unit,
             diff,
+            method,
             sortOrder: canonical.order,
             raw: cells
         });
@@ -20759,12 +21045,14 @@ function parseIcpImportText(text = '') {
 
 function analyzeIcpImportText(text = '', rows = parseIcpImportText(text)) {
     const source = String(text || '');
+    const normalizedSource = normalizeIcpImportSource(source);
     const metadata = parseIcpImportMetadata(source);
     const warnings = [];
     const hasContent = source.trim().length > 0;
-    const hasTabs = /\t/.test(source);
-    const sectionsFound = ICP_SECTION_ORDER.filter(section => new RegExp(`(^|\\n)\\s*${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\t|\\s{2,})`, 'i').test(source));
-    const numeric = rows.filter(row => Number.isFinite(row.value)).length;
+    const hasTabs = /\t/.test(normalizedSource);
+    const sourceIsHtml = isLikelyIcpHtmlSource(source);
+    const sectionsFound = ICP_SECTION_ORDER.filter(section => new RegExp(`(^|\\n)\\s*${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\t|\\s{2,})`, 'i').test(normalizedSource));
+    const numeric = rows.filter(row => row.method === 'numeric' || (!row.method && Number.isFinite(row.value))).length;
     const qualitative = rows.length - numeric;
     const duplicateKeys = rows
         .map(row => row.key)
@@ -20772,6 +21060,8 @@ function analyzeIcpImportText(text = '', rows = parseIcpImportText(text)) {
 
     if (!hasContent) {
         warnings.push({ type: 'info', text: 'Füge zuerst die kopierte Tabelle aus dem OSCI-Laborportal ein.' });
+    } else if (sourceIsHtml && rows.length) {
+        warnings.push({ type: 'info', text: 'HTML-/Elemente-Quelltext erkannt. ReefTools hat daraus automatisch Tabellendaten erzeugt.' });
     } else if (!hasTabs && rows.length < 20) {
         warnings.push({ type: 'warning', text: 'Es wurden kaum Tabellen-Spalten erkannt. Kopiere die Tabelle direkt von der Labor-Webseite, nicht aus der PDF oder einem Screenshot.' });
     }
@@ -20904,6 +21194,21 @@ function renderIcpImportMetaPreview(metadata = {}) {
     `;
 }
 
+function renderIcpReportMetadata(metadata = {}) {
+    const items = [
+        metadata.analysisId ? ['Analyse-ID', metadata.analysisId] : null,
+        Number.isFinite(metadata.volumeLiters) ? ['Aquariumvolumen', `${formatIcpNumber(metadata.volumeLiters, 'L')}`] : null,
+        metadata.sampledAtText ? ['Probe gezogen', metadata.sampledAtText] : null,
+        metadata.measuredAtText ? ['Probe gemessen', metadata.measuredAtText] : null
+    ].filter(Boolean);
+    if (!items.length) return '';
+    return `
+        <div class="icp-report-meta">
+            ${items.map(([label, value]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></span>`).join('')}
+        </div>
+    `;
+}
+
 function renderIcpImportWarnings(warnings = []) {
     if (!warnings.length) return '<div class="icp-import-check is-success"><strong>Import sieht gut aus</strong><span>Die Tabelle wurde plausibel erkannt. Bitte die Vorschau einmal fachlich gegenlesen.</span></div>';
     return `
@@ -20969,11 +21274,21 @@ async function saveIcpReportFromImport() {
     const textInput = document.getElementById('icpImportText');
     const sourceText = textInput?.value || '';
     const values = sortIcpValues(parseIcpImportText(sourceText));
-    if (values.length === 0) return alert('Bitte füge zuerst ICP-Tabellendaten ein.');
+    if (values.length === 0) {
+        await appAlert('Bitte füge zuerst ICP-Tabellendaten ein.', {
+            title: 'ICP-Import leer',
+            type: 'warning'
+        });
+        return;
+    }
     const analysis = analyzeIcpImportText(sourceText, values);
     if (analysis.warnings.some(item => item.type === 'error')) {
         previewIcpImport();
-        return alert('Der ICP-Import ist unvollständig. Bitte kopiere die Tabelle direkt aus dem OSCI-Laborportal und prüfe die Vorschau.');
+        await appAlert('Der ICP-Import ist unvollständig. Bitte kopiere die Tabelle direkt aus dem OSCI-Laborportal und prüfe die Vorschau.', {
+            title: 'Import prüfen',
+            type: 'warning'
+        });
+        return;
     }
     const date = dateInput?.value
         ? new Date(`${dateInput.value}T12:00:00`).toISOString()
@@ -21000,10 +21315,16 @@ async function saveIcpReportFromImport() {
     showToast('ICP gespeichert', 'success', 2400);
 }
 
-function deleteIcpReport(reportId) {
+async function deleteIcpReport(reportId) {
     const report = ensureIcpReports().find(item => item.id === reportId);
     if (!report) return;
-    if (!confirm(`ICP "${report.name}" löschen?`)) return;
+    const confirmed = await appConfirm(`ICP "${report.name}" löschen?`, {
+        title: 'ICP löschen',
+        type: 'warning',
+        confirmText: 'Löschen',
+        cancelText: 'Abbrechen'
+    });
+    if (!confirmed) return;
     db.icpReports = ensureIcpReports().filter(item => item.id !== reportId);
     if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
     if (icpUiState.editingReportId === reportId) icpUiState.editingReportId = null;
@@ -21427,6 +21748,7 @@ function renderIcpPage() {
             </article>
             ${editing ? renderIcpReportEditForm(report) : (selected ? `
                 <div class="icp-report-detail">
+                    ${renderIcpReportMetadata(report.metadata)}
                     ${groupedValues.map(([section, values]) => `
                         <div class="icp-report-section-title">${escapeHtml(section)}</div>
                         ${values.map(value => {
@@ -24587,10 +24909,13 @@ function clearCRPdfImport() {
     if (results) results.innerHTML = '';
 }
 
-function exportCRAdjustment(index) {
+async function exportCRAdjustment(index) {
     if (!CR_PDF_IMPORT_ENABLED) {
         setCRPdfStatus(CR_PDF_MAINTENANCE_MESSAGE);
-        alert(CR_PDF_MAINTENANCE_MESSAGE);
+        await appAlert(CR_PDF_MAINTENANCE_MESSAGE, {
+            title: 'PDF-Import pausiert',
+            type: 'info'
+        });
         return;
     }
     const adjustment = crPdfAdjustments[index];
@@ -24600,14 +24925,26 @@ function exportCRAdjustment(index) {
         .filter(entry => entry.amount > 0)
         .map(entry => ({ cat: entry.cat, item: entry.item, amount: entry.amount }));
 
-    if (queue.length === 0) return alert('Dieser Ausgleich enthält keine Mengen zum Auslagern.');
+    if (queue.length === 0) {
+        await appAlert('Dieser Ausgleich enthält keine Mengen zum Auslagern.', {
+            title: 'Keine Mengen',
+            type: 'warning'
+        });
+        return;
+    }
 
     const summary = getCRAdjustmentSummary(adjustment);
     let message = `${adjustment.label} jetzt auslagern?\n\n${queue.length} Position(en), ${summary.totalRequired.toFixed(2)} ml gesamt.`;
     if (summary.missing.length > 0) {
         message += `\n\nAchtung: Bei ${summary.missing.length} Position(en) reicht der Vorrat nicht. Die App fragt beim Auslagern einzeln nach.`;
     }
-    if (!confirm(message)) return;
+    const confirmed = await appConfirm(message, {
+        title: 'C&R Ausgleich auslagern',
+        type: summary.missing.length > 0 ? 'warning' : 'info',
+        confirmText: 'Auslagern',
+        cancelText: 'Abbrechen'
+    });
+    if (!confirmed) return;
 
     executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }

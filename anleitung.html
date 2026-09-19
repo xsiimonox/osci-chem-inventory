@@ -18,7 +18,7 @@
             });
         } catch (error) {}
     </script>
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.139-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.153-release">
 </head>
 <body class="guide-page">
     <main class="guide-shell">
@@ -40,6 +40,7 @@
             <a href="#lager">Lager</a>
             <a href="#cr">C&amp;R</a>
             <a href="#trace">Trace</a>
+            <a href="#icp">ICP</a>
             <a href="#tools">Tools</a>
             <a href="#logbuch">Logbuch</a>
             <a href="#korallen">Korallen</a>
@@ -91,7 +92,8 @@
                     <li><strong>Bevorzugte Einheit:</strong> Du kannst einstellen, ob ml oder g zuerst und groß angezeigt wird.</li>
                     <li><strong>Bestandsprüfung:</strong> Jede Position zeigt, wie viel nach der Auslagerung übrig bleibt.</li>
                     <li><strong>Ausgleichslisten:</strong> Standardmäßig eingeklappt, damit die Seite übersichtlich bleibt.</li>
-                    <li><strong>PDF-Analyse:</strong> Aktuell wegen Wartung deaktiviert, da PDF-Erkennung fehleranfällig sein kann.</li>
+                    <li><strong>PDF / Drucken:</strong> Aus eingefügten C&amp;R-Daten kannst du eine übersichtliche Arbeitsfolie zum Drucken oder Speichern erstellen.</li>
+                    <li><strong>PDF-Import:</strong> Der direkte PDF-Analyseimport ist pausiert. Nutze Copy &amp; Paste aus der Auswertung oder die manuelle Eingabe, weil PDF-Erkennung je nach Datei fehleranfällig sein kann.</li>
                 </ul>
             </div>
         </section>
@@ -113,6 +115,21 @@
                 <img loading="lazy" decoding="async" src="docs-assets/trace.png" alt="Screenshot des Trace Rechners">
                 <figcaption>Trace-Rechner mit Historie und Reef Manager Import.</figcaption>
             </figure>
+        </section>
+
+        <section id="icp" class="guide-card">
+            <div class="guide-copy">
+                <span class="section-eyebrow">Analyse &amp; Verlauf</span>
+                <h2>ICP Daten</h2>
+                <p>Der ICP-Bereich speichert Laborwerte pro Aquarium, zeigt Verläufe, Optimalwerte und Auffälligkeiten und hilft beim Vergleich über mehrere Analysen.</p>
+                <ul>
+                    <li><strong>OSCI Lab Werte einfügen:</strong> Kopiere die sichtbare Labortabelle oder den HTML-/Elemente-Text der Laborseite in das Importfeld.</li>
+                    <li><strong>Vorschau prüfen:</strong> Vor dem Speichern zeigt Reeftools erkannte Kategorien, Werte, Einheiten, Analyse-ID und Warnungen.</li>
+                    <li><strong>Graphen:</strong> Hauptwert und zusätzliche Werte werden als Verlauf mit Optimalwert angezeigt.</li>
+                    <li><strong>Bearbeiten:</strong> Gespeicherte ICPs können aufgeklappt, bearbeitet oder gelöscht werden.</li>
+                    <li><strong>PDF/Screenshot:</strong> Werte aus Bild-PDFs oder Screenshots sind nicht zuverlässig auslesbar und sollten nicht als sichere Importquelle genutzt werden.</li>
+                </ul>
+            </div>
         </section>
 
         <section id="tools" class="guide-card guide-card-wide">
