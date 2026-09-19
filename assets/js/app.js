@@ -13586,6 +13586,39 @@ function getTraceCalculatorLatestHistory() {
     return history.length ? history[history.length - 1] : null;
 }
 
+function getTraceCalculatorActiveIcp() {
+    const state = ensureTraceCalculatorState();
+    if (state.icpSourceEntryId) {
+        const sourceEntry = state.history.find(entry => entry.id === state.icpSourceEntryId);
+        if (sourceEntry?.icp && typeof sourceEntry.icp === 'object') return sourceEntry.icp;
+    }
+    const currentValues = state.icp && typeof state.icp === 'object' ? state.icp : {};
+    const hasCurrentValues = traceCalculatorElements.some(element => {
+        const value = traceCalcNumber(currentValues[element.item], null);
+        return value !== null && value >= 0;
+    });
+    if (hasCurrentValues) return currentValues;
+
+    const latest = getTraceCalculatorLatestHistory();
+    return latest?.icp && typeof latest.icp === 'object' ? latest.icp : {};
+}
+
+function getTraceCalculatorActiveIcpLabel() {
+    const state = ensureTraceCalculatorState();
+    if (state.icpSourceEntryId) {
+        const sourceEntry = state.history.find(entry => entry.id === state.icpSourceEntryId);
+        if (sourceEntry) return `Historie vom ${formatTraceMixtureDate(sourceEntry)}`;
+    }
+    if (state.selectedIcpReportId) {
+        const report = getIcpReportsSorted(true).find(item => item.id === state.selectedIcpReportId);
+        if (report) return `ICP „${report.name || 'Analyse'}“`;
+    }
+    const hasCurrentValues = traceCalculatorElements.some(element => traceCalcNumber(state.icp?.[element.item], null) !== null);
+    if (hasCurrentValues) return 'aktuelle Eingabe';
+    const latest = getTraceCalculatorLatestHistory();
+    return latest ? `letzte Historien-ICP · ${formatTraceMixtureDate(latest)}` : 'noch keine ICP';
+}
+
 function getTraceCalculatorStartingRecipe(config) {
     const latest = getTraceCalculatorLatestHistory();
     if (!latest || !latest.amounts || !latest.config) return getTraceCalculatorBaseRecipe(config);
@@ -13680,9 +13713,10 @@ function getTraceCalculatorAdjustment(element, measured, previousAmount, config)
 
 function calculateTraceRecipe(config = getTraceCalculatorConfigFromUi()) {
     const state = ensureTraceCalculatorState();
+    const activeIcp = getTraceCalculatorActiveIcp();
     const startingRecipe = getTraceCalculatorStartingRecipe(config);
     const rows = traceCalculatorElements.map(element => {
-        const measured = state.icp[element.item];
+        const measured = activeIcp[element.item];
         const previousAmount = startingRecipe[element.item] || 0;
         const adjustment = getTraceCalculatorAdjustment(element, measured, previousAmount, config);
         return {
@@ -14643,6 +14677,7 @@ async function useStoredIcpForTrace() {
     }
 
     state.selectedIcpReportId = report.id;
+    state.icpSourceEntryId = '';
     state.icp = {};
     const missing = [];
     traceCalculatorElements.forEach(element => {
@@ -15802,6 +15837,11 @@ async function addManualTraceHistoryEntry() {
         }
     });
     state.history.push(entry);
+    if (assignedIcp && hasTraceCalculatorIcpValues(entry) && getTraceCalculatorLatestHistory()?.id === entry.id) {
+        state.icpSourceEntryId = entry.id;
+        state.selectedIcpReportId = assignedIcpReportId;
+        state.icp = { ...entry.icp };
+    }
     pruneTraceCalculatorHistory();
     saveDB();
     renderTraceCalculator();
@@ -15939,6 +15979,11 @@ async function editTraceHistoryEntry(id) {
     entry.sourceIcpReportId = assignedIcpReportId;
     if (assignedIcp) entry.icp = getTraceIcpValuesForHistoryEntry(assignedIcp);
     else if (isReefManagerArchive) entry.icp = {};
+    // Die zugeordnete ICP wird sofort zur Berechnungsbasis. Ohne Zuordnung fällt
+    // der Rechner wieder auf die letzte vollständig zugeordnete Historien-ICP zurück.
+    state.icpSourceEntryId = assignedIcp && hasTraceCalculatorIcpValues(entry) ? entry.id : '';
+    state.selectedIcpReportId = assignedIcpReportId;
+    state.icp = assignedIcp ? { ...entry.icp } : {};
     entry.includeInCalculation = values.includeInCalculation !== 'no';
     entry.calculationLocked = isReefManagerArchive && !assignedIcpReportId;
     entry.mixtureDate = String(values.mixtureDate || '').trim() || entry.mixtureDate || getTodayDateInputValue();
@@ -16058,7 +16103,7 @@ function renderTraceCalculator() {
         <div class="trace-calculator-result">
             ${warnings.length ? `<div class="workflow-message workflow-message--error" role="alert"><strong>Bitte prüfen</strong><span>${warnings.map(escapeHtml).join('<br>')}</span></div>` : ''}
             <div class="trace-result-head">
-                <span><small>Berechnung</small><strong>Rezeptvorschlag</strong><em>Ansatzdatum ${formatTraceDateInput(state.currentMixtureDate)}</em></span>
+                <span><small>Berechnung</small><strong>Rezeptvorschlag</strong><em>Ansatzdatum ${formatTraceDateInput(state.currentMixtureDate)}</em><small>ICP-Basis: ${escapeHtml(getTraceCalculatorActiveIcpLabel())}</small></span>
                 <span class="trace-result-dose"><small>Täglich je Lösung</small><strong>${traceCalcFormatMl(config.dailyDoseMl)}</strong><em>K+ ${traceCalcFormatG(dailyKationenG)} · A- ${traceCalcFormatG(dailyAnionenG)}</em></span>
             </div>
             <div class="trace-summary-strip">
@@ -16082,6 +16127,8 @@ function renderTraceCalculator() {
 
 function updateTraceCalculatorIcp(item, value) {
     const state = ensureTraceCalculatorState();
+    state.icpSourceEntryId = '';
+    state.selectedIcpReportId = '';
     if (String(value || '').trim() === '') delete state.icp[item];
     else state.icp[item] = String(value).replace(',', '.');
     renderTraceCalculator();
@@ -16178,6 +16225,7 @@ function importTraceCalculatorIcpText(sourceText) {
     }
 
     const state = ensureTraceCalculatorState();
+    state.icpSourceEntryId = '';
     parsed.forEach(entry => {
         state.icp[entry.item] = String(entry.value);
     });
@@ -16244,6 +16292,8 @@ function loadTraceCalculatorHistoryEntry(id) {
     if (!entry) return;
     state.config = { ...state.config, ...(entry.config || {}) };
     state.currentMixtureDate = entry.mixtureDate || getTodayDateInputValue();
+    state.icpSourceEntryId = entry.id;
+    state.selectedIcpReportId = entry.sourceIcpReportId || '';
     state.icp = { ...(entry.icp || {}) };
     document.querySelectorAll('[id^="traceCalc"]').forEach(el => {
         if (el && el.dataset) delete el.dataset.traceCalcSynced;
@@ -16284,6 +16334,7 @@ function createTraceCalculatorMixturePayload() {
         createdAt: Date.now(),
         mixtureDate,
         config: { ...recipe.config },
+        sourceIcpReportId: state.selectedIcpReportId || '',
         icp: canSaveAsStartMixture ? {} : { ...state.icp },
         amounts,
         grams,
