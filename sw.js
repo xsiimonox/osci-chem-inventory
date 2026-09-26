@@ -1,14 +1,16 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v34163-release';
+const CACHE_NAME = 'reef-storage-tools-cache-v34176-release';
 const CORE_ASSETS = [
   './',
   './index.html',
   './assets/css/style.css',
   './assets/js/app.js',
   './assets/js/lighting-sim.js',
+  './assets/js/sangokai-data.js',
   './manifest.json',
   './version.json',
   './assets/img/icon.png',
   './assets/img/badman.svg',
+  './anleitung.html',
   './privacy.html',
   './impressum.html'
 ];

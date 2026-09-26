@@ -1,6 +1,6 @@
 # Reeftools.de Benutzerhandbuch
 
-Stand: v3.0.2
+Stand: v3.4.176
 
 Diese Anleitung erklärt die wichtigsten Funktionen von Reeftools.de und wie du sie im Alltag rund um ein Meerwasseraquarium nutzt. Die App ist vor allem für das OSCI Motion Versorgungssystem, Lagerverwaltung, C&R, Trace-Mischungen, Messwerte, Logbuch und praktische Rechner gedacht.
 
@@ -809,4 +809,3 @@ Einige Funktionen sind experimentell oder in Entwicklung, z. B.:
 - einzelne Berechnungen in Tools
 
 Bitte Ergebnisse kritisch prüfen und bei wichtigen Entscheidungen gegen Herstellerangaben, Fachliteratur oder Laborwerte validieren.
-
