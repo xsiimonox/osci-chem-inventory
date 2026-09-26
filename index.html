@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.163-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.176-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.163</span>
+                    <span class="version-badge">v3.4.176</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -146,6 +146,49 @@
                 </div>
             </div>
 
+            <!-- Temporarily hidden: keep the individual C&R recipe planner in the code for a later release. -->
+            <div class="card card-accent custom-cr-tool-card workflow-card" hidden>
+                <h3>2. C&amp;R-Rezept individuell anpassen</h3>
+                <p class="hint">Das eingefügte C&amp;R-Rezept bleibt die Basis. Passe nur die Zielwerte an, die du bewusst anders einstellen möchtest.</p>
+                <div class="tool-experimental-banner" role="note">
+                    <strong>Expertenwerkzeug</strong>
+                    <span>Die Rechnung betrifft ausschließlich Na, Mg, Ca, K, Sr, F, Cl, S, Br und B. C&amp;R-Salze bringen mehrere Ionen gemeinsam ein; deshalb werden gekoppelte Änderungen transparent angezeigt.</span>
+                </div>
+                <div id="customCrLockState" class="custom-cr-lock-state">
+                    <div>
+                        <strong>Geschützter C&amp;R-Rezeptplaner</strong>
+                        <small>Für bewusst individuelle Rezepturen. Das Standardrezept wird nicht überschrieben.</small>
+                    </div>
+                    <div class="custom-cr-unlock-row">
+                        <input type="password" id="customCrPasswordInput" placeholder="Passwort" autocomplete="off" onkeydown="if(event.key==='Enter') unlockCustomCRTool()">
+                        <button type="button" class="btn-secondary btn-animated" onclick="unlockCustomCRTool()">Öffnen</button>
+                    </div>
+                </div>
+                <div id="customCrProtectedContent" class="custom-cr-protected-content" hidden>
+                    <div class="custom-cr-planner-fields">
+                        <div class="input-group">
+                            <label for="customCrRecipeLiters">Rezeptvolumen (L)</label>
+                            <input type="number" id="customCrRecipeLiters" min="0.1" step="0.1" value="100" oninput="updateCustomCrRecipeAdjustment()">
+                            <small class="field-help">Bezugsvolumen der eingefügten Mischung.</small>
+                        </div>
+                    </div>
+                    <div id="customCrRecipeBasis" class="custom-cr-target-help" role="status">
+                        <strong>Noch kein C&amp;R-Rezept erkannt</strong>
+                        <span>Füge oben die vollständige C&amp;R-Datenzeile ein. Die Anpassung wird dann automatisch daraus berechnet.</span>
+                    </div>
+                    <div class="custom-cr-target-help" role="note">
+                        <strong>Zielwerte der fertigen Mischung</strong>
+                        <span>Die Vorgaben starten mit den C&amp;R-Referenzwerten. Ändere nur einzelne Werte, zum Beispiel S von 920 auf 940 mg/l.</span>
+                    </div>
+                    <div id="customCrRecipeTargets" class="custom-cr-limits-grid"></div>
+                    <div class="btn-group calculator-actions custom-cr-toolbar">
+                        <button type="button" class="btn-secondary btn-animated" onclick="loadCustomCrRecipeOptimalTargets()">Referenzwerte laden</button>
+                        <button type="button" class="btn-out btn-animated" onclick="lockCustomCRTool()">Schließen</button>
+                    </div>
+                    <div id="customCrRecipeAdjustmentResult"></div>
+                </div>
+            </div>
+
         </div>
 
         <div id="trace-export" class="tab-content workflow-page workflow-page--trace">
@@ -161,6 +204,17 @@
                     <strong id="traceActiveWarehouseName">Lager</strong>
                 </div>
             </div>
+            <section class="card workflow-card trace-start-solution-card" aria-labelledby="traceStartSolutionTitle">
+                <div class="trace-start-solution-head">
+                    <div>
+                        <span class="workflow-eyebrow">Ausgangspunkt</span>
+                        <h3 id="traceStartSolutionTitle">Startlösung erstellen</h3>
+                        <p class="hint">Lege die erste K+ / A- Mischung als OSCI-Preset oder eigene Rezeptur an. Die nächste ICP wird automatisch mit dieser Startlösung verglichen.</p>
+                    </div>
+                    <span class="trace-start-solution-badge">1. Mischung</span>
+                </div>
+                <div id="traceStartSolutionEditor"></div>
+            </section>
             <details class="card workflow-card trace-calculator-card trace-workflow-accordion">
                 <summary class="trace-workflow-summary">
                     <span><strong>Trace Calculator</strong><small>ICP auswerten und neue K+ / A- Mischung berechnen</small></span>
@@ -2434,8 +2488,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.163-release"></script>
-    <script src="assets/js/app.js?v=3.4.163-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.176-release"></script>
+    <script src="assets/js/app.js?v=3.4.176-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -7252,6 +7252,130 @@ body.theme-light .nav-links button.active {
     display: none !important;
 }
 
+.custom-cr-tool-card {
+    border-color: rgba(255, 178, 107, 0.28);
+}
+
+.custom-cr-lock-state,
+.custom-cr-target-help {
+    display: grid;
+    gap: 8px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 178, 107, 0.22);
+    border-radius: 12px;
+    background: rgba(255, 178, 107, 0.06);
+}
+
+.custom-cr-lock-state > div:first-child,
+.custom-cr-target-help {
+    display: grid;
+    gap: 4px;
+}
+
+.custom-cr-lock-state strong,
+.custom-cr-target-help strong {
+    color: #ffc27e;
+}
+
+.custom-cr-lock-state small,
+.custom-cr-target-help span {
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.custom-cr-unlock-row,
+.custom-cr-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.custom-cr-unlock-row input {
+    flex: 1 1 150px;
+    min-width: 0;
+}
+
+.custom-cr-planner-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.custom-cr-target-help {
+    margin: 12px 0;
+}
+
+.custom-cr-reasoning {
+    border: 1px solid rgba(111, 214, 223, 0.22);
+    border-radius: 12px;
+    background: rgba(111, 214, 223, 0.05);
+}
+
+.custom-cr-reasoning > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    list-style: none;
+}
+
+.custom-cr-reasoning > summary::-webkit-details-marker {
+    display: none;
+}
+
+.custom-cr-reasoning-body {
+    display: grid;
+    gap: 10px;
+    padding: 0 14px 14px;
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
+.custom-cr-reasoning-body p,
+.custom-cr-reasoning-body ul {
+    margin: 0;
+}
+
+.custom-cr-reasoning-body ul {
+    padding-left: 20px;
+}
+
+.custom-cr-reasoning-body strong {
+    color: var(--text);
+}
+
+.custom-cr-calculation-note {
+    padding-top: 10px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 0.86rem;
+}
+
+.custom-cr-linked-warning {
+    padding: 10px 12px;
+    border-left: 3px solid #ffb26b;
+    border-radius: 8px;
+    background: rgba(255, 178, 107, 0.08);
+}
+
+.custom-cr-linked-warning p {
+    margin-top: 4px !important;
+}
+
+@media (max-width: 680px) {
+    .custom-cr-planner-fields {
+        grid-template-columns: 1fr;
+    }
+
+    .custom-cr-unlock-row > *,
+    .custom-cr-toolbar > * {
+        width: 100%;
+    }
+}
+
 .custom-cr-result-shell {
     display: grid;
     gap: 14px;
@@ -7420,6 +7544,237 @@ body.theme-light .nav-links button.active {
 
 .custom-cr-limits-grid input {
     width: 100%;
+}
+
+.custom-cr-recipe-target-row {
+    grid-template-columns: minmax(44px, 0.55fr) minmax(0, 1fr);
+    padding: 8px 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.025);
+}
+
+.custom-cr-recipe-target-row input {
+    grid-column: 1 / -1;
+}
+
+.custom-cr-product-line.is-adjusted {
+    border-color: rgba(111, 214, 223, 0.34);
+    background: rgba(111, 214, 223, 0.06);
+}
+
+.cr-correction-value {
+    color: #ffc27e;
+    font-weight: 700;
+}
+
+.trace-start-solution-card {
+    border-color: rgba(111, 214, 223, 0.34);
+    background: linear-gradient(145deg, rgba(111, 214, 223, 0.08), rgba(255,255,255,0.025));
+}
+
+.trace-start-solution-head,
+.trace-start-solution-controls,
+.trace-start-solution-group-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.trace-start-solution-head h3 {
+    margin: 3px 0 4px;
+}
+
+.trace-start-solution-badge,
+.trace-start-solution-note {
+    border: 1px solid rgba(111, 214, 223, 0.24);
+    border-radius: 999px;
+    padding: 7px 10px;
+    color: var(--secondary);
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.trace-start-solution-controls {
+    align-items: end;
+    margin-top: 16px;
+}
+
+.trace-start-solution-planning {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 16px;
+    padding: 12px;
+    border: 1px solid rgba(111, 214, 223, 0.2);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.12);
+}
+
+.trace-start-solution-planning-hint {
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
+.trace-start-solution-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin: 12px 0;
+}
+
+.trace-start-solution-summary-item {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+    padding: 11px 13px;
+    border: 1px solid rgba(111, 214, 223, 0.18);
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.14);
+}
+
+.trace-start-solution-summary-item small,
+.trace-start-solution-summary-item span {
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.trace-start-solution-summary-item strong {
+    color: var(--text);
+    font-size: 1.05rem;
+}
+
+.trace-start-solution-summary-water strong {
+    font-size: 0.94rem;
+}
+
+.trace-start-solution-reference {
+    margin: 10px 0 14px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.trace-start-solution-reference strong {
+    color: var(--text);
+}
+
+.trace-start-solution-controls .input-group {
+    flex: 1 1 220px;
+}
+
+.trace-start-solution-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.trace-start-solution-note {
+    display: grid;
+    gap: 3px;
+    margin: 12px 0;
+    border-radius: 12px;
+    white-space: normal;
+}
+
+.trace-start-solution-note strong {
+    color: var(--text);
+}
+
+.trace-start-solution-note span,
+.trace-start-solution-group-head small {
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.trace-start-solution-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.trace-start-solution-group {
+    padding: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    background: rgba(0,0,0,0.12);
+}
+
+.trace-start-solution-group-head {
+    align-items: baseline;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.trace-start-solution-fields {
+    display: grid;
+    gap: 7px;
+    margin-top: 10px;
+}
+
+.trace-start-solution-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 150px);
+    align-items: center;
+    gap: 10px;
+}
+
+.trace-start-solution-field > span:first-child {
+    display: grid;
+    gap: 1px;
+}
+
+.trace-start-solution-field > span:first-child small {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 720px) {
+    .trace-start-solution-head,
+    .trace-start-solution-controls {
+        display: grid;
+    }
+
+    .trace-start-solution-groups {
+        grid-template-columns: 1fr;
+    }
+
+    .trace-start-solution-planning {
+        grid-template-columns: 1fr;
+    }
+
+    .trace-start-solution-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .trace-start-solution-badge {
+        justify-self: start;
+    }
+}
+
+.custom-cr-delta-pill.is-warning {
+    border-color: rgba(255, 178, 107, 0.45);
+    background: rgba(255, 178, 107, 0.08);
+}
+
+@media (max-width: 640px) {
+    .custom-cr-recipe-target-row {
+        grid-template-columns: minmax(44px, 0.7fr) minmax(0, 1.3fr);
+    }
+
+    .custom-cr-product-line {
+        grid-template-columns: 1fr;
+    }
+
+    .custom-cr-product-line span,
+    .custom-cr-product-line b {
+        text-align: left;
+    }
 }
 
 .custom-cr-product-grid {

@@ -13006,6 +13006,214 @@ function renderTraceExportInputs() {
         input.addEventListener('input', () => updateTraceDraft(getTraceInputId(prefix, item), item));
         input.addEventListener('change', () => updateTraceDraft(getTraceInputId(prefix, item), item));
     });
+    renderTraceStartSolutionEditor();
+}
+
+function getTraceStartSolutionEntry() {
+    const state = ensureTraceCalculatorState();
+    return state.history.find(entry => isTraceStartMixture(entry)) || null;
+}
+
+function getTraceStartSolutionAmountsFromUi() {
+    return Object.fromEntries(traceCalculatorElements.map(element => {
+        const value = traceCalcNumber(document.getElementById(`traceStart-${element.symbol}`)?.value, 0);
+        return [element.item, Math.max(0, traceCalcRound(value))];
+    }));
+}
+
+function renderTraceStartSolutionEditor() {
+    const container = document.getElementById('traceStartSolutionEditor');
+    if (!container) return;
+    const state = ensureTraceCalculatorState();
+    const saved = state.startSolution && typeof state.startSolution === 'object' ? state.startSolution : {};
+    const startEntry = getTraceStartSolutionEntry();
+    const preset = saved.preset === 'custom' ? 'custom' : 'osci';
+    const config = state.config || {};
+    if (preset === 'osci') {
+        applyTraceOsciStartPlanning(config);
+        state.config = config;
+        saved.amounts = getTraceCalculatorBaseRecipe(config);
+        state.startSolution = saved;
+    }
+    const defaultAmounts = getTraceCalculatorBaseRecipe(config);
+    const hasSavedAmounts = saved.amounts && typeof saved.amounts === 'object' && Object.keys(saved.amounts).length > 0;
+    const amounts = hasSavedAmounts
+        ? saved.amounts
+        : (startEntry?.amounts || defaultAmounts);
+    const plannedVolume = traceCalcRound(
+        traceCalcNumber(config.dailyDoseMl, traceCalculatorBase.dailyDoseMl)
+        * traceCalcNumber(config.days, traceCalculatorBase.days)
+    );
+    const plannedTotals = getTraceTotalsFromAmounts(amounts, config);
+    const formatAmount = value => traceCalcFormatMl(value).replace(/\sml$/, '');
+    const renderGroup = (group, label, symbol) => `
+        <div class="trace-start-solution-group">
+            <div class="trace-start-solution-group-head"><strong>${label}</strong><small>Gesamtmenge je Flasche</small></div>
+            <div class="trace-start-solution-fields">
+                ${traceCalculatorElements.filter(element => element.group === group).map(element => `
+                    <label class="trace-start-solution-field" for="traceStart-${element.symbol}">
+                        <span><strong>${element.symbol}</strong><small>${escapeHtml(element.item.replace(` (${element.symbol})`, ''))}</small></span>
+                        <span class="trace-input-with-unit"><input type="number" id="traceStart-${element.symbol}" min="0" step="0.01" value="${escapeHtml(amounts[element.item] ?? 0)}"><span>ml</span></span>
+                    </label>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    container.innerHTML = `
+        <div class="trace-start-solution-planning">
+            <div class="input-group">
+                <label for="traceStartTankLiters">Aquariumvolumen</label>
+                <div class="trace-input-with-unit"><input type="number" id="traceStartTankLiters" min="1" step="1" value="${escapeHtml(config.tankLiters ?? 500)}" oninput="handleTraceStartPlanningInput()"><span>Liter</span></div>
+            </div>
+            <div class="input-group">
+                <label for="traceStartDays">Laufzeit</label>
+                <div class="trace-input-with-unit"><input type="number" id="traceStartDays" min="1" step="1" value="${escapeHtml(config.days ?? 40)}" oninput="handleTraceStartPlanningInput()"><span>Tage</span></div>
+            </div>
+            <p class="trace-start-solution-planning-hint">Diese beiden Werte bestimmen die Größe des OSCI-Startrezepts. Die Angaben werden auch im Trace Calculator verwendet.</p>
+        </div>
+        <div class="trace-start-solution-controls">
+            <div class="input-group">
+                <label for="traceStartSolutionPreset">Rezeptbasis</label>
+                <select id="traceStartSolutionPreset" onchange="handleTraceStartSolutionPreset(this.value)">
+                    <option value="osci" ${preset === 'osci' ? 'selected' : ''}>OSCI-Preset</option>
+                    <option value="custom" ${preset === 'custom' ? 'selected' : ''}>Eigene Startlösung</option>
+                </select>
+            </div>
+            <div class="trace-start-solution-actions">
+                <button type="button" class="btn-secondary btn-animated" onclick="loadTraceOsciStartSolution()">OSCI-Preset laden</button>
+                <button type="button" class="btn-primary btn-animated" onclick="saveTraceStartSolution()">Startlösung speichern</button>
+            </div>
+        </div>
+        <div class="trace-start-solution-summary" aria-label="Dosierübersicht der Startlösung">
+            <div class="trace-start-solution-summary-item">
+                <small>Aktuelle Berechnung · K+</small>
+                <strong>${formatAmount(plannedTotals.kationen.volumeMl)} ml</strong>
+                <span>${formatAmount(config.dailyDoseMl)} ml täglich</span>
+            </div>
+            <div class="trace-start-solution-summary-item">
+                <small>Aktuelle Berechnung · A-</small>
+                <strong>${formatAmount(plannedTotals.anionen.volumeMl)} ml</strong>
+                <span>${formatAmount(config.dailyDoseMl)} ml täglich</span>
+            </div>
+            <div class="trace-start-solution-summary-item trace-start-solution-summary-water">
+                <small>Osmosewasser zum Auffüllen</small>
+                <strong>K+ ${formatAmount(plannedTotals.kationen.osmoseMl)} ml · A- ${formatAmount(plannedTotals.anionen.osmoseMl)} ml</strong>
+                <span>${formatAmount(plannedVolume)} ml Gesamtvolumen je Lösung</span>
+            </div>
+        </div>
+        <div class="trace-start-solution-note" role="note"><strong>${startEntry ? 'Startlösung gespeichert' : 'Noch keine Startlösung gespeichert'}</strong><span>${startEntry ? `Die nächste ICP wird mit ${formatTraceMixtureDate(startEntry)} als Ausgangspunkt berechnet.` : 'Bearbeite die Mengen bei Bedarf und speichere anschließend die erste Mischung.'}</span></div>
+        <p class="trace-start-solution-reference"><strong>OSCI-Referenz:</strong> Bei 500&nbsp;L, 40&nbsp;Tagen und 5&nbsp;ml Tagesdosis entstehen 200&nbsp;ml je Lösung. Die Elementmengen des Presets werden an das eingestellte Aquarium angepasst; die Osmosewassermenge ergibt sich immer als Rest bis zum Gesamtvolumen.</p>
+        <div class="trace-start-solution-groups">${renderGroup('kationen', 'Kationen K+', 'K+')}${renderGroup('anionen', 'Anionen A-', 'A-')}</div>
+    `;
+}
+
+function handleTraceStartPlanningInput() {
+    const state = ensureTraceCalculatorState();
+    const tankInput = document.getElementById('traceStartTankLiters');
+    const daysInput = document.getElementById('traceStartDays');
+    const tankLiters = Math.max(1, traceCalcNumber(tankInput?.value, state.config?.tankLiters || traceCalculatorBase.liters));
+    const days = Math.max(1, Math.floor(traceCalcNumber(daysInput?.value, state.config?.days || traceCalculatorBase.days)));
+    state.config = { ...(state.config || {}), tankLiters, days };
+    if (state.startSolution?.preset !== 'custom') applyTraceOsciStartPlanning(state.config);
+    ['traceCalcTankLiters', 'traceCalcDays'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.value = id === 'traceCalcTankLiters' ? tankLiters : days;
+    });
+    const bottleInput = document.getElementById('traceCalcBottleMax');
+    const doseInput = document.getElementById('traceCalcDailyDose');
+    if (bottleInput) bottleInput.value = state.config.bottleMaxMl;
+    if (doseInput) doseInput.value = state.config.dailyDoseMl;
+    if (state.startSolution?.preset !== 'custom') {
+        state.startSolution = {
+            ...(state.startSolution || {}),
+            preset: 'osci',
+            amounts: getTraceCalculatorBaseRecipe(state.config)
+        };
+    }
+    renderTraceStartSolutionEditor();
+    renderTraceCalculator();
+}
+
+function applyTraceOsciStartPlanning(config) {
+    const tankLiters = Math.max(1, traceCalcNumber(config?.tankLiters, traceCalculatorBase.liters));
+    const days = Math.max(1, Math.floor(traceCalcNumber(config?.days, traceCalculatorBase.days)));
+    const bottleMaxMl = traceCalcRound(traceCalculatorBase.volumeMl * (tankLiters / traceCalculatorBase.liters));
+    config.tankLiters = tankLiters;
+    config.days = days;
+    config.bottleMaxMl = Math.max(0.01, bottleMaxMl);
+    config.dailyDoseAuto = true;
+    config.dailyDoseMl = getTraceSuggestedDailyDose(days, config.bottleMaxMl);
+    return config;
+}
+
+function handleTraceStartSolutionPreset(value) {
+    const state = ensureTraceCalculatorState();
+    if (!state.startSolution || typeof state.startSolution !== 'object') state.startSolution = {};
+    state.startSolution.preset = value === 'custom' ? 'custom' : 'osci';
+    if (value === 'osci') loadTraceOsciStartSolution();
+}
+
+function loadTraceOsciStartSolution() {
+    const state = ensureTraceCalculatorState();
+    const config = applyTraceOsciStartPlanning({ ...(state.config || {}) });
+    state.config = config;
+    const amounts = getTraceCalculatorBaseRecipe(config);
+    state.startSolution = { ...(state.startSolution || {}), preset: 'osci', amounts };
+    ['traceCalcTankLiters', 'traceCalcDays', 'traceCalcBottleMax', 'traceCalcDailyDose'].forEach(id => {
+        const input = document.getElementById(id);
+        if (!input) return;
+        const values = {
+            traceCalcTankLiters: config.tankLiters,
+            traceCalcDays: config.days,
+            traceCalcBottleMax: config.bottleMaxMl,
+            traceCalcDailyDose: config.dailyDoseMl
+        };
+        input.value = values[id];
+    });
+    renderTraceStartSolutionEditor();
+    showToast('OSCI-Startrezept geladen. Prüfe Mengen und Dosierübersicht, dann speichere es.', 'info', 3200);
+}
+
+async function saveTraceStartSolution() {
+    const state = ensureTraceCalculatorState();
+    const amounts = getTraceStartSolutionAmountsFromUi();
+    const total = Object.values(amounts).reduce((sum, value) => sum + value, 0);
+    if (total <= 0) {
+        await appAlert('Bitte trage mindestens eine Startmenge größer als 0 ml ein.', { title: 'Startlösung unvollständig', type: 'warning' });
+        return;
+    }
+    const existing = getTraceStartSolutionEntry();
+    if (existing) {
+        const confirmed = await appConfirm('Die vorhandene Startlösung wird ersetzt. Fortfahren?', { title: 'Startlösung ersetzen', confirmText: 'Ersetzen', cancelText: 'Abbrechen' });
+        if (!confirmed) return;
+    }
+    const config = getTraceCalculatorConfigFromUi();
+    const entry = normalizeTraceCalculatorHistoryEntry({
+        id: existing?.id || createWarehouseId(),
+        source: 'traceStartMixture',
+        includeInCalculation: false,
+        isStartMixture: true,
+        createdAt: existing?.createdAt || Date.now(),
+        mixtureDate: document.getElementById('traceCalcMixtureDate')?.value || getTodayDateInputValue(),
+        config,
+        icp: {},
+        amounts,
+        grams: Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)])),
+        totals: getTraceTotalsFromAmounts(amounts, config),
+        label: 'Startlösung'
+    });
+    const existingIndex = state.history.findIndex(item => item.id === entry.id);
+    if (existingIndex >= 0) state.history[existingIndex] = entry;
+    else state.history.push(entry);
+    state.startSolution = {
+        preset: document.getElementById('traceStartSolutionPreset')?.value === 'custom' ? 'custom' : 'osci',
+        amounts,
+        updatedAt: Date.now()
+    };
+    saveDB();
+    renderTraceStartSolutionEditor();
+    renderTraceCalculator();
+    showToast('Startlösung gespeichert. Die nächste ICP kann darauf aufbauen.', 'success', 3200);
 }
 
 function getTraceInputId(prefix, itemName) {
@@ -13289,6 +13497,9 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
     if (db.traceCalculator.selectedIcpReportId === undefined) db.traceCalculator.selectedIcpReportId = '';
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
+    if (!db.traceCalculator.startSolution || typeof db.traceCalculator.startSolution !== 'object') {
+        db.traceCalculator.startSolution = { preset: 'osci', amounts: {}, updatedAt: 0 };
+    }
     return db.traceCalculator;
 }
 
@@ -16504,6 +16715,9 @@ window.loadTraceCalculatorFromLast = loadTraceCalculatorFromLast;
 window.loadTraceCalculatorHistoryEntry = loadTraceCalculatorHistoryEntry;
 window.saveTraceCalculatorMixture = saveTraceCalculatorMixture;
 window.saveAndBookTraceCalculatorMixture = saveAndBookTraceCalculatorMixture;
+window.handleTraceStartSolutionPreset = handleTraceStartSolutionPreset;
+window.loadTraceOsciStartSolution = loadTraceOsciStartSolution;
+window.saveTraceStartSolution = saveTraceStartSolution;
 window.openTraceCalculationGuide = openTraceCalculationGuide;
 window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
 window.addManualTraceHistoryEntry = addManualTraceHistoryEntry;
@@ -16783,6 +16997,7 @@ function syncCustomCRLockUI() {
     const unlocked = isCustomCRUnlocked();
     if (lockState) lockState.hidden = unlocked;
     if (protectedContent) protectedContent.hidden = !unlocked;
+    if (unlocked) renderCustomCrRecipeAdjustment();
 }
 
 function unlockCustomCRTool() {
@@ -16800,12 +17015,14 @@ function unlockCustomCRTool() {
     renderCustomCrPlannerMatrix();
     renderCustomCRPlanner();
     renderSavedCustomCrPlans();
+    renderCustomCrRecipeAdjustment();
     showToast('C&R Tool entsperrt', 'success', 2200);
 }
 
 function lockCustomCRTool() {
     localStorage.removeItem(CUSTOM_CR_UNLOCK_KEY);
     syncCustomCRLockUI();
+    renderCustomCrRecipeAdjustment();
     showToast('C&R Tool gesperrt', 'info', 2200);
 }
 
@@ -19660,6 +19877,161 @@ function solveCustomCrNnls(massNeed, warmStart = null) {
     return { amounts, prediction };
 }
 
+// Solves recipe changes around the pasted C&R basis. Negative changes are
+// allowed only up to the amount that is actually present in the base recipe.
+function solveCustomCrRecipeDelta(targetValues, baseAmounts, recipeLiters) {
+    const rows = customCrElementDefinitions.length;
+    const cols = customCrProducts.length;
+    const liters = Math.max(0.1, parseFloat(recipeLiters) || 100);
+    const matrix = customCrElementDefinitions.map(entry =>
+        customCrProducts.map(product => getCustomCrElementContributionPerMl(product, entry.key) / liters)
+    );
+    const need = customCrElementDefinitions.map(entry =>
+        (parseFloat(targetValues?.[entry.key]) || 0) - (customCrOptimalTargets[entry.key] || 0)
+    );
+    const lowerBounds = customCrProducts.map(product => -(Math.max(0, parseFloat(baseAmounts?.[product.key]) || 0)));
+    const amounts = new Array(cols).fill(0);
+    const prediction = new Array(rows).fill(0);
+    const columnNorms = customCrProducts.map((_, col) => {
+        const norm = matrix.reduce((sum, row) => sum + (row[col] * row[col]), 0);
+        return norm || 1;
+    });
+
+    for (let iteration = 0; iteration < 500; iteration += 1) {
+        let maxChange = 0;
+        for (let col = 0; col < cols; col += 1) {
+            let numerator = 0;
+            for (let row = 0; row < rows; row += 1) {
+                const coefficient = matrix[row][col];
+                numerator += coefficient * (need[row] - prediction[row] + coefficient * amounts[col]);
+            }
+            const next = Math.min(50000, Math.max(lowerBounds[col], numerator / columnNorms[col]));
+            const change = next - amounts[col];
+            if (!change) continue;
+            amounts[col] = next;
+            maxChange = Math.max(maxChange, Math.abs(change));
+            for (let row = 0; row < rows; row += 1) prediction[row] += matrix[row][col] * change;
+        }
+        if (maxChange < 0.00001) break;
+    }
+    return { amounts, prediction, need, liters };
+}
+
+function getCustomCrRecipeBasisRows() {
+    const text = document.getElementById('cr-paste-area')?.value || '';
+    const rows = parseCRPasteAmounts(text);
+    if (rows.length < crOrder.length) return [];
+    return customCrProducts.map(product => {
+        const match = rows.find(row => row.item === product.item);
+        return { ...product, baseAmount: Math.max(0, parseFloat(match?.amount) || 0) };
+    });
+}
+
+function renderCustomCrRecipeTargets() {
+    const container = document.getElementById('customCrRecipeTargets');
+    if (!container) return;
+    container.innerHTML = customCrElementDefinitions.map(entry => {
+        const existing = document.getElementById(`customCrRecipeTarget-${entry.key}`)?.value;
+        const value = existing !== undefined && existing !== '' ? existing : customCrOptimalTargets[entry.key];
+        return `<div class="custom-cr-limits-label custom-cr-recipe-target-row">
+            <strong>${entry.label}</strong><small>${entry.unit}</small>
+            <input type="number" id="customCrRecipeTarget-${entry.key}" min="0" step="any" value="${value}" aria-label="Zielwert ${entry.label}" oninput="updateCustomCrRecipeAdjustment()">
+        </div>`;
+    }).join('');
+}
+
+function getCustomCrRecipeTargetValues() {
+    const values = {};
+    customCrElementDefinitions.forEach(entry => {
+        const value = parseFloat(document.getElementById(`customCrRecipeTarget-${entry.key}`)?.value);
+        values[entry.key] = Number.isFinite(value) ? value : customCrOptimalTargets[entry.key];
+    });
+    return values;
+}
+
+function updateCustomCrRecipeAdjustment() {
+    renderCustomCrRecipeAdjustment();
+    previewCRPaste();
+}
+
+function loadCustomCrRecipeOptimalTargets() {
+    renderCustomCrRecipeTargets();
+    customCrElementDefinitions.forEach(entry => {
+        const input = document.getElementById(`customCrRecipeTarget-${entry.key}`);
+        if (input) input.value = customCrOptimalTargets[entry.key];
+    });
+    updateCustomCrRecipeAdjustment();
+}
+
+function getCustomCrRecipeAdjustmentRows() {
+    if (!isCustomCRUnlocked()) return null;
+    const basisRows = getCustomCrRecipeBasisRows();
+    if (!basisRows.length) return null;
+    const liters = Math.max(0.1, parseFloat(document.getElementById('customCrRecipeLiters')?.value) || 100);
+    const baseAmounts = Object.fromEntries(basisRows.map(row => [row.key, row.baseAmount]));
+    const solved = solveCustomCrRecipeDelta(getCustomCrRecipeTargetValues(), baseAmounts, liters);
+    return basisRows.map((row, index) => ({
+        ...row,
+        correction: solved.amounts[index],
+        adjustedAmount: Math.max(0, row.baseAmount + solved.amounts[index])
+    }));
+}
+
+function renderCustomCrRecipeAdjustment() {
+    const basisMessage = document.getElementById('customCrRecipeBasis');
+    const result = document.getElementById('customCrRecipeAdjustmentResult');
+    if (!basisMessage || !result) return;
+    // Do not rebuild the input grid while typing. Replacing it would remove
+    // focus and let the global number-key navigation handle the next digit.
+    if (!document.getElementById('customCrRecipeTarget-Na')) renderCustomCrRecipeTargets();
+    const basisRows = getCustomCrRecipeBasisRows();
+    if (!basisRows.length) {
+        basisMessage.innerHTML = '<strong>Noch kein C&amp;R-Rezept erkannt</strong><span>Füge oben die vollständige C&amp;R-Datenzeile ein. Die Anpassung wird dann automatisch daraus berechnet.</span>';
+        result.innerHTML = '';
+        return;
+    }
+    const liters = Math.max(0.1, parseFloat(document.getElementById('customCrRecipeLiters')?.value) || 100);
+    const baseAmounts = Object.fromEntries(basisRows.map(row => [row.key, row.baseAmount]));
+    const targets = getCustomCrRecipeTargetValues();
+    const solved = solveCustomCrRecipeDelta(targets, baseAmounts, liters);
+    const newAmounts = solved.amounts.map((delta, index) => Math.max(0, basisRows[index].baseAmount + delta));
+    const outputValues = {};
+    customCrElementDefinitions.forEach((entry, rowIndex) => {
+        outputValues[entry.key] = customCrOptimalTargets[entry.key] + solved.prediction[rowIndex];
+    });
+    const totalBase = basisRows.reduce((sum, row) => sum + row.baseAmount, 0);
+    const totalNew = newAmounts.reduce((sum, amount) => sum + amount, 0);
+    const productRows = basisRows.map((product, index) => {
+        const delta = solved.amounts[index];
+        const deltaLabel = `${delta > 0.004 ? '+' : ''}${formatCustomCrNumber(delta, 2)} ml`;
+        return `<div class="custom-cr-product-line ${Math.abs(delta) > 0.004 ? 'is-adjusted' : ''}">
+            <strong>${escapeHtml(product.item)}</strong>
+            <span>Basis: ${formatCustomCrNumber(product.baseAmount, 2)} ml</span>
+            <span>Änderung: ${deltaLabel}</span>
+            <b>Neu: ${formatCustomCrNumber(newAmounts[index], 2)} ml</b>
+        </div>`;
+    }).join('');
+    const elementRows = customCrElementDefinitions.map((entry, index) => {
+        const target = targets[entry.key];
+        const resultValue = outputValues[entry.key];
+        const residual = resultValue - target;
+        return `<div class="custom-cr-delta-pill ${Math.abs(residual) > Math.max(0.01, Math.abs(target) * 0.002) ? 'is-warning' : ''}">
+            <strong>${entry.label}</strong><span>Ziel ${formatCustomCrNumber(target, 3)} ${entry.unit}</span><b>Berechnet ${formatCustomCrNumber(resultValue, 3)} ${entry.unit}</b>
+        </div>`;
+    }).join('');
+    const hasChange = solved.amounts.some(value => Math.abs(value) > 0.004);
+    basisMessage.innerHTML = `<strong>Basisrezept erkannt</strong><span>${basisRows.length} C&amp;R-Komponenten · ${formatCustomCrNumber(totalBase, 2)} ml Basis · Bezugsvolumen ${formatCustomCrNumber(liters, 1)} L</span>`;
+    result.innerHTML = `<div class="custom-cr-result-shell">
+        <div class="custom-cr-overview-card"><strong>${hasChange ? 'Angepasste Rezeptur' : 'Keine Anpassung nötig'}</strong><span>${formatCustomCrNumber(totalNew, 2)} ml Gesamtmenge · Zielwerte werden gegen die C&amp;R-Referenz gerechnet.</span></div>
+        <div class="custom-cr-section"><div class="custom-cr-section-head"><strong>Rezeptur</strong><small>Basis, Änderung und neue Menge</small></div><div class="custom-cr-product-list">${productRows}</div></div>
+        <details class="custom-cr-reasoning"><summary>Warum ändert sich welcher Wert?</summary><div class="custom-cr-reasoning-body"><p>Die Referenzrezeptur wird nicht neu erfunden. Der Rechner bildet nur die Differenz zwischen deinen Zielwerten und den C&amp;R-Referenzwerten ab. Weil ein Salz mehrere Ionen enthält, können gekoppelte Werte leicht mitbewegt werden.</p><div class="custom-cr-delta-grid">${elementRows}</div></div></details>
+    </div>`;
+}
+
+function formatCustomCrNumber(value, digits = 2) {
+    return Number(value || 0).toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
 function createCustomCrNeedMap(current, target, tankLiters, removalLiters) {
     const map = {};
     customCrElementDefinitions.forEach(entry => {
@@ -19677,6 +20049,36 @@ function applyCustomCrDoseToNeedMap(needMap, productKey, amountMl) {
     Object.keys(product.increaseMgL || {}).forEach(elementKey => {
         needMap[elementKey] = Math.max(0, (needMap[elementKey] || 0) - (getCustomCrElementContributionPerMl(product, elementKey) * amountMl));
     });
+}
+
+function addCustomCrBestSulfateCarrier(needMap, additionsMap, current, target, tankLiters) {
+    const sulfateNeed = Math.max(0, Number(needMap.S) || 0);
+    if (!sulfateNeed || !tankLiters) return null;
+    const candidates = customCrProducts.filter(product => ['MgSO4', 'Na2SO4', 'K2SO4'].includes(product.key));
+    if (!candidates.length) return null;
+    const collateralScales = { Na: 50, Mg: 10, K: 5, Cl: 60, S: 8 };
+    const ranked = candidates.map(product => {
+        const sulfatePerMl = getCustomCrElementContributionPerMl(product, 'S');
+        if (!sulfatePerMl) return null;
+        const amountMl = sulfateNeed / sulfatePerMl;
+        let collateralScore = 0;
+        const impacts = {};
+        Object.entries(product.increaseMgL || {}).forEach(([elementKey]) => {
+            const impact = (getCustomCrElementContributionPerMl(product, elementKey) * amountMl) / tankLiters;
+            impacts[elementKey] = impact;
+            if (elementKey !== 'S') {
+                const currentValue = Number(current?.[elementKey]) || 0;
+                const targetValue = Number(target?.[elementKey]) || 0;
+                const scale = collateralScales[elementKey] || 1;
+                collateralScore += Math.pow((currentValue + impact - targetValue) / scale, 2);
+            }
+        });
+        return { product, amountMl, impacts, collateralScore };
+    }).filter(Boolean).sort((a, b) => a.collateralScore - b.collateralScore);
+    const selected = ranked[0];
+    additionsMap[selected.product.item] += selected.amountMl;
+    applyCustomCrDoseToNeedMap(needMap, selected.product.key, selected.amountMl);
+    return selected;
 }
 
 function getCustomCrBaseRemovalLiters(current, target, tankLiters, currentPsu, targetPsu) {
@@ -19838,6 +20240,10 @@ function solveCustomCRAdjustmentWithRemoval(current, target, tankLiters, current
         if ((needMap.K || 0) > 0) applyByPrimaryNeed('KCl', 'K');
     }
 
+    // Sulfat kann bewusst über das Herstellerziel hinaus angehoben werden.
+    // Dafür muss ein Sulfatsalz gewählt werden, auch wenn Na/Mg/K bereits am Ziel liegen.
+    const sulfateCarrier = addCustomCrBestSulfateCarrier(needMap, additionsMap, current, target, tankLiters);
+
     if ((needMap.S || 0) > 0 && (needMap.Na || 0) > 0) {
         const na2so4 = customCrProducts.find(entry => entry.key === 'Na2SO4');
         const na2so4ByS = (needMap.S || 0) / getCustomCrElementContributionPerMl(na2so4, 'S');
@@ -19912,8 +20318,53 @@ function solveCustomCRAdjustmentWithRemoval(current, target, tankLiters, current
         extraDilutionLiters,
         basePsu
     };
+    if (sulfateCarrier) {
+        const carrierLabel = sulfateCarrier.product.key;
+        const sulfateImpact = sulfateCarrier.impacts.S || 0;
+        solution.note = `${solution.note ? `${solution.note} ` : ''}${carrierLabel} wurde als Sulfatträger gewählt: +${sulfateImpact.toFixed(2)} mg/l S im Schritt; die mitgeführten Ionen werden separat ausgewiesen.`.trim();
+        solution.sulfateCarrier = carrierLabel;
+    }
     solution.score = scoreCustomCrSolution(solution, targetPsu);
     return solution;
+}
+
+function getCustomCrReasoningHtml(solution, current, target, tankLiters) {
+    const activeProducts = customCrProducts.map(product => {
+        const amount = Number(solution?.additions?.[product.item]) || 0;
+        if (amount <= 0.01) return '';
+        const impacts = Object.entries(product.increaseMgL || {}).map(([elementKey]) => {
+            const impact = (getCustomCrElementContributionPerMl(product, elementKey) * amount) / Math.max(1, tankLiters);
+            return `${elementKey} ${impact >= 0 ? '+' : ''}${impact.toFixed(2)} mg/l`;
+        }).join(', ');
+        return `<li><strong>${product.key}</strong>: ${amount.toFixed(2)} ml · rechnerischer Beitrag bei ${tankLiters.toFixed(0)} L: ${escapeHtml(impacts)}</li>`;
+    }).filter(Boolean).join('');
+    const targetChanges = customCrElementDefinitions.map(entry => {
+        const from = Number(current?.[entry.key]) || 0;
+        const to = Number(target?.[entry.key]) || 0;
+        const delta = to - from;
+        if (Math.abs(delta) <= 0.001) return '';
+        return `<li><strong>${entry.label}</strong>: ${from.toFixed(2)} → ${to.toFixed(2)} ${entry.unit} (${delta >= 0 ? '+' : ''}${delta.toFixed(2)})</li>`;
+    }).filter(Boolean).join('');
+    const coupledChanges = customCrElementDefinitions.map(entry => {
+        const before = Number(current?.[entry.key]) || 0;
+        const after = Number(solution?.finalValues?.[entry.key]) || 0;
+        const desired = Number(target?.[entry.key]) || 0;
+        if (Math.abs(after - desired) <= 0.01) return '';
+        return `<li><strong>${entry.label}</strong>: Ergebnis ${after.toFixed(2)} ${entry.unit}, Ziel ${desired.toFixed(2)} ${entry.unit} (${after - before >= 0 ? '+' : ''}${(after - before).toFixed(2)} gegenüber Ist)</li>`;
+    }).filter(Boolean).join('');
+    return `
+        <details class="custom-cr-reasoning" open>
+            <summary><strong>Warum dieser Plan?</strong><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
+            <div class="custom-cr-reasoning-body">
+                <p>Der Rechner betrachtet zuerst die Differenz zwischen Ist- und Zielwerten. C&amp;R-Salze liefern immer mehrere Ionen gleichzeitig. Deshalb kann Sulfat nicht völlig unabhängig erhöht werden: Ein Sulfatsalz bringt zusätzlich Natrium, Magnesium oder Kalium mit.</p>
+                ${targetChanges ? `<div><strong>Gewünschte Änderungen</strong><ul>${targetChanges}</ul></div>` : '<p>Es wurde kein Elementziel geändert.</p>'}
+                ${activeProducts ? `<div><strong>Auswahl der Produkte</strong><ul>${activeProducts}</ul></div>` : ''}
+                ${coupledChanges ? `<div class="custom-cr-linked-warning"><strong>Gekoppelte Abweichungen</strong><p>Diese Abweichungen entstehen, weil ein Salz mehrere Ionen gleichzeitig liefert. Sie sind kein stillschweigender Zielwertwechsel und müssen nach dem Wasserwechsel kontrolliert werden.</p><ul>${coupledChanges}</ul></div>` : ''}
+                ${(Number(solution?.removalLiters) || 0) > 0 ? `<p><strong>Wasserbewegung:</strong> ${Number(solution.removalLiters).toFixed(2)} L werden entnommen. Davon werden ${Math.max(0, Number(solution.roLiters) || 0).toFixed(2)} L durch Osmosewasser ersetzt; der Rest entspricht der C&amp;R-Zugabe. So werden Konzentrationen aus der Entnahme und den neuen Salzen gemeinsam bilanziert.</p>` : ''}
+                <p class="custom-cr-calculation-note"><strong>Rechenbasis:</strong> Produktwirkung je ml = Herstellerwirkung pro 100 ml bzw. 100 l auf die tatsächliche Aquariengröße umgerechnet. Danach werden Wasserentnahme, Zugaben und PSU-Korrektur gemeinsam neu berechnet. Das Ergebnis ist eine Modellrechnung und muss durch Messung bestätigt werden.</p>
+            </div>
+        </details>
+    `;
 }
 
 function solveCustomCRAdjustment(current, target, tankLiters, currentPsu, targetPsu) {
@@ -20123,9 +20574,12 @@ function renderCustomCRPlanner() {
     const optimizerHint = primarySolution.optimizerMeta?.optimizedRemovalLiters > primarySolution.optimizerMeta?.baseRemovalLiters + 0.25
         ? `Der Rechner hat den Wasserwechsel bewusst auf ${primarySolution.optimizerMeta.optimizedRemovalLiters.toFixed(2)} L erhöht, damit weniger Gesamtschritte nötig werden.`
         : 'Der Rechner sucht automatisch den kleinsten noch sauberen Schritt und vergrößert ihn nur, wenn dadurch weniger Gesamtschritte nötig sind.';
-    const planStatusCopy = plan.steps.length > 1
-        ? `Mit deinen Limits sind aktuell ${plan.steps.length} Schritte der kürzeste saubere Plan.`
-        : 'Mit deinen Limits reicht aktuell ein einziger C&R Wasserwechsel.';
+    const hasLinkedDeviation = Boolean(primaryStep?.violations?.length);
+    const planStatusCopy = hasLinkedDeviation
+        ? 'Einige gekoppelte Ionen weichen bewusst leicht ab. Nach dem Wasserwechsel kontrollieren.'
+        : (plan.steps.length > 1
+            ? `Mit deinen Limits sind aktuell ${plan.steps.length} Schritte der vorsichtigste berechenbare Plan.`
+            : 'Mit deinen Limits reicht aktuell ein einziger C&R Wasserwechsel.');
     result.innerHTML = `
         <div class="tool-result custom-cr-result-shell">
             <div class="custom-cr-topline">
@@ -20190,10 +20644,12 @@ function renderCustomCRPlanner() {
                 </div>
             </div>
 
+            ${getCustomCrReasoningHtml(primarySolution, syncedPlanner.current, syncedPlanner.target, syncedPlanner.tankLiters)}
+
             <details class="custom-cr-section" open>
                 <div class="custom-cr-section-head">
                     <strong>Vorher → Nachher in Schritt 1</strong>
-                    <small>Kein Wert darf über sein Ziel hinausschießen.</small>
+                    <small>Abweichungen vom Ziel werden sichtbar erklärt; gekoppelte Ionen können leicht mitbewegt werden.</small>
                 </div>
                 <div class="custom-cr-delta-grid">
                     ${beforeAfterRows}
@@ -24566,18 +25022,23 @@ function previewCRPaste() {
 
     if (!text.trim()) {
         previewContainer.hidden = true;
+        renderCustomCrRecipeAdjustment();
         return;
     }
 
     if (parsedRows.length < crOrder.length) {
         previewContainer.hidden = false;
         previewList.innerHTML = '<div class="workflow-message workflow-message--error" role="alert"><strong>Eingabe unvollständig</strong><span>Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span></div>';
+        renderCustomCrRecipeAdjustment();
         return;
     }
 
+    const adjustmentRows = getCustomCrRecipeAdjustmentRows();
+    const adjustmentByItem = new Map((adjustmentRows || []).map(row => [row.item, row]));
     let html = '<div class="cr-preview-list">';
     parsedRows.forEach(row => {
-        let amountMl = row.amount;
+        const adjustment = adjustmentByItem.get(row.item);
+        let amountMl = adjustment ? adjustment.adjustedAmount : row.amount;
         let itemName = row.item;
         let cat = row.cat;
         const resolution = getInterchangeableStockResolution(cat, itemName, amountMl);
@@ -24601,6 +25062,7 @@ function previewCRPaste() {
                     <span class="cr-preview-product"><strong>${itemName}</strong>${stockWarning}${renderInterchangeableStockHint(resolution, itemName)}</span>
                     <span class="cr-preview-amount">
                         ${formatCRPreferredAmountHtml(itemName, amountMl).html}
+                        ${adjustment && Math.abs(adjustment.correction) > 0.004 ? `<small class="cr-correction-value">Basis: ${formatCRPreferredAmountHtml(itemName, adjustment.baseAmount).plain} · Korrektur: ${adjustment.correction > 0 ? '+' : ''}${formatCRPreferredAmountHtml(itemName, Math.abs(adjustment.correction)).plain}</small>` : ''}
                         <small>${resolution.hasAlternatives ? 'Neuer Gesamtbestand' : 'Neuer Bestand'}: ${newStockDisplay.plain}</small>
                     </span>
                 </div>
@@ -24611,6 +25073,7 @@ function previewCRPaste() {
 
     previewList.innerHTML = html;
     previewContainer.hidden = false;
+    renderCustomCrRecipeAdjustment();
 }
 
 function processCRPaste() {
@@ -24618,7 +25081,10 @@ function processCRPaste() {
     const rows = parseCRPasteAmounts(text);
     if (rows.length < crOrder.length) return alert("Fehler: Format ungültig.");
     
+    const adjustmentRows = getCustomCrRecipeAdjustmentRows();
+    const adjustmentByItem = new Map((adjustmentRows || []).map(row => [row.item, row]));
     let queue = rows
+        .map(row => ({ ...row, amount: adjustmentByItem.get(row.item)?.adjustedAmount ?? row.amount }))
         .filter(row => row.amount > 0)
         .map(row => ({ cat: row.cat, item: row.item, amount: row.amount }));
     executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
@@ -27204,6 +27670,13 @@ document.addEventListener('keydown', (e) => {
         }
     }
 });
+
+// Scrolling over a focused number field must scroll the page, not change the
+// value accidentally via the browser's native number-step behavior.
+document.addEventListener('wheel', event => {
+    const activeElement = document.activeElement;
+    if (activeElement?.matches?.('input[type="number"]')) event.preventDefault();
+}, { passive: false });
 
 // APP START
 function scheduleStartupTask(label, fn, delay = 0) {
