@@ -23854,15 +23854,24 @@ progress.mini-progress::-moz-progress-bar {
 }
 
 #tools .tool-info-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+    padding: 0;
     border-color: color-mix(in srgb, var(--accent) 34%, var(--border-color)) !important;
     background: color-mix(in srgb, var(--accent) 10%, var(--surface-raised)) !important;
     color: var(--accent) !important;
 }
 
 #tools .tool-link-button {
-    width: 30px;
-    height: 30px;
-    flex: 0 0 30px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+    padding: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
