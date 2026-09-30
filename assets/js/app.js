@@ -17458,8 +17458,6 @@ function showToolInfo(event, toolId) {
 function setupToolTiles() {
     const settings = getToolSettings();
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
-        // This is a full-width calculator card, not a collapsed tool tile.
-        if (card.classList.contains('trace-direct-elements-card')) return;
         const title = card.querySelector('h3');
         if (!title) return;
         const toolTitle = getToolCardTitle(card);

@@ -9856,6 +9856,7 @@ body.theme-badman.party-mode .card {
 
 .trace-warning-mark {
     display: inline-flex;
+    flex: 0 0 28px;
     align-items: center;
     justify-content: center;
     width: 28px;
@@ -24572,7 +24573,109 @@ progress.mini-progress::-moz-progress-bar {
 .trace-osci-workflow-body { padding-top: 16px; }
 
 .trace-direct-elements-card {
+    grid-column: 1 / -1;
     border-color: color-mix(in srgb, var(--status-warning) 42%, var(--border-color));
+}
+
+/* The direct-element calculator follows the same compact tile behavior as the other tools. */
+.trace-direct-elements-card.tool-tile-collapsed {
+    display: block;
+    grid-column: span 1;
+    min-height: 84px;
+    padding: 14px;
+    cursor: pointer;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed > .trace-direct-elements-head {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    gap: 4px 10px;
+    margin: 0;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed > .trace-direct-elements-head > div {
+    display: contents;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed .workflow-eyebrow {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed h3 {
+    grid-column: 1;
+    grid-row: 2;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin: 0;
+    font-size: clamp(.82rem, 2.8vw, .98rem);
+    line-height: 1.14;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed h3 .tool-title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed .hint {
+    display: none;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed .trace-start-solution-badge {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+}
+
+.trace-direct-elements-card.tool-tile-collapsed > #traceDirectElementsCalculator {
+    display: none !important;
+}
+
+/* Keep the nested header visible despite the generic tile hide rule. */
+#tools .trace-direct-elements-card.tool-tile-collapsed > .trace-direct-elements-head {
+    display: grid !important;
+}
+
+#tools .trace-direct-elements-card.tool-tile-collapsed > .trace-direct-elements-head > div {
+    display: contents !important;
+}
+
+#tools .trace-direct-elements-card.tool-tile-collapsed .workflow-eyebrow {
+    display: none;
+}
+
+#tools .trace-direct-elements-card.tool-tile-collapsed h3 {
+    grid-column: 1;
+    grid-row: 1;
+    width: auto;
+}
+
+#tools .trace-direct-elements-card.tool-tile-collapsed h3 .tool-title-text {
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+#tools .trace-direct-elements-card.tool-tile-collapsed .hint {
+    display: block !important;
+    grid-column: 1;
+    grid-row: 2;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: clamp(.68rem, 2.25vw, .78rem);
+    line-height: 1.2;
+    overflow: hidden;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
 }
 
 .trace-direct-elements-head,
