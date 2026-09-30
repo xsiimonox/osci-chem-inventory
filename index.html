@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.176-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.191-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.176</span>
+                    <span class="version-badge">v3.4.191</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -119,6 +119,22 @@
                     <strong id="crActiveWarehouseName">Lager</strong>
                 </div>
             </div>
+            <section class="card workflow-card cr-routine-card" aria-labelledby="crRoutineTitle">
+                <div class="cr-routine-head">
+                    <div>
+                        <span class="workflow-eyebrow">OSCI-Arbeitsweise</span>
+                        <h3 id="crRoutineTitle">C&amp;R-Methode auswählen</h3>
+                        <p class="hint">Wähle zuerst, wie du den Ausgleich durchführen möchtest. ReefTools zeigt dir danach die passende Vorgehensweise.</p>
+                    </div>
+                    <span class="cr-routine-badge" id="crRoutineBadge">R1</span>
+                </div>
+                <div id="crRoutineOptions" class="cr-routine-options" role="group" aria-label="C&amp;R-Methode">
+                    <button type="button" class="cr-routine-option" data-routine="R1" onclick="selectCRRoutine('R1')"><strong>R1 · Defizite</strong><small>Nur fehlende Elemente ausgleichen</small></button>
+                    <button type="button" class="cr-routine-option" data-routine="R2" onclick="selectCRRoutine('R2')"><strong>R2 · Wasserwechsel</strong><small>Angepasstes Meerwasser herstellen</small></button>
+                    <button type="button" class="cr-routine-option" data-routine="R3" onclick="selectCRRoutine('R3')"><strong>R3 · Direkte Zugabe</strong><small>Lösung dosieren und Wasser entnehmen</small></button>
+                </div>
+                <div class="cr-routine-description" id="crRoutineDescription" role="status"></div>
+            </section>
             <div class="card card-accent cr-paste-card workflow-card">
                 <h3>1. Daten und Anzeige</h3>
                 <p class="hint">Füge hier die unformatierte Zeile aus C &amp; R Methode 1, 2 oder 3 ein: (von NaCl bis ml Wert unter Bor)</p>
@@ -204,6 +220,24 @@
                     <strong id="traceActiveWarehouseName">Lager</strong>
                 </div>
             </div>
+            <details class="card workflow-card trace-osci-workflow-card" aria-labelledby="traceWorkflowTitle">
+                <summary class="trace-osci-workflow-summary">
+                    <div>
+                        <span class="workflow-eyebrow">OSCI-Arbeitsablauf</span>
+                        <h3 id="traceWorkflowTitle">Von der Startlösung zur nächsten ICP</h3>
+                    </div>
+                    <span class="trace-osci-workflow-badge">4 Schritte</span>
+                </summary>
+                <div class="trace-osci-workflow-body">
+                <div class="trace-osci-workflow-steps">
+                    <button type="button" class="trace-osci-workflow-step" onclick="document.getElementById('traceStartSolutionTitle')?.scrollIntoView({ behavior: 'smooth', block: 'start' })"><span>1</span><strong>Startlösung</strong><small>Volumen und Laufzeit festlegen</small></button>
+                    <button type="button" class="trace-osci-workflow-step" onclick="selectTab('icp')"><span>2</span><strong>ICP speichern</strong><small>Analysewerte einmalig erfassen</small></button>
+                    <button type="button" class="trace-osci-workflow-step" onclick="document.querySelector('.trace-calculator-card')?.setAttribute('open', ''); document.querySelector('.trace-calculator-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })"><span>3</span><strong>Trace berechnen</strong><small>K+ und A- auswerten</small></button>
+                    <button type="button" class="trace-osci-workflow-step" onclick="selectTab('cr-export')"><span>4</span><strong>C&amp;R prüfen</strong><small>Makroelemente korrigieren</small></button>
+                </div>
+                <p class="trace-osci-workflow-note">Die Startlösung ist der Ausgangspunkt. Danach werden neue ICP-Werte über den Verlauf und die gespeicherten Mischungen eingeordnet.</p>
+                </div>
+            </details>
             <section class="card workflow-card trace-start-solution-card" aria-labelledby="traceStartSolutionTitle">
                 <div class="trace-start-solution-head">
                     <div>
@@ -438,6 +472,17 @@
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
+                        <div class="card tool-compact-card trace-direct-elements-card" aria-labelledby="traceDirectElementsTitle">
+                            <div class="trace-direct-elements-head">
+                                <div>
+                                    <span class="workflow-eyebrow">Trace-Einzelkorrektur</span>
+                                    <h3 id="traceDirectElementsTitle">Barium, Lithium &amp; Molybdän direkt ausgleichen</h3>
+                                    <p class="hint">Diese drei Lösungen werden separat dosiert. Sie gehören <strong>nicht</strong> in K+ oder A− und werden nicht in die Spurenelementmischung eingerechnet.</p>
+                                </div>
+                                <span class="trace-start-solution-badge">ICP-basiert</span>
+                            </div>
+                            <div id="traceDirectElementsCalculator"></div>
+                        </div>
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>KH / Ca Korrektur <button type="button" class="tool-inline-fav" data-tool-id="kh-ca-korrektur">☆ Fav</button></h3>
                             <p class="hint">Aktuellen Wert, Zielwert und Produktwirkung eintragen. So bleibt der Rechner mit jedem Produkt nutzbar.</p>
@@ -2488,8 +2533,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.176-release"></script>
-    <script src="assets/js/app.js?v=3.4.176-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.191-release"></script>
+    <script src="assets/js/app.js?v=3.4.191-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

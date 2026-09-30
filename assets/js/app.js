@@ -78,6 +78,13 @@ const traceCalculatorIntervalRules = {
 
 const traceCalculatorBase = { liters: 500, days: 40, volumeMl: 200, dailyDoseMl: 5 };
 
+// Separate OSCI correction solutions. They must never be folded into K+/A-.
+const traceDirectElementCorrections = [
+    { item: 'Barium (Ba)', symbol: 'Ba', unit: 'µg/l', min: 5, optimal: 17.5, max: 30, effect: 5, maxDailyIncrease: 5, product: 'Trace Elements Barium', note: '0,1 ml je 100 L erhöht Barium um 5 µg/l.' },
+    { item: 'Lithium (Li)', symbol: 'Li', unit: 'µg/l', min: 120, optimal: 285, max: 450, effect: 10, maxDailyIncrease: 25, product: 'Trace Elements Lithium', note: '0,1 ml je 100 L erhöht Lithium um 10 µg/l.' },
+    { item: 'Molybdän (Mo)', symbol: 'Mo', unit: 'µg/l', min: 8, optimal: 14, max: 20, effect: 10, maxDailyIncrease: 2, product: 'Trace Molybdän', note: '0,1 ml je 100 L erhöht Molybdän um 10 µg/l.' }
+];
+
 // Single source of truth for both the calculation and its in-app explanation.
 const traceCalculatorRules = {
     roundingMl: 0.01,
@@ -8790,6 +8797,7 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'lager') renderLager();
         if(tabId === 'cr-export') {
             syncCRPreferredUnitUI();
+            renderCRRoutineSelection();
             setupPriority4CalculatorUI();
         }
         if(tabId === 'statistik') renderStats();
@@ -13807,6 +13815,152 @@ function getTraceSuggestedDailyDose(days, bottleMaxMl) {
     return Math.max(0.01, Math.floor(volume / runtime));
 }
 
+function getTraceDirectElementState() {
+    db.settings = db.settings || {};
+    db.settings.traceDirectElements = db.settings.traceDirectElements || { portions: 3, tankLiters: null, values: {} };
+    db.settings.traceDirectElements.values = db.settings.traceDirectElements.values || {};
+    return db.settings.traceDirectElements;
+}
+
+function updateTraceDirectElementInput(symbol, field, value, shouldRender = true) {
+    const element = traceDirectElementCorrections.find(item => item.symbol === symbol);
+    if (!element) return;
+    const state = getTraceDirectElementState();
+    state.values[symbol] = state.values[symbol] || {};
+    if (value === '') {
+        state.values[symbol][field] = '';
+    } else if (field === 'target') {
+        state.values[symbol][field] = Math.min(element.max, Math.max(element.min, traceCalcNumber(value, element.optimal)));
+    } else {
+        state.values[symbol][field] = Math.max(0, traceCalcNumber(value, 0));
+    }
+    saveDB();
+    if (shouldRender) renderTraceDirectElementCalculator();
+}
+
+function updateTraceDirectElementInputLive(symbol, field, value) {
+    const state = getTraceDirectElementState();
+    updateTraceDirectElementInput(symbol, field, value, false);
+    window.clearTimeout(state.liveRenderTimer);
+    state.liveRenderTimer = window.setTimeout(() => {
+        state.liveRenderTimer = null;
+        renderTraceDirectElementCalculator();
+    }, 180);
+}
+
+function setTraceDirectElementTarget(symbol, preset) {
+    const element = traceDirectElementCorrections.find(item => item.symbol === symbol);
+    if (!element) return;
+    const target = preset === 'min' ? element.min : preset === 'max' ? element.max : element.optimal;
+    const state = getTraceDirectElementState();
+    state.values[symbol] = { ...(state.values[symbol] || {}), target };
+    saveDB();
+    renderTraceDirectElementCalculator();
+}
+
+function updateTraceDirectElementPortions(value) {
+    const state = getTraceDirectElementState();
+    state.portions = Math.max(1, Math.min(30, Math.floor(traceCalcNumber(value, 3) || 3)));
+    saveDB();
+    renderTraceDirectElementCalculator();
+}
+
+function updateTraceDirectTankLiters(value) {
+    const state = getTraceDirectElementState();
+    state.tankLiters = value === '' ? '' : Math.max(1, traceCalcNumber(value, 1));
+    saveDB();
+    renderTraceDirectElementCalculator();
+}
+
+function traceDirectElementDose(element, current, target, tankLiters) {
+    if (current === null || target === null || tankLiters <= 0 || current >= target) return 0;
+    return Math.max(0, ((target - current) * tankLiters * 0.1) / (100 * element.effect));
+}
+
+function renderTraceDirectElementCalculator() {
+    const container = document.getElementById('traceDirectElementsCalculator');
+    if (!container) return;
+    const state = getTraceDirectElementState();
+    const activeIcp = getTraceCalculatorActiveIcp();
+    const storedTankLiters = traceCalcNumber(state.tankLiters, null);
+    const tankLiters = Math.max(0, storedTankLiters !== null ? storedTankLiters : traceCalcNumber(document.getElementById('traceCalcTankLiters')?.value, 0));
+    container.innerHTML = `
+        <div class="trace-direct-elements-explainer">
+            <span class="trace-warning-mark" aria-hidden="true">i</span>
+            <span><strong>Automatische Korrekturgeschwindigkeit</strong><small>Die Gaben werden elementbezogen aus einer vorsichtigen maximalen Änderung pro Tag abgeleitet. Es gibt dafür keine offizielle numerische OSCI-Tagesgrenze; ReefTools kennzeichnet diese Werte deshalb ausdrücklich als konservative Startregel.</small></span>
+        </div>
+        <div class="trace-direct-elements-toolbar">
+            <div class="input-group trace-direct-volume-input">
+                <label for="traceDirectTankLiters">Aquariumvolumen für diese Korrektur</label>
+                <div class="trace-input-with-unit"><input type="number" id="traceDirectTankLiters" min="1" step="0.1" value="${tankLiters || ''}" placeholder="z. B. 500" onchange="updateTraceDirectTankLiters(this.value)"><span>L</span></div>
+            </div>
+            <span class="trace-direct-volume-note">Regel: <strong>kleine tägliche Korrekturschritte</strong></span>
+        </div>
+        <div class="trace-direct-elements-grid">
+            ${traceDirectElementCorrections.map(element => {
+                const saved = state.values[element.symbol] || {};
+                const rawCurrent = saved.current !== undefined && saved.current !== '' ? saved.current : activeIcp[element.item];
+                const current = traceCalcNumber(rawCurrent, null);
+                const target = traceCalcNumber(saved.target, element.optimal);
+                const dose = traceDirectElementDose(element, current, target, tankLiters);
+                const difference = current === null ? 0 : Math.max(0, target - current);
+                const correctionDays = difference > 0 ? Math.max(1, Math.ceil(difference / element.maxDailyIncrease)) : 0;
+                const perDose = correctionDays > 0 ? dose / correctionDays : 0;
+                const status = current === null ? 'missing' : current >= target ? 'complete' : 'add';
+                const statusText = current === null ? 'ICP-Wert fehlt' : current >= target ? 'Keine Zugabe nötig' : 'Zugabe berechnet';
+                return `
+                    <article class="trace-direct-element-card trace-direct-element-card--${status}">
+                        <div class="trace-direct-element-title"><span class="trace-direct-element-symbol">${element.symbol}</span><span><strong>${element.product}</strong><small>ICP-Referenzbereich: ${element.min}–${element.max} ${element.unit}</small></span></div>
+                        <div class="trace-direct-element-inputs">
+                            <label>ICP-Wert <span>${element.unit}</span><input id="traceDirectCurrent${element.symbol}" type="number" min="0" step="0.01" value="${current === null ? '' : current}" placeholder="z. B. ${element.optimal}" onchange="updateTraceDirectElementInput('${element.symbol}', 'current', this.value)"></label>
+                            <label>Zielwert <span>${element.unit}</span><input id="traceDirectTarget${element.symbol}" type="number" min="${element.min}" max="${element.max}" step="0.01" value="${target}" onchange="updateTraceDirectElementInput('${element.symbol}', 'target', this.value)"></label>
+                        </div>
+                        <div class="trace-direct-presets" aria-label="ICP-Referenzziel auswählen">
+                            ${[
+                                ['min', 'Untergrenze', element.min],
+                                ['optimal', 'Mittelwert', element.optimal],
+                                ['max', 'Obergrenze', element.max]
+                            ].map(([preset, label, value]) => `
+                                <button type="button" class="trace-direct-preset-option${Math.abs(target - value) < 0.0001 ? ' is-selected' : ''}" onclick="setTraceDirectElementTarget('${element.symbol}', '${preset}')" aria-pressed="${Math.abs(target - value) < 0.0001}">
+                                    <span>${label}</span><small>ICP-Referenz</small><strong>${value} <em>${element.unit}</em></strong>
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="trace-direct-card-actions"><button type="button" class="btn-primary trace-direct-calculate-button" onclick="renderTraceDirectElementCalculator()">Berechnen</button></div>
+                        <div class="trace-direct-result"><span class="trace-status-pill">${statusText}</span>${current === null ? '<p>ICP-Wert eintragen oder eine gespeicherte ICP auswählen.</p>' : `<strong>${dose > 0 ? traceCalcFormatValue(dose, 2) + ' ml gesamt' : '0 ml'}</strong><small>${dose > 0 ? traceCalcFormatValue(perDose, 2) + ' ml täglich · mindestens ' + correctionDays + ' Tage' : current > target ? 'Der aktuelle Wert liegt bereits über dem Ziel.' : 'Der Zielwert ist erreicht.'}</small>`}</div>
+                        <p class="trace-direct-element-note">${element.note} <span>ReefTools-Regel: maximal etwa +${element.maxDailyIncrease} ${element.unit} pro Tag. Nach jeder Korrektur per ICP kontrollieren.</span></p>
+                    </article>
+                `;
+            }).join('')}
+        </div>
+        <p class="trace-direct-elements-footnote"><strong>Wichtig:</strong> Das Ergebnis ist eine rechnerische Korrekturmenge, keine automatische Freigabe zur Einmalzugabe. Bei größeren Abweichungen die Dosis auf mehrere Tage verteilen, nachdosieren erst nach Kontrolle und niemals in K+ oder A− einmischen.</p>
+        <details class="trace-direct-sources">
+            <summary>Quellenlage &amp; fachliche Einordnung</summary>
+            <div class="trace-direct-sources-body">
+                <p><strong>Herstellerbasis:</strong> Die Wirkstärken und OSCI-Referenzbereiche stammen aus den jeweiligen Produktangaben. OSCI bezeichnet Ba, Li und Mo als separate Ausgleichslösungen und nicht als Bestandteile der K+/A−-Spurenlösungen.</p>
+                <p><strong>Abgleich:</strong> Andere Systeme wie ATI und Reef Zlements verwenden teilweise andere Referenzbereiche oder Korrekturschritte. Diese Werte werden deshalb nicht ungeprüft miteinander vermischt.</p>
+                <p><strong>Wissenschaftliche Vorsicht:</strong> Die Einordnung einzelner Spurenelemente ist nicht für alle Elemente eindeutig. Randy Holmes-Farley weist insbesondere darauf hin, dass eine nachgewiesene Einlagerung eines Elements nicht automatisch einen biologischen Nutzen beweist. Deshalb: nur ICP-geführt korrigieren, kleine Schritte verwenden und mit einer Folge-ICP kontrollieren.</p>
+                <ul>
+                    <li><a href="https://osci-motion.de/product/trace-elements-barium/" target="_blank" rel="noopener">OSCI Motion: Barium</a></li>
+                    <li><a href="https://osci-motion.de/product/trace-elements-lithium/" target="_blank" rel="noopener">OSCI Motion: Lithium</a></li>
+                    <li><a href="https://osci-motion.de/product/trace-elements-molybdaen/" target="_blank" rel="noopener">OSCI Motion: Molybdän</a></li>
+                    <li><a href="https://home.atiaquaristik.com/en/rechner/" target="_blank" rel="noopener">ATI: ICP-Element-Rechner</a></li>
+                    <li><a href="https://www.reef2reef.com/ams/randys-elements-to-dose.952/" target="_blank" rel="noopener">Randy Holmes-Farley: Elements to Dose</a></li>
+                    <li><a href="https://icp.reef-zlements.com/icp-eos-analysis/" target="_blank" rel="noopener">Reef Zlements: ICP-Referenzbeispiel</a></li>
+                </ul>
+            </div>
+        </details>
+    `;
+}
+
+function syncTraceOsciWorkflowCard() {
+    const card = document.querySelector('.trace-osci-workflow-card');
+    if (!card || card.dataset.initialized === 'true') return;
+    const hasMixture = getTraceCalculatorHistoryEntries({ calculationOnly: true }).some(entry => entry?.amounts && Object.keys(entry.amounts).length);
+    card.open = !hasMixture;
+    card.dataset.initialized = 'true';
+}
+
 function syncTraceCalculatorDailyDoseSuggestion() {
     const state = ensureTraceCalculatorState();
     if (state.config.dailyDoseAuto === false) return;
@@ -16345,6 +16499,8 @@ function renderTraceCalculator() {
     if (!root) return;
     const state = ensureTraceCalculatorState();
     syncTraceCalculatorConfigUi();
+    syncTraceOsciWorkflowCard();
+    renderTraceDirectElementCalculator();
     const config = getTraceCalculatorConfigFromUi();
     renderTraceCalculatorExpertControls();
     renderTraceStoredIcpPicker();
@@ -16616,6 +16772,8 @@ function commitTraceCalculatorMixture(payload) {
     if (!payload) return null;
     const { state, amounts, entry } = payload;
     state.history.push(normalizeTraceCalculatorHistoryEntry(entry));
+    const workflowCard = document.querySelector('.trace-osci-workflow-card');
+    if (workflowCard) workflowCard.open = false;
     pruneTraceCalculatorHistory();
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
     return entry;
@@ -16729,6 +16887,11 @@ window.updateTraceReuseRemaining = updateTraceReuseRemaining;
 window.updateTraceReuseRemainingDays = updateTraceReuseRemainingDays;
 window.applyTraceReuseEstimatedDays = applyTraceReuseEstimatedDays;
 window.applyTraceReusePlanToDraft = applyTraceReusePlanToDraft;
+window.updateTraceDirectElementInput = updateTraceDirectElementInput;
+window.updateTraceDirectElementInputLive = updateTraceDirectElementInputLive;
+window.setTraceDirectElementTarget = setTraceDirectElementTarget;
+window.updateTraceDirectElementPortions = updateTraceDirectElementPortions;
+window.updateTraceDirectTankLiters = updateTraceDirectTankLiters;
 
 function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
@@ -16884,6 +17047,7 @@ function initTools() {
     runToolInit('Tool-Kategorien', setupToolSections);
     runToolInit('Tool-Favoriten', renderToolFavorites);
     runToolInit('Rechner UI', setupPriority4CalculatorUI);
+    runToolInit('Trace-Einzelkorrektur', renderTraceDirectElementCalculator);
     applyToolVisibility();
     document.querySelectorAll('#tools .tool-section[open]').forEach(section => {
         initToolSection(section.dataset.sectionId || '');
@@ -17294,6 +17458,8 @@ function showToolInfo(event, toolId) {
 function setupToolTiles() {
     const settings = getToolSettings();
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
+        // This is a full-width calculator card, not a collapsed tool tile.
+        if (card.classList.contains('trace-direct-elements-card')) return;
         const title = card.querySelector('h3');
         if (!title) return;
         const toolTitle = getToolCardTitle(card);
@@ -24861,6 +25027,38 @@ function syncCRPreferredUnitUI() {
     if (select) select.value = getCRPreferredUnit();
 }
 
+const crRoutineDescriptions = {
+    R1: 'R1 gleicht nur Defizite aus. Überschüsse bleiben bestehen; die Zugabemenge sollte möglichst klein bleiben.',
+    R2: 'R2 nutzt speziell angepasstes Meerwasser. Die berechneten Lösungen werden mit Osmosewasser angesetzt und als Wasserwechsel eingebracht.',
+    R3: 'R3 dosiert die C&R-Lösungen direkt ins Technikbecken. Danach wird die angegebene Wassermenge entnommen und durch Osmosewasser ersetzt.'
+};
+
+function getCRRoutine() {
+    return ['R1', 'R2', 'R3'].includes(db?.settings?.crRoutine) ? db.settings.crRoutine : 'R1';
+}
+
+function renderCRRoutineSelection() {
+    const selected = getCRRoutine();
+    document.querySelectorAll('#crRoutineOptions [data-routine]').forEach(option => {
+        const active = option.dataset.routine === selected;
+        option.classList.toggle('is-active', active);
+        option.setAttribute('aria-pressed', String(active));
+    });
+    const badge = document.getElementById('crRoutineBadge');
+    if (badge) badge.textContent = selected;
+    const description = document.getElementById('crRoutineDescription');
+    if (description) description.textContent = crRoutineDescriptions[selected];
+}
+
+function selectCRRoutine(routine) {
+    const selected = ['R1', 'R2', 'R3'].includes(routine) ? routine : 'R1';
+    if (!db.settings) db.settings = {};
+    db.settings.crRoutine = selected;
+    saveDB(false);
+    renderCRRoutineSelection();
+    showToast(`${selected} ausgewählt. Prüfe die angezeigte Vorgehensweise.`, 'info', 2600);
+}
+
 async function fillCRDemoData() {
     const pasteArea = document.getElementById('cr-paste-area');
     if (!pasteArea) return;
@@ -27650,17 +27848,6 @@ document.addEventListener('keydown', (e) => {
             if (searchInput) searchInput.focus();
         }, 200);
     }
-    // Number keys follow the personal menu order
-    if (!e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        const order = getMenuOrder();
-        const tabMap = {};
-        order.slice(0, 9).forEach((tabId, index) => {
-            tabMap[String(index + 1)] = tabId;
-        });
-        if (tabMap[e.key]) {
-            selectTab(tabMap[e.key]);
-        }
-    }
     // Ctrl + Z = Undo
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         // Only if not in an input
@@ -27675,7 +27862,7 @@ document.addEventListener('keydown', (e) => {
 // value accidentally via the browser's native number-step behavior.
 document.addEventListener('wheel', event => {
     const activeElement = document.activeElement;
-    if (activeElement?.matches?.('input[type="number"]')) event.preventDefault();
+    if (activeElement?.matches?.('input[type="number"]')) activeElement.blur();
 }, { passive: false });
 
 // APP START

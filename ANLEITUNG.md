@@ -1,6 +1,6 @@
 # Reeftools.de Benutzerhandbuch
 
-Stand: v3.4.176
+Stand: v3.4.177
 
 Diese Anleitung erklärt die wichtigsten Funktionen von Reeftools.de und wie du sie im Alltag rund um ein Meerwasseraquarium nutzt. Die App ist vor allem für das OSCI Motion Versorgungssystem, Lagerverwaltung, C&R, Trace-Mischungen, Messwerte, Logbuch und praktische Rechner gedacht.
 
@@ -103,6 +103,8 @@ Prognosen werden aus Auslagerungen berechnet. Für eine sinnvolle Prognose brauc
 
 Der C&R Bereich ist für OSCI Motion Custom & Repair Produkte gedacht.
 
+Wähle vor dem Einfügen der Liste die passende Arbeitsweise: **R1** gleicht nur Defizite aus, **R2** nutzt speziell angepasstes Meerwasser für einen Wasserwechsel und **R3** dosiert direkt ins Technikbecken mit anschließendem Wasserentzug. Die Auswahl wird gespeichert und die zugehörige Vorgehensweise angezeigt.
+
 Du kannst eine C&R-Liste einfügen und die benötigten Produkte aus dem Lager auslagern.
 
 Die App zeigt:
@@ -118,6 +120,8 @@ Der frühere PDF-Import ist deaktiviert, weil PDF-Analysen fehleranfällig sein 
 ---
 
 ## Trace
+
+Der Trace-Bereich führt jetzt sichtbar durch den Ablauf: Startlösung mit Aquariumvolumen und Laufzeit anlegen, ICP einmalig speichern, K+ und A- berechnen und anschließend C&R prüfen. Die Startlösung dient als Basis für die erste folgende ICP-Berechnung.
 
 Der Trace Bereich ist für Kationen K+ und Anionen A- Mischungen gedacht.
 
