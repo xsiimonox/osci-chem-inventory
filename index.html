@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.199-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.210-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.199</span>
+                    <span class="version-badge">v3.4.210</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -262,7 +262,8 @@
                 <p class="trace-osci-workflow-note">Die Startlösung ist der Ausgangspunkt. Danach werden neue ICP-Werte über den Verlauf und die gespeicherten Mischungen eingeordnet.</p>
                 </div>
             </details>
-            <section class="card workflow-card trace-start-solution-card" aria-labelledby="traceStartSolutionTitle">
+            <details class="card workflow-card trace-start-solution-card" aria-labelledby="traceStartSolutionTitle">
+                <summary class="trace-start-solution-summary-head">
                 <div class="trace-start-solution-head">
                     <div>
                         <span class="workflow-eyebrow">Ausgangspunkt</span>
@@ -271,8 +272,12 @@
                     </div>
                     <span class="trace-start-solution-badge">1. Mischung</span>
                 </div>
+                <span class="settings-accordion-hint" aria-hidden="true"></span>
+                </summary>
+                <div class="trace-start-solution-body">
                 <div id="traceStartSolutionEditor"></div>
-            </section>
+                </div>
+            </details>
             <details class="card workflow-card trace-calculator-card trace-workflow-accordion">
                 <summary class="trace-workflow-summary">
                     <span><strong>Trace Calculator</strong><small>ICP auswerten und neue K+ / A- Mischung berechnen</small></span>
@@ -1589,7 +1594,7 @@
                 <div>
                     <small>Analyse & Verlauf</small>
                     <h2>ICP Daten</h2>
-                    <p class="hint">Speichere ICP-Auswertungen pro Aquarium, vergleiche Werte im Verlauf und erkenne Trends über die letzten Analysen.</p>
+                    <p class="hint">Importiere deine Laboranalyse einmal, prüfe sie und verknüpfe sie anschließend direkt mit der passenden Trace-Mischung.</p>
                 </div>
             </section>
 
@@ -1597,39 +1602,35 @@
                 <div class="icp-card-head">
                     <div>
                         <h3>OSCI Lab Werte einfügen</h3>
-                        <p class="hint">Kopiere die Messwert-Tabelle direkt aus der Labor-Webseite und prüfe die Vorschau, bevor du sie speicherst.</p>
+                        <p class="hint">Der schnellste Weg: Tabelle im Labor markieren, kopieren, hier einfügen und erst danach speichern.</p>
                     </div>
                     <span class="status-badge status-info">Aquariumgebunden</span>
                 </div>
-                <div class="icp-import-guide">
-                    <div>
-                        <strong>So klappt der Import zuverlässig</strong>
-                        <span>Im Laborportal die Tabelle von <b>Basiswerte</b> bis <b>Zirkonium</b> markieren, kopieren und hier einfügen. Nicht die PDF verwenden, wenn die Werte dort nur als Bild vorliegen.</span>
-                    </div>
-                    <div>
-                        <strong>Vor dem Speichern prüfen</strong>
-                        <span>ReefTools erkennt Datum, Analyse-ID, Volumen, Kategorien, Einheiten, Optimalwerte sowie <b>nn</b> und <b>nwb</b>. Auffälligkeiten erscheinen in der Vorschau.</span>
-                    </div>
+                <div class="icp-import-steps" aria-label="ICP Import in drei Schritten">
+                    <div class="icp-import-step"><span>1</span><strong>Im Labor kopieren</strong><small>OSCI-Lab-Tabelle von „Basiswerte“ bis „Zirkonium“ markieren und kopieren.</small></div>
+                    <div class="icp-import-step"><span>2</span><strong>Hier einfügen</strong><small>Die kopierten Tabellenwerte in das große Feld einsetzen.</small></div>
+                    <div class="icp-import-step"><span>3</span><strong>Prüfen & speichern</strong><small>Vorschau kontrollieren, dann die ICP speichern.</small></div>
                 </div>
+                <div class="icp-import-source-note"><strong>Wichtig:</strong> Die sichtbare Tabelle aus der Labor-Webseite funktioniert am zuverlässigsten. Eine PDF mit Bild-/Grafikwerten kann nicht sicher ausgelesen werden.<br><span><b>Nur Messwerte:</b> von „Basiswerte“ bis „Zirkonium (Zr)“ markieren. <b>Mit Labordaten:</b> die komplette Auswertung von „Auswertung vom …“ bis „Zirkonium (Zr)“ kopieren. Dann werden zusätzlich Volumen, Analyse-ID sowie „Probe gezogen“ und „Probe gemessen“ übernommen.</span></div>
                 <div class="icp-import-grid">
                     <div class="input-group">
-                        <label for="icpReportName">Name</label>
-                        <input type="text" id="icpReportName" placeholder="automatisch oder z.B. ICP August">
+                        <label for="icpReportName">Name der Analyse <span class="label-optional">optional</span></label>
+                        <input type="text" id="icpReportName" placeholder="wird automatisch erkannt, z. B. ICP August">
                     </div>
                     <div class="input-group">
-                        <label for="icpReportDate">Datum</label>
+                        <label for="icpReportDate">Probe genommen am <span class="label-optional">optional</span></label>
                         <input type="date" id="icpReportDate">
                     </div>
                 </div>
                 <div class="input-group">
-                    <label for="icpImportText">Kopierte OSCI-Lab-Tabelle</label>
+                    <label for="icpImportText">1. Kopierte OSCI-Lab-Tabelle hier einfügen</label>
                     <textarea id="icpImportText" class="icp-import-textarea" oninput="previewIcpImport()" onpaste="window.setTimeout(previewIcpImport, 0)" placeholder="Hier die kopierte OSCI-Lab-Tabelle oder den Elemente-/HTML-Quelltext einfügen, z.B.&#10;Basiswerte&#9;Messwert&#9;Minimum&#9;Referenz optimal&#9;Maximum&#9;Einheit&#9;Differenz&#10;Salinität&#9;35.07&#9;34&#9;34.5&#9;35.5&#9;PSU&#9;+0.57"></textarea>
-                    <p class="hint icp-import-note"><strong>Hinweis:</strong> Du kannst die sichtbare Tabelle aus der Laborseite oder den kopierten HTML-/Elemente-Text einfügen. <strong>nn</strong> bedeutet nicht nachweisbar, <strong>nwb</strong> bedeutet nachweisbar an der unteren Nachweisgrenze. Werte aus Bild-PDFs können nicht sicher übernommen werden.</p>
+                    <p class="hint icp-import-note"><strong>Erkannt werden auch:</strong> <span class="icp-token-help"><b>nn</b> = nicht nachweisbar · <b>nwb</b> = nachweisbar, aber unter der genauen Messgrenze · <b>---</b> = keine Messung</span></p>
                 </div>
                 <div class="button-row">
-                    <button type="button" class="btn-primary btn-animated" onclick="saveIcpReportFromImport()">ICP speichern</button>
-                    <button type="button" class="btn-secondary btn-animated" onclick="previewIcpImport()">Vorschau prüfen</button>
-                    <button type="button" class="btn-secondary btn-animated" onclick="clearIcpImportForm()">Leeren</button>
+                    <button type="button" class="btn-primary btn-animated" onclick="previewIcpImport()">2. Vorschau prüfen</button>
+                    <button type="button" class="btn-secondary btn-animated" onclick="saveIcpReportFromImport()">3. ICP speichern</button>
+                    <button type="button" class="btn-text btn-animated" onclick="clearIcpImportForm()">Felder leeren</button>
                 </div>
                 <div id="icpImportPreview" class="icp-import-preview"></div>
             </section>
@@ -1671,9 +1672,9 @@
                     <summary class="icp-history-summary">
                         <div>
                             <h3>Gespeicherte ICPs</h3>
-                            <p class="hint">Alle gespeicherten Analysen des aktiven Aquariums.</p>
+                            <p class="hint">Analysen des aktiven Aquariums. Öffne eine ICP für Messwerte, Bearbeitung und Trace-Zuordnung.</p>
                         </div>
-                        <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        <span class="icp-history-summary-side"><span id="icpHistorySummaryMeta" class="icp-history-summary-meta">Wird geladen</span><span class="settings-chevron" aria-hidden="true">⌄</span></span>
                     </summary>
                     <div class="icp-history-body">
                         <div id="icpReportList"></div>
@@ -2592,8 +2593,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.199-release"></script>
-    <script src="assets/js/app.js?v=3.4.199-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.210-release"></script>
+    <script src="assets/js/app.js?v=3.4.210-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

@@ -14054,6 +14054,12 @@ function getTraceHistoryEntrySummary(entry) {
     return entry?.inventoryBooking ? 'Gespeichert & ausgelagert' : 'Manuell gespeichert';
 }
 
+function getTraceHistoryIcpLabel(entry) {
+    if (!entry?.sourceIcpReportId) return 'keine ICP zugeordnet';
+    const report = getIcpReportsSorted(true).find(item => String(item.id) === String(entry.sourceIcpReportId));
+    return report ? `ICP: ${report.name || formatWarehouseDate(report.date || report.createdAt)}` : 'ICP-Zuordnung fehlt';
+}
+
 function getTraceHistoryEntryStatus(entry) {
     if (isReefManagerTraceArchive(entry) && !entry.sourceIcpReportId) {
         return { className: 'ignored', label: 'Archiv', note: 'nur Auslagerung/Doku' };
@@ -16312,13 +16318,17 @@ function renderTraceCalculatorHistory() {
     const chartHistory = sortTraceHistoryByDate(history, 'asc');
     if (!history.length) {
         container.innerHTML = `
-            <div class="card workflow-card trace-history-block trace-history-empty">
-                <div class="trace-history-head">
+            <details class="card workflow-card trace-history-block trace-history-empty">
+                <summary class="trace-history-summary">
                     <span><strong>Historie &amp; Analyse</strong><small>Vergleich der gespeicherten Mischungen</small></span>
-                    <span class="trace-history-head-actions"><span class="trace-history-count">0 Mischungen</span><button type="button" class="btn-secondary" onclick="addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></span>
+                    <span class="trace-history-summary-side"><span class="trace-history-count">0 Mischungen</span><span class="settings-accordion-hint" aria-hidden="true"></span></span>
+                </summary>
+                <div class="trace-history-content">
+                    <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Trage Ansatzdatum, Beckenvolumen, Laufzeit, Tagesdosierung und die Mengen aus K+ und A- ein. Danach kannst du die passende ICP auswählen. Die Verbindung bleibt lokal und wird mit dem normalen Cloud-Sync übernommen.</p></div>
+                    <div class="trace-history-head-actions"><button type="button" class="btn-secondary" onclick="event.stopPropagation(); addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></div>
+                    <p>Nach dem ersten Speichern erscheinen hier Verlauf, prozentuale Entwicklung und die Wirkung der Anpassungen.</p>
                 </div>
-                <p>Nach dem ersten Speichern erscheinen hier Verlauf, prozentuale Entwicklung und die Wirkung der Anpassungen.</p>
-            </div>
+            </details>
         `;
         return;
     }
@@ -16335,12 +16345,14 @@ function renderTraceCalculatorHistory() {
         ? '<p class="hint">Die Startmischung dient als Ausgangsbasis. Für Analyse und automatische Bewertung braucht der nächste Eintrag vollständige ICP-Werte.</p>'
         : '<p class="hint">Alle Historien-Einträge sind deaktiviert oder enthalten keine vollständigen ICP-Werte. Der Rechner nutzt wieder das Basisrezept.</p>';
     container.innerHTML = `
-        <div class="card workflow-card trace-history-block">
-            <div class="trace-history-head">
+        <details class="card workflow-card trace-history-block">
+            <summary class="trace-history-summary">
                 <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Berechnung nutzt ${calculationInfo} · letzter Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
-                <span class="trace-history-head-actions"><span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span><button type="button" class="btn-secondary" onclick="addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></span>
-            </div>
+                <span class="trace-history-summary-side"><span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span><span class="settings-accordion-hint" aria-hidden="true"></span></span>
+            </summary>
             <div class="trace-history-content">
+                <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Nutze „Vergangene Mischung hinzufügen“, wenn ein früheres Rezept noch nicht in ReefTools erfasst ist. Eine ICP und eine Trace-Mischung können jeweils nur einmal verbunden werden.</p></div>
+                <div class="trace-history-head-actions"><button type="button" class="btn-secondary" onclick="event.stopPropagation(); addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></div>
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
                 ${renderTraceCalculatorHistoryChart(chartHistory)}
                 <div class="trace-history-list">
@@ -16349,11 +16361,12 @@ function renderTraceCalculatorHistory() {
                         const status = getTraceHistoryEntryStatus(entry);
                         return `
                         <div class="trace-history-row ${!canTraceHistoryEntryAffectCalculation(entry) && !isTraceStartMixture(entry) ? 'trace-history-row-inactive' : ''}">
-                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small></span>
-                            <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small></span>
+                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small><small class="trace-history-icp-link">${escapeHtml(getTraceHistoryIcpLabel(entry))}</small></span>
+                            <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</span>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
                             <div class="trace-history-actions">
+                                <button type="button" class="btn-secondary" onclick='recordTraceActualAmounts(${jsArg(entry.id)})'>Reale Mengen</button>
                                 <button type="button" class="btn-secondary" onclick='editTraceHistoryEntry(${jsArg(entry.id)})'>Bearbeiten</button>
                                 <button type="button" class="btn-out" onclick='deleteTraceHistoryEntry(${jsArg(entry.id)})'>Löschen</button>
                             </div>
@@ -16361,7 +16374,7 @@ function renderTraceCalculatorHistory() {
                     `;}).join('')}
                 </div>
             </div>
-        </div>
+        </details>
     `;
 }
 
@@ -16369,6 +16382,68 @@ function recalculateTraceHistoryEntryTotals(entry) {
     entry.grams = Object.fromEntries(Object.entries(entry.amounts || {}).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)]));
     entry.totals = getTraceTotalsFromAmounts(entry.amounts || {}, entry.config || {});
     return entry;
+}
+
+async function recordTraceActualAmounts(id) {
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => item.id === id);
+    if (!entry) return;
+    normalizeTraceCalculatorHistoryEntry(entry);
+    const targetAmounts = { ...(entry.targetAmounts || entry.amounts || {}) };
+    const fields = [
+        getTraceAmountUnitField(getTraceHistoryStoredUnit(entry.actualInputs)),
+        ...getTraceHistoryElementFields('actual_kationen', targetAmounts, entry.actualInputs || {}, getTraceHistoryStoredUnit(entry.actualInputs)),
+        ...getTraceHistoryElementFields('actual_anionen', targetAmounts, entry.actualInputs || {}, getTraceHistoryStoredUnit(entry.actualInputs))
+    ];
+    const values = await showAppDialog({
+        kind: 'prompt',
+        type: 'info',
+        title: 'Reale Mengen nachtragen',
+        eyebrow: 'Trace-Historie · Soll / Ist',
+        message: 'Trage nach dem Ansetzen die tatsächlich verwendeten Mengen je Element ein. Wähle die Einheit einmal oben aus. Prüfe besonders das Dezimaltrennzeichen, damit aus 1,2 nicht versehentlich 12 wird.',
+        wide: true,
+        confirmText: 'Ist-Mengen speichern',
+        cancelText: 'Abbrechen',
+        fields
+    });
+    if (!values) return;
+
+    const kationFields = parseTraceHistoryElementFields(values, 'actual_kationen');
+    const anionFields = parseTraceHistoryElementFields(values, 'actual_anionen');
+    const invalidAmountFields = [...kationFields.invalid, ...anionFields.invalid];
+    if (invalidAmountFields.length) {
+        await appAlert(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende nur Zahlen mit optionalem Zusatz „ml“ oder „g“.`, { title: 'Ist-Mengen prüfen', type: 'warning' });
+        return;
+    }
+
+    const actualAmounts = {};
+    traceCalculatorElements.forEach(element => {
+        const parsed = element.group === 'kationen' ? kationFields.amounts[element.item] : anionFields.amounts[element.item];
+        actualAmounts[element.item] = parsed === undefined
+            ? traceCalcNumber(targetAmounts[element.item], 0)
+            : parsed;
+    });
+    const warnings = getTraceActualAmountWarnings({ ...entry, targetAmounts }, actualAmounts);
+    if (warnings.length) {
+        const details = warnings.map(warning => warning.text).join('\n');
+        const critical = warnings.some(warning => warning.severity === 'danger');
+        const confirmed = await appConfirm(
+            `${critical ? 'Sehr große' : 'Deutliche'} Abweichung von der Sollmenge erkannt.\n\n${details}\n\nBitte prüfe Dezimaltrennzeichen und Einheit. Soll die Eingabe trotzdem gespeichert werden?`,
+            { title: 'Soll / Ist prüfen', type: 'warning', confirmText: 'Trotzdem speichern', cancelText: 'Noch einmal prüfen' }
+        );
+        if (!confirmed) return;
+    }
+
+    entry.targetAmounts = targetAmounts;
+    entry.amounts = actualAmounts;
+    entry.actualInputs = { ...kationFields.inputs, ...anionFields.inputs };
+    entry.actualRecordedAt = new Date().toISOString();
+    entry.updatedAt = Date.now();
+    recalculateTraceHistoryEntryTotals(entry);
+    saveDB();
+    renderTraceExportInputs();
+    renderTraceCalculator();
+    showToast('Reale Ist-Mengen gespeichert und für die nächste Berechnung übernommen', 'success', 3200);
 }
 
 function toggleTraceHistoryCalculation(id) {
@@ -16414,18 +16489,189 @@ function parseTraceHistoryAmountsText(text, group = '') {
     return amounts;
 }
 
+function parseTraceAmountInput(raw, item) {
+    const text = String(raw ?? '').trim().replace(',', '.');
+    if (!text) return { value: null, unit: 'ml', grams: null, raw: '' };
+    const match = text.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*(ml|g)?$/i);
+    if (!match) return { value: null, unit: '', grams: null, raw: String(raw || '') };
+    const entered = Number(match[1]);
+    if (!Number.isFinite(entered) || entered < 0) return { value: null, unit: '', grams: null, raw: String(raw || '') };
+    const unit = String(match[2] || 'ml').toLowerCase();
+    const density = densityFactors[item] || 1;
+    const value = unit === 'g' ? entered / density : entered;
+    const grams = unit === 'g' ? entered : entered * density;
+    return { value: traceCalcRound(value), unit, grams: traceCalcRound(grams), raw: String(raw || '') };
+}
+
+function formatTraceAmountInput(value, item, unit = 'ml') {
+    const numeric = traceCalcNumber(value, null);
+    if (numeric === null) return '';
+    if (unit === 'g') return `${traceCalcRound(numeric * (densityFactors[item] || 1)).toString().replace('.', ',')} g`;
+    return `${traceCalcRound(numeric).toString().replace('.', ',')} ml`;
+}
+
+function getTraceHistoryElementFields(prefix, amounts = {}, actualInputs = {}, unit = 'ml') {
+    const group = prefix.includes('anionen') ? 'anionen' : 'kationen';
+    const isActual = prefix.startsWith('actual_');
+    return traceCalculatorElements.map(element => {
+        const raw = actualInputs[element.item]?.raw || formatTraceAmountInput(amounts[element.item], element.item);
+        return {
+            name: `${prefix}_${element.item}`,
+            label: `${element.symbol} · ${element.item.replace(` (${element.symbol})`, '')} · ${isActual ? 'Ist-Menge' : 'Menge'}`,
+            type: 'text',
+            inputMode: 'decimal',
+            value: raw,
+            placeholder: 'z. B. 1,20',
+            suffix: unit === 'g' ? 'g' : 'ml',
+            description: isActual
+                ? `Soll: ${formatTraceAmountInput(amounts[element.item], element.item) || '0 ml'}`
+                : (traceCalcNumber(amounts[element.item], null) === null
+                    ? 'Menge eintragen'
+                    : `Bisher gespeichert: ${formatTraceAmountInput(amounts[element.item], element.item)}`)
+        };
+    }).filter((field, index) => traceCalculatorElements[index].group === group);
+}
+
+function getTraceAmountUnitField(value = 'ml') {
+    return {
+        name: 'traceAmountUnit',
+        label: 'Alle Elementmengen angeben in',
+        value: value === 'g' ? 'g' : 'ml',
+        options: [
+            { value: 'ml', label: 'Milliliter (ml)' },
+            { value: 'g', label: 'Gramm (g)' }
+        ],
+        description: 'Die Auswahl gilt für alle K+- und A--Elementfelder dieser Mischung.'
+    };
+}
+
+function getTraceHistoryStoredUnit(inputs = {}) {
+    const units = Object.values(inputs || {}).map(input => input?.unit).filter(Boolean);
+    return units.length && units.every(unit => unit === 'g') ? 'g' : 'ml';
+}
+
+function parseTraceHistoryElementFields(values, prefix) {
+    const group = prefix.includes('anionen') ? 'anionen' : 'kationen';
+    const defaultUnit = values.traceAmountUnit === 'g' ? 'g' : 'ml';
+    const amounts = {};
+    const inputs = {};
+    const invalid = [];
+    traceCalculatorElements.filter(element => element.group === group).forEach(element => {
+        const raw = values[`${prefix}_${element.item}`];
+        const parsed = parseTraceAmountInput(String(raw || '').trim() && !/[a-z]/i.test(String(raw)) ? `${raw} ${defaultUnit}` : raw, element.item);
+        if (String(raw || '').trim() && parsed.value === null) invalid.push(element.symbol);
+        if (parsed.value !== null) {
+            amounts[element.item] = parsed.value;
+            inputs[element.item] = parsed;
+        }
+    });
+    return { amounts, inputs, invalid };
+}
+
+function getTraceActualAmountWarnings(entry, actualAmounts) {
+    const targetAmounts = entry.targetAmounts || entry.amounts || {};
+    return traceCalculatorElements.reduce((warnings, element) => {
+        const target = traceCalcNumber(targetAmounts[element.item], 0);
+        const actual = traceCalcNumber(actualAmounts[element.item], 0);
+        if (actual <= 0 && target <= 0) return warnings;
+        const relative = target > 0 ? Math.abs(actual - target) / target : actual > 0 ? 1 : 0;
+        if (relative >= 1 || (target > 0 && actual >= target * 4)) {
+            warnings.push({ severity: 'danger', symbol: element.symbol, text: `${element.symbol}: Soll ${traceCalcFormatMl(target)} · Ist ${traceCalcFormatMl(actual)} (sehr große Abweichung)` });
+        } else if (relative > 0.25) {
+            warnings.push({ severity: 'warning', symbol: element.symbol, text: `${element.symbol}: Soll ${traceCalcFormatMl(target)} · Ist ${traceCalcFormatMl(actual)} (mehr als 25 % Abweichung)` });
+        }
+        return warnings;
+    }, []);
+}
+
 function getTraceHistoryGroupTotalValue(entry, group, key) {
     return traceCalcNumber(entry?.totals?.[group]?.[key], null);
 }
 
 function getTraceIcpAssignmentOptions(selectedId = '') {
+    const assignedReportIds = new Set(
+        getTraceCalculatorHistoryEntries({ sort: 'asc' })
+            .filter(entry => entry.sourceIcpReportId && String(entry.sourceIcpReportId) !== String(selectedId))
+            .map(entry => String(entry.sourceIcpReportId))
+    );
     return [
         { value: '', label: 'Keine ICP zugeordnet (nur Archiv)' },
         ...getIcpReportsSorted(true).map(report => ({
             value: report.id,
-            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`
-        }))
+            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`,
+            disabled: assignedReportIds.has(String(report.id))
+        })).filter(option => !option.disabled || option.value === selectedId)
     ].map(option => ({ ...option, selected: option.value === selectedId }));
+}
+
+function getTraceIcpAssignmentEntry(reportId = '') {
+    const normalizedId = String(reportId || '').trim();
+    if (!normalizedId) return null;
+    return getTraceCalculatorHistoryEntries({ sort: 'asc' })
+        .find(entry => String(entry.sourceIcpReportId || '') === normalizedId) || null;
+}
+
+function getTraceHistoryAssignmentOptions(selectedEntryId = '', selectedReportId = '') {
+    const entries = getTraceCalculatorHistoryEntries({ sort: 'desc' });
+    return [
+        { value: '', label: 'Keine Trace-Mischung zugeordnet' },
+        ...entries.map(entry => {
+            const assignedReportId = String(entry.sourceIcpReportId || '');
+            const isCurrent = String(entry.id) === String(selectedEntryId);
+            return {
+                value: entry.id,
+                label: `${formatTraceMixtureDate(entry)} · ${getTraceHistoryEntrySummary(entry)}`,
+                disabled: Boolean(assignedReportId && assignedReportId !== String(selectedReportId || '') && !isCurrent)
+            };
+        }).filter(option => !option.disabled || option.value === selectedEntryId)
+    ].map(option => ({ ...option, selected: option.value === selectedEntryId }));
+}
+
+function renderIcpTraceAssignment(report) {
+    const assignedEntry = getTraceIcpAssignmentEntry(report.id);
+    const selectedEntryId = assignedEntry?.id || '';
+    const options = getTraceHistoryAssignmentOptions(selectedEntryId, report.id);
+    return `
+        <div class="icp-trace-assignment" onclick="event.stopPropagation()">
+            <label for="icpTraceAssignment-${escapeHtml(report.id)}">Trace-Mischung hinzufügen</label>
+            <select id="icpTraceAssignment-${escapeHtml(report.id)}" onchange="assignIcpReportToTrace(${jsArg(report.id)}, this.value)">
+                ${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.selected ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
+            </select>
+            <small>${assignedEntry ? '1:1 verknüpft · wird in der Trace-Historie berücksichtigt.' : 'Wähle eine vorhandene Mischung oder lasse die ICP zunächst ohne Zuordnung.'}</small>
+        </div>
+    `;
+}
+
+async function assignIcpReportToTrace(reportId, entryId) {
+    const report = getIcpReportsSorted(true).find(item => String(item.id) === String(reportId));
+    if (!report) return;
+    const state = ensureTraceCalculatorState();
+    const currentEntry = getTraceIcpAssignmentEntry(report.id);
+    const nextEntry = entryId ? state.history.find(item => String(item.id) === String(entryId)) : null;
+    if (nextEntry && nextEntry.sourceIcpReportId && String(nextEntry.sourceIcpReportId) !== String(report.id)) {
+        await appAlert('Diese Trace-Mischung ist bereits einer anderen ICP zugeordnet. Eine Trace-Mischung und eine ICP dürfen jeweils nur einmal verbunden sein.', { title: 'Zuordnung nicht möglich', type: 'warning' });
+        renderIcpReportList();
+        return;
+    }
+    if (currentEntry && nextEntry && currentEntry.id !== nextEntry.id) {
+        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'Zuordnung nicht möglich', type: 'warning' });
+        renderIcpReportList();
+        return;
+    }
+    if (currentEntry) {
+        currentEntry.sourceIcpReportId = '';
+        currentEntry.icp = {};
+        currentEntry.updatedAt = Date.now();
+    }
+    if (nextEntry) {
+        nextEntry.sourceIcpReportId = String(report.id);
+        nextEntry.icp = getTraceIcpValuesForHistoryEntry(report);
+        nextEntry.updatedAt = Date.now();
+    }
+    saveDB();
+    renderIcpReportList();
+    renderTraceCalculator();
+    showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
 }
 
 function getTraceIcpValuesForHistoryEntry(report) {
@@ -16473,50 +16719,9 @@ async function addManualTraceHistoryEntry() {
             value: String(state.config?.dailyDoseMl || 5),
             required: true
         },
-        {
-            name: 'kationenVolumeMl',
-            label: 'Kationen Gesamtvolumen K+ (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            placeholder: 'z. B. 200'
-        },
-        {
-            name: 'kationenOsmoseMl',
-            label: 'Kationen Osmoseanteil K+ (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            placeholder: 'z. B. 100'
-        },
-        {
-            name: 'anionenVolumeMl',
-            label: 'Anionen Gesamtvolumen A- (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            placeholder: 'z. B. 200'
-        },
-        {
-            name: 'anionenOsmoseMl',
-            label: 'Anionen Osmoseanteil A- (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            placeholder: 'z. B. 100'
-        },
-        {
-            name: 'kationenAmounts',
-            label: 'Kationen K+ Elementmengen',
-            value: '',
-            multiline: true,
-            required: true,
-            description: 'Eine Zeile pro Element, z. B. Co 33,01'
-        },
-        {
-            name: 'anionenAmounts',
-            label: 'Anionen A- Elementmengen',
-            value: '',
-            multiline: true,
-            required: true,
-            description: 'Eine Zeile pro Element, z. B. F 32,18'
-        },
+        getTraceAmountUnitField(),
+        ...getTraceHistoryElementFields('kationen'),
+        ...getTraceHistoryElementFields('anionen'),
         {
             name: 'sourceIcpReportId',
             label: 'Gespeicherte ICP zuordnen (optional)',
@@ -16538,7 +16743,7 @@ async function addManualTraceHistoryEntry() {
         type: 'info',
         title: 'Vergangene Mischung hinzufügen',
         eyebrow: 'Trace-Historie',
-        message: 'Trage eine früher von Hand berechnete K+/A−-Mischung nach. Eine gespeicherte ICP kann optional zugeordnet werden.',
+        message: 'Trage die Werte aus Excel oder vom Zettel je Element einzeln ein. Wähle die Einheit einmal oben aus und trage danach nur die Zahlen ein, z. B. 1,20. Leere Felder zählen als 0; eine gespeicherte ICP kann optional zugeordnet werden.',
         wide: true,
         confirmText: 'Historie speichern',
         cancelText: 'Abbrechen',
@@ -16546,10 +16751,15 @@ async function addManualTraceHistoryEntry() {
     });
     if (!values) return;
 
-    const amounts = {
-        ...parseTraceHistoryAmountsText(values.kationenAmounts, 'kationen'),
-        ...parseTraceHistoryAmountsText(values.anionenAmounts, 'anionen')
-    };
+    const kationFields = parseTraceHistoryElementFields(values, 'kationen');
+    const anionFields = parseTraceHistoryElementFields(values, 'anionen');
+    const amounts = { ...kationFields.amounts, ...anionFields.amounts };
+    const actualInputs = { ...kationFields.inputs, ...anionFields.inputs };
+    const invalidAmountFields = [...kationFields.invalid, ...anionFields.invalid];
+    if (invalidAmountFields.length) {
+        await appAlert(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende nur Zahlen mit optionalem Zusatz „ml“ oder „g“.`, { title: 'Mengen prüfen', type: 'warning' });
+        return;
+    }
     const hasKationen = traceCalculatorElements.some(element => element.group === 'kationen' && amounts[element.item] !== undefined);
     const hasAnionen = traceCalculatorElements.some(element => element.group === 'anionen' && amounts[element.item] !== undefined);
     if (!hasKationen || !hasAnionen) {
@@ -16564,24 +16774,15 @@ async function addManualTraceHistoryEntry() {
         dailyDoseMl: Math.max(0.01, traceCalcNumber(values.dailyDoseMl, 5))
     };
     const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
+    const existingAssignment = getTraceIcpAssignmentEntry(assignedIcpReportId);
+    if (existingAssignment) {
+        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'ICP bereits verknüpft', type: 'warning' });
+        return;
+    }
     const assignedIcp = assignedIcpReportId
         ? getIcpReportsSorted(true).find(report => report.id === assignedIcpReportId)
         : null;
     const calculatedTotals = getTraceTotalsFromAmounts(amounts, config);
-    const overrideTotal = (group, volumeKey, osmoseKey) => {
-        const volume = traceCalcNumber(values[volumeKey], null);
-        const osmose = traceCalcNumber(values[osmoseKey], null);
-        if (volume === null && osmose === null) return calculatedTotals[group];
-        const nextVolume = Math.max(0, volume ?? (osmose + calculatedTotals[group].elementsMl));
-        const nextOsmose = Math.max(0, osmose ?? (nextVolume - calculatedTotals[group].elementsMl));
-        return {
-            ...calculatedTotals[group],
-            volumeMl: traceCalcRound(nextVolume),
-            volumeG: traceCalcRound(calculatedTotals[group].elementsG + nextOsmose),
-            osmoseMl: traceCalcRound(nextOsmose),
-            osmoseG: traceCalcRound(nextOsmose)
-        };
-    };
     const entry = normalizeTraceCalculatorHistoryEntry({
         id: createWarehouseId(),
         source: 'manual-history',
@@ -16593,11 +16794,9 @@ async function addManualTraceHistoryEntry() {
         sourceIcpReportId: assignedIcpReportId,
         icp: assignedIcp ? getTraceIcpValuesForHistoryEntry(assignedIcp) : {},
         amounts,
+        actualInputs,
         grams: Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, traceCalcElementGrams(item, amount)])),
-        totals: {
-            kationen: overrideTotal('kationen', 'kationenVolumeMl', 'kationenOsmoseMl'),
-            anionen: overrideTotal('anionen', 'anionenVolumeMl', 'anionenOsmoseMl')
-        }
+        totals: calculatedTotals
     });
     state.history.push(entry);
     if (assignedIcp && hasTraceCalculatorIcpValues(entry) && getTraceCalculatorLatestHistory()?.id === entry.id) {
@@ -16664,54 +16863,9 @@ async function editTraceHistoryEntry(id) {
             value: String(entry.config?.dailyDoseMl || state.config?.dailyDoseMl || 5),
             required: true
         },
-        {
-            name: 'kationenVolumeMl',
-            label: 'Kationen Gesamtvolumen K+ (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'volumeMl') ?? ''),
-            required: true
-        },
-        {
-            name: 'kationenOsmoseMl',
-            label: 'Kationen Osmoseanteil K+ (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            value: String(getTraceHistoryGroupTotalValue(entry, 'kationen', 'osmoseMl') ?? ''),
-            required: true
-        },
-        {
-            name: 'anionenVolumeMl',
-            label: 'Anionen Gesamtvolumen A- (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'volumeMl') ?? ''),
-            required: true
-        },
-        {
-            name: 'anionenOsmoseMl',
-            label: 'Anionen Osmoseanteil A- (ml)',
-            type: 'number',
-            inputMode: 'decimal',
-            value: String(getTraceHistoryGroupTotalValue(entry, 'anionen', 'osmoseMl') ?? ''),
-            required: true
-        },
-        {
-            name: 'kationenAmounts',
-            label: 'Kationen K+ Elementmengen',
-            value: getTraceHistoryAmountsText(entry, 'kationen'),
-            multiline: true,
-            required: true,
-            description: 'Eine Zeile pro Kation, z.B. Co 33,01'
-        },
-        {
-            name: 'anionenAmounts',
-            label: 'Anionen A- Elementmengen',
-            value: getTraceHistoryAmountsText(entry, 'anionen'),
-            multiline: true,
-            required: true,
-            description: 'Eine Zeile pro Anion, z.B. F 32,18'
-        }
+        getTraceAmountUnitField(getTraceHistoryStoredUnit(entry.actualInputs)),
+        ...getTraceHistoryElementFields('kationen', entry.amounts || {}, entry.actualInputs || {}, getTraceHistoryStoredUnit(entry.actualInputs)),
+        ...getTraceHistoryElementFields('anionen', entry.amounts || {}, entry.actualInputs || {}, getTraceHistoryStoredUnit(entry.actualInputs))
     ];
     const values = await showAppDialog({
         kind: 'prompt',
@@ -16720,22 +16874,32 @@ async function editTraceHistoryEntry(id) {
         eyebrow: 'Historie & Analyse',
         message: isReefManagerArchive
             ? 'Ordne diesem Reef Manager-Rezept optional eine gespeicherte ICP zu. Erst danach kann es mit „Ja“ in die nächste Trace-Berechnung einfließen.'
-            : 'Passe den Historien-Eintrag an. Eine zugeordnete ICP dokumentiert den Messstand zum Rezept.',
+            : 'Passe den Historien-Eintrag an. Jede Elementmenge kann in ml oder g eingetragen werden. Eine zugeordnete ICP dokumentiert den Messstand zum Rezept.',
         wide: true,
         confirmText: 'Speichern',
         cancelText: 'Abbrechen',
         fields
     });
     if (!values) return;
-    const parsedAmounts = {
-        ...parseTraceHistoryAmountsText(values.kationenAmounts, 'kationen'),
-        ...parseTraceHistoryAmountsText(values.anionenAmounts, 'anionen')
-    };
+    const kationFields = parseTraceHistoryElementFields(values, 'kationen');
+    const anionFields = parseTraceHistoryElementFields(values, 'anionen');
+    const parsedAmounts = { ...kationFields.amounts, ...anionFields.amounts };
+    const actualInputs = { ...kationFields.inputs, ...anionFields.inputs };
+    const invalidAmountFields = [...kationFields.invalid, ...anionFields.invalid];
+    if (invalidAmountFields.length) {
+        await appAlert(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende nur Zahlen mit optionalem Zusatz „ml“ oder „g“.`, { title: 'Mengen prüfen', type: 'warning' });
+        return;
+    }
     if (!Object.keys(parsedAmounts).length) {
         await appAlert('Keine gültigen Elementmengen erkannt. Änderungen wurden nicht gespeichert.', { title: 'Bitte prüfen', type: 'warning' });
         return;
     }
     const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
+    const existingAssignment = getTraceIcpAssignmentEntry(assignedIcpReportId);
+    if (existingAssignment && existingAssignment.id !== entry.id) {
+        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'ICP bereits verknüpft', type: 'warning' });
+        return;
+    }
     const assignedIcp = assignedIcpReportId
         ? getIcpReportsSorted(true).find(report => report.id === assignedIcpReportId)
         : null;
@@ -16756,13 +16920,11 @@ async function editTraceHistoryEntry(id) {
         days: Math.max(1, Math.round(traceCalcNumber(values.days, entry.config?.days || 40))),
         dailyDoseMl: Math.max(0.01, traceCalcNumber(values.dailyDoseMl, entry.config?.dailyDoseMl || 5))
     };
+    if (!entry.targetAmounts) entry.targetAmounts = { ...(entry.amounts || {}) };
     entry.amounts = parsedAmounts;
+    entry.actualInputs = actualInputs;
     entry.updatedAt = Date.now();
     recalculateTraceHistoryEntryTotals(entry);
-    const kationenVolumeMl = Math.max(0, traceCalcNumber(values.kationenVolumeMl, entry.totals?.kationen?.volumeMl || 0));
-    const kationenOsmoseMl = Math.max(0, traceCalcNumber(values.kationenOsmoseMl, entry.totals?.kationen?.osmoseMl || 0));
-    const anionenVolumeMl = Math.max(0, traceCalcNumber(values.anionenVolumeMl, entry.totals?.anionen?.volumeMl || 0));
-    const anionenOsmoseMl = Math.max(0, traceCalcNumber(values.anionenOsmoseMl, entry.totals?.anionen?.osmoseMl || 0));
     const kationenItems = traceCalculatorElements.filter(element => element.group === 'kationen').map(element => element.item);
     const anionenItems = traceCalculatorElements.filter(element => element.group === 'anionen').map(element => element.item);
     const kationenElementsMl = kationenItems.reduce((sum, item) => sum + traceCalcNumber(entry.amounts[item], 0), 0);
@@ -16773,19 +16935,19 @@ async function editTraceHistoryEntry(id) {
         ...entry.totals.kationen,
         elementsMl: traceCalcRound(kationenElementsMl),
         elementsG: traceCalcRound(kationenElementsG),
-        osmoseMl: traceCalcRound(kationenOsmoseMl),
-        osmoseG: traceCalcRound(kationenOsmoseMl),
-        volumeMl: traceCalcRound(kationenVolumeMl),
-        volumeG: traceCalcRound(kationenElementsG + kationenOsmoseMl)
+        osmoseMl: traceCalcRound(Math.max(0, entry.totals.kationen?.osmoseMl || 0)),
+        osmoseG: traceCalcRound(Math.max(0, entry.totals.kationen?.osmoseMl || 0)),
+        volumeMl: traceCalcRound(kationenElementsMl + Math.max(0, entry.totals.kationen?.osmoseMl || 0)),
+        volumeG: traceCalcRound(kationenElementsG + Math.max(0, entry.totals.kationen?.osmoseMl || 0))
     };
     entry.totals.anionen = {
         ...entry.totals.anionen,
         elementsMl: traceCalcRound(anionenElementsMl),
         elementsG: traceCalcRound(anionenElementsG),
-        osmoseMl: traceCalcRound(anionenOsmoseMl),
-        osmoseG: traceCalcRound(anionenOsmoseMl),
-        volumeMl: traceCalcRound(anionenVolumeMl),
-        volumeG: traceCalcRound(anionenElementsG + anionenOsmoseMl)
+        osmoseMl: traceCalcRound(Math.max(0, entry.totals.anionen?.osmoseMl || 0)),
+        osmoseG: traceCalcRound(Math.max(0, entry.totals.anionen?.osmoseMl || 0)),
+        volumeMl: traceCalcRound(anionenElementsMl + Math.max(0, entry.totals.anionen?.osmoseMl || 0)),
+        volumeG: traceCalcRound(anionenElementsG + Math.max(0, entry.totals.anionen?.osmoseMl || 0))
     };
     saveDB();
     renderTraceExportInputs();
@@ -17222,6 +17384,7 @@ window.addReefManagerImportToTraceHistory = addReefManagerImportToTraceHistory;
 window.addManualTraceHistoryEntry = addManualTraceHistoryEntry;
 window.toggleTraceHistoryCalculation = toggleTraceHistoryCalculation;
 window.editTraceHistoryEntry = editTraceHistoryEntry;
+window.recordTraceActualAmounts = recordTraceActualAmounts;
 window.deleteTraceHistoryEntry = deleteTraceHistoryEntry;
 window.updateTraceReuseMode = updateTraceReuseMode;
 window.updateTraceReuseRemaining = updateTraceReuseRemaining;
@@ -22253,7 +22416,8 @@ function parseIcpImportMetadata(text = '') {
     const measuredDate = measuredMatch ? parseGermanDate(measuredMatch[1]) : null;
     const sampledDate = sampledMatch ? parseGermanDate(sampledMatch[1]) : null;
     return {
-        reportDate: dateMatch ? parseGermanDate(dateMatch[1]) : (sampledDate || measuredDate),
+        // Für die zeitliche Zuordnung zählt die Wasserprobe, nicht der spätere Labortermin.
+        reportDate: sampledDate || (dateMatch ? parseGermanDate(dateMatch[1]) : null) || measuredDate,
         volumeLiters: volumeMatch ? parseIcpNumber(volumeMatch[1]) : null,
         analysisId: analysisMatch ? cleanIcpCell(analysisMatch[1]) : '',
         sampledAtText: sampledMatch ? cleanIcpCell(sampledMatch[1]) : '',
@@ -22359,7 +22523,7 @@ function analyzeIcpImportText(text = '', rows = parseIcpImportText(text)) {
         warnings.push({ type: 'warning', text: 'Einige Werte wurden doppelt erkannt. Prüfe die Vorschau vor dem Speichern.' });
     }
     if (hasContent && !metadata.reportDate) {
-        warnings.push({ type: 'info', text: 'Kein Auswertungsdatum erkannt. Trage das Datum oben manuell ein.' });
+        warnings.push({ type: 'info', text: 'Kein Datum der Probe erkannt. Trage „Probe genommen am“ oben manuell ein.' });
     }
     if (hasContent && !metadata.analysisId) {
         warnings.push({ type: 'info', text: 'Keine Analyse-ID erkannt. Das ist okay, erleichtert aber später die Zuordnung.' });
@@ -22463,7 +22627,7 @@ function previewIcpImport() {
 function renderIcpImportMetaPreview(metadata = {}) {
     const items = [
         metadata.analysisId ? ['Analyse-ID', metadata.analysisId] : null,
-        metadata.reportDate ? ['Auswertung', formatWarehouseDate(metadata.reportDate)] : null,
+        metadata.reportDate ? ['Probe genommen', formatWarehouseDate(metadata.reportDate)] : null,
         Number.isFinite(metadata.volumeLiters) ? ['Volumen', `${formatIcpNumber(metadata.volumeLiters, 'L')}`] : null,
         metadata.sampledAtText ? ['Probe gezogen', metadata.sampledAtText] : null,
         metadata.measuredAtText ? ['Probe gemessen', metadata.measuredAtText] : null
@@ -22610,6 +22774,18 @@ async function deleteIcpReport(reportId) {
     });
     if (!confirmed) return;
     db.icpReports = ensureIcpReports().filter(item => item.id !== reportId);
+    const traceState = ensureTraceCalculatorState();
+    traceState.history.forEach(entry => {
+        if (String(entry.sourceIcpReportId || '') !== String(reportId)) return;
+        entry.sourceIcpReportId = '';
+        entry.icp = {};
+        entry.updatedAt = Date.now();
+    });
+    if (String(traceState.selectedIcpReportId || '') === String(reportId)) {
+        traceState.selectedIcpReportId = '';
+        traceState.icpSourceEntryId = '';
+        traceState.icp = {};
+    }
     if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
     if (icpUiState.editingReportId === reportId) icpUiState.editingReportId = null;
     saveDB();
@@ -22911,6 +23087,7 @@ function renderIcpPage() {
     const comparePicker = document.getElementById('icpComparePicker');
     const analysis = document.getElementById('icpAnalysis');
     const list = document.getElementById('icpReportList');
+    const historySummaryMeta = document.getElementById('icpHistorySummaryMeta');
     if (!parameterSelect || !rangeSelect || !analysis || !list) return;
 
     const options = getIcpParameterOptions();
@@ -22939,9 +23116,15 @@ function renderIcpPage() {
     }
 
     if (reports.length === 0) {
+        if (historySummaryMeta) historySummaryMeta.textContent = '0 Analysen';
         analysis.innerHTML = '<div class="icp-empty-state"><strong>Noch keine ICP gespeichert</strong><span>Importiere deine erste ICP, dann erscheinen hier Verlauf, Trend und Referenzbewertung.</span></div>';
         list.innerHTML = '<div class="icp-empty-state"><strong>Historie leer</strong><span>Gespeicherte ICPs werden chronologisch angezeigt.</span></div>';
         return;
+    }
+
+    if (historySummaryMeta) {
+        const linkedCount = reports.filter(report => getTraceIcpAssignmentEntry(report.id)).length;
+        historySummaryMeta.textContent = `${reports.length} Analysen · ${linkedCount} mit Trace`;
     }
 
     const count = parseInt(rangeSelect.value || '5', 10);
@@ -23025,6 +23208,7 @@ function renderIcpPage() {
                     <span><strong>${escapeHtml(report.name)}</strong><small>${escapeHtml(formatWarehouseDate(report.date))}</small></span>
                     <span>${numericCount}/${(report.values || []).length} numerisch · ${issueCount} auffällig</span>
                 </button>
+                ${renderIcpTraceAssignment(report)}
                 <div class="icp-report-actions">
                     <button type="button" class="btn-secondary btn-animated" onclick='event.stopPropagation(); startEditIcpReport(${jsArg(report.id)})'>Bearbeiten</button>
                     <button type="button" class="btn-out btn-animated" onclick='event.stopPropagation(); deleteIcpReport(${jsArg(report.id)})'>Löschen</button>
@@ -27772,10 +27956,20 @@ function showAppDialog(options = {}) {
 
     const fieldsMount = document.getElementById('appDialogFields');
     fieldsMount.replaceChildren();
+    fieldsMount.classList.toggle('has-trace-element-fields', normalizedFields.some(field => /^(?:actual_)?(?:kationen|anionen)_/.test(String(field.name || ''))));
     normalizedFields.forEach((field, index) => {
+        const fieldName = String(field.name || '');
+        const groupMatch = fieldName.match(/^(actual_)?(kationen|anionen)_/);
+        if (groupMatch && !fieldsMount.querySelector(`[data-dialog-group="${groupMatch[1] || ''}${groupMatch[2]}"]`)) {
+            const groupHeading = document.createElement('div');
+            groupHeading.className = `trace-element-group-heading trace-element-group-heading--${groupMatch[2]}`;
+            groupHeading.dataset.dialogGroup = `${groupMatch[1] || ''}${groupMatch[2]}`;
+            groupHeading.innerHTML = `<strong>${groupMatch[1] ? 'Tatsächliche ' : ''}${groupMatch[2] === 'kationen' ? 'Kationen (K+)' : 'Anionen (A−)'}</strong><span>${groupMatch[1] ? 'Nach dem Ansetzen gemessene Ist-Mengen' : 'Elementmengen dieser Lösung'}</span>`;
+            fieldsMount.appendChild(groupHeading);
+        }
         const fieldId = `appDialogField${index}`;
         const wrapper = document.createElement('div');
-        wrapper.className = 'form-field';
+        wrapper.className = `form-field${groupMatch ? ` trace-element-dialog-field trace-${groupMatch[2]}-field` : ''}`;
         const label = document.createElement('label');
         label.htmlFor = fieldId;
         label.textContent = field.label || 'Eingabe';
@@ -27802,15 +27996,35 @@ function showAppDialog(options = {}) {
         control.required = field.required === true;
         if (field.autocomplete) control.autocomplete = field.autocomplete;
         if (field.inputMode) control.inputMode = field.inputMode;
-        wrapper.append(label, control);
+        if (field.suffix) {
+            const inputRow = document.createElement('div');
+            inputRow.className = 'app-dialog-input-with-suffix';
+            const suffix = document.createElement('span');
+            suffix.className = 'app-dialog-input-suffix';
+            suffix.dataset.traceUnitSuffix = 'true';
+            suffix.textContent = field.suffix;
+            inputRow.append(control, suffix);
+            wrapper.append(label, inputRow);
+        } else {
+            wrapper.append(label, control);
+        }
         if (field.description) {
             const description = document.createElement('small');
             description.className = 'field-description';
             description.textContent = field.description;
-            wrapper.insertBefore(description, control);
+            const descriptionTarget = wrapper.querySelector('.app-dialog-input-with-suffix') || control;
+            wrapper.insertBefore(description, descriptionTarget);
         }
         fieldsMount.appendChild(wrapper);
     });
+
+    const unitField = fieldsMount.querySelector('[data-dialog-field="traceAmountUnit"]');
+    if (unitField) {
+        unitField.addEventListener('change', () => {
+            const suffix = unitField.value === 'g' ? 'g' : 'ml';
+            fieldsMount.querySelectorAll('[data-trace-unit-suffix="true"]').forEach(node => { node.textContent = suffix; });
+        });
+    }
 
     const error = document.getElementById('appDialogError');
     error.hidden = true;

@@ -18,7 +18,7 @@
             });
         } catch (error) {}
     </script>
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.192-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.200-release">
 </head>
 <body class="guide-page">
     <main class="guide-shell">
@@ -26,7 +26,7 @@
             <div>
                 <span class="section-eyebrow">Reeftools.de</span>
                 <h1>Anleitung</h1>
-                <p>Alle wichtigen Funktionen mit Bildern, kurzen Erklärungen und praxisnahen Abläufen für Lager, C&amp;R, Trace, Tools, Logbuch und Pflege.</p>
+                <p>Der praxisnahe Einstieg in ReefTools: Aquarium anlegen, Daten sichern, ICP und Trace verbinden, Bestände pflegen und die passenden Rechner schnell finden.</p>
                 <p class="community-project-note"><strong>Unabhängiges Community-Projekt:</strong> ReefTools wird eigenständig entwickelt und ist nicht OSCI Motion. OSCI Motion wird dort genannt, wo Produkte, Quellen oder externe Rechner verwendet werden.</p>
             </div>
         </section>
@@ -37,6 +37,7 @@
         </section>
 
         <nav class="guide-toc" aria-label="Inhaltsverzeichnis">
+            <a href="#start">Schnellstart</a>
             <a href="#uebersicht">Übersicht</a>
             <a href="#lager">Lager</a>
             <a href="#cr">C&amp;R</a>
@@ -46,16 +47,37 @@
             <a href="#logbuch">Logbuch</a>
             <a href="#korallen">Korallen</a>
             <a href="#sync">Datensicherung</a>
+            <a href="#einstellungen">Einstellungen</a>
         </nav>
+
+        <section id="start" class="guide-card guide-card-wide">
+            <div class="guide-copy">
+                <span class="section-eyebrow">In wenigen Minuten</span>
+                <h2>Schnellstart &amp; Orientierung</h2>
+                <p>ReefTools speichert zunächst lokal im verwendeten Browser. Lege zuerst dein Aquarium an, trage nur die Bereiche ein, die du wirklich nutzt, und richte danach eine Sicherung ein.</p>
+                <ol>
+                    <li><strong>Aquarium auswählen:</strong> Tools, Logbuch, ToDos, Messwerte, ICPs, Trace-Historie und Korallen gehören zum aktiven Aquarium.</li>
+                    <li><strong>Lager pflegen:</strong> Produktbestände, Ein- und Auslagerungen sowie Nachbestellungen gehören zum aktiven Lager.</li>
+                    <li><strong>Daten sichern:</strong> Verbinde Google Drive oder erstelle regelmäßig ein Projekt-Backup als Datei.</li>
+                    <li><strong>Nur benötigte Funktionen zeigen:</strong> In Einstellungen → Ansicht &amp; Inhalte lassen sich Seiten, Tools sowie OSCI-spezifische Funktionen ausblenden.</li>
+                </ol>
+                <div class="guide-subtool-list">
+                    <article><strong>Globale Suche</strong><p>Das Suchsymbol in der Kopfzeile findet Seiten, Rechner und Einstellungen. Auf dem Desktop funktionieren zusätzlich <kbd>Strg/Cmd + K</kbd> und <kbd>Strg/Cmd + F</kbd>.</p></article>
+                    <article><strong>Direkte Tool-Links</strong><p>Geöffnete Rechner erhalten eine eigene Adresse. Über das Link-Symbol am Tool kannst du genau diesen Rechner teilen.</p></article>
+                    <article><strong>Demo-Profil</strong><p>Ein vollständig gefülltes Beispielsystem kann in den Einstellungen geladen werden. Die deutlich markierte Demo lässt sich jederzeit wieder gegen das eigene Profil tauschen.</p></article>
+                </div>
+            </div>
+        </section>
 
         <section id="uebersicht" class="guide-card">
             <div class="guide-copy">
                 <span class="section-eyebrow">Startseite</span>
                 <h2>Übersicht</h2>
-                <p>Die Übersicht ist dein schneller Blick auf den aktuellen Zustand. Kacheln zeigen Lagerwarnungen, Messwerte, Aufgaben, Füllstände und wichtige Hinweise. Viele Kacheln sind anklickbar und führen direkt in den passenden Bereich.</p>
+                <p>Die optionale Übersicht ist dein schneller Blick auf den aktuellen Zustand. Kacheln zeigen Lagerwarnungen, Messwerte, Aufgaben, Füllstände, Korallen und wichtige Hinweise. Viele Kacheln führen direkt in den passenden Bereich.</p>
                 <ul>
-                    <li><strong>Lager, C&amp;R und Trace</strong> sind klar als Bereiche für das OSCI Versorgungssystem gedacht.</li>
-                    <li><strong>Messwert-Grafiken</strong> zeigen Trends und Entwicklung deiner selbst eingetragenen Werte.</li>
+                    <li><strong>Individuell anpassbar:</strong> In Einstellungen → Übersicht anpassen wählst du Kacheln und Messwert-Diagramme selbst aus.</li>
+                    <li><strong>Pro Aquarium:</strong> Korallen, ToDos und Messwert-Grafiken folgen dem aktiven Aquarium.</li>
+                    <li><strong>Optional:</strong> Ist die Übersichtsseite ausgeblendet, kann sie unter Ansicht &amp; Inhalte wieder aktiviert werden.</li>
                     <li><strong>Cloud Status</strong> zeigt, ob Google Drive Sync online, offline oder ungesynct ist.</li>
                 </ul>
             </div>
@@ -75,6 +97,8 @@
                     <li><strong>Auslagern:</strong> Menge buchen oder neuen Zielbestand eintragen. Danach kannst du entscheiden, ob nur korrigiert oder mit Protokoll ausgelagert wird.</li>
                     <li><strong>Live-Umrechnung:</strong> Bei ml und g wird anhand der Dichte direkt umgerechnet, wenn die Produktdaten vorhanden sind.</li>
                     <li><strong>Prognose:</strong> Eine Verbrauchsprognose entsteht erst sinnvoll ab mindestens zwei Entnahmen.</li>
+                    <li><strong>Produktgleichheit:</strong> Fluor und Natriumfluorid werden bei unterstützten Buchungen gemeinsam geprüft. Vor einer Ersatz-Auslagerung fragt ReefTools nach.</li>
+                    <li><strong>Eigene Produkte:</strong> Artikel, Gebinde, Tara, Preise und Shop-Links lassen sich in den Einstellungen ergänzen.</li>
                     <li><strong>TXT/PDF Export:</strong> Lagerstände können als Datei dokumentiert und später wieder importiert werden.</li>
                 </ul>
             </div>
@@ -93,6 +117,7 @@
                 <ul>
                     <li><strong>Bevorzugte Einheit:</strong> Du kannst einstellen, ob ml oder g zuerst und groß angezeigt wird.</li>
                     <li><strong>Bestandsprüfung:</strong> Jede Position zeigt, wie viel nach der Auslagerung übrig bleibt.</li>
+                    <li><strong>Demo-Daten:</strong> Füllt den Eingabebereich mit einem vollständigen Beispiel, ohne dass du eine echte Liste benötigst.</li>
                     <li><strong>Ausgleichslisten:</strong> Standardmäßig eingeklappt, damit die Seite übersichtlich bleibt.</li>
                     <li><strong>PDF / Drucken:</strong> Aus eingefügten C&amp;R-Daten kannst du eine übersichtliche Arbeitsfolie zum Drucken oder Speichern erstellen.</li>
                     <li><strong>PDF-Import:</strong> Der direkte PDF-Analyseimport ist pausiert. Nutze Copy &amp; Paste aus der Auswertung oder die manuelle Eingabe, weil PDF-Erkennung je nach Datei fehleranfällig sein kann.</li>
@@ -104,14 +129,17 @@
             <div class="guide-copy">
                 <span class="section-eyebrow">OSCI Versorgungssystem</span>
                 <h2>Trace</h2>
-                <p>Trace unterstützt Kationen- und Anionen-Mischungen, Reef Manager Importe, Historie und Auslagerung aus dem Lager. Der neue OSCI-Arbeitsablauf führt von der Startlösung über die ICP bis zur nächsten Trace-Berechnung und C&amp;R-Prüfung.</p>
+                <p>Trace unterstützt Kationen- und Anionen-Mischungen, gespeicherte ICPs, historische Rezepte, Restlösungen und lagergeführte Auslagerungen. Der Arbeitsablauf führt von der Startlösung über die ICP bis zur nächsten Mischung.</p>
                 <ul>
-                    <li><strong>Reef Manager Import:</strong> Export aus der Reef Manager App einfügen, Aquariumvolumen manuell ergänzen und zur Historie hinzufügen.</li>
-                    <li><strong>ICP Pflicht:</strong> Normale Mischungen und importierte Mischungen werden erst verarbeitet, wenn die passenden ICP-Werte hinterlegt sind.</li>
-                    <li><strong>Startmischung:</strong> Nur die allererste Startmischung darf ohne ICP-Werte gespeichert werden und wird gesondert markiert.</li>
-                    <li><strong>Historie &amp; Analyse:</strong> Einträge können bearbeitet werden. Anionen, Kationen, Osmoseanteil und Gesamtvolumen sind getrennt sichtbar.</li>
-                    <li><strong>Auslagern:</strong> Trace-Mengen können lagergeführt ausgelagert und protokolliert werden.</li>
+                    <li><strong>Startlösung:</strong> Für den ersten Ansatz OSCI-Preset oder eigene Rezeptur, Aquariumvolumen und Laufzeit festlegen. Nur diese erste Mischung darf ohne ICP gespeichert werden.</li>
+                    <li><strong>Gespeicherte ICP verwenden:</strong> Eine bereits im ICP-Bereich importierte Analyse direkt übernehmen. <em>nn</em> wird als 0 behandelt; bei <em>nwb</em> nutzt ReefTools die obere angegebene Nachweisgrenze.</li>
+                    <li><strong>Vergangene Mischungen:</strong> Reef-Manager-Rezepte oder handschriftlich dokumentierte Altansätze manuell zur Historie hinzufügen und der passenden ICP zuordnen.</li>
+                    <li><strong>Historie &amp; Analyse:</strong> Einträge bearbeiten und festlegen, ob sie in die nächste Berechnung einfließen. Ausgangsmengen werden passend zu neuer Laufzeit und neuem Aquariumvolumen skaliert.</li>
+                    <li><strong>Restlösung weiterverwenden:</strong> Restmenge oder Resttage angeben und zwischen optimal angepasster Lösung sowie unveränderter Tagesdosierung wählen. Alte und neue Dosiermenge werden gegenübergestellt. Restlösungen höchstens einmal ergänzen.</li>
+                    <li><strong>Expertenmodus:</strong> Maximale prozentuale Änderung nach unten und oben je Element begrenzen und eigene Grenzwert-Presets speichern.</li>
+                    <li><strong>Speichern &amp; Auslagern:</strong> Erst nach vollständiger Bestandsprüfung wird die Mischung gespeichert, aus dem Lager gebucht und protokolliert. Rezepte und Weiterverwendungspläne können als PDF vorbereitet werden.</li>
                 </ul>
+                <p class="community-project-note"><strong>Wichtig:</strong> Der Trace Calculator ist eine experimentelle, regelbasierte Rechenhilfe und keine chemische Simulation. Jede Mischung vor dem Ansetzen fachlich prüfen.</p>
             </div>
             <figure class="guide-figure">
                 <img loading="lazy" decoding="async" src="docs-assets/trace.png" alt="Screenshot des Trace Rechners">
@@ -126,9 +154,12 @@
                 <p>Der ICP-Bereich speichert Laborwerte pro Aquarium, zeigt Verläufe, Optimalwerte und Auffälligkeiten und hilft beim Vergleich über mehrere Analysen.</p>
                 <ul>
                     <li><strong>OSCI Lab Werte einfügen:</strong> Kopiere die sichtbare Labortabelle oder den HTML-/Elemente-Text der Laborseite in das Importfeld.</li>
-                    <li><strong>Vorschau prüfen:</strong> Vor dem Speichern zeigt Reeftools erkannte Kategorien, Werte, Einheiten, Analyse-ID und Warnungen.</li>
-                    <li><strong>Graphen:</strong> Hauptwert und zusätzliche Werte werden als Verlauf mit Optimalwert angezeigt.</li>
-                    <li><strong>Bearbeiten:</strong> Gespeicherte ICPs können aufgeklappt, bearbeitet oder gelöscht werden.</li>
+                    <li><strong>Metadaten:</strong> Analyse-ID, Aquariumvolumen sowie „Probe gezogen am“ werden übernommen. Für den Verlauf zählt das Entnahmedatum, nicht das spätere Messdatum.</li>
+                    <li><strong>Vorschau prüfen:</strong> Vor dem Speichern zeigt ReefTools Kategorien, Werte, Einheiten und Warnungen. Gleicher Name oder gleiches Datum erzeugen eine Duplikatwarnung.</li>
+                    <li><strong>Nachweisgrenzen:</strong> <em>nn</em> bedeutet nicht nachweisbar und wird rechnerisch als 0 gespeichert. Bei <em>nwb 0,1–0,25</em> wird für Trace vorsichtig der obere Wert 0,25 verwendet und entsprechend gekennzeichnet.</li>
+                    <li><strong>Graphen:</strong> Anzeige der letzten 1, 2, 5 oder 10 ICPs, mehrere frei wählbare Graphen und die jeweiligen Optimalwerte.</li>
+                    <li><strong>Bearbeiten:</strong> Gespeicherte ICPs sind zunächst eingeklappt und können bearbeitet oder gelöscht werden.</li>
+                    <li><strong>Trace-Verknüpfung:</strong> Dieselbe ICP kann anschließend im Trace Calculator ausgewählt und historischen Mischungen zugeordnet werden. Ein zweiter Import ist nicht nötig.</li>
                     <li><strong>PDF/Screenshot:</strong> Werte aus Bild-PDFs oder Screenshots sind nicht zuverlässig auslesbar und sollten nicht als sichere Importquelle genutzt werden.</li>
                 </ul>
             </div>
@@ -138,66 +169,70 @@
             <div class="guide-copy">
                 <span class="section-eyebrow">Rechner</span>
                 <h2>Tools</h2>
-                <p>Die Tools sind bewusst in Arbeitsbereiche sortiert. Öffne zuerst die passende Kategorie und danach nur das einzelne Tool, das du wirklich brauchst.</p>
+                <p>Die Tools sind in Arbeitsbereiche sortiert und standardmäßig eingeklappt. Suche oben auf der Tool-Seite oder über die globale Suche nach einem Rechner. Favoriten und direkte Links erleichtern den späteren Zugriff.</p>
                 <div class="guide-tool-map" aria-label="Toolbereiche in Reeftools">
                     <article class="guide-tool-card">
                         <span>01</span>
-                        <strong>Wasserwerte &amp; Dosierung</strong>
-                        <p>KH/Ca Korrektur, Verbrauch pro Tag, Nutrition Rechner, Testkorrekturen und Messwert-Umrechner.</p>
+                        <strong>Dosierung, Verbrauch &amp; Messen</strong>
+                        <p>KH/Ca, Tagesdosierung, Ba/Li/Mo, Verbrauch, N‑Ratio, Testkorrekturen und Messwert-Umrechner.</p>
                     </article>
                     <article class="guide-tool-card">
                         <span>02</span>
-                        <strong>Salz &amp; Wasserwechsel</strong>
-                        <p>Salzgehalt, Dichte, Specific Gravity, PSU-Korrektur und rechnerischer Wasserwechsel-Effekt.</p>
+                        <strong>Wasserwechsel &amp; Salinität</strong>
+                        <p>Salzgehalt, Dichte, Specific Gravity, PSU-Korrektur, Nettovolumen und Wasserwechsel-Effekt.</p>
                     </article>
                     <article class="guide-tool-card">
                         <span>03</span>
-                        <strong>Mischen &amp; Lösungen</strong>
-                        <p>C&amp;R Meerwasser, NaCl Lösung und Makro-Elemente auf deine gewünschte Zielmenge skalieren.</p>
+                        <strong>Mischen &amp; Rezepte</strong>
+                        <p>C&amp;R Meerwasser samt Kosten, NaCl aus Pulver sowie Makro-Elemente auf die Zielmenge skalieren.</p>
                     </article>
                     <article class="guide-tool-card">
                         <span>04</span>
-                        <strong>Adsorber &amp; Filter</strong>
-                        <p>Durchfluss langsam planen und eine grobe Orientierung für Eisenbasis, Aluminiumbasis oder Aktivkohle erhalten.</p>
+                        <strong>Sangokai A-Z</strong>
+                        <p>Die lokal eingebaute Wissensbasis durchsuchen und Fundstellen im Original gegenprüfen.</p>
                     </article>
                     <article class="guide-tool-card">
                         <span>05</span>
-                        <strong>Wissen &amp; Quellen</strong>
-                        <p>Sangokai A-Z Assistent, OSCI Links, Meerwasser Lexikon und Buchtipps. Assistentenantworten immer prüfen.</p>
+                        <strong>Hilfe &amp; Quellen</strong>
+                        <p>Anleitung, OSCI Motion Links, Meerwasser-Lexikon und Buchtipps zentral öffnen.</p>
                     </article>
                 </div>
                 <div class="guide-subtool-groups" aria-label="Einzelne Tools erklärt">
                     <section class="guide-subtool-group">
-                        <h3>Wasserwerte &amp; Dosierung</h3>
+                        <h3>Dosierung, Verbrauch &amp; Messen</h3>
                         <div class="guide-subtool-list">
+                            <article><strong>Barium, Lithium &amp; Molybdän</strong><p>Berechnet die getrennte Direktzugabe aus ICP-Istwert, Aquariumvolumen und frei wählbarem Ziel innerhalb des Referenzbereichs. Die vorsichtige Anzahl der Gaben wird vorgeschlagen.</p></article>
                             <article><strong>KH / Ca Korrektur</strong><p>Berechnet die Dosiermenge, um KH oder Calcium von Istwert auf Zielwert zu bringen.</p></article>
                             <article><strong>Verbrauch pro Tag</strong><p>Berechnet aus zwei Messungen, wie stark ein Wert täglich fällt oder steigt.</p></article>
+                            <article><strong>Tagesdosierung Wirkung</strong><p>Zeigt, wie stark eine tägliche KH- oder Calciumdosierung den Wert rechnerisch anhebt.</p></article>
                             <article><strong>Test Korrekturfaktor</strong><p>Gleicht Heimtests mit ICP oder Referenzlösung ab und speichert den Faktor.</p></article>
                             <article><strong>Hanna P → PO4</strong><p>Rechnet Phosphor ppb vom Hanna Checker in Phosphat mg/l um.</p></article>
                             <article><strong>Salifert Umrechner</strong><p>Wandelt Salifert Spritzen-Restwerte für Calcium oder KH in Messwerte um.</p></article>
                             <article><strong>Nutrition Rechner</strong><p>Berät zu NO3/PO4 und berechnet Dosierungen für N, P, La und Kohlenstoff.</p></article>
+                            <article><strong>N‑Ratio Monitor</strong><p>Bindet den externen OSCI-Motion-Rechner ein. NO3 und TNb lassen sich zusätzlich im ReefTools-Logbuch speichern und als Verhältnisverlauf beobachten; Orientierung 1 : 3.</p></article>
                         </div>
                     </section>
                     <section class="guide-subtool-group">
-                        <h3>Salz &amp; Wasserwechsel</h3>
+                        <h3>Wasserwechsel &amp; Salinität</h3>
                         <div class="guide-subtool-list">
                             <article><strong>Salzgehalt Rechner</strong><p>Rechnet Dichte, Specific Gravity, Leitwert und PSU mit Temperaturbezug um.</p></article>
                             <article><strong>Salzgehalt korrigieren</strong><p>Gibt eine Orientierung, wie du eine Abweichung zur Ziel-PSU ausgleichst.</p></article>
+                            <article><strong>Nettovolumen berechnen</strong><p>Schätzt aus geplanter und tatsächlich gemessener PSU-Änderung das reale Wasservolumen des Systems.</p></article>
                             <article><strong>Wasserwechsel Effekt</strong><p>Zeigt den rechnerischen Nachher-Wert nach einem Wasserwechsel.</p></article>
+                            <article><strong>Adsorber Durchfluss</strong><p>Berechnet einen langsamen kontrollierten Durchfluss für Adsorber.</p></article>
                         </div>
                     </section>
                     <section class="guide-subtool-group">
                         <h3>Mischen &amp; Lösungen</h3>
                         <div class="guide-subtool-list">
-                            <article><strong>Meerwasser aus C&amp;R</strong><p>Skaliert das C&amp;R Meerwasser-Rezept auf beliebige Zielmengen.</p></article>
+                            <article><strong>Meerwasser aus C&amp;R</strong><p>Skaliert das Rezept und berechnet Kosten aus der gewählten Gebindegröße. Natriumchlorid-Pulver kann mit einem eigenen Preis pro kg hinterlegt werden.</p></article>
                             <article><strong>C&amp;R NaCl aus Pulver</strong><p>Berechnet NaCl Pulver und Osmosewasser für flüssiges C&amp;R Natriumchlorid.</p></article>
                             <article><strong>Makro-Elemente</strong><p>Skaliert Rezepte für KH-Tag, KH-Nacht, Calcium und Magnesium.</p></article>
                         </div>
                     </section>
                     <section class="guide-subtool-group">
-                        <h3>Adsorber, Wissen &amp; Quellen</h3>
+                        <h3>Wissen &amp; Quellen</h3>
                         <div class="guide-subtool-list">
-                            <article><strong>Adsorber Durchfluss</strong><p>Berechnet langsamen Durchfluss und gibt eine grobe Adsorber-Empfehlung.</p></article>
                             <article><strong>Sangokai A-Z Assistent</strong><p>Durchsucht die lokale Wissensbasis. Testversion, Antworten immer prüfen.</p></article>
                             <article><strong>Links &amp; Nachschlagen</strong><p>Sammelt Anleitung, OSCI Tools, Meerwasser Lexikon, Sangokai A-Z und Buchtipps.</p></article>
                         </div>
@@ -227,8 +262,11 @@
                 <p>Das Logbuch ist an Aquarien gekoppelt, nicht an Lager. So kannst du mehrere Becken sauber dokumentieren.</p>
                 <ul>
                     <li><strong>Logs:</strong> Einträge mit Datum, Kategorie und Notizen speichern, bearbeiten, löschen und nach Kategorie filtern.</li>
-                    <li><strong>Messwerte:</strong> KH, Ca, Mg, PO4, NO3 und eigene Werte eintragen. Grafiken zeigen Verlauf, Trend, Prognose und Abweichung.</li>
+                    <li><strong>Messwerte:</strong> KH, Ca, Mg, PO4, NO3, Salzgehalt und eigene Werte eintragen. Für Salzgehalt stehen PSU, Dichte und Specific Gravity zur Auswahl; die eingegebene Genauigkeit bleibt erhalten.</li>
                     <li><strong>ToDos:</strong> Wiederkehrende Aufgaben mit Intervall, letzter Ausführung und nächster Fälligkeit verwalten.</li>
+                    <li><strong>Geräteverwaltung:</strong> Lampen, Pumpen und weitere Technik mit Seriennummer, Kaufdatum, Garantie und Wartungsintervall dokumentieren.</li>
+                    <li><strong>Problem-Tagebuch:</strong> Cyanos, Dinos, Algen, Gewebeverlust und andere Auffälligkeiten mit Maßnahme und Verlauf festhalten.</li>
+                    <li><strong>Notfallmodus:</strong> Checklisten für Stromausfall, Pumpenausfall, Dosierfehler und Überdosierung griffbereit halten.</li>
                     <li><strong>Vorratsbehälter &amp; Osmosetank:</strong> Füllstände, Verbrauch und Restlaufzeit überwachen.</li>
                 </ul>
             </div>
@@ -242,11 +280,15 @@
             <div class="guide-copy">
                 <span class="section-eyebrow">Bestand</span>
                 <h2>Korallen</h2>
-                <p>Die Korallenverwaltung dient als Katalog für deinen Besatz. Du kannst Korallen manuell anlegen, Fotos hinzufügen und später suchen oder filtern.</p>
+                <p>Die Korallenverwaltung kombiniert deinen eigenen Bestand mit einer Platzierungs- und Verträglichkeitshilfe. Empfehlungen unterstützen die Entscheidung, ersetzen aber nicht die Beobachtung im eigenen Aquarium.</p>
                 <ul>
-                    <li><strong>Pflichtdaten:</strong> Wissenschaftlicher Name, Gattung, Art, Handelsname, Korallentyp, Wuchsform und Farbe.</li>
+                    <li><strong>Suche:</strong> Wissenschaftliche und gängige deutsche Namen werden berücksichtigt, zum Beispiel Bartkoralle für Duncanopsammia.</li>
+                    <li><strong>Platzierungsberater:</strong> Beckenmaße, Lichtzone und Strömung eintragen und einen verständlichen Standortvorschlag im Aquarium erhalten.</li>
+                    <li><strong>Verträglichkeit:</strong> Abstand, Nesselkraft, Überwuchs-Risiko und geeignete Nachbarschaft vergleichen.</li>
+                    <li><strong>Eigene Profile:</strong> Nicht gelistete Korallen mit Licht-, Strömungs- und Platzierungsanforderungen ergänzen.</li>
                     <li><strong>Fotos:</strong> Hauptbild und weitere Bilder aus Kamera oder Fotobibliothek zuweisen.</li>
                     <li><strong>Ableger:</strong> Ableger können einer Mutterkoralle zugeordnet werden.</li>
+                    <li><strong>Kaufpreis:</strong> Anschaffungskosten je Koralle dokumentieren.</li>
                     <li><strong>Abgabe:</strong> Abgegebene Korallen können gelöscht oder in einer separaten Abgabeliste mit Kontakt hinterlegt werden.</li>
                 </ul>
             </div>
@@ -263,7 +305,7 @@
                 <p>Diese Bereiche helfen bei wiederkehrender Lagerarbeit und bei der Kontrolle deiner Bestände.</p>
                 <ul>
                     <li><strong>Wareneingang:</strong> Mehrere Produkte gesammelt einlagern.</li>
-                    <li><strong>Nachbestellen:</strong> Produkte mit niedrigem Bestand sammeln und Bestellbedarf besser planen.</li>
+                    <li><strong>Nachbestellen:</strong> Produkte mit niedrigem Bestand sammeln, Mengen prüfen und vorhandene Shop-Links einzeln öffnen. Mehrere Tabs können durch den Browser-Popup-Schutz begrenzt werden.</li>
                     <li><strong>Statistik:</strong> Lagergebundene Auswertungen und Prognosen. Zugriff nur mit Schreibberechtigung.</li>
                     <li><strong>Protokoll:</strong> Lagergebundene Buchungshistorie. Nur Lesefreigabe erlaubt keine Änderungen.</li>
                 </ul>
@@ -278,11 +320,13 @@
             <div class="guide-copy">
                 <span class="section-eyebrow">Datensicherung</span>
                 <h2>Google Drive Sync &amp; Backup</h2>
-                <p>Reeftools speichert lokal im Browser und kann zusätzlich verschlüsselte App-Daten in deinem eigenen Google Drive App-Speicher ablegen. Diese Dateien sind in Google Drive normalerweise nicht sichtbar, gehören aber zu deinem Konto.</p>
+                <p>ReefTools speichert lokal im Browser und kann zusätzlich App-Daten in deinem eigenen Google-Drive-App-Speicher ablegen. Diese Dateien sind in Google Drive normalerweise nicht sichtbar, gehören aber zu deinem Konto.</p>
                 <ul>
                     <li><strong>Cloud Status:</strong> Grün bedeutet online, rot offline, gelb ungesyncte Änderung.</li>
-                    <li><strong>Upload:</strong> Aktuellen lokalen Stand in Google Drive sichern.</li>
-                    <li><strong>Download:</strong> Gesicherten Stand aus Google Drive laden.</li>
+                    <li><strong>Sync in der Kopfzeile:</strong> Fragt, ob du hochladen, herunterladen oder die Cloud-Einstellungen öffnen möchtest.</li>
+                    <li><strong>Upload:</strong> Sichert den vollständigen lokalen Projektstand einschließlich Lager, Aquarien, ICP, Trace-Historie, Logbuch, ToDos, Geräte, Probleme und Korallen.</li>
+                    <li><strong>Download:</strong> Lädt den Cloud-Stand und speichert ihn anschließend wieder lokal im aktuellen Browser.</li>
+                    <li><strong>Auto-Sync:</strong> Überträgt Änderungen verzögert im Hintergrund; die Kopfzeile zeigt während Upload und Download den Vorgang an.</li>
                     <li><strong>Wiederherstellung:</strong> Je nach Sicherungsstand können ältere Datenstände zurückgeholt werden.</li>
                     <li><strong>Lokale Backups:</strong> JSON, TXT und PDF-Exporte bleiben wichtig, wenn du komplett unabhängig sichern möchtest.</li>
                 </ul>
@@ -293,16 +337,55 @@
             </figure>
         </section>
 
+        <section id="einstellungen" class="guide-card guide-card-wide">
+            <div class="guide-copy">
+                <span class="section-eyebrow">App konfigurieren</span>
+                <h2>Einstellungen finden und sinnvoll nutzen</h2>
+                <p>Die Einstellungen sind nach Aufgaben gruppiert. Alle Bereiche bleiben zunächst geschlossen. Nutze die Suche oder einen Kategorienfilter, statt die gesamte Seite zu durchsuchen.</p>
+                <div class="guide-subtool-groups">
+                    <section class="guide-subtool-group">
+                        <h3>Daten &amp; Backup</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Datensicherheit, Demo &amp; Backup</strong><p>Lokalen Speicher prüfen, Sicherungspunkte verwalten, Projektdateien importieren oder exportieren, Google Drive einrichten und zwischen Demo- und eigenem Profil wechseln.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Darstellung &amp; Navigation</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Übersicht anpassen</strong><p>Dashboard-Kacheln und Diagramme pro Aquarium auswählen.</p></article>
+                            <article><strong>Ansicht &amp; Inhalte</strong><p>Seiten, einzelne Tools, OSCI-Funktionen, Vorratsbehälter und Osmosetank ein- oder ausblenden.</p></article>
+                            <article><strong>Design &amp; Effekte</strong><p>Theme, Grund- und Sekundärfarbe sowie optionale Effekte festlegen.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Lager, System &amp; Hilfe</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Lager &amp; Produkte</strong><p>Eigene Produkte, Behälter, Tara, Produktlisten, Sichtbarkeit, Shop-Links und Preise verwalten.</p></article>
+                            <article><strong>System &amp; Hilfe</strong><p>Web-App installieren, Updates prüfen, Benachrichtigungen einrichten, Messe-Übersicht öffnen oder einen Fehlerbericht vorbereiten.</p></article>
+                        </div>
+                    </section>
+                    <section class="guide-subtool-group">
+                        <h3>Entwicklung &amp; Zurücksetzen</h3>
+                        <div class="guide-subtool-list">
+                            <article><strong>Entwicklung</strong><p>Passwortgeschützter, experimenteller Bereich für lokale Geräte, Pumpendemo und Licht-/PAR-Simulation. Diese Funktionen gehören nicht zum normalen Arbeitsablauf.</p></article>
+                            <article><strong>Daten-Reset</strong><p>Einzelne Datenbereiche gezielt leeren. Vorher immer Cloud-Stand oder Projekt-Backup prüfen.</p></article>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
         <section class="guide-card guide-final">
             <div class="guide-copy">
                 <span class="section-eyebrow">Praxis</span>
                 <h2>Empfohlene Arbeitsweise</h2>
                 <ol>
-                    <li>Lagerbestand regelmäßig pflegen und nach größeren Buchungen prüfen.</li>
-                    <li>Messwerte im Logbuch eintragen, damit Trends belastbarer werden.</li>
-                    <li>C&amp;R, Trace und Nutrition Rechnungen vor der Anwendung gegen Messwerte und Herstellerangaben prüfen.</li>
-                    <li>Nach wichtigen Änderungen einen Google Drive Upload oder lokalen Backup-Export erstellen.</li>
-                    <li>Bei Unsicherheit langsam dosieren, messen und dokumentieren.</li>
+                    <li>Aktives Aquarium und aktives Lager vor einer Eingabe kontrollieren.</li>
+                    <li>ICP nur einmal importieren und anschließend für Trace und Historienzuordnung wiederverwenden.</li>
+                    <li>Lagerbestand und Messwerte regelmäßig pflegen, damit Prognosen und Verläufe belastbarer werden.</li>
+                    <li>C&amp;R-, Trace- und Dosierrechnungen vor der Anwendung gegen Originalquelle, Messwerte und Herstellerangaben prüfen.</li>
+                    <li>Nach wichtigen Änderungen synchronisieren oder ein lokales Projekt-Backup erstellen.</li>
+                    <li>Bei Unsicherheit langsam korrigieren, erneut messen und die Wirkung dokumentieren.</li>
                 </ol>
             </div>
         </section>
