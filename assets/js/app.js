@@ -16325,7 +16325,7 @@ function renderTraceCalculatorHistory() {
                 </summary>
                 <div class="trace-history-content">
                     <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Trage Ansatzdatum, Beckenvolumen, Laufzeit, Tagesdosierung und die Mengen aus K+ und A- ein. Danach kannst du die passende ICP auswählen. Die Verbindung bleibt lokal und wird mit dem normalen Cloud-Sync übernommen.</p></div>
-                    <div class="trace-history-head-actions"><button type="button" class="btn-secondary" onclick="event.stopPropagation(); addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></div>
+                    <div class="trace-history-head-actions"><button type="button" class="btn-primary trace-history-add-button" onclick="event.stopPropagation(); addManualTraceHistoryEntry()"><span aria-hidden="true">+</span> Vergangene Mischung hinzufügen</button></div>
                     <p>Nach dem ersten Speichern erscheinen hier Verlauf, prozentuale Entwicklung und die Wirkung der Anpassungen.</p>
                 </div>
             </details>
@@ -16352,7 +16352,7 @@ function renderTraceCalculatorHistory() {
             </summary>
             <div class="trace-history-content">
                 <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Nutze „Vergangene Mischung hinzufügen“, wenn ein früheres Rezept noch nicht in ReefTools erfasst ist. Eine ICP und eine Trace-Mischung können jeweils nur einmal verbunden werden.</p></div>
-                <div class="trace-history-head-actions"><button type="button" class="btn-secondary" onclick="event.stopPropagation(); addManualTraceHistoryEntry()">Vergangene Mischung hinzufügen</button></div>
+                <div class="trace-history-head-actions"><button type="button" class="btn-primary trace-history-add-button" onclick="event.stopPropagation(); addManualTraceHistoryEntry()"><span aria-hidden="true">+</span> Vergangene Mischung hinzufügen</button></div>
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
                 ${renderTraceCalculatorHistoryChart(chartHistory)}
                 <div class="trace-history-list">
