@@ -1324,8 +1324,8 @@ const TOOL_SECTION_DEFINITIONS = [
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
     lager: 'Lager',
-    'cr-export': 'C&R',
-    'trace-export': 'Trace',
+    'cr-export': 'OSCI C&R',
+    'trace-export': 'OSCI Trace',
     tools: 'Tools',
     logbuch: 'Logbuch',
     icp: 'ICP',
@@ -1353,6 +1353,7 @@ const TAB_RENDER_HEALTH = {
 };
 const tabRenderRecoveryAttempts = new Map();
 const TOOL_SEARCH_KEYWORDS = {
+    'fauna-marin-traces': 'fauna marin balling trace 1 2 3 strontium sr molybdaen mo jod iod kanister restwert icp dosierung',
     'barium-lithium-und-molybdaen-direkt-ausgleichen': 'trace einzelkorrektur barium ba lithium li molybdaen molybdän mo icp zielwert direkt ausgleichen dosieren',
     'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
     'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
@@ -1383,6 +1384,7 @@ const TOOL_DEFINITIONS = [
     { id: 'salifert-umrechner', label: 'Salifert Umrechner', sectionId: 'dosieren-und-messwerte' },
     { id: 'nutrition-rechner', label: 'Nutrition Rechner', sectionId: 'dosieren-und-messwerte', osciOnly: true },
     { id: 'n-ratio-monitor', label: 'N-Ratio Monitor', sectionId: 'dosieren-und-messwerte', osciOnly: true },
+    { id: 'fauna-marin-traces', label: 'Fauna Marin Balling Trace 1 / 2 / 3', sectionId: 'dosieren-und-messwerte' },
     { id: 'salzgehalt-rechner', label: 'Salzgehalt Rechner', sectionId: 'salinitaet-und-wasserwechsel' },
     { id: 'salz-korrektur', label: 'Salzgehalt Korrigieren', sectionId: 'salinitaet-und-wasserwechsel' },
     { id: 'nettovolumen-berechnen', label: 'Nettovolumen Berechnen', sectionId: 'salinitaet-und-wasserwechsel' },
@@ -3193,7 +3195,7 @@ async function renderDemoProfileSettings() {
         ['lager', 'Lager'],
         ['logbuch', 'Logbuch'],
         ['icp', 'ICP'],
-        ['trace-export', 'Trace'],
+        ['trace-export', 'OSCI Trace'],
         ['statistik', 'Statistik'],
         ['protokoll', 'Protokoll'],
         ['korallen', 'Korallen']
@@ -3206,7 +3208,7 @@ async function renderDemoProfileSettings() {
         ['ToDos', stats.todos],
         ['Messwerte', stats.measurements],
         ['ICPs', stats.icp],
-        ['Trace', stats.trace],
+            ['OSCI Trace', stats.trace],
         ['Behälter', stats.dosing],
         ['Korallen', stats.corals]
     ];
@@ -9339,8 +9341,8 @@ Object.assign(window, {
 const APP_SEARCH_PAGES = [
     { id: 'uebersicht', label: 'Übersicht', description: 'Startseite, Status, Diagramme und wichtige Hinweise', keywords: 'dashboard start status kritisch diagramm korallen' },
     { id: 'lager', label: 'Lager', description: 'Bestände, Produkte, Kategorien und Warnungen verwalten', keywords: 'bestand produkt menge einlagern auslagern warnung' },
-    { id: 'cr-export', label: 'C&R', description: 'C&R Daten übernehmen, prüfen, auslagern und Rezepte dokumentieren', keywords: 'custom repair rezept auslagerung mischung pdf' },
-    { id: 'trace-export', label: 'Trace', description: 'ICP-Werte, Anionen, Kationen, Mischungen und Historie', keywords: 'spurenelemente icp anionen kationen historie rezept startlösung' },
+    { id: 'cr-export', label: 'OSCI C&R', description: 'OSCI C&R-Daten übernehmen, prüfen, auslagern und Rezepte dokumentieren', keywords: 'osci custom repair rezept auslagerung mischung pdf' },
+    { id: 'trace-export', label: 'OSCI Trace', description: 'OSCI ICP-Werte, Anionen, Kationen, Mischungen und Historie', keywords: 'osci spurenelemente icp anionen kationen historie rezept startlösung' },
     { id: 'tools', label: 'Tools', description: 'Rechner für Wasserwerte, Dosierung, Salinität und Rezepte', keywords: 'rechner berechnen wasserwerte dosierung salz' },
     { id: 'logbuch', label: 'Logbuch', description: 'Messwerte, ToDos, Wartung und Aquariumdokumentation', keywords: 'messen messung todo erinnerung wartung dokumentieren' },
     { id: 'icp', label: 'ICP', description: 'Laboranalysen importieren, speichern und als Verlauf anzeigen', keywords: 'labor osci messwerte analyse graph trend import' },
@@ -16743,7 +16745,7 @@ async function addManualTraceHistoryEntry() {
         type: 'info',
         title: 'Vergangene Mischung hinzufügen',
         eyebrow: 'Trace-Historie',
-        message: 'Trage die Werte aus Excel oder vom Zettel je Element einzeln ein. Wähle die Einheit einmal oben aus und trage danach nur die Zahlen ein, z. B. 1,20. Leere Felder zählen als 0; eine gespeicherte ICP kann optional zugeordnet werden.',
+        message: 'Trage die Werte aus Excel oder vom Zettel für jedes K+- und A--Element einzeln ein. Wähle die Einheit einmal oben aus und trage danach nur die Zahlen ein, z. B. 1,20. Auch 0 ist ein gültiger Wert; leere Felder müssen vor dem Speichern ergänzt werden.',
         wide: true,
         confirmText: 'Historie speichern',
         cancelText: 'Abbrechen',
@@ -16757,13 +16759,12 @@ async function addManualTraceHistoryEntry() {
     const actualInputs = { ...kationFields.inputs, ...anionFields.inputs };
     const invalidAmountFields = [...kationFields.invalid, ...anionFields.invalid];
     if (invalidAmountFields.length) {
-        await appAlert(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende nur Zahlen mit optionalem Zusatz „ml“ oder „g“.`, { title: 'Mengen prüfen', type: 'warning' });
+        showAppDialogInlineError(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende Zahlen ohne Einheit; die Einheit wird oben für alle Felder festgelegt.`);
         return;
     }
-    const hasKationen = traceCalculatorElements.some(element => element.group === 'kationen' && amounts[element.item] !== undefined);
-    const hasAnionen = traceCalculatorElements.some(element => element.group === 'anionen' && amounts[element.item] !== undefined);
-    if (!hasKationen || !hasAnionen) {
-        await appAlert('Bitte mindestens ein Kationen- und ein Anionen-Element mit Menge eintragen.', { title: 'Mischung unvollständig', type: 'warning' });
+    const missingElements = traceCalculatorElements.filter(element => amounts[element.item] === undefined);
+    if (missingElements.length) {
+        showAppDialogInlineError(`Für eine vollständige Mischung fehlen noch: ${missingElements.map(element => `${element.symbol} (${element.group === 'kationen' ? 'K+' : 'A-'})`).join(', ')}. Trage auch bei einem nicht dosierten Element ausdrücklich 0 ein.`);
         return;
     }
 
@@ -16887,11 +16888,12 @@ async function editTraceHistoryEntry(id) {
     const actualInputs = { ...kationFields.inputs, ...anionFields.inputs };
     const invalidAmountFields = [...kationFields.invalid, ...anionFields.invalid];
     if (invalidAmountFields.length) {
-        await appAlert(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende nur Zahlen mit optionalem Zusatz „ml“ oder „g“.`, { title: 'Mengen prüfen', type: 'warning' });
+        showAppDialogInlineError(`Bitte prüfe die Eingaben bei: ${invalidAmountFields.join(', ')}. Verwende Zahlen ohne Einheit; die Einheit wird oben für alle Felder festgelegt.`);
         return;
     }
-    if (!Object.keys(parsedAmounts).length) {
-        await appAlert('Keine gültigen Elementmengen erkannt. Änderungen wurden nicht gespeichert.', { title: 'Bitte prüfen', type: 'warning' });
+    const missingElements = traceCalculatorElements.filter(element => parsedAmounts[element.item] === undefined);
+    if (missingElements.length) {
+        showAppDialogInlineError(`Die Mischung ist noch nicht vollständig. Es fehlen: ${missingElements.map(element => `${element.symbol} (${element.group === 'kationen' ? 'K+' : 'A-'})`).join(', ')}. Trage auch bei einem nicht dosierten Element ausdrücklich 0 ein.`);
         return;
     }
     const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
@@ -17397,6 +17399,164 @@ window.setTraceDirectElementTarget = setTraceDirectElementTarget;
 window.updateTraceDirectElementPortions = updateTraceDirectElementPortions;
 window.updateTraceDirectTankLiters = updateTraceDirectTankLiters;
 
+function getFaunaTraceInputValue(id, fallback = 0) {
+    return Math.max(0, traceCalcNumber(document.getElementById(id)?.value, fallback));
+}
+
+function getFaunaTraceIcpNumeric(report, candidates, convertMicroToMilli = false) {
+    const value = (report?.values || []).find(entry => candidates.includes(entry.key) || candidates.some(candidate => String(entry.name || '').toLowerCase() === candidate.toLowerCase()));
+    let numeric = traceCalcNumber(value?.value, null);
+    if (numeric === null) return null;
+    const unit = String(value?.unit || '').toLowerCase();
+    if (convertMicroToMilli && (unit.includes('µg') || unit.includes('ug'))) numeric /= 1000;
+    return numeric;
+}
+
+function populateFaunaTraceIcpOptions() {
+    const select = document.getElementById('faunaTraceIcpSelect');
+    if (!select) return;
+    const selected = select.value;
+    select.innerHTML = '<option value="">Keine ICP ausgewählt</option>' + getIcpReportsSorted(true).map(report => `<option value="${escapeHtml(report.id)}">${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date || report.createdAt))}</option>`).join('');
+    select.value = getIcpReportsSorted(true).some(report => String(report.id) === selected) ? selected : '';
+}
+
+function applyFaunaTraceIcp(reportId) {
+    const report = getIcpReportsSorted(true).find(item => String(item.id) === String(reportId));
+    if (!report) return;
+    const values = {
+        faunaTraceSrMeasured: getFaunaTraceIcpNumeric(report, ['Strontium (Sr)', 'Sr'], false),
+        faunaTraceMoMeasured: getFaunaTraceIcpNumeric(report, ['Molybdän (Mo)', 'Mo'], true),
+        faunaTraceIMeasured: getFaunaTraceIcpNumeric(report, ['Iod (I)', 'Jod (I)', 'I'], true)
+    };
+    Object.entries(values).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input && value !== null) input.value = String(value).replace('.', ',');
+    });
+    calculateFaunaTraceCalculator();
+}
+
+function getFaunaTraceCalculationInputs() {
+    const caRemainingUnit = document.getElementById('faunaTraceCaRemainingUnit')?.value || 'percent';
+    const khRemainingUnit = document.getElementById('faunaTraceKhRemainingUnit')?.value || 'percent';
+    const caRemainingRaw = getFaunaTraceInputValue('faunaTraceCaRemaining', 0);
+    const khRemainingRaw = getFaunaTraceInputValue('faunaTraceKhRemaining', 0);
+    const caRemaining = caRemainingUnit === 'ml'
+        ? Math.min(100, caRemainingRaw / (getFaunaTraceInputValue('faunaTraceCaLiters', 5) * 10))
+        : Math.min(100, caRemainingRaw);
+    const khRemaining = khRemainingUnit === 'ml'
+        ? Math.min(100, khRemainingRaw / (getFaunaTraceInputValue('faunaTraceKhLiters', 5) * 10))
+        : Math.min(100, khRemainingRaw);
+    return {
+        caLiters: getFaunaTraceInputValue('faunaTraceCaLiters', 5),
+        khLiters: getFaunaTraceInputValue('faunaTraceKhLiters', 5),
+        trace1Last: getFaunaTraceInputValue('faunaTrace1Last', 25),
+        trace2Last: getFaunaTraceInputValue('faunaTrace2Last', 25),
+        trace3Last: getFaunaTraceInputValue('faunaTrace3Last', 25),
+        srMeasured: getFaunaTraceInputValue('faunaTraceSrMeasured', 0),
+        srTarget: getFaunaTraceInputValue('faunaTraceSrTarget', 0),
+        moMeasured: getFaunaTraceInputValue('faunaTraceMoMeasured', 0),
+        moTarget: getFaunaTraceInputValue('faunaTraceMoTarget', 0),
+        iMeasured: getFaunaTraceInputValue('faunaTraceIMeasured', 0),
+        iTarget: getFaunaTraceInputValue('faunaTraceITarget', 0),
+        caRemaining,
+        khRemaining,
+        caRemainingRaw,
+        khRemainingRaw,
+        caRemainingUnit,
+        khRemainingUnit,
+        icpReportId: document.getElementById('faunaTraceIcpSelect')?.value || ''
+    };
+}
+
+function updateFaunaTraceRemainingUnit(kind) {
+    const prefix = kind === 'kh' ? 'Kh' : 'Ca';
+    const input = document.getElementById(`faunaTrace${prefix}Remaining`);
+    const unit = document.getElementById(`faunaTrace${prefix}RemainingUnit`)?.value || 'percent';
+    const liters = getFaunaTraceInputValue(`faunaTrace${prefix}Liters`, 5);
+    if (!input) return;
+    input.max = unit === 'ml' ? String(Math.round(liters * 1000)) : '100';
+    input.step = unit === 'ml' ? '1' : '1';
+    input.setAttribute('aria-label', `Rest im ${kind === 'kh' ? 'KH' : 'Ca'}-Kanister in ${unit === 'ml' ? 'Milliliter' : 'Prozent'}`);
+}
+
+function calculateFaunaTraceDose(lastDose, measured, target, remainingPercent) {
+    const adjustedFullDose = measured > 0 ? lastDose * target / measured : null;
+    if (adjustedFullDose === null) return { status: 'missing', adjustedFullDose: null, addition: null };
+    const oldContribution = lastDose * remainingPercent / 100;
+    const addition = adjustedFullDose - oldContribution;
+    return {
+        status: addition < -0.0001 ? 'reduce-impossible' : remainingPercent <= 0 ? 'new-solution' : 'reuse',
+        adjustedFullDose,
+        oldContribution,
+        addition: Math.max(0, addition)
+    };
+}
+
+function renderFaunaTraceDoseResult(label, dose, remaining, unitLabel) {
+    if (dose.status === 'missing') return `<div class="fauna-trace-result-row is-warning"><strong>${label}</strong><span>Messwert muss größer als 0 sein.</span></div>`;
+    if (dose.status === 'reduce-impossible') return `<div class="fauna-trace-result-row is-danger"><strong>${label}</strong><span>Die erforderliche Zugabe würde auf ${dose.adjustedFullDose.toFixed(1)} ml sinken. Das kann durch Zugabe nicht sicher korrigiert werden; bitte neue Lösung ansetzen.</span></div>`;
+    const mode = dose.status === 'new-solution' ? 'Neue Lösung' : `Restbestand ${remaining.toFixed(0)} % weiterverwenden`;
+    return `<div class="fauna-trace-result-row"><strong>${label}</strong><span><b>${dose.addition.toFixed(1)} ml</b> neu zugeben · ${mode} · Zielmenge einer vollständigen Lösung: ${dose.adjustedFullDose.toFixed(1)} ml ${unitLabel}</span></div>`;
+}
+
+function calculateFaunaTraceCalculator() {
+    const result = document.getElementById('faunaTraceResult');
+    if (!result) return null;
+    const input = getFaunaTraceCalculationInputs();
+    const trace1 = calculateFaunaTraceDose(input.trace1Last, input.srMeasured, input.srTarget, input.caRemaining);
+    const trace2 = calculateFaunaTraceDose(input.trace2Last, input.moMeasured, input.moTarget, input.caRemaining);
+    const trace3 = calculateFaunaTraceDose(input.trace3Last, input.iMeasured, input.iTarget, input.khRemaining);
+    const calculation = { ...input, trace1, trace2, trace3, calculatedAt: new Date().toISOString() };
+    result.innerHTML = `<div class="fauna-trace-result-card"><strong>Ergebnis der neuen Mischung</strong><p>Die Werte werden proportional aus Messwert und Zielwert angepasst. Bei Restbestand wird die bereits vorhandene Trace-Menge zuerst angerechnet.</p><div class="fauna-trace-result-list">${renderFaunaTraceDoseResult('Trace 1 · Strontium · Kanister Ca', trace1, input.caRemaining, 'ml')}${renderFaunaTraceDoseResult('Trace 2 · Molybdän · Kanister Ca', trace2, input.caRemaining, 'ml')}${renderFaunaTraceDoseResult('Trace 3 · Jod · Kanister KH', trace3, input.khRemaining, 'ml')}</div><small>Berechnung nach dem öffentlich sichtbaren Eingabemodell des Fauna-Marin-Rechners; nicht offiziell von Fauna Marin freigegeben.</small></div>`;
+    result.dataset.calculation = JSON.stringify(calculation);
+    return calculation;
+}
+
+function saveFaunaTraceCalculation() {
+    const calculation = calculateFaunaTraceCalculator();
+    if (!calculation) return;
+    if (!Array.isArray(db.faunaTraceHistory)) db.faunaTraceHistory = [];
+    db.faunaTraceHistory.unshift({ id: createWarehouseId(), ...calculation });
+    db.faunaTraceHistory = db.faunaTraceHistory.slice(0, 50);
+    saveDB();
+    renderFaunaTraceHistory();
+    showToast('Fauna-Marin-Trace-Berechnung dokumentiert', 'success', 2800);
+}
+
+function renderFaunaTraceHistory() {
+    const container = document.getElementById('faunaTraceHistory');
+    if (!container) return;
+    const history = Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : [];
+    container.innerHTML = history.length ? `<details><summary>Dokumentierte Fauna-Marin-Berechnungen (${history.length})</summary><div class="fauna-trace-history-list">${history.slice(0, 8).map(entry => `<div class="fauna-trace-history-item"><strong>${escapeHtml(formatWarehouseDate(entry.calculatedAt))}</strong><span>Ca: ${entry.trace1?.addition?.toFixed?.(1) ?? '-'} ml · Ca: ${entry.trace2?.addition?.toFixed?.(1) ?? '-'} ml · KH: ${entry.trace3?.addition?.toFixed?.(1) ?? '-'} ml</span></div>`).join('')}</div></details>` : '';
+}
+
+function initFaunaTraceCalculator() {
+    populateFaunaTraceIcpOptions();
+    updateFaunaTraceRemainingUnit('ca');
+    updateFaunaTraceRemainingUnit('kh');
+    renderFaunaTraceHistory();
+}
+
+function openFaunaTraceCalculator() {
+    selectTab('tools');
+    window.setTimeout(() => {
+        const section = document.querySelector('#tools details[data-section-id="dosieren-und-messwerte"]');
+        const card = document.querySelector('#tools [data-tool-id="fauna-marin-traces"]');
+        if (section) section.open = true;
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            card.classList.add('tool-focus-highlight');
+            window.setTimeout(() => card.classList.remove('tool-focus-highlight'), 1800);
+        }
+    }, 80);
+}
+
+window.calculateFaunaTraceCalculator = calculateFaunaTraceCalculator;
+window.saveFaunaTraceCalculation = saveFaunaTraceCalculation;
+window.applyFaunaTraceIcp = applyFaunaTraceIcp;
+window.updateFaunaTraceRemainingUnit = updateFaunaTraceRemainingUnit;
+window.openFaunaTraceCalculator = openFaunaTraceCalculator;
+
 function setupPriority4CalculatorUI() {
     const scopedSections = document.querySelectorAll(
         '#tools details[data-section-id="dosieren-und-messwerte"], ' +
@@ -17455,6 +17615,7 @@ function initToolSection(sectionId, force = false) {
     initializedToolSections.add(sectionId);
 
     if (sectionId === 'dosieren-und-messwerte') {
+        runToolInit('Fauna Marin Trace', initFaunaTraceCalculator);
         runToolInit('Nutrition Rechner', renderNutritionCalculator);
         runToolInit('Dosierwirkung', initDoseImpactCalculator);
         runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
@@ -17964,6 +18125,15 @@ function setupToolTiles() {
     document.querySelectorAll('#tools .tool-compact-card').forEach(card => {
         const title = card.querySelector('h3');
         if (!title) return;
+        // Keep collapsed tiles resilient when a new tool uses a wrapper around
+        // its heading or hint. The overview always needs direct compact text.
+        if (title.parentElement !== card) {
+            card.insertBefore(title, card.firstChild);
+        }
+        const nestedHint = card.querySelector('.hint');
+        if (nestedHint && nestedHint.parentElement !== card) {
+            card.insertBefore(nestedHint, title.nextSibling);
+        }
         const toolTitle = getToolCardTitle(card);
         const toolId = getCanonicalToolId(card, title);
         const visual = getToolTileVisual(toolId, toolTitle);
@@ -28066,6 +28236,14 @@ function showAppDialog(options = {}) {
             if (firstField && typeof firstField.select === 'function') firstField.select();
         }, 0);
     });
+}
+
+function showAppDialogInlineError(message) {
+    const error = document.getElementById('appDialogError');
+    if (!error) return;
+    error.textContent = String(message || 'Bitte prüfe die Eingaben.');
+    error.hidden = false;
+    error.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 function appAlert(message, options = {}) {

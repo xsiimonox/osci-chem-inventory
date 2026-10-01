@@ -11919,6 +11919,212 @@ body.theme-badman.party-mode .card {
     line-height: 1;
 }
 
+.fauna-trace-card {
+    grid-column: 1 / -1;
+    border-color: color-mix(in srgb, #3d91d8 42%, var(--border-color));
+}
+
+/* The Fauna calculator keeps its heading in a small header wrapper. The
+   shared collapsed-tile rule otherwise hides that wrapper and leaves an
+   empty card in the tools overview. */
+.fauna-trace-card.tool-tile-collapsed {
+    display: block;
+    min-height: 84px;
+    padding: 14px;
+}
+
+.fauna-trace-card.tool-tile-collapsed .workflow-eyebrow,
+.fauna-trace-card.tool-tile-collapsed .external-tool-note,
+.fauna-trace-card.tool-tile-collapsed > .fauna-trace-subsection,
+.fauna-trace-card.tool-tile-collapsed > .fauna-trace-actions,
+.fauna-trace-card.tool-tile-collapsed > #faunaTraceResult,
+.fauna-trace-card.tool-tile-collapsed > #faunaTraceHistory {
+    display: none !important;
+}
+
+.fauna-trace-card.tool-tile-collapsed > h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    margin: 0;
+    font-size: clamp(0.82rem, 2.8vw, 0.98rem);
+    line-height: 1.14;
+}
+
+.fauna-trace-card.tool-tile-collapsed > h3 .tool-title-text {
+    min-width: 0;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.fauna-trace-card.tool-tile-collapsed > .hint {
+    display: -webkit-box !important;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.tool-focus-highlight {
+    animation: toolFocusHighlight 1.8s var(--ease-standard) both;
+}
+
+@keyframes toolFocusHighlight {
+    0%, 100% { box-shadow: var(--shadow-card); }
+    35% { box-shadow: 0 0 0 4px color-mix(in srgb, #3d91d8 50%, transparent), 0 0 28px color-mix(in srgb, #3d91d8 26%, transparent); }
+}
+
+.trace-related-tool-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 12px 14px;
+    border: 1px solid color-mix(in srgb, #3d91d8 48%, var(--border-color));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, #3d91d8 8%, var(--surface-card));
+}
+
+.trace-related-tool-link > div {
+    display: grid;
+    gap: 3px;
+}
+
+.trace-related-tool-link strong {
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.trace-related-tool-link span {
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+}
+
+@media (max-width: 620px) {
+    .trace-related-tool-link {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .trace-related-tool-link button {
+        width: 100%;
+    }
+}
+
+.fauna-trace-card .workflow-eyebrow {
+    color: #66b6f2;
+}
+
+.fauna-trace-disclaimer {
+    border-left-color: #e5a93d;
+}
+
+.fauna-trace-disclaimer a {
+    color: #66b6f2;
+    font-weight: 700;
+}
+
+.fauna-trace-subsection {
+    margin-top: var(--space-4);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--border-color);
+}
+
+.fauna-trace-subsection h4 {
+    margin: 0 0 var(--space-3);
+    color: var(--text-primary);
+    font-size: 0.98rem;
+}
+
+.fauna-trace-unit-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 86px;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.fauna-trace-unit-row input,
+.fauna-trace-unit-row select {
+    margin-bottom: 0;
+}
+
+/* Each Fauna value is entered as a measured/target pair. Keeping two
+   columns makes those pairs scannable without wasting a full row per field. */
+#tools .fauna-trace-card:not(.tool-tile-collapsed) .fauna-trace-input-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+}
+
+#tools .fauna-trace-card:not(.tool-tile-collapsed) .fauna-trace-input-grid .input-group {
+    min-width: 0;
+}
+
+.fauna-trace-result-card {
+    display: grid;
+    gap: 10px;
+    margin-top: var(--space-4);
+    padding: 14px;
+    border: 1px solid color-mix(in srgb, #3d91d8 42%, var(--border-color));
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, #3d91d8 7%, var(--surface-raised));
+}
+
+.fauna-trace-result-card > p,
+.fauna-trace-result-card > small {
+    margin: 0;
+    color: var(--text-secondary);
+}
+
+.fauna-trace-result-list,
+.fauna-trace-history-list {
+    display: grid;
+    gap: 8px;
+}
+
+.fauna-trace-result-row,
+.fauna-trace-history-item {
+    display: grid;
+    gap: 3px;
+    padding: 10px 12px;
+    border-left: 3px solid #3d91d8;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--surface-card) 82%, transparent);
+}
+
+.fauna-trace-result-row span,
+.fauna-trace-history-item span {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.fauna-trace-result-row.is-warning {
+    border-left-color: var(--status-warning);
+}
+
+.fauna-trace-result-row.is-danger {
+    border-left-color: var(--status-danger);
+}
+
+.fauna-trace-history {
+    margin-top: var(--space-4);
+}
+
+.fauna-trace-history summary {
+    cursor: pointer;
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.fauna-trace-history-list {
+    margin-top: 10px;
+}
+
 .trace-history-content {
     display: grid;
     gap: var(--space-4);

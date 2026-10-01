@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.211-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.220-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.211</span>
+                    <span class="version-badge">v3.4.220</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -88,8 +88,8 @@
         <div class="nav-links">
             <button onclick="selectTab('uebersicht')" id="tab-uebersicht">Übersicht</button>
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
-            <button onclick="selectTab('cr-export')" id="tab-cr-export">C&amp;R</button>
-            <button onclick="selectTab('trace-export')" id="tab-trace-export">Trace</button>
+            <button onclick="selectTab('cr-export')" id="tab-cr-export">OSCI C&amp;R</button>
+            <button onclick="selectTab('trace-export')" id="tab-trace-export">OSCI Trace</button>
             <button onclick="selectTab('tools')" id="tab-tools">Tools</button>
             <button onclick="selectTab('logbuch')" id="tab-logbuch">Logbuch</button>
             <button onclick="selectTab('icp')" id="tab-icp">ICP</button>
@@ -238,6 +238,13 @@
                     <h2>Trace Calculator &amp; Auslagerung</h2>
                     <p>ICP-Werte auswerten, Kationen und Anionen getrennt berechnen, Verlauf prüfen und die fertige Mischung auslagern.</p>
                     <div class="osci-system-note">Für OSCI Motion Trace-Mischungen und lagergeführte OSCI Produkte gedacht.</div>
+                    <div class="trace-related-tool-link">
+                        <div>
+                            <strong>Auch Fauna Marin Balling Trace 1 / 2 / 3?</strong>
+                            <span>Separater, nicht offizieller ReefTools-Rechner mit eigener Dokumentation und ICP-Verknüpfung.</span>
+                        </div>
+                        <button type="button" class="btn-secondary btn-animated" onclick="openFaunaTraceCalculator()">Fauna-Trace-Rechner öffnen</button>
+                    </div>
                 </div>
                 <div class="workflow-context" aria-label="Aktives Lager">
                     <span>Aktives Lager</span>
@@ -784,6 +791,70 @@
                             <div id="osciTnbMonitorFrameWrap" class="external-tool-frame-wrap" hidden>
                                 <iframe id="osciTnbMonitorFrame" title="OSCI Motion N-Ratio Monitor" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
                             </div>
+                        </div>
+
+                        <div class="card tool-compact-card fauna-trace-card" data-tool-id="fauna-marin-traces">
+                            <span class="workflow-eyebrow">EIGENER RECHNER · FAUNA MARIN</span>
+                            <h3>Fauna Marin Balling Trace 1 / 2 / 3</h3>
+                            <p class="hint">Berechnet die neue Trace-Zugabe für Calcium- und KH-Kanister und dokumentiert sie getrennt vom OSCI-Trace-Workflow.</p>
+                            <div class="external-tool-note fauna-trace-disclaimer">
+                                <strong>Hinweis: kein offizieller Fauna-Marin-Rechner</strong>
+                                <span>Dieser ReefTools-Rechner wurde anhand des öffentlich sichtbaren Fauna-Marin-Rechners nachempfunden. Es gibt keine offizielle Freigabe oder Bestätigung durch Fauna Marin. Ergebnisse bitte selbst prüfen und mit einer ICP kontrollieren.</span>
+                                <a href="https://lab.faunamarin.de/de/calc-traces" target="_blank" rel="noopener noreferrer">Originalen Fauna-Marin-Rechner öffnen</a>
+                            </div>
+                            <div class="tool-grid calculator-input-grid fauna-trace-input-grid">
+                                <div class="input-group">
+                                    <label for="faunaTraceCaLiters">Kanister Ca (Liter)</label>
+                                    <input type="number" id="faunaTraceCaLiters" min="0.1" step="0.1" value="5">
+                                </div>
+                                <div class="input-group">
+                                    <label for="faunaTraceKhLiters">Kanister KH (Liter)</label>
+                                    <input type="number" id="faunaTraceKhLiters" min="0.1" step="0.1" value="5">
+                                </div>
+                                <div class="input-group">
+                                    <label for="faunaTrace1Last">Letzte Trace 1-Zugabe (ml)</label>
+                                    <input type="number" id="faunaTrace1Last" min="0" step="0.1" value="25">
+                                </div>
+                                <div class="input-group">
+                                    <label for="faunaTrace2Last">Letzte Trace 2-Zugabe (ml)</label>
+                                    <input type="number" id="faunaTrace2Last" min="0" step="0.1" value="25">
+                                </div>
+                                <div class="input-group">
+                                    <label for="faunaTrace3Last">Letzte Trace 3-Zugabe (ml)</label>
+                                    <input type="number" id="faunaTrace3Last" min="0" step="0.1" value="25">
+                                </div>
+                                <div class="input-group">
+                                    <label for="faunaTraceIcpSelect">Gespeicherte ICP verwenden</label>
+                                    <select id="faunaTraceIcpSelect" onchange="applyFaunaTraceIcp(this.value)">
+                                        <option value="">Keine ICP ausgewählt</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="fauna-trace-subsection">
+                                <h4>Gemessene und gewünschte Werte</h4>
+                                <div class="tool-grid calculator-input-grid fauna-trace-input-grid">
+                                    <div class="input-group"><label for="faunaTraceSrMeasured">Strontium gemessen (mg/l)</label><input type="number" id="faunaTraceSrMeasured" min="0" step="0.01" value="8.2"></div>
+                                    <div class="input-group"><label for="faunaTraceSrTarget">Strontium Ziel (mg/l)</label><input type="number" id="faunaTraceSrTarget" min="0" step="0.01" value="8.2"></div>
+                                    <div class="input-group"><label for="faunaTraceMoMeasured">Molybdän gemessen (µg/l)</label><input type="number" id="faunaTraceMoMeasured" min="0" step="0.1" value="14"></div>
+                                    <div class="input-group"><label for="faunaTraceMoTarget">Molybdän Ziel (µg/l)</label><input type="number" id="faunaTraceMoTarget" min="0" step="0.1" value="14"></div>
+                                    <div class="input-group"><label for="faunaTraceIMeasured">Jod gemessen (mg/l)</label><input type="number" id="faunaTraceIMeasured" min="0" step="0.0001" value="0.06"></div>
+                                    <div class="input-group"><label for="faunaTraceITarget">Jod Ziel (mg/l)</label><input type="number" id="faunaTraceITarget" min="0" step="0.0001" value="0.06"></div>
+                                </div>
+                            </div>
+                            <div class="fauna-trace-subsection">
+                                <h4>Restbestand der vorhandenen Lösung</h4>
+                                <p class="hint">Bei 0 % wird eine neue Lösung angesetzt. Bei Restbestand wird die vorhandene Trace-Menge anteilig weitergeführt. Muss die Zugabe sinken, ist eine Anpassung durch Zugabe nicht möglich.</p>
+                                <div class="tool-grid calculator-input-grid fauna-trace-input-grid">
+                                    <div class="input-group"><label for="faunaTraceCaRemaining">Rest im Ca-Kanister</label><div class="fauna-trace-unit-row"><input type="number" id="faunaTraceCaRemaining" min="0" max="100" step="1" value="0"><select id="faunaTraceCaRemainingUnit" aria-label="Einheit für Rest im Ca-Kanister" onchange="updateFaunaTraceRemainingUnit('ca')"><option value="percent">%</option><option value="ml">ml</option></select></div></div>
+                                    <div class="input-group"><label for="faunaTraceKhRemaining">Rest im KH-Kanister</label><div class="fauna-trace-unit-row"><input type="number" id="faunaTraceKhRemaining" min="0" max="100" step="1" value="0"><select id="faunaTraceKhRemainingUnit" aria-label="Einheit für Rest im KH-Kanister" onchange="updateFaunaTraceRemainingUnit('kh')"><option value="percent">%</option><option value="ml">ml</option></select></div></div>
+                                </div>
+                            </div>
+                            <div class="btn-group calculator-actions fauna-trace-actions">
+                                <button type="button" class="btn-primary btn-animated" onclick="calculateFaunaTraceCalculator()">Berechnen</button>
+                                <button type="button" class="btn-secondary btn-animated" onclick="saveFaunaTraceCalculation()">Berechnung dokumentieren</button>
+                            </div>
+                            <div id="faunaTraceResult" class="tool-result" aria-live="polite"></div>
+                            <div id="faunaTraceHistory" class="fauna-trace-history"></div>
                         </div>
                     </div>
                 </details>
@@ -2593,8 +2664,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.211-release"></script>
-    <script src="assets/js/app.js?v=3.4.211-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.220-release"></script>
+    <script src="assets/js/app.js?v=3.4.220-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
