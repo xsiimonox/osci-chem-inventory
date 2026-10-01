@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.197-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.199-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.197</span>
+                    <span class="version-badge">v3.4.199</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -54,11 +54,16 @@
                     <a href="anleitung.html" class="header-quick-sync-button header-help-link" data-help-page="guide" aria-label="Hilfe und Anleitung öffnen">Hilfe</a>
                 </div>
             </div>
-            <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen" aria-controls="main-nav" aria-expanded="false">
-                <div class="bar"></div>
-                <div class="bar"></div>
-                <div class="bar"></div>
-            </button>
+            <div class="header-icon-actions">
+                <button type="button" class="global-search-trigger" onclick="openGlobalSearch()" aria-label="Funktionen und Bereiche suchen" title="Suchen">
+                    <span aria-hidden="true">⌕</span>
+                </button>
+                <button class="menu-toggle" onclick="toggleMenu()" aria-label="Menü öffnen" aria-controls="main-nav" aria-expanded="false">
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                    <div class="bar"></div>
+                </button>
+            </div>
         </div>
         <div class="subtitle"><span>Aktiver Bereich</span><strong id="activePageTitle" aria-live="polite">Lager</strong></div>
     </header>
@@ -101,6 +106,25 @@
     </nav>
     
     <div class="menu-backdrop" id="menu-backdrop" onclick="toggleMenu()"></div>
+
+    <div id="globalSearchDialog" class="global-search-dialog" hidden aria-hidden="true">
+        <button type="button" class="global-search-backdrop" onclick="closeGlobalSearch()" aria-label="Suche schließen"></button>
+        <section class="global-search-panel" role="dialog" aria-modal="true" aria-labelledby="globalSearchTitle">
+            <header class="global-search-head">
+                <div>
+                    <span class="section-eyebrow">ReefTools durchsuchen</span>
+                    <h2 id="globalSearchTitle">Funktion finden</h2>
+                </div>
+                <button type="button" class="global-search-close" onclick="closeGlobalSearch()" aria-label="Suche schließen">×</button>
+            </header>
+            <label class="global-search-field" for="globalSearchInput">
+                <span aria-hidden="true">⌕</span>
+                <input type="search" id="globalSearchInput" placeholder="z. B. ICP importieren, Salzgehalt, Backup ..." autocomplete="off" oninput="renderGlobalSearchResults(this.value)">
+            </label>
+            <p id="globalSearchStatus" class="global-search-status" role="status" aria-live="polite"></p>
+            <div id="globalSearchResults" class="global-search-results"></div>
+        </section>
+    </div>
 
     <main id="app" tabindex="-1">
         <div id="uebersicht" class="tab-content"></div>
@@ -1967,6 +1991,16 @@
                 </div>
             </section>
 
+            <section class="settings-control-center" aria-label="Einstellungen durchsuchen und filtern">
+                <label class="settings-search-field" for="settingsSearchInput">
+                    <span aria-hidden="true">⌕</span>
+                    <input type="search" id="settingsSearchInput" placeholder="Einstellung suchen: Backup, Farbe, Produkt, Menü ..." autocomplete="off" oninput="filterSettingsView(this.value)">
+                    <button type="button" id="settingsSearchClear" onclick="clearSettingsSearch()" aria-label="Einstellungssuche leeren" hidden>×</button>
+                </label>
+                <nav id="settingsGroupNav" class="settings-group-nav" aria-label="Einstellungskategorien"></nav>
+                <p id="settingsSearchStatus" class="settings-search-status" role="status" aria-live="polite"></p>
+            </section>
+
             <div class="card settings-card settings-card-dashboard">
                 <h3>Übersicht anpassen</h3>
                 <p class="hint">Lege fest, welche Kacheln und Messwert-Diagramme auf der Startübersicht sichtbar sind. Diese Auswahl wird mit deinen Projektdaten gespeichert.</p>
@@ -2077,22 +2111,48 @@
                 <button type="button" class="btn-primary btn-animated" onclick="openTradeFairShowcase()">Messe-Übersicht öffnen</button>
             </div>
 
-            <div class="card settings-card settings-card-local-devices">
-                <h3>Lokale Geräte einbinden</h3>
-                <p class="hint">DEV-Bereich für Tests mit ESP32, Home Assistant oder anderen Webinterfaces im eigenen Netzwerk.</p>
-                <div id="localDeviceSettings"></div>
-            </div>
-
-            <div class="card settings-card settings-card-wave-demo">
-                <h3>Wave Pumpensteuerung Demo</h3>
-                <p class="hint">Geschützter Testbereich für die Vorschau deiner ESP32-Strömungspumpensteuerung.</p>
-                <div id="wavePumpDemoSettings"></div>
-            </div>
-
-            <div class="card settings-card settings-card-lighting-sim">
-                <h3>Licht &amp; PAR Simulation</h3>
-                <p class="hint">Geschützter Testbereich für eine physikalische Lampenplanung mit PAR-Heatmap und Positionssuche.</p>
-                <div id="lightingPlannerSettings"></div>
+            <div class="card settings-card settings-card-development">
+                <h3>Entwicklung</h3>
+                <p class="hint">Geschützter Bereich für experimentelle Funktionen, lokale Geräte und technische Demos.</p>
+                <div id="developmentSettingsGate"></div>
+                <div id="developmentSettingsContent" class="development-settings-list" hidden>
+                    <details class="development-settings-section" ontoggle="if(this.open) renderDevelopmentSubsection('devices')">
+                        <summary>
+                            <span>
+                                <strong>Lokale Geräte einbinden</strong>
+                                <small>ESP32, Home Assistant oder andere Webinterfaces im eigenen Netzwerk.</small>
+                            </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="development-settings-body">
+                            <div id="localDeviceSettings"></div>
+                        </div>
+                    </details>
+                    <details class="development-settings-section" ontoggle="if(this.open) renderDevelopmentSubsection('wave')">
+                        <summary>
+                            <span>
+                                <strong>Wave Pumpensteuerung Demo</strong>
+                                <small>Vorschau der experimentellen ESP32-Strömungspumpensteuerung.</small>
+                            </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="development-settings-body">
+                            <div id="wavePumpDemoSettings"></div>
+                        </div>
+                    </details>
+                    <details class="development-settings-section" ontoggle="if(this.open) renderDevelopmentSubsection('lighting')">
+                        <summary>
+                            <span>
+                                <strong>Licht &amp; PAR Simulation</strong>
+                                <small>Experimentelle Lampenplanung mit PAR-Heatmap und Positionssuche.</small>
+                            </span>
+                            <span class="settings-chevron" aria-hidden="true">⌄</span>
+                        </summary>
+                        <div class="development-settings-body">
+                            <div id="lightingPlannerSettings"></div>
+                        </div>
+                    </details>
+                </div>
             </div>
 
             <div class="card sync-disabled-card storage-safety-card">
@@ -2532,8 +2592,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.197-release"></script>
-    <script src="assets/js/app.js?v=3.4.197-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.199-release"></script>
+    <script src="assets/js/app.js?v=3.4.199-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

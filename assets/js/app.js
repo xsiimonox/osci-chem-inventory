@@ -1353,6 +1353,7 @@ const TAB_RENDER_HEALTH = {
 };
 const tabRenderRecoveryAttempts = new Map();
 const TOOL_SEARCH_KEYWORDS = {
+    'barium-lithium-und-molybdaen-direkt-ausgleichen': 'trace einzelkorrektur barium ba lithium li molybdaen molybdän mo icp zielwert direkt ausgleichen dosieren',
     'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
     'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
     'tagesdosierung-wirkung': 'wasserwert wasserwerte dosierpumpe dosierung täglich tagesdosis konzentration produktwirkung kh calcium ca',
@@ -1373,6 +1374,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
 const TOOL_DEFINITIONS = [
+    { id: 'barium-lithium-und-molybdaen-direkt-ausgleichen', label: 'Barium, Lithium & Molybdän direkt ausgleichen', sectionId: 'dosieren-und-messwerte' },
     { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur', sectionId: 'dosieren-und-messwerte' },
     { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag', sectionId: 'dosieren-und-messwerte' },
     { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung', sectionId: 'dosieren-und-messwerte' },
@@ -9053,7 +9055,7 @@ function setupSettingsAccordions() {
         const firstChild = card.firstElementChild;
         if (firstChild && firstChild.tagName === 'DETAILS') {
             const existingTitle = card.querySelector('h2, h3');
-            if (existingTitle) applySettingsMetadata(card, existingTitle.innerText || '');
+            if (existingTitle) applySettingsMetadata(card, existingTitle.textContent?.trim() || '');
             if (card.dataset.settingsLazyBound !== 'true') {
                 card.dataset.settingsLazyBound = 'true';
                 firstChild.addEventListener('toggle', () => {
@@ -9063,10 +9065,12 @@ function setupSettingsAccordions() {
             firstChild.open = false;
             return;
         }
-        if (card.dataset.settingsAccordion === 'true') return;
-
         const title = card.querySelector('h2, h3');
         if (!title) return;
+        if (card.dataset.settingsAccordion === 'true') {
+            applySettingsMetadata(card, title.textContent?.trim() || '');
+            return;
+        }
 
         const details = document.createElement('details');
         details.className = 'settings-accordion';
@@ -9097,7 +9101,7 @@ function setupSettingsAccordions() {
                 if (details.open) renderSettingsCardOnDemand(card);
             });
         }
-        applySettingsMetadata(card, title.innerText || '');
+        applySettingsMetadata(card, title.textContent?.trim() || '');
     });
 
     renderSettingsGroupLabels(settings);
@@ -9108,6 +9112,7 @@ function setupSettingsAccordions() {
     settings.querySelectorAll(':scope > .card, .settings-group-label').forEach(el => {
         el.hidden = false;
     });
+    filterSettingsView();
 }
 
 function runSettingsRender(label, fn) {
@@ -9135,14 +9140,8 @@ function renderSettingsCardOnDemand(card, force = false) {
     if (targetCard.classList.contains('settings-card-dashboard')) {
         runSettingsRender('Dashboard-Einstellungen', renderDashboardSettingsPanel);
     }
-    if (targetCard.classList.contains('settings-card-local-devices')) {
-        runSettingsRender('Lokale Geräte', renderLocalDeviceSettings);
-    }
-    if (targetCard.classList.contains('settings-card-wave-demo')) {
-        runSettingsRender('Wave Demo', renderWavePumpDemoSettings);
-    }
-    if (targetCard.classList.contains('settings-card-lighting-sim')) {
-        runSettingsRender('Licht Simulation', renderLightingPlannerSettings);
+    if (targetCard.classList.contains('settings-card-development')) {
+        runSettingsRender('Entwicklungsbereich', renderDevelopmentSettingsGate);
     }
     if (targetCard.classList.contains('sync-disabled-card')) {
         runSettingsRender('App Updates', renderAppUpdateStatus);
@@ -9198,20 +9197,19 @@ function renderOpenSettingsCards() {
 
 function getSettingsMeta(title) {
     const normalized = String(title || '').toLowerCase();
-    if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud|demo-profil/.test(normalized)) return { group: 'Datensicherheit', hint: 'Speicherstatus, Wiederherstellung, Datei-Backup, Demo-Profil und Google Drive', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download demo beispieldaten testprofil' };
+    if (/datensicherheit|datenrettung|datenspeicher|sicherung|backup|export|import|google drive|sync|cloud|demo-profil/.test(normalized)) return { group: 'Daten & Backup', hint: 'Speichern, wiederherstellen, exportieren und Demo-Daten verwalten', keywords: 'datenrettung sicherung backup export import wiederherstellen datei lokal google drive sync cloud upload download demo beispieldaten testprofil' };
     if (/messe|showcase|präsentation|vorführung/.test(normalized)) return { group: 'System & Hilfe', hint: 'Animierte Funktionsübersicht für Vorführungen und Gespräche', keywords: 'messe showcase präsentation vorführung feature übersicht werbung stand demo' };
     if (/app installieren|pwa|home-bildschirm|startbildschirm/.test(normalized)) return { group: 'System & Hilfe', hint: 'ReefTools als App-Icon auf Handy oder Desktop hinzufügen', keywords: 'app installieren pwa android chrome iphone ipad home bildschirm startbildschirm desktop icon' };
     if (/app-update|app-updates|update|version/.test(normalized)) return { group: 'System & Hilfe', hint: 'Version prüfen, Cache aktualisieren und neue App-Stände laden', keywords: 'app update version aktualisieren cache neu laden release' };
     if (/projekt unterstützen|unterstützen|spenden|paypal|coffee/.test(normalized)) return { group: 'System & Hilfe', hint: 'Freiwillige Unterstützung für Betrieb, Tests und Weiterentwicklung', keywords: 'projekt unterstützen spenden paypal buy me coffee freiwillig' };
     if (/problem melden|fehler melden|bug/.test(normalized)) return { group: 'System & Hilfe', hint: 'Fehlerbericht mit Beschreibung und technischen Basisdaten erstellen', keywords: 'problem melden fehler bug mail support diagnose' };
     if (/hilfe|anleitung/.test(normalized)) return { group: 'System & Hilfe', hint: 'Hilfe, Anleitung und Orientierung', keywords: 'hilfe anleitung dokumentation' };
-    if (/menü|navigation|schnellzugriff/.test(normalized)) return { group: 'Navigation', hint: 'Menü, Sichtbarkeit und Schnellzugriff', keywords: 'menü navigation schnellzugriff reihenfolge sichtbar ausblenden' };
-    if (/wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev|licht|par|simulation/.test(normalized)) return { group: 'Entwicklung', hint: 'ESP32, lokale Geräte und geschützte Testbereiche', keywords: 'wave pumpe pumpensteuerung esp32 home assistant dev demo lokal licht par simulation led lampe' };
+    if (/übersicht|dashboard|menü|navigation|schnellzugriff|ansicht & inhalte/.test(normalized)) return { group: 'Darstellung & Navigation', hint: 'Startübersicht, Menü, Sichtbarkeit und Schnellzugriff', keywords: 'übersicht dashboard startseite menü navigation schnellzugriff reihenfolge sichtbar ausblenden tools funktionen' };
+    if (/entwicklung|wave|pumpe|pumpensteuerung|lokale geräte|esp32|home assistant|dev|licht|par|simulation/.test(normalized)) return { group: 'Entwicklung', hint: 'Passwortgeschützte experimentelle Funktionen und technische Demos', keywords: 'entwicklung wave pumpe pumpensteuerung esp32 home assistant dev demo lokal licht par simulation led lampe' };
     if (/app|system|support/.test(normalized)) return { group: 'System & Hilfe', hint: 'Allgemeine App-Funktionen und Support', keywords: 'app system support hilfe' };
-    if (/benachrichtigung/.test(normalized)) return { group: 'Hinweise', hint: 'Warnungen und Erinnerungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
-    if (/behälter|tara|produkte ausblenden|geteilte lager/.test(normalized)) return { group: 'Lager', hint: 'Lageransicht, Behälter und Sichtbarkeit', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte geteilte lager' };
-    if (/eigene produkte|produktlisten|preset|shop-links|produktpreise|preise/.test(normalized)) return { group: 'Produkte', hint: 'Eigene Produkte, Listen, Preise und Links', keywords: 'produkt eigene waren preset produktlisten shop link preis kosten größe dichte stück gramm ml' };
-    if (/design|effekte|aussehen|farbschema/.test(normalized)) return { group: 'Aussehen', hint: 'Farben, Stil und Animationen', keywords: 'design theme farbe badman light girl mint effekt animation disco aussehen' };
+    if (/benachrichtigung/.test(normalized)) return { group: 'System & Hilfe', hint: 'Warnungen, Erinnerungen und Systemmeldungen', keywords: 'benachrichtigung warnung push alarm prognose warnzeitraum' };
+    if (/behälter|tara|produkte ausblenden|geteilte lager|eigene produkte|produktlisten|preset|shop-links|produktpreise|preise/.test(normalized)) return { group: 'Lager & Produkte', hint: 'Produkte, Behälter, Preise, Links und Sichtbarkeit verwalten', keywords: 'lager behälter tara leergewicht ausblenden einblenden sichtbarkeit produkte eigene waren preset produktlisten shop link preis kosten größe dichte stück gramm ml' };
+    if (/design|effekte|aussehen|farbschema/.test(normalized)) return { group: 'Darstellung & Navigation', hint: 'Farben, Stil, Animationen und Bedienung', keywords: 'design theme farbe badman light girl mint effekt animation disco aussehen cursor' };
     if (/reset|löschen/.test(normalized)) return { group: 'Zurücksetzen', hint: 'Daten gezielt löschen', keywords: 'reset löschen statistik protokoll lagerbestand daten' };
     return { group: 'Weitere', hint: 'Weitere Einstellungen', keywords: normalized };
 }
@@ -9219,6 +9217,7 @@ function getSettingsMeta(title) {
 function applySettingsMetadata(card, title) {
     const meta = getSettingsMeta(title);
     card.dataset.settingsGroup = meta.group;
+    card.dataset.settingsKeywords = normalizeSearchText(`${title} ${meta.hint} ${meta.keywords}`);
     const summary = card.querySelector('.settings-accordion-summary');
     if (summary && !summary.querySelector('.settings-summary-copy')) {
         const titleEl = summary.querySelector('h2, h3');
@@ -9236,7 +9235,7 @@ function applySettingsMetadata(card, title) {
 
 function renderSettingsGroupLabels(settings) {
     settings.querySelectorAll('.settings-group-label').forEach(label => label.remove());
-    const groupOrder = ['Datensicherheit', 'System & Hilfe', 'Aussehen', 'Navigation', 'Hinweise', 'Lager', 'Produkte', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
+    const groupOrder = ['Daten & Backup', 'Darstellung & Navigation', 'Lager & Produkte', 'System & Hilfe', 'Entwicklung', 'Zurücksetzen', 'Weitere'];
     const cards = Array.from(settings.querySelectorAll(':scope > .card'));
     cards.sort((a, b) => {
         const aIndex = groupOrder.indexOf(a.dataset.settingsGroup || 'Weitere');
@@ -9256,11 +9255,282 @@ function renderSettingsGroupLabels(settings) {
         label.innerHTML = `<span>${group}</span>`;
         settings.insertBefore(label, card);
     });
+    renderSettingsGroupNavigation(settings);
 }
 
 function normalizeSettingsGroupId(group) {
     return String(group || 'weitere').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 }
+
+let activeSettingsGroup = 'all';
+
+function getSettingsGroups(settings = document.getElementById('einstellungen')) {
+    if (!settings) return [];
+    return Array.from(new Set(Array.from(settings.querySelectorAll(':scope > .card'))
+        .map(card => card.dataset.settingsGroup || 'Weitere')));
+}
+
+function renderSettingsGroupNavigation(settings = document.getElementById('einstellungen')) {
+    const nav = document.getElementById('settingsGroupNav');
+    if (!settings || !nav) return;
+    const groups = getSettingsGroups(settings);
+    if (activeSettingsGroup !== 'all' && !groups.includes(activeSettingsGroup)) activeSettingsGroup = 'all';
+    nav.innerHTML = ['all', ...groups].map(group => {
+        const label = group === 'all' ? 'Alle' : group;
+        const active = group === activeSettingsGroup;
+        return `<button type="button" class="${active ? 'active' : ''}" data-settings-group="${escapeHtml(group)}" aria-pressed="${active}" onclick="setSettingsGroupFilter('${escapeHtml(group)}')">${escapeHtml(label)}</button>`;
+    }).join('');
+}
+
+function setSettingsGroupFilter(group = 'all') {
+    activeSettingsGroup = group || 'all';
+    renderSettingsGroupNavigation();
+    filterSettingsView();
+}
+
+function filterSettingsView(query = null) {
+    const settings = document.getElementById('einstellungen');
+    if (!settings) return;
+    const input = document.getElementById('settingsSearchInput');
+    const rawQuery = query === null ? (input?.value || '') : String(query || '');
+    const normalized = normalizeSearchText(rawQuery);
+    let matches = 0;
+
+    settings.querySelectorAll(':scope > .card').forEach(card => {
+        const group = card.dataset.settingsGroup || 'Weitere';
+        const groupMatches = activeSettingsGroup === 'all' || group === activeSettingsGroup;
+        const searchable = `${card.dataset.settingsKeywords || ''} ${normalizeSearchText(card.textContent || '')}`;
+        const queryMatches = !normalized || smartSearchMatches(normalized, searchable);
+        const visible = groupMatches && queryMatches;
+        card.hidden = !visible;
+        if (visible) matches += 1;
+    });
+
+    settings.querySelectorAll(':scope > .settings-group-label').forEach(label => {
+        const group = label.dataset.settingsGroupLabel || '';
+        const hasVisibleCard = Array.from(settings.querySelectorAll(':scope > .card'))
+            .some(card => !card.hidden && (card.dataset.settingsGroup || 'Weitere') === group);
+        label.hidden = !hasVisibleCard || activeSettingsGroup !== 'all';
+    });
+
+    const clearButton = document.getElementById('settingsSearchClear');
+    if (clearButton) clearButton.hidden = !normalized;
+    const status = document.getElementById('settingsSearchStatus');
+    if (status) {
+        if (normalized) status.textContent = matches ? `${matches} passende ${matches === 1 ? 'Einstellung' : 'Einstellungen'}` : 'Keine passende Einstellung gefunden.';
+        else if (activeSettingsGroup !== 'all') status.textContent = `${matches} ${matches === 1 ? 'Einstellung' : 'Einstellungen'} in ${activeSettingsGroup}`;
+        else status.textContent = '';
+    }
+}
+
+function clearSettingsSearch() {
+    const input = document.getElementById('settingsSearchInput');
+    if (input) input.value = '';
+    filterSettingsView('');
+    input?.focus();
+}
+
+Object.assign(window, {
+    setSettingsGroupFilter,
+    filterSettingsView,
+    clearSettingsSearch
+});
+
+const APP_SEARCH_PAGES = [
+    { id: 'uebersicht', label: 'Übersicht', description: 'Startseite, Status, Diagramme und wichtige Hinweise', keywords: 'dashboard start status kritisch diagramm korallen' },
+    { id: 'lager', label: 'Lager', description: 'Bestände, Produkte, Kategorien und Warnungen verwalten', keywords: 'bestand produkt menge einlagern auslagern warnung' },
+    { id: 'cr-export', label: 'C&R', description: 'C&R Daten übernehmen, prüfen, auslagern und Rezepte dokumentieren', keywords: 'custom repair rezept auslagerung mischung pdf' },
+    { id: 'trace-export', label: 'Trace', description: 'ICP-Werte, Anionen, Kationen, Mischungen und Historie', keywords: 'spurenelemente icp anionen kationen historie rezept startlösung' },
+    { id: 'tools', label: 'Tools', description: 'Rechner für Wasserwerte, Dosierung, Salinität und Rezepte', keywords: 'rechner berechnen wasserwerte dosierung salz' },
+    { id: 'logbuch', label: 'Logbuch', description: 'Messwerte, ToDos, Wartung und Aquariumdokumentation', keywords: 'messen messung todo erinnerung wartung dokumentieren' },
+    { id: 'icp', label: 'ICP', description: 'Laboranalysen importieren, speichern und als Verlauf anzeigen', keywords: 'labor osci messwerte analyse graph trend import' },
+    { id: 'statistik', label: 'Statistik', description: 'Verbrauch, Bestandsbewegungen und Entwicklungen auswerten', keywords: 'auswertung verlauf verbrauch daten' },
+    { id: 'log', label: 'Protokoll', description: 'Änderungen, Auslagerungen und Vorgänge nachvollziehen', keywords: 'historie vorgang änderung ereignis' },
+    { id: 'korallen', label: 'Korallen', description: 'Korallenbestand, Platzierung, Verträglichkeit und Kaufpreise', keywords: 'koralle katalog standort licht strömung kompatibilität preis' },
+    { id: 'masseneingang', label: 'Wareneingang', description: 'Mehrere Produkte schnell einlagern', keywords: 'lieferung einkauf zugang bestand erhöhen' },
+    { id: 'nachbestellen', label: 'Nachbestellen', description: 'Fehlende Produkte prüfen und Bestellungen vorbereiten', keywords: 'einkauf shop link warenkorb bestellen knapp' },
+    { id: 'einstellungen', label: 'Einstellungen', description: 'Darstellung, Daten, Produkte und App-Verhalten konfigurieren', keywords: 'konfiguration option backup design navigation' }
+];
+
+let globalSearchLastFocus = null;
+
+function getGlobalSearchIndex() {
+    const entries = APP_SEARCH_PAGES
+        .filter(page => !isUserMenuTabHidden(page.id))
+        .map(page => ({ ...page, kind: 'page', context: 'Bereich' }));
+
+    TOOL_DEFINITIONS.forEach(tool => {
+        if (isToolHidden(tool.id)) return;
+        if (tool.osciOnly && !isOsciFeaturesEnabled()) return;
+        const section = TOOL_SECTION_DEFINITIONS.find(item => item.id === tool.sectionId);
+        entries.push({
+            id: tool.id,
+            kind: 'tool',
+            label: tool.label,
+            description: section?.hint || 'ReefTools Rechner öffnen',
+            keywords: TOOL_SEARCH_KEYWORDS[tool.id] || '',
+            context: `Tool · ${section?.label || 'Rechner'}`
+        });
+    });
+
+    const settings = document.getElementById('einstellungen');
+    settings?.querySelectorAll(':scope > .card').forEach((card, cardIndex) => {
+        const title = card.querySelector('.settings-summary-copy h2, .settings-summary-copy h3, :scope > h2, :scope > h3, :scope > details > summary h3');
+        if (!title) return;
+        const id = `settings-card-${cardIndex}`;
+        card.dataset.settingsSearchId = id;
+        const meta = getSettingsMeta(title.textContent || '');
+        entries.push({
+            id,
+            kind: 'setting',
+            label: title.textContent.trim(),
+            description: meta.hint,
+            keywords: `${meta.keywords} ${card.dataset.settingsKeywords || ''}`,
+            context: `Einstellung · ${card.dataset.settingsGroup || meta.group}`
+        });
+
+        card.querySelectorAll('.data-safety-section, details.custom-color-settings, :scope > details:not(.settings-accordion)').forEach((details, detailIndex) => {
+            const detailTitle = details.querySelector(':scope > summary strong, :scope > summary h3, :scope > summary span');
+            if (!detailTitle) return;
+            const detailId = `${id}-detail-${detailIndex}`;
+            details.dataset.settingsSearchId = detailId;
+            entries.push({
+                id: detailId,
+                kind: 'setting',
+                label: detailTitle.textContent.trim(),
+                description: details.querySelector(':scope > summary small')?.textContent?.trim() || meta.hint,
+                keywords: `${meta.keywords} ${normalizeSearchText(details.textContent || '')}`,
+                context: `Einstellung · ${card.dataset.settingsGroup || meta.group}`
+            });
+        });
+    });
+    return entries;
+}
+
+function scoreGlobalSearchEntry(entry, query) {
+    const normalized = normalizeSearchText(query);
+    if (!normalized) {
+        const featured = ['lager', 'logbuch', 'icp', 'tools', 'einstellungen'];
+        const index = featured.indexOf(entry.id);
+        return index >= 0 ? 100 - index : (entry.kind === 'tool' ? 25 : 0);
+    }
+    const label = normalizeSearchText(entry.label);
+    const description = normalizeSearchText(entry.description);
+    const searchable = `${label} ${description} ${normalizeSearchText(entry.keywords)} ${normalizeSearchText(entry.context)}`;
+    if (!smartSearchMatches(normalized, searchable)) return -1;
+    let score = 20;
+    if (label === normalized) score += 120;
+    else if (label.startsWith(normalized)) score += 90;
+    else if (label.includes(normalized)) score += 65;
+    if (description.includes(normalized)) score += 25;
+    score += getSearchWords(normalized).filter(word => searchable.includes(word)).length * 8;
+    return score;
+}
+
+function renderGlobalSearchResults(query = '') {
+    const container = document.getElementById('globalSearchResults');
+    const status = document.getElementById('globalSearchStatus');
+    if (!container) return;
+    const results = getGlobalSearchIndex()
+        .map(entry => ({ ...entry, score: scoreGlobalSearchEntry(entry, query) }))
+        .filter(entry => entry.score > 0)
+        .sort((a, b) => b.score - a.score || a.label.localeCompare(b.label, 'de'))
+        .slice(0, 14);
+
+    if (!results.length) {
+        container.innerHTML = `<div class="global-search-empty"><strong>Nichts Passendes gefunden</strong><span>Versuche einen anderen Begriff, zum Beispiel „Backup“, „ICP“ oder „Salzgehalt“.</span></div>`;
+        if (status) status.textContent = 'Keine Treffer';
+        return;
+    }
+
+    container.innerHTML = results.map(entry => `
+        <button type="button" class="global-search-result" data-search-kind="${escapeHtml(entry.kind)}" data-search-id="${escapeHtml(entry.id)}">
+            <span class="global-search-result-type">${escapeHtml(entry.context)}</span>
+            <strong>${escapeHtml(entry.label)}</strong>
+            <small>${escapeHtml(entry.description)}</small>
+            <span class="global-search-result-arrow" aria-hidden="true">›</span>
+        </button>
+    `).join('');
+    container.querySelectorAll('.global-search-result').forEach(button => {
+        button.addEventListener('click', () => activateGlobalSearchResult(button.dataset.searchKind, button.dataset.searchId));
+    });
+    if (status) status.textContent = normalizeSearchText(query) ? `${results.length} Treffer` : 'Häufig verwendete Bereiche und Tools';
+}
+
+function openGlobalSearch() {
+    const dialog = document.getElementById('globalSearchDialog');
+    const input = document.getElementById('globalSearchInput');
+    if (!dialog) return;
+    globalSearchLastFocus = document.activeElement;
+    dialog.hidden = false;
+    dialog.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('global-search-open');
+    acquireBodyScrollLock('global-search');
+    if (input) input.value = '';
+    renderGlobalSearchResults('');
+    requestAnimationFrame(() => input?.focus());
+}
+
+function closeGlobalSearch() {
+    const dialog = document.getElementById('globalSearchDialog');
+    if (!dialog || dialog.hidden) return;
+    dialog.hidden = true;
+    dialog.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('global-search-open');
+    releaseBodyScrollLock('global-search');
+    if (globalSearchLastFocus?.focus) globalSearchLastFocus.focus({ preventScroll: true });
+    globalSearchLastFocus = null;
+}
+
+function activateGlobalSearchResult(kind, id) {
+    closeGlobalSearch();
+    if (kind === 'page') {
+        selectTab(id);
+        return;
+    }
+    if (kind === 'tool') {
+        selectTab('tools');
+        window.setTimeout(() => openToolById(id, { updateHash: true, highlight: true }), 120);
+        return;
+    }
+    if (kind === 'setting') {
+        selectTab('einstellungen');
+        window.setTimeout(() => {
+            activeSettingsGroup = 'all';
+            const input = document.getElementById('settingsSearchInput');
+            if (input) input.value = '';
+            renderSettingsGroupNavigation();
+            filterSettingsView('');
+            const target = Array.from(document.querySelectorAll('[data-settings-search-id]'))
+                .find(element => element.dataset.settingsSearchId === id);
+            if (!target) return;
+            const card = target.matches('.card') ? target : target.closest('.card');
+            openSettingsCard(card, { fallbackGroup: card?.dataset.settingsGroup || '' });
+            if (target.matches('details')) target.open = true;
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('settings-search-highlight');
+            window.setTimeout(() => target.classList.remove('settings-search-highlight'), 1800);
+        }, 160);
+    }
+}
+
+function initGlobalSearch() {
+    document.addEventListener('keydown', event => {
+        if ((event.ctrlKey || event.metaKey) && (event.key.toLowerCase() === 'k' || event.key.toLowerCase() === 'f')) {
+            event.preventDefault();
+            openGlobalSearch();
+            return;
+        }
+        if (event.key === 'Escape' && !document.getElementById('globalSearchDialog')?.hidden) closeGlobalSearch();
+    });
+}
+
+Object.assign(window, {
+    openGlobalSearch,
+    closeGlobalSearch,
+    renderGlobalSearchResults,
+    activateGlobalSearchResult
+});
 
 // --- DESIGN / THEME STEUERUNG ---
 const CUSTOM_THEME_COLORS_KEY = 'reeftools_custom_theme_colors_v1';
@@ -9545,7 +9815,78 @@ let localDeviceSettingsUnlocked = false;
 let activeLocalDeviceId = '';
 let wavePumpDemoUnlocked = false;
 let lightingPlannerUnlocked = false;
+let developmentSettingsUnlocked = false;
 const lightingDragState = { activeIndex: null };
+
+function renderDevelopmentSettingsGate() {
+    const gate = document.getElementById('developmentSettingsGate');
+    const content = document.getElementById('developmentSettingsContent');
+    if (!gate || !content) return;
+
+    if (!developmentSettingsUnlocked) {
+        content.hidden = true;
+        content.querySelectorAll('details').forEach(details => { details.open = false; });
+        gate.innerHTML = `
+            <div class="dev-lock-card development-master-lock">
+                <strong>Entwicklungsbereich gesperrt</strong>
+                <p class="hint">Die experimentellen Untermenüs werden erst nach Eingabe des DEV-Passworts sichtbar.</p>
+                <div class="local-device-unlock-row">
+                    <input type="password" id="developmentSettingsPassword" placeholder="Passwort" autocomplete="off" aria-label="Passwort für den Entwicklungsbereich" onkeydown="if(event.key==='Enter') unlockDevelopmentSettings()">
+                    <button type="button" class="btn-secondary btn-animated" onclick="unlockDevelopmentSettings()">Entsperren</button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    gate.innerHTML = `
+        <div class="development-unlocked-bar">
+            <span><strong>Entwicklungsbereich entsperrt</strong><small>Untermenüs werden erst beim Öffnen geladen.</small></span>
+            <button type="button" class="btn-secondary" onclick="lockDevelopmentSettings()">Sperren</button>
+        </div>
+    `;
+    content.hidden = false;
+}
+
+function unlockDevelopmentSettings() {
+    const input = document.getElementById('developmentSettingsPassword');
+    if ((input?.value || '').trim() !== 'DEV') {
+        showToast('Falsches DEV-Passwort', 'warning');
+        input?.focus();
+        return;
+    }
+    developmentSettingsUnlocked = true;
+    localDeviceSettingsUnlocked = true;
+    wavePumpDemoUnlocked = true;
+    lightingPlannerUnlocked = true;
+    renderDevelopmentSettingsGate();
+    showToast('Entwicklungsbereich entsperrt', 'success');
+}
+
+function lockDevelopmentSettings() {
+    developmentSettingsUnlocked = false;
+    localDeviceSettingsUnlocked = false;
+    wavePumpDemoUnlocked = false;
+    lightingPlannerUnlocked = false;
+    ['localDeviceSettings', 'wavePumpDemoSettings', 'lightingPlannerSettings'].forEach(id => {
+        const container = document.getElementById(id);
+        if (container) container.innerHTML = '';
+    });
+    renderDevelopmentSettingsGate();
+}
+
+function renderDevelopmentSubsection(section) {
+    if (!developmentSettingsUnlocked) return;
+    if (section === 'devices') renderLocalDeviceSettings();
+    if (section === 'wave') renderWavePumpDemoSettings();
+    if (section === 'lighting') renderLightingPlannerSettings();
+}
+
+Object.assign(window, {
+    renderDevelopmentSubsection,
+    unlockDevelopmentSettings,
+    lockDevelopmentSettings
+});
 
 function createDefaultLightingPlanner() {
     return {
@@ -27837,15 +28178,6 @@ document.addEventListener('keydown', (e) => {
         exportData();
         showToast('Backup gespeichert', 'success');
     }
-    // Ctrl/Cmd + F = Focus Search
-    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        selectTab('lager');
-        setTimeout(() => {
-            const searchInput = document.querySelector('.search-input');
-            if (searchInput) searchInput.focus();
-        }, 200);
-    }
     // Ctrl + Z = Undo
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
         // Only if not in an input
@@ -27903,6 +28235,7 @@ async function bootstrapApplication() {
     runPostBootstrapDomSetup();
     initCustomCursor();
     initTextFitGuard();
+    initGlobalSearch();
     initLiveUpdateChecks();
     initPwaInstallPrompt();
     renderGoogleDriveHeaderStatus();
