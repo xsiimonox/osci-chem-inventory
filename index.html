@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.220-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.4.230-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.220</span>
+                    <span class="version-badge">v3.4.232</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -812,18 +812,6 @@
                                     <input type="number" id="faunaTraceKhLiters" min="0.1" step="0.1" value="5">
                                 </div>
                                 <div class="input-group">
-                                    <label for="faunaTrace1Last">Letzte Trace 1-Zugabe (ml)</label>
-                                    <input type="number" id="faunaTrace1Last" min="0" step="0.1" value="25">
-                                </div>
-                                <div class="input-group">
-                                    <label for="faunaTrace2Last">Letzte Trace 2-Zugabe (ml)</label>
-                                    <input type="number" id="faunaTrace2Last" min="0" step="0.1" value="25">
-                                </div>
-                                <div class="input-group">
-                                    <label for="faunaTrace3Last">Letzte Trace 3-Zugabe (ml)</label>
-                                    <input type="number" id="faunaTrace3Last" min="0" step="0.1" value="25">
-                                </div>
-                                <div class="input-group">
                                     <label for="faunaTraceIcpSelect">Gespeicherte ICP verwenden</label>
                                     <select id="faunaTraceIcpSelect" onchange="applyFaunaTraceIcp(this.value)">
                                         <option value="">Keine ICP ausgewählt</option>
@@ -831,14 +819,38 @@
                                 </div>
                             </div>
                             <div class="fauna-trace-subsection">
-                                <h4>Gemessene und gewünschte Werte</h4>
-                                <div class="tool-grid calculator-input-grid fauna-trace-input-grid">
-                                    <div class="input-group"><label for="faunaTraceSrMeasured">Strontium gemessen (mg/l)</label><input type="number" id="faunaTraceSrMeasured" min="0" step="0.01" value="8.2"></div>
-                                    <div class="input-group"><label for="faunaTraceSrTarget">Strontium Ziel (mg/l)</label><input type="number" id="faunaTraceSrTarget" min="0" step="0.01" value="8.2"></div>
-                                    <div class="input-group"><label for="faunaTraceMoMeasured">Molybdän gemessen (µg/l)</label><input type="number" id="faunaTraceMoMeasured" min="0" step="0.1" value="14"></div>
-                                    <div class="input-group"><label for="faunaTraceMoTarget">Molybdän Ziel (µg/l)</label><input type="number" id="faunaTraceMoTarget" min="0" step="0.1" value="14"></div>
-                                    <div class="input-group"><label for="faunaTraceIMeasured">Jod gemessen (mg/l)</label><input type="number" id="faunaTraceIMeasured" min="0" step="0.0001" value="0.06"></div>
-                                    <div class="input-group"><label for="faunaTraceITarget">Jod Ziel (mg/l)</label><input type="number" id="faunaTraceITarget" min="0" step="0.0001" value="0.06"></div>
+                                <h4>Spuren getrennt berechnen</h4>
+                                <div class="fauna-trace-panels">
+                                    <section class="fauna-trace-panel" aria-labelledby="faunaTrace1Title">
+                                        <h5 id="faunaTrace1Title">Trace 1 · Strontium · Kanister Ca</h5>
+                                        <div class="fauna-trace-panel-grid">
+                                            <div class="input-group"><label for="faunaTrace1Last">Letzte Zugabe (ml)</label><input type="number" id="faunaTrace1Last" min="0" step="0.1" value="25"></div>
+                                            <div class="input-group"><label for="faunaTraceSrMeasured">Gemessen (mg/l)</label><input type="number" id="faunaTraceSrMeasured" min="0" step="0.01" value="8.2"></div>
+                                            <div class="input-group"><label for="faunaTraceSrTarget">Zielwert (mg/l)</label><input type="number" id="faunaTraceSrTarget" min="0" step="0.01" value="8.2"></div>
+                                        </div>
+                                        <button type="button" class="btn-primary btn-animated" onclick="calculateFaunaTraceCalculator('trace1')">Trace 1 berechnen</button>
+                                        <div id="faunaTraceResult1" class="tool-result fauna-trace-panel-result" aria-live="polite"></div>
+                                    </section>
+                                    <section class="fauna-trace-panel" aria-labelledby="faunaTrace2Title">
+                                        <h5 id="faunaTrace2Title">Trace 2 · Molybdän · Kanister Ca</h5>
+                                        <div class="fauna-trace-panel-grid">
+                                            <div class="input-group"><label for="faunaTrace2Last">Letzte Zugabe (ml)</label><input type="number" id="faunaTrace2Last" min="0" step="0.1" value="25"></div>
+                                            <div class="input-group"><label for="faunaTraceMoMeasured">Gemessen (µg/l)</label><input type="number" id="faunaTraceMoMeasured" min="0" step="0.1" value="14"></div>
+                                            <div class="input-group"><label for="faunaTraceMoTarget">Zielwert (µg/l)</label><input type="number" id="faunaTraceMoTarget" min="0" step="0.1" value="14"></div>
+                                        </div>
+                                        <button type="button" class="btn-primary btn-animated" onclick="calculateFaunaTraceCalculator('trace2')">Trace 2 berechnen</button>
+                                        <div id="faunaTraceResult2" class="tool-result fauna-trace-panel-result" aria-live="polite"></div>
+                                    </section>
+                                    <section class="fauna-trace-panel" aria-labelledby="faunaTrace3Title">
+                                        <h5 id="faunaTrace3Title">Trace 3 · Jod · Kanister KH</h5>
+                                        <div class="fauna-trace-panel-grid">
+                                            <div class="input-group"><label for="faunaTrace3Last">Letzte Zugabe (ml)</label><input type="number" id="faunaTrace3Last" min="0" step="0.1" value="25"></div>
+                                            <div class="input-group"><label for="faunaTraceIMeasured">Gemessen (mg/l)</label><input type="number" id="faunaTraceIMeasured" min="0" step="0.0001" value="0.06"></div>
+                                            <div class="input-group"><label for="faunaTraceITarget">Zielwert (mg/l)</label><input type="number" id="faunaTraceITarget" min="0" step="0.0001" value="0.06"></div>
+                                        </div>
+                                        <button type="button" class="btn-primary btn-animated" onclick="calculateFaunaTraceCalculator('trace3')">Trace 3 berechnen</button>
+                                        <div id="faunaTraceResult3" class="tool-result fauna-trace-panel-result" aria-live="polite"></div>
+                                    </section>
                                 </div>
                             </div>
                             <div class="fauna-trace-subsection">
@@ -850,10 +862,8 @@
                                 </div>
                             </div>
                             <div class="btn-group calculator-actions fauna-trace-actions">
-                                <button type="button" class="btn-primary btn-animated" onclick="calculateFaunaTraceCalculator()">Berechnen</button>
-                                <button type="button" class="btn-secondary btn-animated" onclick="saveFaunaTraceCalculation()">Berechnung dokumentieren</button>
+                                <button type="button" class="btn-secondary btn-animated" onclick="saveFaunaTraceCalculation()">Berechnungen dokumentieren</button>
                             </div>
-                            <div id="faunaTraceResult" class="tool-result" aria-live="polite"></div>
                             <div id="faunaTraceHistory" class="fauna-trace-history"></div>
                         </div>
                     </div>
@@ -2058,9 +2068,19 @@
                     <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
                 <div class="settings-page-actions">
+                    <button type="button" class="btn-primary btn-animated settings-assistant-link" onclick="openSetupAssistant()">Einrichtungsassistent starten</button>
                     <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
                     <button type="button" class="btn-primary btn-animated settings-showcase-link" onclick="openTradeFairShowcase()">Messe-Übersicht</button>
                 </div>
+            </section>
+
+            <section class="card setup-assistant-card" aria-labelledby="setupAssistantTitle">
+                <div>
+                    <span class="section-eyebrow">Freiwilliger Schnellstart</span>
+                    <h3 id="setupAssistantTitle">Einrichtungsassistent</h3>
+                    <p class="hint">Richte Aquariumname und Nettovolumen ein und springe danach direkt zur passenden ersten Aufgabe. Der Assistent startet nur, wenn du ihn ausdrücklich öffnest.</p>
+                </div>
+                <button type="button" class="btn-primary btn-animated" onclick="openSetupAssistant()">Assistent öffnen</button>
             </section>
 
             <section class="settings-control-center" aria-label="Einstellungen durchsuchen und filtern">
@@ -2664,8 +2684,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.220-release"></script>
-    <script src="assets/js/app.js?v=3.4.220-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.4.230-release"></script>
+    <script src="assets/js/app.js?v=3.4.230-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

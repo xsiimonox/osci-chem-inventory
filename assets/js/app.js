@@ -668,6 +668,7 @@ const CORAL_PLACEMENT_PROFILES = [
     }
 ];
 const AQUARIUM_FIELD_KEYS = [
+    'volumeLiters',
     'implementationLog',
     'logBookCategories',
     'logBookEntries',
@@ -684,6 +685,8 @@ const AQUARIUM_FIELD_KEYS = [
     'traceDraft',
     'reefManagerTraceImport',
     'traceCalculator',
+    'doseImpactSettings',
+    'customCrPlanner',
     'testCorrections',
     'majorCorrectionSettings',
     'psuCorrectionOffset',
@@ -2590,7 +2593,13 @@ async function requestGoogleDriveAccessToken(interactive = true) {
             if (!interactive) googleDriveMonitorState.silentAuthPausedUntil = Date.now() + (5 * 60 * 1000);
             reject(new Error(error?.message || 'Google OAuth abgebrochen.'));
         };
-        client.requestAccessToken({ prompt: interactive ? 'consent' : 'none' });
+        const syncSettings = getGoogleDriveSyncSettings();
+        // Do not force the consent screen on every manual reconnect. Google
+        // can reuse the existing grant and the remembered account instead.
+        client.requestAccessToken({
+            prompt: interactive ? '' : 'none',
+            ...(syncSettings.connectedEmail ? { login_hint: syncSettings.connectedEmail } : {})
+        });
     });
 }
 
@@ -4824,8 +4833,19 @@ function createAquariumId() {
     return 'aquarium-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
 }
 
+function getAquariumVolumeFromSource(source = {}) {
+    const candidates = [
+        source.volumeLiters,
+        source.traceCalculator?.config?.tankLiters,
+        source.majorCorrectionSettings?.tankLiters
+    ];
+    const value = candidates.map(item => Number(item)).find(item => Number.isFinite(item) && item > 0);
+    return value || 500;
+}
+
 function createAquariumData(source = {}) {
     return {
+        volumeLiters: getAquariumVolumeFromSource(source),
         implementationLog: cloneSerializable(source.implementationLog || source.dosePlanArchive || []),
         logBookCategories: cloneSerializable(source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges']),
         logBookEntries: cloneSerializable(source.logBookEntries || []),
@@ -4842,6 +4862,8 @@ function createAquariumData(source = {}) {
         traceDraft: cloneSerializable(source.traceDraft || {}),
         reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
         traceCalculator: cloneSerializable(source.traceCalculator || null),
+        doseImpactSettings: cloneSerializable(source.doseImpactSettings || null),
+        customCrPlanner: cloneSerializable(source.customCrPlanner || null),
         testCorrections: cloneSerializable(source.testCorrections || {}),
         majorCorrectionSettings: cloneSerializable(source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } }),
         psuCorrectionOffset: source.psuCorrectionOffset || 0,
@@ -5034,6 +5056,40 @@ function getActiveAquarium() {
     return appState.aquariums[activeAquariumId] || Object.values(appState.aquariums)[0] || null;
 }
 
+function getActiveAquariumVolumeLiters(fallback = 500) {
+    const value = Number(getActiveAquarium()?.data?.volumeLiters);
+    return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function applyAquariumVolumeToCurrentDefaults(volumeLiters, target = db) {
+    const volume = Math.max(1, Number(volumeLiters) || 500);
+    target.volumeLiters = volume;
+    target.traceCalculator = target.traceCalculator && typeof target.traceCalculator === 'object' ? target.traceCalculator : {};
+    target.traceCalculator.config = target.traceCalculator.config && typeof target.traceCalculator.config === 'object' ? target.traceCalculator.config : {};
+    target.traceCalculator.config.tankLiters = volume;
+    target.majorCorrectionSettings = target.majorCorrectionSettings && typeof target.majorCorrectionSettings === 'object' ? target.majorCorrectionSettings : {};
+    target.majorCorrectionSettings.tankLiters = volume;
+    target.doseImpactSettings = target.doseImpactSettings && typeof target.doseImpactSettings === 'object' ? target.doseImpactSettings : {};
+    target.doseImpactSettings.tankLiters = volume;
+    target.customCrPlanner = target.customCrPlanner && typeof target.customCrPlanner === 'object' ? target.customCrPlanner : {};
+    target.customCrPlanner.tankLiters = volume;
+    target.settings = target.settings && typeof target.settings === 'object' ? target.settings : {};
+    target.settings.traceDirectElements = target.settings.traceDirectElements && typeof target.settings.traceDirectElements === 'object'
+        ? target.settings.traceDirectElements
+        : { portions: 3, tankLiters: null, values: {} };
+    target.settings.traceDirectElements.tankLiters = volume;
+    return target;
+}
+
+function syncAquariumVolumeInputs(volumeLiters) {
+    const volume = String(Math.max(1, Number(volumeLiters) || 500));
+    ['traceCalcTankLiters', 'traceStartTankLiters', 'traceDirectTankLiters', 'majorCorrectionLiters', 'doseImpactTankLiters', 'customCrTankLiters']
+        .forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.value = volume;
+        });
+}
+
 function syncActiveAquariumDataFromDb(markDirty = true) {
     const aquarium = getActiveAquarium();
     if (!aquarium) return;
@@ -5062,6 +5118,9 @@ function overlayActiveAquariumData() {
     AQUARIUM_FIELD_KEYS.forEach(key => {
         db[key] = cloneSerializable(aquarium.data[key]);
     });
+    // The selected aquarium is the single source for current-volume defaults.
+    // Historical Trace entries keep their own config and are intentionally untouched.
+    applyAquariumVolumeToCurrentDefaults(getActiveAquariumVolumeLiters(), db);
 }
 
 function normalizeWarehouseData(data) {
@@ -8392,12 +8451,142 @@ function switchAquarium(id) {
     renderCurrentWarehouseViews();
 }
 
-function createAquarium() {
-    const name = prompt('Name für das neue Aquarium:', `Aquarium ${Object.keys(appState.aquariums || {}).length + 1}`);
-    if (!name || !name.trim()) return;
-    const record = createAquariumRecord(name.trim(), db);
+async function createAquarium() {
+    const values = await showAppDialog({
+        kind: 'prompt',
+        title: 'Neues Aquarium',
+        eyebrow: 'Aquarium anlegen',
+        type: 'info',
+        message: 'Lege das effektive Nettovolumen fest. Es wird als Standard in den Rechnern verwendet. Historische Mischungen behalten weiterhin ihr eigenes damaliges Volumen.',
+        confirmText: 'Aquarium anlegen',
+        cancelText: 'Abbrechen',
+        fields: [
+            { name: 'name', label: 'Name', value: `Aquarium ${Object.keys(appState.aquariums || {}).length + 1}`, required: true },
+            { name: 'volumeLiters', label: 'Effektives Nettovolumen', value: String(getActiveAquariumVolumeLiters()), type: 'number', suffix: 'L', required: true, description: 'Wasserinhalt für Dosier- und Korrekturberechnungen, nicht das Außenmaß.' }
+        ]
+    });
+    if (!values) return;
+    const name = String(values.name || '').trim();
+    const volume = Number(values.volumeLiters);
+    if (!name || !Number.isFinite(volume) || volume <= 0) return;
+    const data = createAquariumData(db);
+    applyAquariumVolumeToCurrentDefaults(volume, data);
+    const record = createAquariumRecord(name, data);
     appState.aquariums[record.id] = record;
     switchAquarium(record.id);
+}
+
+async function editAquariumVolume() {
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    const values = await showAppDialog({
+        kind: 'prompt',
+        title: 'Aquariumgröße bearbeiten',
+        eyebrow: 'Aktives Aquarium',
+        type: 'info',
+        message: 'Diese Größe gilt ab jetzt als Standard für neue Berechnungen. Bereits gespeicherte Trace-Mischungen werden nicht verändert: Jede historische Mischung nutzt weiterhin ihr damaliges Volumen.',
+        confirmText: 'Größe übernehmen',
+        cancelText: 'Abbrechen',
+        fields: [{
+            name: 'volumeLiters',
+            label: 'Effektives Nettovolumen',
+            value: String(getActiveAquariumVolumeLiters()),
+            type: 'number',
+            suffix: 'L',
+            required: true,
+            description: 'Der tatsächlich mit Wasser gefüllte Inhalt.'
+        }]
+    });
+    if (!values) return;
+    const volume = Number(typeof values === 'object' ? values.volumeLiters : values);
+    if (!Number.isFinite(volume) || volume <= 0) return;
+    aquarium.data = normalizeAquariumData(aquarium.data);
+    aquarium.data.volumeLiters = volume;
+    applyAquariumVolumeToCurrentDefaults(volume, db);
+    syncActiveAquariumDataFromDb();
+    saveDB();
+    renderCurrentWarehouseViews();
+    syncAquariumVolumeInputs(volume);
+    showToast(`Aquariumgröße auf ${volume} L gesetzt`, 'success');
+}
+
+async function openSetupAssistant() {
+    const active = getActiveAquarium();
+    if (!active) return;
+    const values = await showAppDialog({
+        kind: 'prompt',
+        title: 'Einrichtungsassistent',
+        eyebrow: 'Freiwilliger Schnellstart',
+        type: 'info',
+        message: 'Lege die wichtigsten Grundlagen fest. Danach öffnet ReefTools direkt den Bereich, mit dem du weitermachen möchtest. Der Assistent ändert nur die Angaben, die du hier bestätigst.',
+        confirmText: 'Einrichtung übernehmen',
+        cancelText: 'Abbrechen',
+        fields: [
+            {
+                name: 'mode',
+                label: 'Was soll eingerichtet werden?',
+                value: 'active',
+                options: [
+                    { value: 'active', label: 'Aktives Aquarium aktualisieren' },
+                    { value: 'new', label: 'Neues Aquarium anlegen' }
+                ]
+            },
+            {
+                name: 'name',
+                label: 'Aquariumname',
+                value: active.name || 'Mein Aquarium',
+                required: true
+            },
+            {
+                name: 'volumeLiters',
+                label: 'Effektives Nettovolumen',
+                value: String(getActiveAquariumVolumeLiters()),
+                type: 'number',
+                suffix: 'L',
+                required: true,
+                description: 'Der tatsächliche Wasserinhalt, der für neue Berechnungen verwendet wird.'
+            },
+            {
+                name: 'nextStep',
+                label: 'Danach öffnen',
+                value: 'icp',
+                options: [
+                    { value: 'icp', label: 'ICP importieren oder anlegen' },
+                    { value: 'trace-export', label: 'OSCI Trace berechnen' },
+                    { value: 'tools', label: 'Alle Tools ansehen' },
+                    { value: 'none', label: 'Nur speichern' }
+                ]
+            }
+        ]
+    });
+    if (!values) return;
+    const name = String(values.name || '').trim();
+    const volume = Number(values.volumeLiters);
+    if (!name || !Number.isFinite(volume) || volume <= 0) {
+        await appAlert('Bitte trage einen Namen und ein gültiges Nettovolumen größer als 0 ein.', { title: 'Angaben prüfen', type: 'warning' });
+        return;
+    }
+
+    if (values.mode === 'new') {
+        const data = createAquariumData(db);
+        applyAquariumVolumeToCurrentDefaults(volume, data);
+        const record = createAquariumRecord(name, data);
+        appState.aquariums[record.id] = record;
+        switchAquarium(record.id);
+    } else {
+        active.name = name;
+        active.data = normalizeAquariumData(active.data);
+        active.data.volumeLiters = volume;
+        applyAquariumVolumeToCurrentDefaults(volume, db);
+        syncActiveAquariumDataFromDb();
+        saveDB();
+        renderCurrentWarehouseViews();
+        syncAquariumVolumeInputs(volume);
+    }
+
+    const nextStep = values.nextStep || 'none';
+    if (nextStep !== 'none') selectTab(nextStep);
+    showToast('Einrichtung gespeichert. Du kannst jederzeit wieder zum Assistenten zurückkehren.', 'success', 3600);
 }
 
 function renameAquarium() {
@@ -8502,16 +8691,18 @@ function renderAquariumWorkspacePanels() {
             <div>
                 <span>Aktives Aquarium</span>
                 <strong>${escapeHtml(aquarium?.name || 'Aquarium')}</strong>
+                <small class="aquarium-workspace-volume">${escapeHtml(String(getActiveAquariumVolumeLiters()))} L effektives Nettovolumen</small>
             </div>
             <div class="aquarium-workspace-actions">
                 <button type="button" onclick="createAquarium()">Neu</button>
                 <button type="button" onclick="renameAquarium()">Umbenennen</button>
+                <button type="button" onclick="editAquariumVolume()">Größe ändern</button>
                 <button type="button" onclick="deleteAquarium()">Löschen</button>
             </div>
         </div>
         <div class="aquarium-workspace-select">
             <select id="${selectId}" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln">${options}</select>
-            <small>Tools, Logbuch, ToDos und Messwerte folgen dem Aquarium und nicht dem Lager.</small>
+            <small>Tools, Logbuch, ToDos und Messwerte folgen dem Aquarium. Neue Rechner übernehmen die Aquariumgröße automatisch.</small>
         </div>
     `;
     const toolsPanel = document.getElementById('toolsAquariumPanel');
@@ -9361,6 +9552,15 @@ function getGlobalSearchIndex() {
         .filter(page => !isUserMenuTabHidden(page.id))
         .map(page => ({ ...page, kind: 'page', context: 'Bereich' }));
 
+    entries.push({
+        id: 'setup-assistant',
+        kind: 'assistant',
+        label: 'Einrichtungsassistent',
+        description: 'Aquarium einrichten und direkt zur ersten Aufgabe springen',
+        keywords: 'erststart neues aquarium nettovolumen icp trace schnellstart',
+        context: 'Schnellstart'
+    });
+
     TOOL_DEFINITIONS.forEach(tool => {
         if (isToolHidden(tool.id)) return;
         if (tool.osciOnly && !isOsciFeaturesEnabled()) return;
@@ -9377,6 +9577,7 @@ function getGlobalSearchIndex() {
 
     const settings = document.getElementById('einstellungen');
     settings?.querySelectorAll(':scope > .card').forEach((card, cardIndex) => {
+        if (card.classList.contains('setup-assistant-card')) return;
         const title = card.querySelector('.settings-summary-copy h2, .settings-summary-copy h3, :scope > h2, :scope > h3, :scope > details > summary h3');
         if (!title) return;
         const id = `settings-card-${cardIndex}`;
@@ -9486,6 +9687,10 @@ function closeGlobalSearch() {
 
 function activateGlobalSearchResult(kind, id) {
     closeGlobalSearch();
+    if (kind === 'assistant') {
+        openSetupAssistant();
+        return;
+    }
     if (kind === 'page') {
         selectTab(id);
         return;
@@ -9531,7 +9736,8 @@ Object.assign(window, {
     openGlobalSearch,
     closeGlobalSearch,
     renderGlobalSearchResults,
-    activateGlobalSearchResult
+    activateGlobalSearchResult,
+    openSetupAssistant
 });
 
 // --- DESIGN / THEME STEUERUNG ---
@@ -13414,7 +13620,7 @@ function renderTraceStartSolutionEditor() {
         <div class="trace-start-solution-planning">
             <div class="input-group">
                 <label for="traceStartTankLiters">Aquariumvolumen</label>
-                <div class="trace-input-with-unit"><input type="number" id="traceStartTankLiters" min="1" step="1" value="${escapeHtml(config.tankLiters ?? 500)}" oninput="handleTraceStartPlanningInput()"><span>Liter</span></div>
+                <div class="trace-input-with-unit"><input type="number" id="traceStartTankLiters" min="1" step="1" value="${escapeHtml(config.tankLiters ?? getActiveAquariumVolumeLiters(500))}" oninput="handleTraceStartPlanningInput()"><span>Liter</span></div>
             </div>
             <div class="input-group">
                 <label for="traceStartDays">Laufzeit</label>
@@ -13805,7 +14011,7 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator || typeof db.traceCalculator !== 'object') db.traceCalculator = {};
     if (!db.traceCalculator.config) {
         db.traceCalculator.config = {
-            tankLiters: 500,
+            tankLiters: getActiveAquariumVolumeLiters(500),
             interval: 'monthly',
             stocking: 'normal',
             days: 40,
@@ -13960,10 +14166,19 @@ function normalizeTraceCalculatorHistoryEntry(entry) {
     if (!entry.amounts || typeof entry.amounts !== 'object') entry.amounts = {};
     if (!entry.grams || typeof entry.grams !== 'object') entry.grams = {};
     if (!entry.config || typeof entry.config !== 'object') entry.config = {};
+    const historicalVolume = traceCalcNumber(entry.config.tankLiters, null);
+    entry.config.historicalVolumeKnown = historicalVolume !== null && historicalVolume > 0;
     if (!entry.totals || typeof entry.totals !== 'object') {
         entry.totals = getTraceTotalsFromAmounts(entry.amounts, entry.config);
     }
     return entry;
+}
+
+function getTraceHistoryVolumeLabel(entry) {
+    const volume = traceCalcNumber(entry?.config?.tankLiters, null);
+    return volume !== null && volume > 0
+        ? `${traceCalcFormatValue(volume, 2)} L`
+        : `${traceCalculatorBase.liters} L (nicht angegeben)`;
 }
 
 function getTraceHistorySortTime(entry) {
@@ -14109,7 +14324,7 @@ function getTraceCalculatorConfigFromUi() {
         if (dailyDoseInput) dailyDoseInput.value = String(suggestedDailyDose);
     }
     const config = {
-        tankLiters: readConfigNumber('traceCalcTankLiters', saved.tankLiters || 500, 1),
+        tankLiters: readConfigNumber('traceCalcTankLiters', saved.tankLiters || getActiveAquariumVolumeLiters(500), 1),
         interval: document.getElementById('traceCalcInterval')?.value || saved.interval || 'monthly',
         stocking: document.getElementById('traceCalcStocking')?.value || saved.stocking || 'normal',
         days,
@@ -14232,7 +14447,7 @@ function renderTraceDirectElementCalculator() {
     const state = getTraceDirectElementState();
     const activeIcp = getTraceCalculatorActiveIcp();
     const storedTankLiters = traceCalcNumber(state.tankLiters, null);
-    const tankLiters = Math.max(0, storedTankLiters !== null ? storedTankLiters : traceCalcNumber(document.getElementById('traceCalcTankLiters')?.value, 0));
+    const tankLiters = Math.max(0, storedTankLiters !== null ? storedTankLiters : traceCalcNumber(document.getElementById('traceCalcTankLiters')?.value, getActiveAquariumVolumeLiters(500)));
     container.innerHTML = `
         <div class="trace-direct-elements-explainer">
             <span class="trace-warning-mark" aria-hidden="true">i</span>
@@ -16335,6 +16550,7 @@ function renderTraceCalculatorHistory() {
         return;
     }
     const latestRelevant = basisHistory[basisHistory.length - 1] || null;
+    const latestVolumeMissing = latestRelevant && traceCalcNumber(latestRelevant.config?.tankLiters, null) === null;
     const ignoredCount = history.length - activeHistoryAll.length;
     const withIcpCount = activeHistoryAll.filter(hasTraceCalculatorIcpValues).length;
     const startCount = activeHistoryAll.filter(isTraceStartMixture).length;
@@ -16354,6 +16570,7 @@ function renderTraceCalculatorHistory() {
             </summary>
             <div class="trace-history-content">
                 <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Nutze „Vergangene Mischung hinzufügen“, wenn ein früheres Rezept noch nicht in ReefTools erfasst ist. Eine ICP und eine Trace-Mischung können jeweils nur einmal verbunden werden.</p></div>
+                ${latestVolumeMissing ? '<div class="workflow-message workflow-message--warning"><strong>Historisches Volumen fehlt</strong><span>Der letzte passende Eintrag enthält noch keine Aquariumgröße und wird vorläufig wie das Referenzrezept mit 500 L behandelt. Öffne ihn über „Bearbeiten“ und trage das damalige Volumen nach, damit die Skalierung korrekt ist.</span></div>' : ''}
                 <div class="trace-history-head-actions"><button type="button" class="btn-primary trace-history-add-button" onclick="event.stopPropagation(); addManualTraceHistoryEntry()"><span aria-hidden="true">+</span> Vergangene Mischung hinzufügen</button></div>
                 ${calculationHistory.length ? renderTraceCalculatorHistoryAnalysis(calculationHistory) : analysisHint}
                 ${renderTraceCalculatorHistoryChart(chartHistory)}
@@ -16363,7 +16580,7 @@ function renderTraceCalculatorHistory() {
                         const status = getTraceHistoryEntryStatus(entry);
                         return `
                         <div class="trace-history-row ${!canTraceHistoryEntryAffectCalculation(entry) && !isTraceStartMixture(entry) ? 'trace-history-row-inactive' : ''}">
-                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${traceCalcFormatValue(entry.config?.tankLiters, 2)} L · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small><small class="trace-history-icp-link">${escapeHtml(getTraceHistoryIcpLabel(entry))}</small></span>
+                            <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${escapeHtml(getTraceHistoryVolumeLabel(entry))} · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small><small class="trace-history-icp-link">${escapeHtml(getTraceHistoryIcpLabel(entry))}</small></span>
                             <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</span>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
@@ -16702,7 +16919,7 @@ async function addManualTraceHistoryEntry() {
             label: 'Aquariumvolumen in Litern',
             type: 'number',
             inputMode: 'decimal',
-            value: String(state.config?.tankLiters || 500),
+            value: String(state.config?.tankLiters || getActiveAquariumVolumeLiters(500)),
             required: true
         },
         {
@@ -16770,7 +16987,7 @@ async function addManualTraceHistoryEntry() {
 
     const config = {
         ...state.config,
-        tankLiters: Math.max(1, traceCalcNumber(values.tankLiters, 500)),
+        tankLiters: Math.max(1, traceCalcNumber(values.tankLiters, getActiveAquariumVolumeLiters(500))),
         days: Math.max(1, Math.round(traceCalcNumber(values.days, 40))),
         dailyDoseMl: Math.max(0.01, traceCalcNumber(values.dailyDoseMl, 5))
     };
@@ -17499,16 +17716,26 @@ function renderFaunaTraceDoseResult(label, dose, remaining, unitLabel) {
     return `<div class="fauna-trace-result-row"><strong>${label}</strong><span><b>${dose.addition.toFixed(1)} ml</b> neu zugeben · ${mode} · Zielmenge einer vollständigen Lösung: ${dose.adjustedFullDose.toFixed(1)} ml ${unitLabel}</span></div>`;
 }
 
-function calculateFaunaTraceCalculator() {
-    const result = document.getElementById('faunaTraceResult');
-    if (!result) return null;
+function renderFaunaTracePanelResult(traceKey, label, dose, remaining, unitLabel) {
+    const result = document.getElementById(`faunaTraceResult${traceKey.replace('trace', '')}`);
+    if (!result) return;
+    result.innerHTML = `<div class="fauna-trace-result-card"><strong>Ergebnis ${label}</strong><div class="fauna-trace-result-list">${renderFaunaTraceDoseResult(label, dose, remaining, unitLabel)}</div><small>Bitte Ergebnis prüfen und die Zugabe langsam umsetzen.</small></div>`;
+}
+
+function calculateFaunaTraceCalculator(traceKey = '') {
     const input = getFaunaTraceCalculationInputs();
     const trace1 = calculateFaunaTraceDose(input.trace1Last, input.srMeasured, input.srTarget, input.caRemaining);
     const trace2 = calculateFaunaTraceDose(input.trace2Last, input.moMeasured, input.moTarget, input.caRemaining);
     const trace3 = calculateFaunaTraceDose(input.trace3Last, input.iMeasured, input.iTarget, input.khRemaining);
     const calculation = { ...input, trace1, trace2, trace3, calculatedAt: new Date().toISOString() };
-    result.innerHTML = `<div class="fauna-trace-result-card"><strong>Ergebnis der neuen Mischung</strong><p>Die Werte werden proportional aus Messwert und Zielwert angepasst. Bei Restbestand wird die bereits vorhandene Trace-Menge zuerst angerechnet.</p><div class="fauna-trace-result-list">${renderFaunaTraceDoseResult('Trace 1 · Strontium · Kanister Ca', trace1, input.caRemaining, 'ml')}${renderFaunaTraceDoseResult('Trace 2 · Molybdän · Kanister Ca', trace2, input.caRemaining, 'ml')}${renderFaunaTraceDoseResult('Trace 3 · Jod · Kanister KH', trace3, input.khRemaining, 'ml')}</div><small>Berechnung nach dem öffentlich sichtbaren Eingabemodell des Fauna-Marin-Rechners; nicht offiziell von Fauna Marin freigegeben.</small></div>`;
-    result.dataset.calculation = JSON.stringify(calculation);
+    const results = {
+        trace1: ['Trace 1 · Strontium · Kanister Ca', trace1, input.caRemaining, 'ml'],
+        trace2: ['Trace 2 · Molybdän · Kanister Ca', trace2, input.caRemaining, 'ml'],
+        trace3: ['Trace 3 · Jod · Kanister KH', trace3, input.khRemaining, 'ml']
+    };
+    const keys = traceKey && results[traceKey] ? [traceKey] : Object.keys(results);
+    keys.forEach(key => renderFaunaTracePanelResult(key, ...results[key]));
+    window.faunaTraceLastCalculation = calculation;
     return calculation;
 }
 
@@ -17516,6 +17743,11 @@ function saveFaunaTraceCalculation() {
     const calculation = calculateFaunaTraceCalculator();
     if (!calculation) return;
     if (!Array.isArray(db.faunaTraceHistory)) db.faunaTraceHistory = [];
+    const assignedIcp = db.faunaTraceHistory.find(entry => entry.icpReportId && String(entry.icpReportId) === String(calculation.icpReportId));
+    if (calculation.icpReportId && assignedIcp) {
+        showToast('Diese ICP ist bereits einer Fauna-Trace-Dokumentation zugeordnet.', 'warning', 3200);
+        return;
+    }
     db.faunaTraceHistory.unshift({ id: createWarehouseId(), ...calculation });
     db.faunaTraceHistory = db.faunaTraceHistory.slice(0, 50);
     saveDB();
@@ -17523,11 +17755,95 @@ function saveFaunaTraceCalculation() {
     showToast('Fauna-Marin-Trace-Berechnung dokumentiert', 'success', 2800);
 }
 
+function getFaunaTraceIcpAssignmentOptions(selectedId = '') {
+    const assigned = new Set((Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : [])
+        .filter(entry => entry.icpReportId && String(entry.id) !== String(selectedId))
+        .map(entry => String(entry.icpReportId)));
+    return [
+        { value: '', label: 'Keine ICP zugeordnet' },
+        ...getIcpReportsSorted(true)
+            .filter(report => !assigned.has(String(report.id)) || String(report.id) === String(selectedId))
+            .map(report => ({
+                value: report.id,
+                label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`
+            }))
+    ];
+}
+
+async function editFaunaTraceCalculation(id) {
+    const entry = (Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : []).find(item => String(item.id) === String(id));
+    if (!entry) return;
+    const fields = [
+        { name: 'icpReportId', label: 'Gespeicherte ICP zuordnen', value: entry.icpReportId || '', options: getFaunaTraceIcpAssignmentOptions(entry.id) },
+        { name: 'caLiters', label: 'Kanister Ca (Liter)', type: 'number', value: String(entry.caLiters ?? 5), required: true },
+        { name: 'khLiters', label: 'Kanister KH (Liter)', type: 'number', value: String(entry.khLiters ?? 5), required: true },
+        { name: 'trace1Last', label: 'Trace 1 letzte Zugabe (ml)', type: 'number', value: String(entry.trace1Last ?? 25), required: true },
+        { name: 'srMeasured', label: 'Trace 1 Strontium gemessen (mg/l)', type: 'number', value: String(entry.srMeasured ?? 0), required: true },
+        { name: 'srTarget', label: 'Trace 1 Strontium Zielwert (mg/l)', type: 'number', value: String(entry.srTarget ?? 0), required: true },
+        { name: 'trace2Last', label: 'Trace 2 letzte Zugabe (ml)', type: 'number', value: String(entry.trace2Last ?? 25), required: true },
+        { name: 'moMeasured', label: 'Trace 2 Molybdän gemessen (µg/l)', type: 'number', value: String(entry.moMeasured ?? 0), required: true },
+        { name: 'moTarget', label: 'Trace 2 Molybdän Zielwert (µg/l)', type: 'number', value: String(entry.moTarget ?? 0), required: true },
+        { name: 'trace3Last', label: 'Trace 3 letzte Zugabe (ml)', type: 'number', value: String(entry.trace3Last ?? 25), required: true },
+        { name: 'iMeasured', label: 'Trace 3 Jod gemessen (mg/l)', type: 'number', value: String(entry.iMeasured ?? 0), required: true },
+        { name: 'iTarget', label: 'Trace 3 Jod Zielwert (mg/l)', type: 'number', value: String(entry.iTarget ?? 0), required: true },
+        { name: 'caRemainingUnit', label: 'Einheit Rest Ca-Kanister', value: entry.caRemainingUnit || 'percent', options: [{ value: 'percent', label: '%' }, { value: 'ml', label: 'ml' }] },
+        { name: 'caRemaining', label: 'Rest Ca-Kanister', type: 'number', value: String(entry.caRemainingRaw ?? entry.caRemaining ?? 0), required: true },
+        { name: 'khRemainingUnit', label: 'Einheit Rest KH-Kanister', value: entry.khRemainingUnit || 'percent', options: [{ value: 'percent', label: '%' }, { value: 'ml', label: 'ml' }] },
+        { name: 'khRemaining', label: 'Rest KH-Kanister', type: 'number', value: String(entry.khRemainingRaw ?? entry.khRemaining ?? 0), required: true }
+    ];
+    const values = await showAppDialog({
+        kind: 'prompt', type: 'info', title: 'Fauna-Trace-Dokumentation bearbeiten', eyebrow: 'Fauna Marin Trace',
+        message: 'Ändere die dokumentierten Eingaben oder ordne die Berechnung einer ICP zu.', wide: true,
+        confirmText: 'Änderungen speichern', cancelText: 'Abbrechen', fields
+    });
+    if (!values) return;
+    const assignedIcp = String(values.icpReportId || '').trim();
+    if (assignedIcp && (Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : []).some(item => String(item.id) !== String(id) && String(item.icpReportId || '') === assignedIcp)) {
+        await appAlert('Diese ICP ist bereits einer anderen Fauna-Trace-Dokumentation zugeordnet.', { title: 'ICP bereits verknüpft', type: 'warning' });
+        return;
+    }
+    const ids = ['caLiters', 'khLiters', 'trace1Last', 'srMeasured', 'srTarget', 'trace2Last', 'moMeasured', 'moTarget', 'trace3Last', 'iMeasured', 'iTarget'];
+    ids.forEach(key => {
+        const inputId = `faunaTrace${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+        const input = document.getElementById(inputId);
+        if (input) input.value = String(values[key] ?? '').replace('.', ',');
+    });
+    const caRemaining = document.getElementById('faunaTraceCaRemaining');
+    const khRemaining = document.getElementById('faunaTraceKhRemaining');
+    const caRemainingUnit = document.getElementById('faunaTraceCaRemainingUnit');
+    const khRemainingUnit = document.getElementById('faunaTraceKhRemainingUnit');
+    if (caRemainingUnit) caRemainingUnit.value = values.caRemainingUnit || 'percent';
+    if (khRemainingUnit) khRemainingUnit.value = values.khRemainingUnit || 'percent';
+    updateFaunaTraceRemainingUnit('ca');
+    updateFaunaTraceRemainingUnit('kh');
+    if (caRemaining) caRemaining.value = String(values.caRemaining ?? 0).replace('.', ',');
+    if (khRemaining) khRemaining.value = String(values.khRemaining ?? 0).replace('.', ',');
+    const select = document.getElementById('faunaTraceIcpSelect');
+    if (select) select.value = assignedIcp;
+    const calculation = calculateFaunaTraceCalculator();
+    const index = db.faunaTraceHistory.findIndex(item => String(item.id) === String(id));
+    if (index >= 0) db.faunaTraceHistory[index] = { ...db.faunaTraceHistory[index], ...calculation, icpReportId: assignedIcp, updatedAt: Date.now() };
+    saveDB();
+    renderFaunaTraceHistory();
+    showToast('Fauna-Trace-Dokumentation aktualisiert', 'success', 2800);
+}
+
+async function deleteFaunaTraceCalculation(id) {
+    const entry = (Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : []).find(item => String(item.id) === String(id));
+    if (!entry) return;
+    const confirmed = await appConfirm(`Fauna-Trace-Dokumentation vom ${formatWarehouseDate(entry.calculatedAt)} wirklich löschen?`, { title: 'Dokumentation löschen', confirmText: 'Löschen', cancelText: 'Abbrechen', type: 'warning' });
+    if (!confirmed) return;
+    db.faunaTraceHistory = db.faunaTraceHistory.filter(item => String(item.id) !== String(id));
+    saveDB();
+    renderFaunaTraceHistory();
+    showToast('Fauna-Trace-Dokumentation gelöscht', 'success', 2400);
+}
+
 function renderFaunaTraceHistory() {
     const container = document.getElementById('faunaTraceHistory');
     if (!container) return;
     const history = Array.isArray(db.faunaTraceHistory) ? db.faunaTraceHistory : [];
-    container.innerHTML = history.length ? `<details><summary>Dokumentierte Fauna-Marin-Berechnungen (${history.length})</summary><div class="fauna-trace-history-list">${history.slice(0, 8).map(entry => `<div class="fauna-trace-history-item"><strong>${escapeHtml(formatWarehouseDate(entry.calculatedAt))}</strong><span>Ca: ${entry.trace1?.addition?.toFixed?.(1) ?? '-'} ml · Ca: ${entry.trace2?.addition?.toFixed?.(1) ?? '-'} ml · KH: ${entry.trace3?.addition?.toFixed?.(1) ?? '-'} ml</span></div>`).join('')}</div></details>` : '';
+    container.innerHTML = history.length ? `<details><summary>Dokumentierte Fauna-Marin-Berechnungen (${history.length})</summary><div class="fauna-trace-history-list">${history.slice(0, 8).map(entry => { const icp = entry.icpReportId ? getIcpReportsSorted(true).find(report => String(report.id) === String(entry.icpReportId)) : null; return `<div class="fauna-trace-history-item"><div><strong>${escapeHtml(formatWarehouseDate(entry.calculatedAt))}</strong><span>Trace 1: ${entry.trace1?.addition?.toFixed?.(1) ?? '-'} ml · Trace 2: ${entry.trace2?.addition?.toFixed?.(1) ?? '-'} ml · Trace 3: ${entry.trace3?.addition?.toFixed?.(1) ?? '-'} ml</span><small>${icp ? `ICP: ${escapeHtml(icp.name || 'Unbenannte ICP')}` : 'Keine ICP zugeordnet'}</small></div><div class="fauna-trace-history-actions"><button type="button" class="btn-secondary" onclick='editFaunaTraceCalculation(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-secondary" onclick='deleteFaunaTraceCalculation(${jsArg(entry.id)})'>Löschen</button></div></div>`; }).join('')}</div></details>` : '';
 }
 
 function initFaunaTraceCalculator() {
@@ -17553,6 +17869,8 @@ function openFaunaTraceCalculator() {
 
 window.calculateFaunaTraceCalculator = calculateFaunaTraceCalculator;
 window.saveFaunaTraceCalculation = saveFaunaTraceCalculation;
+window.editFaunaTraceCalculation = editFaunaTraceCalculation;
+window.deleteFaunaTraceCalculation = deleteFaunaTraceCalculation;
 window.applyFaunaTraceIcp = applyFaunaTraceIcp;
 window.updateFaunaTraceRemainingUnit = updateFaunaTraceRemainingUnit;
 window.openFaunaTraceCalculator = openFaunaTraceCalculator;
@@ -19093,8 +19411,8 @@ function getMajorCorrectionUnit(element) {
 }
 
 function getMajorCorrectionSettings() {
-    if (!db.majorCorrectionSettings) db.majorCorrectionSettings = JSON.parse(JSON.stringify(majorCorrectionDefaultSettings));
-    if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = majorCorrectionDefaultSettings.tankLiters;
+    if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { ...JSON.parse(JSON.stringify(majorCorrectionDefaultSettings)), tankLiters: getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters) };
+    if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters);
     if (!db.majorCorrectionSettings.selectedPresetId) {
         const legacyStrengths = db.majorCorrectionSettings.strengths || {};
         if (legacyStrengths.Ca === 1 && legacyStrengths.KH !== 0.1) db.majorCorrectionSettings.selectedPresetId = 'osci-calcium';
@@ -19260,11 +19578,11 @@ function getDoseImpactUnit(element) {
 
 function getDoseImpactSettings() {
     if (!db.doseImpactSettings) {
-        db.doseImpactSettings = { selectedPresetId: 'osci-kh-tag', tankLiters: 100, dailyMl: 10, customPresets: [] };
+        db.doseImpactSettings = { selectedPresetId: 'osci-kh-tag', tankLiters: getActiveAquariumVolumeLiters(100), dailyMl: 10, customPresets: [] };
     }
     if (!Array.isArray(db.doseImpactSettings.customPresets)) db.doseImpactSettings.customPresets = [];
     if (!db.doseImpactSettings.selectedPresetId) db.doseImpactSettings.selectedPresetId = 'osci-kh-tag';
-    if (!db.doseImpactSettings.tankLiters) db.doseImpactSettings.tankLiters = 100;
+    if (!db.doseImpactSettings.tankLiters) db.doseImpactSettings.tankLiters = getActiveAquariumVolumeLiters(100);
     if (db.doseImpactSettings.dailyMl === undefined) db.doseImpactSettings.dailyMl = 10;
     return db.doseImpactSettings;
 }
@@ -20327,7 +20645,7 @@ function renderNutritionSafetyNotes(element) {
 function getCustomCrPlannerState() {
     if (!db.customCrPlanner) {
         db.customCrPlanner = {
-            tankLiters: customCrExampleState.tankLiters,
+            tankLiters: getActiveAquariumVolumeLiters(customCrExampleState.tankLiters),
             currentPsu: customCrExampleState.currentPsu,
             targetPsu: customCrExampleState.targetPsu,
             current: { ...customCrExampleState.current },
@@ -20345,7 +20663,7 @@ function getCustomCrPlannerState() {
         if (!Number.isFinite(parseFloat(db.customCrPlanner.limits[key].up))) db.customCrPlanner.limits[key].up = value.up;
         if (!Number.isFinite(parseFloat(db.customCrPlanner.limits[key].down))) db.customCrPlanner.limits[key].down = value.down;
     });
-    if (!db.customCrPlanner.tankLiters) db.customCrPlanner.tankLiters = customCrExampleState.tankLiters;
+    if (!db.customCrPlanner.tankLiters) db.customCrPlanner.tankLiters = getActiveAquariumVolumeLiters(customCrExampleState.tankLiters);
     if (!db.customCrPlanner.currentPsu) db.customCrPlanner.currentPsu = customCrExampleState.currentPsu;
     if (!db.customCrPlanner.targetPsu) db.customCrPlanner.targetPsu = customCrProxyReferencePsu;
     return db.customCrPlanner;
