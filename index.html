@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.233</span>
+                    <span class="version-badge">v3.4.232</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -1699,8 +1699,9 @@
                         <input type="text" id="icpReportName" placeholder="wird automatisch erkannt, z. B. ICP August">
                     </div>
                     <div class="input-group">
-                        <label for="icpReportDate">Probe genommen am <span class="label-optional">optional</span></label>
-                        <input type="date" id="icpReportDate">
+                        <label for="icpReportDate">ICP-Messdatum / Probe genommen am <span class="label-optional">optional</span></label>
+                        <input type="date" id="icpReportDate" oninput="this.dataset.userEdited='true'" onchange="this.dataset.userEdited='true'">
+                        <p class="hint">Dieses Datum wird für Verlauf, Duplikatprüfung und Trace-Zuordnung verwendet. Das Speicherdatum bleibt davon getrennt.</p>
                     </div>
                 </div>
                 <div class="input-group">

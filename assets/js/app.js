@@ -13957,7 +13957,7 @@ function clearReefManagerImport() {
     previewReefManagerImport('');
 }
 
-function addReefManagerImportToTraceHistory() {
+async function addReefManagerImportToTraceHistory() {
     const stored = getStoredReefManagerTraceImport();
     if (!stored) {
         alert('Bitte zuerst einen Reef Manager Export importieren.');
@@ -14002,6 +14002,7 @@ function addReefManagerImportToTraceHistory() {
     pruneTraceCalculatorHistory();
     db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
     saveDB();
+    await flushPendingPersistence('reef-manager-trace-import', false);
     renderTraceExportInputs();
     renderTraceCalculator();
     showToast('Reef Manager Import als Archiv gespeichert', 'success');
@@ -14274,7 +14275,7 @@ function getTraceHistoryEntrySummary(entry) {
 function getTraceHistoryIcpLabel(entry) {
     if (!entry?.sourceIcpReportId) return 'keine ICP zugeordnet';
     const report = getIcpReportsSorted(true).find(item => String(item.id) === String(entry.sourceIcpReportId));
-    return report ? `ICP: ${report.name || formatWarehouseDate(report.date || report.createdAt)}` : 'ICP-Zuordnung fehlt';
+    return report ? `ICP: ${report.name || formatWarehouseDate(report.date)}` : 'ICP-Zuordnung fehlt';
 }
 
 function getTraceHistoryEntryStatus(entry) {
@@ -15603,7 +15604,7 @@ function renderTraceStoredIcpPicker() {
                         const value = getTraceIcpValueFromReport(report, element);
                         return value && Number.isFinite(value.value) && value.value >= 0;
                     }).length;
-                    return `<option value="${escapeHtml(report.id)}" ${report.id === selected?.id ? 'selected' : ''}>${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date || report.createdAt))} · ${count}/${traceCalculatorElements.length}</option>`;
+                    return `<option value="${escapeHtml(report.id)}" ${report.id === selected?.id ? 'selected' : ''}>${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date))} · ${count}/${traceCalculatorElements.length}</option>`;
                 }).join('')}
             </select>
             <button type="button" class="btn-secondary" onclick="useStoredIcpForTrace()">Für Trace übernehmen</button>
@@ -16817,7 +16818,7 @@ function getTraceIcpAssignmentOptions(selectedId = '') {
         { value: '', label: 'Keine ICP zugeordnet (nur Archiv)' },
         ...getIcpReportsSorted(true).map(report => ({
             value: report.id,
-            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`,
+            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date)}`,
             disabled: assignedReportIds.has(String(report.id))
         })).filter(option => !option.disabled || option.value === selectedId)
     ].map(option => ({ ...option, selected: option.value === selectedId }));
@@ -16888,6 +16889,7 @@ async function assignIcpReportToTrace(reportId, entryId) {
         nextEntry.updatedAt = Date.now();
     }
     saveDB();
+    await flushPendingPersistence('trace-icp-assignment', false);
     renderIcpReportList();
     renderTraceCalculator();
     showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
@@ -17633,7 +17635,7 @@ function populateFaunaTraceIcpOptions() {
     const select = document.getElementById('faunaTraceIcpSelect');
     if (!select) return;
     const selected = select.value;
-    select.innerHTML = '<option value="">Keine ICP ausgewählt</option>' + getIcpReportsSorted(true).map(report => `<option value="${escapeHtml(report.id)}">${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date || report.createdAt))}</option>`).join('');
+    select.innerHTML = '<option value="">Keine ICP ausgewählt</option>' + getIcpReportsSorted(true).map(report => `<option value="${escapeHtml(report.id)}">${escapeHtml(report.name || 'Unbenannte ICP')} · ${escapeHtml(formatWarehouseDate(report.date))}</option>`).join('');
     select.value = getIcpReportsSorted(true).some(report => String(report.id) === selected) ? selected : '';
 }
 
@@ -17765,7 +17767,7 @@ function getFaunaTraceIcpAssignmentOptions(selectedId = '') {
             .filter(report => !assigned.has(String(report.id)) || String(report.id) === String(selectedId))
             .map(report => ({
                 value: report.id,
-                label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date || report.createdAt)}`
+            label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date)}`
             }))
     ];
 }
@@ -22698,6 +22700,22 @@ const ICP_ELEMENT_SECTION_ORDER = {
 
 function ensureIcpReports() {
     if (!Array.isArray(db.icpReports)) db.icpReports = [];
+    // Ältere Importe haben das technische Importdatum als Messdatum erhalten.
+    // Wenn der Name eindeutig ein historisches deutsches Datum enthält, kann
+    // diese Altlast ohne Nutzer-Rückfrage sicher korrigiert werden.
+    const todayKey = getIcpReportDateKey(new Date().toISOString());
+    let migrated = false;
+    db.icpReports.forEach(report => {
+        if (!report || getIcpReportDateKey(report.date) !== todayKey) return;
+        const match = String(report.name || '').match(/\b(\d{1,2}\.\d{1,2}\.\d{4})\b/);
+        const inferredDate = match ? parseGermanDate(match[1]) : null;
+        if (!inferredDate || getIcpReportDateKey(inferredDate) === todayKey) return;
+        report.date = inferredDate;
+        report.dateMigratedFromName = true;
+        report.updatedAt = new Date().toISOString();
+        migrated = true;
+    });
+    if (migrated && appBootstrapComplete) saveDB(false);
     return db.icpReports;
 }
 
@@ -23080,8 +23098,7 @@ function previewIcpImport() {
     const rows = parseIcpImportText(sourceText);
     const analysis = analyzeIcpImportText(sourceText, rows);
     const dateInput = document.getElementById('icpReportDate');
-    const todayInputValue = new Date().toISOString().slice(0, 10);
-    if (dateInput && analysis.metadata.reportDate && (!dateInput.value || dateInput.value === todayInputValue)) {
+    if (dateInput && analysis.metadata.reportDate && !dateInput.dataset.userEdited) {
         dateInput.value = analysis.metadata.reportDate.slice(0, 10);
     }
     preview.innerHTML = rows.length
@@ -23163,13 +23180,17 @@ function clearIcpImportForm() {
     const text = document.getElementById('icpImportText');
     const preview = document.getElementById('icpImportPreview');
     if (name) name.value = '';
-    if (date) date.value = '';
+    if (date) {
+        date.value = '';
+        delete date.dataset.userEdited;
+    }
     if (text) text.value = '';
     if (preview) preview.innerHTML = '';
 }
 
 function getIcpReportDateKey(dateValue = '') {
-    const parsed = new Date(dateValue || Date.now());
+    if (!dateValue) return '';
+    const parsed = new Date(dateValue);
     return Number.isFinite(parsed.getTime()) ? parsed.toISOString().slice(0, 10) : '';
 }
 
@@ -23180,12 +23201,14 @@ function getIcpDuplicateWarnings(name = '', dateValue = '', excludeReportId = ''
     ensureIcpReports().forEach(report => {
         if (!report || report.id === excludeReportId) return;
         const sameName = normalizedName && normalizeSearchText(report.name || '') === normalizedName;
-        const sameDate = dateKey && getIcpReportDateKey(report.date || report.createdAt) === dateKey;
+        // Das technische Speicherdatum darf niemals als ICP-Messdatum gelten.
+        // Sonst würden alte/importierte ICPs fälschlich am heutigen Tag dupliziert.
+        const sameDate = dateKey && getIcpReportDateKey(report.date) === dateKey;
         if (!sameName && !sameDate) return;
         const parts = [];
         if (sameName) parts.push('gleicher Name');
         if (sameDate) parts.push('gleiches Datum');
-        warnings.push(`${report.name || 'Unbenannte ICP'} (${formatWarehouseDate(report.date || report.createdAt)}) - ${parts.join(' und ')}`);
+        warnings.push(`${report.name || 'Unbenannte ICP'} (Messdatum: ${formatWarehouseDate(report.date)}) - ${parts.join(' und ')}`);
     });
     return warnings;
 }
@@ -23246,6 +23269,7 @@ async function saveIcpReportFromImport() {
     icpUiState.selectedReportId = report.id;
     if (!icpUiState.selectedParameter && values[0]) icpUiState.selectedParameter = values[0].key;
     saveDB();
+    await flushPendingPersistence('icp-import', false);
     clearIcpImportForm();
     renderIcpPage();
     showToast('ICP gespeichert', 'success', 2400);
@@ -23277,6 +23301,7 @@ async function deleteIcpReport(reportId) {
     if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
     if (icpUiState.editingReportId === reportId) icpUiState.editingReportId = null;
     saveDB();
+    await flushPendingPersistence('icp-delete', false);
     renderIcpPage();
 }
 
@@ -23448,6 +23473,7 @@ async function saveEditedIcpReport(reportId) {
     };
     icpUiState.editingReportId = null;
     saveDB();
+    await flushPendingPersistence('icp-edit', false);
     renderIcpPage();
     showToast('ICP aktualisiert', 'success', 2400);
 }
@@ -23567,8 +23593,6 @@ function renderIcpChart(series, unit = '') {
 }
 
 function renderIcpPage() {
-    const dateInput = document.getElementById('icpReportDate');
-    if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
     const reports = getIcpReportsSorted(true);
     const parameterSelect = document.getElementById('icpParameterSelect');
     const rangeSelect = document.getElementById('icpRangeSelect');
@@ -23693,7 +23717,7 @@ function renderIcpPage() {
         return `
             <article class="icp-report-card ${selected ? 'active' : ''}">
                 <button type="button" class="icp-report-main" onclick='selectIcpReport(${jsArg(report.id)})' aria-expanded="${selected ? 'true' : 'false'}">
-                    <span><strong>${escapeHtml(report.name)}</strong><small>${escapeHtml(formatWarehouseDate(report.date))}</small></span>
+                    <span><strong>${escapeHtml(report.name)}</strong><small>Messdatum: ${escapeHtml(formatWarehouseDate(report.date))}</small></span>
                     <span>${numericCount}/${(report.values || []).length} numerisch · ${issueCount} auffällig</span>
                 </button>
                 ${renderIcpTraceAssignment(report)}
