@@ -12820,6 +12820,11 @@ body.theme-badman.party-mode .card {
     background: color-mix(in srgb, var(--status-success) 10%, var(--surface));
 }
 
+.trace-history-status-assigned {
+    border-color: color-mix(in srgb, var(--secondary) 42%, var(--border-color));
+    background: color-mix(in srgb, var(--secondary) 10%, var(--surface));
+}
+
 .trace-history-status-start {
     border-color: color-mix(in srgb, var(--accent) 42%, var(--border-color));
     background: color-mix(in srgb, var(--accent) 10%, var(--surface));
@@ -22059,7 +22064,7 @@ progress.mini-progress::-moz-progress-bar {
 
 .icp-report-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 34%);
     gap: var(--space-3);
     align-items: center;
     padding: var(--space-2);
@@ -22140,6 +22145,17 @@ progress.mini-progress::-moz-progress-bar {
     text-align: left;
     background: transparent;
     border: 0;
+}
+
+.icp-report-main > span {
+    min-width: 0;
+}
+
+.icp-report-main > span:last-child {
+    flex: 0 1 auto;
+    max-width: 48%;
+    text-align: right;
+    overflow-wrap: anywhere;
 }
 
 .icp-report-detail {
@@ -22340,6 +22356,24 @@ progress.mini-progress::-moz-progress-bar {
 
     .icp-compare-card .icp-chart-scroll .measurement-chart {
         min-width: 430px;
+    }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+    .icp-report-card {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "main"
+            "assignment"
+            "actions";
+    }
+
+    .icp-trace-assignment {
+        min-width: 0;
+    }
+
+    .icp-report-main > span:last-child {
+        max-width: 42%;
     }
 }
 

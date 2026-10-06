@@ -1233,8 +1233,10 @@ const APP_STORAGE_MAX_SNAPSHOTS = 5;
 const APP_STORAGE_SENTINEL_KEY = 'reeftools_local_storage_sentinel_v1';
 const APP_STORAGE_EMERGENCY_KEY = 'reeftools_emergency_state_v1';
 const APP_STORAGE_EMERGENCY_LIMIT = 4_000_000;
+const APP_STORAGE_IMMEDIATE_TRACE_KEY = 'reeftools_immediate_trace_state_v1';
 const DEMO_PROFILE_ACTIVE_KEY = 'reeftools_demo_profile_active_v1';
 const DEMO_PROFILE_RETURN_STATE_KEY = 'demo_profile_return_state';
+const TRACE_ICP_ASSIGNMENTS_KEY = 'reeftools_trace_icp_assignments_v1';
 const LEGACY_DB_KEYS = [DB_KEY, 'osci_db_v4', 'osci_db_v3'];
 const GOOGLE_DRIVE_CLIENT_ID = '416154582322-d4rha9hb68jo0j5allgp50e0r48p3efn.apps.googleusercontent.com';
 const GOOGLE_DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
@@ -1594,6 +1596,42 @@ function getEmergencyStateFallback() {
     }
 }
 
+function storeImmediateTraceState() {
+    if (!activeAquariumId || !db || !db.traceCalculator) return;
+    try {
+        localStorage.setItem(APP_STORAGE_IMMEDIATE_TRACE_KEY, JSON.stringify({
+            savedAt: new Date().toISOString(),
+            aquariumId: activeAquariumId,
+            traceCalculator: cloneSerializable(db.traceCalculator),
+            icpReports: cloneSerializable(db.icpReports || [])
+        }));
+    } catch (err) {
+        // Große Projektstände können das lokale Limit überschreiten. Der normale
+        // IndexedDB-Speicher und die gezielte Zuordnungs-Sicherung bleiben aktiv.
+    }
+}
+
+function applyImmediateTraceState(parsed, immediate) {
+    if (!parsed || !immediate?.aquariumId || !immediate.traceCalculator) return parsed;
+    const indexedUpdatedAt = new Date(immediate.indexedSavedAt || parsed.updatedAt || parsed.savedAt || 0).getTime();
+    const immediateUpdatedAt = new Date(immediate.savedAt || 0).getTime();
+    if (Number.isFinite(indexedUpdatedAt) && Number.isFinite(immediateUpdatedAt) && immediateUpdatedAt <= indexedUpdatedAt) return parsed;
+    if (parsed.aquariums?.[immediate.aquariumId]?.data) {
+        parsed.aquariums[immediate.aquariumId].data.traceCalculator = immediate.traceCalculator;
+        parsed.aquariums[immediate.aquariumId].data.icpReports = immediate.icpReports || [];
+    } else if (parsed.aquariums && typeof parsed.aquariums === 'object') {
+        const aquarium = Object.values(parsed.aquariums).find(item => item?.id === immediate.aquariumId) || Object.values(parsed.aquariums)[0];
+        if (aquarium?.data) {
+            aquarium.data.traceCalculator = immediate.traceCalculator;
+            aquarium.data.icpReports = immediate.icpReports || [];
+        }
+    } else {
+        parsed.traceCalculator = immediate.traceCalculator;
+        parsed.icpReports = immediate.icpReports || [];
+    }
+    return parsed;
+}
+
 function hasCloudRestoreHint(settings = getGoogleDriveSyncSettings()) {
     return Boolean(settings.fileId || settings.lastSyncAt || settings.lastRestoreAt || settings.connectedEmail);
 }
@@ -1812,7 +1850,9 @@ async function loadPersistedAppState() {
     const indexedValue = await idbGet(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY);
     if (indexedValue && typeof indexedValue === 'object') {
         latestPersistAt = indexedValue.savedAt || indexedValue.updatedAt || null;
-        return indexedValue.payload || null;
+        let immediate = null;
+        try { immediate = JSON.parse(localStorage.getItem(APP_STORAGE_IMMEDIATE_TRACE_KEY) || 'null'); } catch (err) {}
+        return applyImmediateTraceState(indexedValue.payload || null, { ...immediate, indexedSavedAt: indexedValue.savedAt || indexedValue.updatedAt });
     }
     const emergencyValue = getEmergencyStateFallback();
     if (emergencyValue?.payload) {
@@ -1927,6 +1967,7 @@ async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     latestPersistAt = savedAt;
     clearPersistenceFailure();
     storeStorageSentinel(savedAt, reason);
+    try { localStorage.removeItem(APP_STORAGE_IMMEDIATE_TRACE_KEY); } catch (err) {}
     try { localStorage.removeItem(APP_STORAGE_EMERGENCY_KEY); } catch (err) {}
     await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
         key: APP_STORAGE_META_KEY,
@@ -5276,10 +5317,14 @@ async function initDB() {
 function saveDB(markDirty = true) {
     try {
         if (!appState) appState = migrateToWarehouseState(db);
+        if (db.traceCalculator && typeof db.traceCalculator === 'object') {
+            syncStoredTraceIcpAssignments(db.traceCalculator);
+        }
         syncActiveAquariumDataFromDb(markDirty);
         syncActiveWarehouseDataFromDb(markDirty);
         appState.activeWarehouseId = activeWarehouseId;
         appState.activeAquariumId = activeAquariumId;
+        storeImmediateTraceState();
         updateWarehouseUI();
         queuePersistAppState(markDirty ? 'save' : 'save-passive', false);
         if (!isDemoProfileActive()) {
@@ -14038,6 +14083,79 @@ function recoverPendingTraceIcpAssignment(state) {
     }, 600);
 }
 
+function getStoredTraceIcpAssignments() {
+    try {
+        const stored = JSON.parse(localStorage.getItem(TRACE_ICP_ASSIGNMENTS_KEY) || '{}');
+        return stored && typeof stored === 'object' ? stored : {};
+    } catch (err) {
+        return {};
+    }
+}
+
+function persistTraceIcpAssignmentLocally(reportId, entryId = '') {
+    if (!activeAquariumId || !reportId) return;
+    const assignments = getStoredTraceIcpAssignments();
+    const aquariumAssignments = assignments[activeAquariumId] && typeof assignments[activeAquariumId] === 'object'
+        ? assignments[activeAquariumId]
+        : {};
+    if (entryId) aquariumAssignments[String(reportId)] = String(entryId);
+    else delete aquariumAssignments[String(reportId)];
+    assignments[activeAquariumId] = aquariumAssignments;
+    try {
+        localStorage.setItem(TRACE_ICP_ASSIGNMENTS_KEY, JSON.stringify(assignments));
+    } catch (err) {}
+}
+
+function syncStoredTraceIcpAssignments(state) {
+    if (!activeAquariumId || !state || !Array.isArray(state.history)) return;
+    const assignments = getStoredTraceIcpAssignments();
+    const aquariumAssignments = {};
+    state.history.forEach(entry => {
+        const reportId = String(entry?.sourceIcpReportId || '').trim();
+        if (!reportId || !entry?.id || aquariumAssignments[reportId]) return;
+        if (!(db.icpReports || []).some(report => String(report.id) === reportId)) return;
+        aquariumAssignments[reportId] = String(entry.id);
+    });
+    state.icpAssignments = aquariumAssignments;
+    assignments[activeAquariumId] = aquariumAssignments;
+    try {
+        localStorage.setItem(TRACE_ICP_ASSIGNMENTS_KEY, JSON.stringify(assignments));
+    } catch (err) {}
+}
+
+function recoverStoredTraceIcpAssignments(state) {
+    const localAssignments = getStoredTraceIcpAssignments()[activeAquariumId] || {};
+    const assignments = {
+        ...(localAssignments && typeof localAssignments === 'object' ? localAssignments : {}),
+        ...(state.icpAssignments && typeof state.icpAssignments === 'object' ? state.icpAssignments : {})
+    };
+    if (!assignments || typeof assignments !== 'object') return;
+    state.icpAssignments = assignments;
+    let changed = false;
+    Object.entries(assignments).forEach(([reportId, entryId]) => {
+        const report = (db.icpReports || []).find(item => String(item.id) === String(reportId));
+        const entry = state.history.find(item => String(item.id) === String(entryId));
+        if (!report || !entry) return;
+        state.history.forEach(item => {
+            if (item !== entry && String(item.sourceIcpReportId || '') === String(reportId)) {
+                item.sourceIcpReportId = '';
+                item.icp = {};
+                changed = true;
+            }
+        });
+        if (String(entry.sourceIcpReportId || '') !== String(reportId)) {
+            entry.sourceIcpReportId = String(reportId);
+            entry.icp = getTraceIcpValuesForHistoryEntry(report);
+            entry.updatedAt = Date.now();
+            changed = true;
+        }
+    });
+    if (!changed || !appBootstrapComplete) return;
+    syncActiveAquariumDataFromDb(false);
+    syncActiveWarehouseDataFromDb(false);
+    queuePersistAppState('trace-icp-assignment-recovery', false);
+}
+
 function ensureTraceCalculatorState() {
     if (!db.traceCalculator || typeof db.traceCalculator !== 'object') db.traceCalculator = {};
     if (!db.traceCalculator.config) {
@@ -14086,6 +14204,7 @@ function ensureTraceCalculatorState() {
     if (db.traceCalculator.selectedIcpReportId === undefined) db.traceCalculator.selectedIcpReportId = '';
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
     recoverPendingTraceIcpAssignment(db.traceCalculator);
+    recoverStoredTraceIcpAssignments(db.traceCalculator);
     if (!db.traceCalculator.startSolution || typeof db.traceCalculator.startSolution !== 'object') {
         db.traceCalculator.startSolution = { preset: 'osci', amounts: {}, updatedAt: 0 };
     }
@@ -14313,8 +14432,11 @@ function getTraceHistoryEntryStatus(entry) {
     if (isReefManagerTraceArchive(entry) && !entry.sourceIcpReportId) {
         return { className: 'ignored', label: 'Archiv', note: 'nur Auslagerung/Doku' };
     }
-    if (isReefManagerTraceArchive(entry) && entry.sourceIcpReportId && hasTraceCalculatorIcpValues(entry)) {
+    if (entry?.sourceIcpReportId && hasTraceCalculatorIcpValues(entry)) {
         return { className: 'icp', label: 'Mit ICP', note: 'Reef Manager-Rezept zugeordnet' };
+    }
+    if (entry?.sourceIcpReportId) {
+        return { className: 'assigned', label: 'ICP zugeordnet', note: 'Trace-Werte unvollständig' };
     }
     if (entry?.includeInCalculation === false && !isTraceStartMixture(entry)) {
         return { className: 'ignored', label: 'Ignoriert', note: 'fließt nicht ein' };
@@ -16584,6 +16706,7 @@ function renderTraceCalculatorHistory() {
     const latestRelevant = basisHistory[basisHistory.length - 1] || null;
     const latestVolumeMissing = latestRelevant && traceCalcNumber(latestRelevant.config?.tankLiters, null) === null;
     const ignoredCount = history.length - activeHistoryAll.length;
+    const assignedIcpCount = activeHistoryAll.filter(entry => Boolean(entry?.sourceIcpReportId)).length;
     const withIcpCount = activeHistoryAll.filter(hasTraceCalculatorIcpValues).length;
     const startCount = activeHistoryAll.filter(isTraceStartMixture).length;
     const calculationInfo = calculationHistory.length
@@ -16598,7 +16721,7 @@ function renderTraceCalculatorHistory() {
         <details class="card workflow-card trace-history-block">
             <summary class="trace-history-summary">
                 <span><strong>Historie &amp; Analyse</strong><small>${latestRelevant ? `Berechnung nutzt ${calculationInfo} · letzter Ansatz ${formatTraceMixtureDate(latestRelevant)}` : 'Kein aktiver Eintrag für die Berechnung'}</small></span>
-                <span class="trace-history-summary-side"><span class="trace-history-count">${withIcpCount} mit ICP${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span><span class="settings-accordion-hint" aria-hidden="true"></span></span>
+                <span class="trace-history-summary-side"><span class="trace-history-count">${assignedIcpCount} ICP zugeordnet · ${withIcpCount} berechnungsfähig${startCount ? ` · ${startCount} Start` : ''}${ignoredCount ? ` · ${ignoredCount} ignoriert` : ''}</span><span class="settings-accordion-hint" aria-hidden="true"></span></span>
             </summary>
             <div class="trace-history-content">
                 <div class="trace-history-help"><strong>Alte Mischung vom Zettel oder aus Excel übernehmen</strong><p>Nutze „Vergangene Mischung hinzufügen“, wenn ein früheres Rezept noch nicht in ReefTools erfasst ist. Eine ICP und eine Trace-Mischung können jeweils nur einmal verbunden werden.</p></div>
@@ -16885,7 +17008,7 @@ function renderIcpTraceAssignment(report) {
     return `
         <div class="icp-trace-assignment" onclick="event.stopPropagation()">
             <label for="icpTraceAssignment-${escapeHtml(report.id)}">Trace-Mischung hinzufügen</label>
-            <select id="icpTraceAssignment-${escapeHtml(report.id)}" onchange="assignIcpReportToTrace(${jsArg(report.id)}, this.value)">
+            <select id="icpTraceAssignment-${escapeHtml(report.id)}" data-report-id="${escapeHtml(report.id)}" onchange="assignIcpReportToTrace(this.dataset.reportId, this.value)">
                 ${options.map(option => `<option value="${escapeHtml(option.value)}" ${option.selected ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
             </select>
             <small>${assignedEntry ? '1:1 verknüpft · wird in der Trace-Historie berücksichtigt.' : 'Wähle eine vorhandene Mischung oder lasse die ICP zunächst ohne Zuordnung.'}</small>
@@ -16919,6 +17042,7 @@ async function assignIcpReportToTrace(reportId, entryId) {
         nextEntry.icp = getTraceIcpValuesForHistoryEntry(report);
         nextEntry.updatedAt = Date.now();
     }
+    syncStoredTraceIcpAssignments(state);
     try {
         localStorage.setItem('reef-tools-pending-trace-icp-assignment', JSON.stringify({
             aquariumId: activeAquariumId,
@@ -16928,13 +17052,17 @@ async function assignIcpReportToTrace(reportId, entryId) {
         }));
     } catch (err) {}
     saveDB();
-    const persisted = await flushPendingPersistence('trace-icp-assignment', false);
-    if (persisted) {
-        try { localStorage.removeItem('reef-tools-pending-trace-icp-assignment'); } catch (err) {}
-    }
     renderIcpPage();
+    renderTraceExportInputs();
     renderTraceCalculator();
     showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
+    // Die Auswahl darf nicht auf einen langsamen IndexedDB-/Cloud-Schreibvorgang warten.
+    // Der lokale Zustand ist bereits aktualisiert; die dauerhafte Persistenz läuft im Hintergrund.
+    void flushPendingPersistence('trace-icp-assignment', false).then(persisted => {
+        if (persisted) {
+            try { localStorage.removeItem('reef-tools-pending-trace-icp-assignment'); } catch (err) {}
+        }
+    }).catch(() => {});
 }
 
 function getTraceIcpValuesForHistoryEntry(report) {
@@ -17061,6 +17189,7 @@ async function addManualTraceHistoryEntry() {
         totals: calculatedTotals
     });
     state.history.push(entry);
+    syncStoredTraceIcpAssignments(state);
     if (assignedIcp && hasTraceCalculatorIcpValues(entry) && getTraceCalculatorLatestHistory()?.id === entry.id) {
         state.icpSourceEntryId = entry.id;
         state.selectedIcpReportId = assignedIcpReportId;
@@ -17212,7 +17341,9 @@ async function editTraceHistoryEntry(id) {
         volumeMl: traceCalcRound(anionenElementsMl + Math.max(0, entry.totals.anionen?.osmoseMl || 0)),
         volumeG: traceCalcRound(anionenElementsG + Math.max(0, entry.totals.anionen?.osmoseMl || 0))
     };
+    syncStoredTraceIcpAssignments(state);
     saveDB();
+    renderIcpPage();
     renderTraceExportInputs();
     renderTraceCalculator();
     showToast('Historien-Eintrag aktualisiert', 'success');
@@ -17224,7 +17355,9 @@ function deleteTraceHistoryEntry(id) {
     if (!entry) return;
     if (!confirm(`Historien-Eintrag vom ${formatTraceMixtureDate(entry)} löschen?`)) return;
     state.history = state.history.filter(item => item.id !== id);
+    syncStoredTraceIcpAssignments(state);
     saveDB();
+    renderIcpPage();
     renderTraceCalculator();
     showToast('Historien-Eintrag gelöscht', 'success');
 }
@@ -19504,6 +19637,12 @@ function syncMajorCorrectionInputsFromSettings(force = false) {
         litersEl.value = settings.tankLiters;
     }
     if (elementDisplay) elementDisplay.value = getMajorCorrectionElementLabel(preset?.element || 'KH');
+    if (force && preset) {
+        const currentEl = document.getElementById('majorCorrectionCurrent');
+        const targetEl = document.getElementById('majorCorrectionTarget');
+        if (currentEl && Number.isFinite(Number(preset.currentValue))) currentEl.value = preset.currentValue;
+        if (targetEl && Number.isFinite(Number(preset.targetValue))) targetEl.value = preset.targetValue;
+    }
 }
 
 function initMajorCorrectionCalculator() {
@@ -19611,9 +19750,9 @@ function renderConsumptionCalculator() {
 }
 
 const doseImpactBuiltInPresets = [
-    { id: 'osci-kh-tag', name: 'OSCI KH Tag', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, locked: true },
-    { id: 'osci-kh-nacht', name: 'OSCI KH Nacht', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 1, locked: true },
-    { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, locked: true }
+    { id: 'osci-kh-tag', name: 'OSCI KH Tag', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, currentValue: 7, targetValue: 7.5, locked: true },
+    { id: 'osci-kh-nacht', name: 'OSCI KH Nacht', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 1, currentValue: 7, targetValue: 7.5, locked: true },
+    { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true }
 ];
 
 function getDoseImpactUnit(element) {
@@ -23328,6 +23467,7 @@ async function deleteIcpReport(reportId) {
     });
     if (!confirmed) return;
     db.icpReports = ensureIcpReports().filter(item => item.id !== reportId);
+    persistTraceIcpAssignmentLocally(reportId, '');
     const traceState = ensureTraceCalculatorState();
     traceState.history.forEach(entry => {
         if (String(entry.sourceIcpReportId || '') !== String(reportId)) return;
