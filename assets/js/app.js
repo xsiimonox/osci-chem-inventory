@@ -14005,6 +14005,39 @@ async function addReefManagerImportToTraceHistory() {
     showToast('Reef Manager Import als Archiv gespeichert', 'success');
 }
 
+function recoverPendingTraceIcpAssignment(state) {
+    const key = 'reef-tools-pending-trace-icp-assignment';
+    let pending = null;
+    try {
+        pending = JSON.parse(localStorage.getItem(key) || 'null');
+    } catch (err) {
+        pending = null;
+    }
+    if (!pending || pending.aquariumId !== activeAquariumId || Date.now() - Number(pending.at || 0) > 24 * 60 * 60 * 1000) return;
+    const report = (db.icpReports || []).find(item => String(item.id) === String(pending.reportId));
+    const entry = pending.entryId
+        ? state.history.find(item => String(item.id) === String(pending.entryId))
+        : null;
+    if (!report) return;
+    state.history.forEach(item => {
+        if (String(item.sourceIcpReportId || '') !== String(report.id)) return;
+        item.sourceIcpReportId = '';
+        item.icp = {};
+    });
+    if (entry) {
+        entry.sourceIcpReportId = String(report.id);
+        entry.icp = getTraceIcpValuesForHistoryEntry(report);
+        entry.updatedAt = Date.now();
+    }
+    if (!appBootstrapComplete) return;
+    syncActiveAquariumDataFromDb(false);
+    syncActiveWarehouseDataFromDb(false);
+    queuePersistAppState('trace-icp-assignment-recovery', false);
+    window.setTimeout(() => {
+        try { localStorage.removeItem(key); } catch (err) {}
+    }, 600);
+}
+
 function ensureTraceCalculatorState() {
     if (!db.traceCalculator || typeof db.traceCalculator !== 'object') db.traceCalculator = {};
     if (!db.traceCalculator.config) {
@@ -14052,6 +14085,7 @@ function ensureTraceCalculatorState() {
     if (!db.traceCalculator.icp || typeof db.traceCalculator.icp !== 'object') db.traceCalculator.icp = {};
     if (db.traceCalculator.selectedIcpReportId === undefined) db.traceCalculator.selectedIcpReportId = '';
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
+    recoverPendingTraceIcpAssignment(db.traceCalculator);
     if (!db.traceCalculator.startSolution || typeof db.traceCalculator.startSolution !== 'object') {
         db.traceCalculator.startSolution = { preset: 'osci', amounts: {}, updatedAt: 0 };
     }
@@ -16885,8 +16919,19 @@ async function assignIcpReportToTrace(reportId, entryId) {
         nextEntry.icp = getTraceIcpValuesForHistoryEntry(report);
         nextEntry.updatedAt = Date.now();
     }
+    try {
+        localStorage.setItem('reef-tools-pending-trace-icp-assignment', JSON.stringify({
+            aquariumId: activeAquariumId,
+            reportId: String(report.id),
+            entryId: nextEntry ? String(nextEntry.id) : '',
+            at: Date.now()
+        }));
+    } catch (err) {}
     saveDB();
-    await flushPendingPersistence('trace-icp-assignment', false);
+    const persisted = await flushPendingPersistence('trace-icp-assignment', false);
+    if (persisted) {
+        try { localStorage.removeItem('reef-tools-pending-trace-icp-assignment'); } catch (err) {}
+    }
     renderIcpPage();
     renderTraceCalculator();
     showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');

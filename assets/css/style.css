@@ -2821,10 +2821,12 @@ select:focus {
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"] {
-    appearance: none;
-    -webkit-appearance: none;
+    appearance: auto;
+    -webkit-appearance: auto;
     min-height: 48px;
     letter-spacing: 0;
+    cursor: pointer;
+    touch-action: manipulation;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
