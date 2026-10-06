@@ -11871,13 +11871,10 @@ function showUpdateBanner(latestVersion) {
         : 'Neue Version erkannt.';
     appUpdateState.lastCheckedAt = new Date().toISOString();
     renderAppUpdateStatus();
-    if (!appUpdateState.autoUpdateTimer) {
-        showToast('Neue Version erkannt. Die App aktualisiert sich gleich automatisch.', 'info', 3200);
-        appUpdateState.autoUpdateTimer = setTimeout(() => {
-            appUpdateState.autoUpdateTimer = null;
-            forceUpdateApp(false);
-        }, 3500);
-    }
+    // Updates werden bewusst nicht automatisch ausgelöst. Wenn ein Browser
+    // noch eine alte index.html cached, würde ein automatischer Reload sonst
+    // zwischen alter Versionsnummer und neuer version.json pendeln.
+    showToast('Neue Version erkannt. Bitte „Jetzt laden“ auswählen.', 'info', 4200);
 }
 
 function hideUpdateBanner() {
