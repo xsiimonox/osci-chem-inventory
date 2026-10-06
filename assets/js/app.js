@@ -4725,6 +4725,7 @@ function createWarehouseData(source = {}) {
         osmoseTank: source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 },
         traceDraft: source.traceDraft || {},
         reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
+        reefManagerAquariumLiters: source.reefManagerAquariumLiters || '',
         traceCalculator: cloneSerializable(source.traceCalculator || null),
         testCorrections: source.testCorrections || {},
         majorCorrectionSettings: source.majorCorrectionSettings || { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } },
@@ -5202,6 +5203,7 @@ function normalizeWarehouseData(data) {
     if (!db.osmoseTank.usageLog) db.osmoseTank.usageLog = [];
     if (!db.traceDraft) db.traceDraft = {};
     if (db.reefManagerTraceImport === undefined) db.reefManagerTraceImport = null;
+    if (db.reefManagerAquariumLiters === undefined) db.reefManagerAquariumLiters = '';
     if (db.traceCalculator && typeof db.traceCalculator !== 'object') db.traceCalculator = null;
     if (!db.testCorrections) db.testCorrections = {};
     if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { tankLiters: 100, strengths: { KH: 0.05, Ca: 1 } };
@@ -13605,7 +13607,23 @@ function renderTraceExportInputs() {
         input.addEventListener('input', () => updateTraceDraft(getTraceInputId(prefix, item), item));
         input.addEventListener('change', () => updateTraceDraft(getTraceInputId(prefix, item), item));
     });
+    const tankInput = document.getElementById('reefManagerAquariumLiters');
+    if (tankInput) {
+        const storedLiters = traceCalcNumber(db.reefManagerAquariumLiters, null);
+        if (document.activeElement !== tankInput) tankInput.value = storedLiters && storedLiters > 0 ? String(storedLiters) : '';
+        if (tankInput.dataset.traceBound !== 'true') {
+            tankInput.dataset.traceBound = 'true';
+            tankInput.addEventListener('change', () => saveReefManagerAquariumLiters(tankInput.value));
+            tankInput.addEventListener('blur', () => saveReefManagerAquariumLiters(tankInput.value));
+        }
+    }
     renderTraceStartSolutionEditor();
+}
+
+function saveReefManagerAquariumLiters(value) {
+    const liters = traceCalcNumber(value, null);
+    db.reefManagerAquariumLiters = liters && liters > 0 ? String(liters) : '';
+    saveDB(false);
 }
 
 function getTraceStartSolutionEntry() {
@@ -13975,18 +13993,22 @@ function importReefManagerTraceText(text) {
 }
 
 async function importReefManagerTraceFromClipboard() {
+    if (!window.isSecureContext || !navigator.clipboard?.readText) {
+        await appAlert('Der automatische Zwischenablagezugriff ist für diese geöffnete Datei nicht verfügbar. Öffne ReefTools über HTTPS oder localhost, damit der Browser den Zugriff nach dem Klick erlauben kann.', { title: 'Zwischenablagezugriff nicht verfügbar', type: 'warning' });
+        return;
+    }
+
     let text = '';
     try {
-        if (navigator.clipboard && navigator.clipboard.readText) {
-            text = await navigator.clipboard.readText();
-        }
+        text = await navigator.clipboard.readText();
     } catch (err) {
-        text = '';
+        await appAlert('Der Browser hat den Zwischenablagezugriff blockiert. Erlaube den Zugriff für diese Website und klicke anschließend erneut auf „Aus Zwischenablage importieren“.', { title: 'Zwischenablagezugriff blockiert', type: 'warning' });
+        return;
     }
-    if (!text) {
-        text = prompt('Reef Manager Export einfügen:') || '';
+    if (!text.trim()) {
+        await appAlert('Die Zwischenablage ist leer. Kopiere zuerst den Reef-Manager-Export und starte den Import anschließend erneut.', { title: 'Keine Daten in der Zwischenablage', type: 'info' });
+        return;
     }
-    if (!text.trim()) return;
     importReefManagerTraceText(text);
 }
 
@@ -14042,10 +14064,14 @@ async function addReefManagerImportToTraceHistory() {
     });
     state.history.push(entry);
     pruneTraceCalculatorHistory();
-    db.traceDraft = Object.fromEntries(Object.entries(amounts).map(([item, amount]) => [item, amount.toFixed(2)]));
+    // Nach dem Archivieren wird der Importbereich geleert, damit der nächste
+    // Reef-Manager-Export nicht versehentlich dieselben Werte erneut übernimmt.
+    db.traceDraft = {};
+    delete db.reefManagerTraceImport;
     saveDB();
     await flushPendingPersistence('reef-manager-trace-import', false);
     renderTraceExportInputs();
+    previewReefManagerImport('');
     renderTraceCalculator();
     showToast('Reef Manager Import als Archiv gespeichert', 'success');
 }
@@ -16733,10 +16759,14 @@ function renderTraceCalculatorHistory() {
                     <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Reef Manager-Rezepte über „Bearbeiten“ einer ICP zuordnen</small></div>
                     ${history.map(entry => {
                         const status = getTraceHistoryEntryStatus(entry);
+                        const statusTag = isTraceStartMixture(entry) ? 'button' : 'span';
+                        const statusAction = isTraceStartMixture(entry)
+                            ? ` type="button" title="ICP direkt zuordnen" onclick='openTraceHistoryIcpAssignment(${jsArg(entry.id)})'`
+                            : '';
                         return `
                         <div class="trace-history-row ${!canTraceHistoryEntryAffectCalculation(entry) && !isTraceStartMixture(entry) ? 'trace-history-row-inactive' : ''}">
                             <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${escapeHtml(getTraceHistoryVolumeLabel(entry))} · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small><small class="trace-history-icp-link">${escapeHtml(getTraceHistoryIcpLabel(entry))}</small></span>
-                            <span class="trace-history-status trace-history-status-${status.className}"><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</span>
+                            <${statusTag} class="trace-history-status trace-history-status-${status.className}${isTraceStartMixture(entry) ? ' trace-history-status-action' : ''}"${statusAction}><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</${statusTag}>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
                             <div class="trace-history-actions">
@@ -17014,6 +17044,71 @@ function renderIcpTraceAssignment(report) {
             <small>${assignedEntry ? '1:1 verknüpft · wird in der Trace-Historie berücksichtigt.' : 'Wähle eine vorhandene Mischung oder lasse die ICP zunächst ohne Zuordnung.'}</small>
         </div>
     `;
+}
+
+async function openTraceHistoryIcpAssignment(entryId) {
+    const state = ensureTraceCalculatorState();
+    const entry = state.history.find(item => String(item.id) === String(entryId));
+    if (!entry) return;
+
+    const values = await showAppDialog({
+        kind: 'prompt',
+        type: 'info',
+        title: 'ICP direkt zuordnen',
+        eyebrow: 'Trace-Historie',
+        message: `Wähle die gespeicherte ICP für die Startmischung vom ${formatTraceMixtureDate(entry)}.`,
+        confirmText: 'Zuordnung speichern',
+        cancelText: 'Abbrechen',
+        fields: [{
+            name: 'sourceIcpReportId',
+            label: 'Gespeicherte ICP',
+            value: entry.sourceIcpReportId || '',
+            options: getTraceIcpAssignmentOptions(entry.sourceIcpReportId || '')
+        }]
+    });
+    if (!values) return;
+
+    const reportId = String(values.sourceIcpReportId || '').trim();
+    const report = reportId
+        ? getIcpReportsSorted(true).find(item => String(item.id) === reportId)
+        : null;
+    if (reportId && !report) {
+        await appAlert('Die ausgewählte ICP ist nicht mehr verfügbar. Bitte aktualisiere die ICP-Liste und versuche es erneut.', { title: 'ICP nicht gefunden', type: 'warning' });
+        return;
+    }
+
+    const existingAssignment = getTraceIcpAssignmentEntry(reportId);
+    if (existingAssignment && existingAssignment.id !== entry.id) {
+        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'ICP bereits verknüpft', type: 'warning' });
+        return;
+    }
+
+    entry.sourceIcpReportId = report ? reportId : '';
+    entry.icp = report ? getTraceIcpValuesForHistoryEntry(report) : {};
+    entry.updatedAt = Date.now();
+    state.icpSourceEntryId = report && hasTraceCalculatorIcpValues(entry) ? entry.id : '';
+    state.selectedIcpReportId = reportId;
+    state.icp = report ? { ...entry.icp } : {};
+    syncStoredTraceIcpAssignments(state);
+    saveDB();
+    renderTraceCalculator();
+    renderIcpPage();
+    renderTraceExportInputs();
+    showToast(report ? 'ICP und Startmischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
+
+    try {
+        localStorage.setItem('reef-tools-pending-trace-icp-assignment', JSON.stringify({
+            aquariumId: activeAquariumId,
+            reportId,
+            entryId: report ? String(entry.id) : '',
+            at: Date.now()
+        }));
+    } catch (err) {}
+    void flushPendingPersistence('trace-icp-assignment', false).then(persisted => {
+        if (persisted) {
+            try { localStorage.removeItem('reef-tools-pending-trace-icp-assignment'); } catch (err) {}
+        }
+    }).catch(() => {});
 }
 
 async function assignIcpReportToTrace(reportId, entryId) {

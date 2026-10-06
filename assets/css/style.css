@@ -12807,6 +12807,23 @@ body.theme-badman.party-mode .card {
     background: var(--surface);
 }
 
+.trace-history-status-action {
+    width: auto;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.trace-history-status-action:hover,
+.trace-history-status-action:focus-visible {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+    outline: none;
+    transform: translateY(-1px);
+}
+
 .trace-history-status strong {
     font-size: 0.66rem;
 }
