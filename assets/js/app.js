@@ -16870,12 +16870,12 @@ async function assignIcpReportToTrace(reportId, entryId) {
     const nextEntry = entryId ? state.history.find(item => String(item.id) === String(entryId)) : null;
     if (nextEntry && nextEntry.sourceIcpReportId && String(nextEntry.sourceIcpReportId) !== String(report.id)) {
         await appAlert('Diese Trace-Mischung ist bereits einer anderen ICP zugeordnet. Eine Trace-Mischung und eine ICP dürfen jeweils nur einmal verbunden sein.', { title: 'Zuordnung nicht möglich', type: 'warning' });
-        renderIcpReportList();
+        renderIcpPage();
         return;
     }
     if (currentEntry && nextEntry && currentEntry.id !== nextEntry.id) {
         await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'Zuordnung nicht möglich', type: 'warning' });
-        renderIcpReportList();
+        renderIcpPage();
         return;
     }
     if (currentEntry) {
@@ -16890,7 +16890,7 @@ async function assignIcpReportToTrace(reportId, entryId) {
     }
     saveDB();
     await flushPendingPersistence('trace-icp-assignment', false);
-    renderIcpReportList();
+    renderIcpPage();
     renderTraceCalculator();
     showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
 }
