@@ -16759,14 +16759,11 @@ function renderTraceCalculatorHistory() {
                     <div class="trace-history-list-head"><strong>Gespeicherte Mischungen</strong><small>Alle ${history.length} nach Ansatzdatum sortiert · Reef Manager-Rezepte über „Bearbeiten“ einer ICP zuordnen</small></div>
                     ${history.map(entry => {
                         const status = getTraceHistoryEntryStatus(entry);
-                        const statusTag = isTraceStartMixture(entry) ? 'button' : 'span';
-                        const statusAction = isTraceStartMixture(entry)
-                            ? ` type="button" title="ICP direkt zuordnen" onclick='openTraceHistoryIcpAssignment(${jsArg(entry.id)})'`
-                            : '';
+                        const statusAction = ` type="button" title="ICP zuordnen oder ändern" aria-label="ICP für diese Trace-Mischung zuordnen oder ändern" onclick='openTraceHistoryIcpAssignment(${jsArg(entry.id)})'`;
                         return `
                         <div class="trace-history-row ${!canTraceHistoryEntryAffectCalculation(entry) && !isTraceStartMixture(entry) ? 'trace-history-row-inactive' : ''}">
                             <span class="trace-history-date"><strong>${formatTraceMixtureDate(entry)}</strong><small>${escapeHtml(getTraceHistoryVolumeLabel(entry))} · ${traceCalcFormatValue(entry.config?.days, 0)} Tage · ${escapeHtml(getTraceHistoryEntrySummary(entry))}</small><small class="trace-history-icp-link">${escapeHtml(getTraceHistoryIcpLabel(entry))}</small></span>
-                            <${statusTag} class="trace-history-status trace-history-status-${status.className}${isTraceStartMixture(entry) ? ' trace-history-status-action' : ''}"${statusAction}><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</${statusTag}>
+                            <button class="trace-history-status trace-history-status-${status.className} trace-history-status-action"${statusAction}><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.note)}</small>${entry.actualRecordedAt ? '<small class="trace-history-actual-label">Ist-Mengen erfasst</small>' : ''}</button>
                             <span class="trace-history-mixture"><small>Kationen K+</small><strong>${traceCalcFormatMlG(entry.totals?.kationen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'kationen'))}</strong></span>
                             <span class="trace-history-mixture"><small>Anionen A-</small><strong>${traceCalcFormatMlG(entry.totals?.anionen?.volumeMl || 0, getTraceHistoryTotalGrams(entry, 'anionen'))}</strong></span>
                             <div class="trace-history-actions">
@@ -17056,7 +17053,7 @@ async function openTraceHistoryIcpAssignment(entryId) {
         type: 'info',
         title: 'ICP direkt zuordnen',
         eyebrow: 'Trace-Historie',
-        message: `Wähle die gespeicherte ICP für die Startmischung vom ${formatTraceMixtureDate(entry)}.`,
+        message: `Wähle die gespeicherte ICP für die Trace-Mischung vom ${formatTraceMixtureDate(entry)}.`,
         confirmText: 'Zuordnung speichern',
         cancelText: 'Abbrechen',
         fields: [{
@@ -17066,9 +17063,12 @@ async function openTraceHistoryIcpAssignment(entryId) {
             options: getTraceIcpAssignmentOptions(entry.sourceIcpReportId || '')
         }]
     });
-    if (!values) return;
+    // Ein leerer String bedeutet bewusst „keine ICP“; nur null/undefined ist Abbrechen.
+    if (values === null || values === undefined) return;
 
-    const reportId = String(values.sourceIcpReportId || '').trim();
+    // Ein Dialog mit genau einem Feld gibt direkt den Feldwert zurück; der
+    // Bearbeiten-Dialog mit mehreren Feldern gibt dagegen ein Objekt zurück.
+    const reportId = String(typeof values === 'string' ? values : values?.sourceIcpReportId || '').trim();
     const report = reportId
         ? getIcpReportsSorted(true).find(item => String(item.id) === reportId)
         : null;
@@ -17090,11 +17090,12 @@ async function openTraceHistoryIcpAssignment(entryId) {
     state.selectedIcpReportId = reportId;
     state.icp = report ? { ...entry.icp } : {};
     syncStoredTraceIcpAssignments(state);
-    saveDB();
+    // Erst den geänderten Zustand lokal sichern, danach nur die aktuelle Ansicht
+    // aktualisieren. Ein kompletter Seiten-/Bereichsaufbau darf die Auswahl nicht überdecken.
+    saveDB(false);
+    storeImmediateTraceState();
     renderTraceCalculator();
-    renderIcpPage();
-    renderTraceExportInputs();
-    showToast(report ? 'ICP und Startmischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
+    showToast(report ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
 
     try {
         localStorage.setItem('reef-tools-pending-trace-icp-assignment', JSON.stringify({
@@ -17488,9 +17489,27 @@ function renderTraceCalculatorConfigWarnings(config) {
     `;
 }
 
+function captureTraceCalculatorDetailsState(root) {
+    if (!root) return [];
+    return Array.from(root.querySelectorAll('details')).map((details, index) => ({
+        index,
+        open: details.open
+    }));
+}
+
+function restoreTraceCalculatorDetailsState(root, detailsState) {
+    if (!root || !Array.isArray(detailsState)) return;
+    Array.from(root.querySelectorAll('details')).forEach((details, index) => {
+        const saved = detailsState.find(item => item.index === index);
+        if (saved) details.open = saved.open;
+    });
+}
+
 function renderTraceCalculator() {
     const root = document.getElementById('traceCalculatorResult');
     if (!root) return;
+    const detailsState = captureTraceCalculatorDetailsState(root);
+    const scrollTop = window.scrollY;
     const state = ensureTraceCalculatorState();
     syncTraceCalculatorConfigUi();
     syncTraceOsciWorkflowCard();
@@ -17540,6 +17559,8 @@ function renderTraceCalculator() {
         </div>
     `;
     renderTraceCalculatorHistory();
+    restoreTraceCalculatorDetailsState(root, detailsState);
+    if (Number.isFinite(scrollTop)) window.scrollTo({ top: scrollTop, behavior: 'auto' });
     saveDB(false);
 }
 

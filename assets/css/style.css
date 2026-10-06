@@ -12803,12 +12803,13 @@ body.theme-badman.party-mode .card {
     justify-self: start;
     padding: 6px 9px;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-md);
     background: var(--surface);
 }
 
 .trace-history-status-action {
     width: auto;
+    min-width: 150px;
     font: inherit;
     color: inherit;
     text-align: left;
