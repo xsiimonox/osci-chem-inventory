@@ -7,7 +7,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.4.255-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.5.0-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,7 +27,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.4.255</span>
+                    <span class="version-badge">v3.5.0</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -418,7 +418,7 @@
                 <div class="reef-manager-history-config">
                     <div class="input-group">
                         <label for="reefManagerAquariumLiters">Aquariumvolumen für diesen Import (L):</label>
-                        <input type="number" id="reefManagerAquariumLiters" min="1" step="0.1" placeholder="z.B. 100" inputmode="decimal" onchange="saveReefManagerAquariumLiters(this.value)">
+                        <input type="number" id="reefManagerAquariumLiters" min="1" step="0.1" placeholder="z.B. 100" inputmode="decimal">
                         <small class="hint">Pflichtangabe, da der Reef-Manager-Export kein Aquariumvolumen enthält. Der Import dient nur zur Auslagerung und optionalen Dokumentation.</small>
                     </div>
                 </div>
@@ -2685,8 +2685,8 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.4.255-release"></script>
-    <script src="assets/js/app.js?v=3.4.255-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.5.0-release"></script>
+    <script src="assets/js/app.js?v=3.5.0-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

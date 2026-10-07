@@ -21,6 +21,7 @@ if (!chromium) {
 }
 
 const targetUrl = process.argv[2] || 'http://127.0.0.1:8202/index.html#uebersicht';
+const desktopMode = process.argv[3] === 'desktop';
 const tabs = [
   'uebersicht',
   'lager',
@@ -28,6 +29,7 @@ const tabs = [
   'trace-export',
   'tools',
   'logbuch',
+  'icp',
   'statistik',
   'log',
   'korallen',
@@ -37,7 +39,10 @@ const tabs = [
 ];
 
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
+const page = await browser.newPage({
+  viewport: desktopMode ? { width: 1440, height: 1000 } : { width: 390, height: 844 },
+  isMobile: !desktopMode
+});
 const errors = [];
 const failedRequests = [];
 
@@ -60,12 +65,41 @@ for (const tab of tabs) {
     inner: window.innerWidth,
     scroll: document.documentElement.scrollWidth
   }));
+  const diagnostics = await page.evaluate(tabId => {
+    const activeRoot = document.getElementById(tabId);
+    const text = activeRoot?.innerText || '';
+    const duplicateIds = Array.from(document.querySelectorAll('[id]'))
+      .map(node => node.id)
+      .filter((id, index, ids) => id && ids.indexOf(id) !== index);
+    const brokenImages = Array.from(activeRoot?.querySelectorAll('img') || [])
+      .filter(image => image.complete && image.naturalWidth === 0)
+      .map(image => image.currentSrc || image.src);
+    const isInsideHorizontalScroller = control => {
+      let parent = control.parentElement;
+      while (parent && parent !== activeRoot) {
+        const style = getComputedStyle(parent);
+        if (['auto', 'scroll'].includes(style.overflowX) && parent.scrollWidth > parent.clientWidth + 2) return true;
+        parent = parent.parentElement;
+      }
+      return false;
+    };
+    const overflowingControls = Array.from(activeRoot?.querySelectorAll('input, select, textarea, button') || [])
+      .filter(control => control.getBoundingClientRect().right > window.innerWidth + 2 && !isInsideHorizontalScroller(control))
+      .map(control => control.id || control.textContent?.trim().slice(0, 40) || control.tagName);
+    return {
+      invalidContent: /\b(?:undefined|NaN)\b/.test(text),
+      duplicateIds: [...new Set(duplicateIds)],
+      brokenImages,
+      overflowingControls
+    };
+  }, tab);
   results.push({
     tab,
     active,
     hidden,
     ok: hidden ? active !== tab : active === tab,
-    horizontalOverflow: width.scroll > width.inner + 2
+    horizontalOverflow: width.scroll > width.inner + 2,
+    ...diagnostics
   });
 }
 
@@ -80,11 +114,17 @@ const persisted = await page.evaluate(async () => {
 
 await browser.close();
 
-const failedTabs = results.filter(result => !result.ok || result.horizontalOverflow);
+const failedTabs = results.filter(result => !result.ok
+  || result.horizontalOverflow
+  || result.invalidContent
+  || result.duplicateIds.length
+  || result.brokenImages.length
+  || result.overflowingControls.length);
 const ok = failedTabs.length === 0 && errors.length === 0 && failedRequests.length === 0 && persisted === true && storageHealth?.ok === true;
 console.log(JSON.stringify({
   ok,
   targetUrl,
+  viewport: desktopMode ? 'desktop' : 'mobile',
   failedTabs,
   persisted,
   storageHealth,

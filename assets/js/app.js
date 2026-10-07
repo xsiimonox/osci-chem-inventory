@@ -684,6 +684,7 @@ const AQUARIUM_FIELD_KEYS = [
     'osmoseTank',
     'traceDraft',
     'reefManagerTraceImport',
+    'reefManagerAquariumLiters',
     'traceCalculator',
     'doseImpactSettings',
     'customCrPlanner',
@@ -4903,6 +4904,7 @@ function createAquariumData(source = {}) {
         osmoseTank: cloneSerializable(source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 }),
         traceDraft: cloneSerializable(source.traceDraft || {}),
         reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
+        reefManagerAquariumLiters: source.reefManagerAquariumLiters || '',
         traceCalculator: cloneSerializable(source.traceCalculator || null),
         doseImpactSettings: cloneSerializable(source.doseImpactSettings || null),
         customCrPlanner: cloneSerializable(source.customCrPlanner || null),
@@ -13622,8 +13624,11 @@ function renderTraceExportInputs() {
 
 function saveReefManagerAquariumLiters(value) {
     const liters = traceCalcNumber(value, null);
-    db.reefManagerAquariumLiters = liters && liters > 0 ? String(liters) : '';
+    const nextValue = liters && liters > 0 ? String(liters) : '';
+    if (String(db.reefManagerAquariumLiters || '') === nextValue) return;
+    db.reefManagerAquariumLiters = nextValue;
     saveDB(false);
+    void flushPendingPersistence('reef-manager-volume', false).catch(() => {});
 }
 
 function getTraceStartSolutionEntry() {
@@ -14149,6 +14154,44 @@ function syncStoredTraceIcpAssignments(state) {
     } catch (err) {}
 }
 
+function reconcileTraceIcpAssignments(state) {
+    if (!state || !Array.isArray(state.history)) return false;
+    const reports = new Map((db.icpReports || []).map(report => [String(report.id), report]));
+    const seenReports = new Set();
+    let changed = false;
+
+    state.history.forEach(entry => {
+        const reportId = String(entry?.sourceIcpReportId || '').trim();
+        if (!reportId) return;
+        const report = reports.get(reportId);
+        if (!report || seenReports.has(reportId)) {
+            entry.sourceIcpReportId = '';
+            entry.icp = {};
+            entry.updatedAt = Date.now();
+            if (isReefManagerTraceArchive(entry)) entry.calculationLocked = true;
+            changed = true;
+            return;
+        }
+        seenReports.add(reportId);
+        const nextIcp = getTraceIcpValuesForHistoryEntry(report);
+        if (JSON.stringify(entry.icp || {}) !== JSON.stringify(nextIcp)) {
+            entry.icp = nextIcp;
+            entry.updatedAt = Date.now();
+            changed = true;
+        }
+    });
+
+    const activeSource = state.icpSourceEntryId
+        ? state.history.find(entry => String(entry.id) === String(state.icpSourceEntryId))
+        : null;
+    if (state.icpSourceEntryId && (!activeSource || !activeSource.sourceIcpReportId)) {
+        syncTraceActiveIcpFromHistory(state);
+        changed = true;
+    }
+    if (changed) syncStoredTraceIcpAssignments(state);
+    return changed;
+}
+
 function recoverStoredTraceIcpAssignments(state) {
     const localAssignments = getStoredTraceIcpAssignments()[activeAquariumId] || {};
     const assignments = {
@@ -14231,6 +14274,7 @@ function ensureTraceCalculatorState() {
     if (!Array.isArray(db.traceCalculator.history)) db.traceCalculator.history = [];
     recoverPendingTraceIcpAssignment(db.traceCalculator);
     recoverStoredTraceIcpAssignments(db.traceCalculator);
+    reconcileTraceIcpAssignments(db.traceCalculator);
     if (!db.traceCalculator.startSolution || typeof db.traceCalculator.startSolution !== 'object') {
         db.traceCalculator.startSolution = { preset: 'osci', amounts: {}, updatedAt: 0 };
     }
@@ -16996,7 +17040,7 @@ function getTraceIcpAssignmentOptions(selectedId = '') {
             .map(entry => String(entry.sourceIcpReportId))
     );
     return [
-        { value: '', label: 'Keine ICP zugeordnet (nur Archiv)' },
+        { value: '', label: 'Keine ICP zugeordnet' },
         ...getIcpReportsSorted(true).map(report => ({
             value: report.id,
             label: `${report.name || 'Unbenannte ICP'} · ${formatWarehouseDate(report.date)}`,
@@ -17010,6 +17054,77 @@ function getTraceIcpAssignmentEntry(reportId = '') {
     if (!normalizedId) return null;
     return getTraceCalculatorHistoryEntries({ sort: 'asc' })
         .find(entry => String(entry.sourceIcpReportId || '') === normalizedId) || null;
+}
+
+function syncTraceActiveIcpFromHistory(state, preferredEntry = null) {
+    if (!state || !Array.isArray(state.history)) return;
+    const preferredReport = preferredEntry?.sourceIcpReportId
+        ? getIcpReportsSorted(true).find(report => String(report.id) === String(preferredEntry.sourceIcpReportId))
+        : null;
+    if (preferredEntry && preferredReport) {
+        state.selectedIcpReportId = String(preferredReport.id);
+        state.icpSourceEntryId = hasTraceCalculatorIcpValues(preferredEntry) ? preferredEntry.id : '';
+        state.icp = { ...(preferredEntry.icp || {}) };
+        return;
+    }
+
+    const fallback = sortTraceHistoryByDate(state.history, 'desc')
+        .find(entry => entry.sourceIcpReportId && hasTraceCalculatorIcpValues(entry));
+    if (fallback) {
+        state.selectedIcpReportId = String(fallback.sourceIcpReportId);
+        state.icpSourceEntryId = fallback.id;
+        state.icp = { ...(fallback.icp || {}) };
+        return;
+    }
+
+    state.selectedIcpReportId = '';
+    state.icpSourceEntryId = '';
+    state.icp = {};
+}
+
+function setTraceIcpAssignment(entryId = '', reportId = '') {
+    const state = ensureTraceCalculatorState();
+    const normalizedEntryId = String(entryId || '').trim();
+    const normalizedReportId = String(reportId || '').trim();
+    const entry = normalizedEntryId
+        ? state.history.find(item => String(item.id) === normalizedEntryId)
+        : null;
+    const report = normalizedReportId
+        ? getIcpReportsSorted(true).find(item => String(item.id) === normalizedReportId)
+        : null;
+
+    if (normalizedEntryId && !entry) return { ok: false, error: 'Die ausgewählte Trace-Mischung ist nicht mehr vorhanden.' };
+    if (normalizedReportId && !report) return { ok: false, error: 'Die ausgewählte ICP ist nicht mehr vorhanden.' };
+
+    const existingAssignment = normalizedReportId ? getTraceIcpAssignmentEntry(normalizedReportId) : null;
+    if (existingAssignment && existingAssignment !== entry) {
+        return { ok: false, error: 'Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.' };
+    }
+
+    const previousReportId = String(entry?.sourceIcpReportId || '');
+    if (entry) {
+        entry.sourceIcpReportId = report ? String(report.id) : '';
+        entry.icp = report ? getTraceIcpValuesForHistoryEntry(report) : {};
+        entry.updatedAt = Date.now();
+        if (isReefManagerTraceArchive(entry)) entry.calculationLocked = !report;
+    } else if (normalizedReportId && existingAssignment) {
+        existingAssignment.sourceIcpReportId = '';
+        existingAssignment.icp = {};
+        existingAssignment.updatedAt = Date.now();
+        if (isReefManagerTraceArchive(existingAssignment)) existingAssignment.calculationLocked = true;
+    }
+
+    if (entry && report) {
+        syncTraceActiveIcpFromHistory(state, entry);
+    } else if (
+        String(state.icpSourceEntryId || '') === normalizedEntryId
+        || String(state.selectedIcpReportId || '') === previousReportId
+        || String(state.selectedIcpReportId || '') === normalizedReportId
+    ) {
+        syncTraceActiveIcpFromHistory(state);
+    }
+    syncStoredTraceIcpAssignments(state);
+    return { ok: true, state, entry, report };
 }
 
 function getTraceHistoryAssignmentOptions(selectedEntryId = '', selectedReportId = '') {
@@ -17069,27 +17184,12 @@ async function openTraceHistoryIcpAssignment(entryId) {
     // Ein Dialog mit genau einem Feld gibt direkt den Feldwert zurück; der
     // Bearbeiten-Dialog mit mehreren Feldern gibt dagegen ein Objekt zurück.
     const reportId = String(typeof values === 'string' ? values : values?.sourceIcpReportId || '').trim();
-    const report = reportId
-        ? getIcpReportsSorted(true).find(item => String(item.id) === reportId)
-        : null;
-    if (reportId && !report) {
-        await appAlert('Die ausgewählte ICP ist nicht mehr verfügbar. Bitte aktualisiere die ICP-Liste und versuche es erneut.', { title: 'ICP nicht gefunden', type: 'warning' });
+    const assignment = setTraceIcpAssignment(entry.id, reportId);
+    if (!assignment.ok) {
+        await appAlert(assignment.error, { title: 'Zuordnung nicht möglich', type: 'warning' });
         return;
     }
-
-    const existingAssignment = getTraceIcpAssignmentEntry(reportId);
-    if (existingAssignment && existingAssignment.id !== entry.id) {
-        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'ICP bereits verknüpft', type: 'warning' });
-        return;
-    }
-
-    entry.sourceIcpReportId = report ? reportId : '';
-    entry.icp = report ? getTraceIcpValuesForHistoryEntry(report) : {};
-    entry.updatedAt = Date.now();
-    state.icpSourceEntryId = report && hasTraceCalculatorIcpValues(entry) ? entry.id : '';
-    state.selectedIcpReportId = reportId;
-    state.icp = report ? { ...entry.icp } : {};
-    syncStoredTraceIcpAssignments(state);
+    const report = assignment.report;
     // Erst den geänderten Zustand lokal sichern, danach nur die aktuelle Ansicht
     // aktualisieren. Ein kompletter Seiten-/Bereichsaufbau darf die Auswahl nicht überdecken.
     saveDB(false);
@@ -17113,43 +17213,25 @@ async function openTraceHistoryIcpAssignment(entryId) {
 }
 
 async function assignIcpReportToTrace(reportId, entryId) {
-    const report = getIcpReportsSorted(true).find(item => String(item.id) === String(reportId));
-    if (!report) return;
-    const state = ensureTraceCalculatorState();
-    const currentEntry = getTraceIcpAssignmentEntry(report.id);
-    const nextEntry = entryId ? state.history.find(item => String(item.id) === String(entryId)) : null;
-    if (nextEntry && nextEntry.sourceIcpReportId && String(nextEntry.sourceIcpReportId) !== String(report.id)) {
-        await appAlert('Diese Trace-Mischung ist bereits einer anderen ICP zugeordnet. Eine Trace-Mischung und eine ICP dürfen jeweils nur einmal verbunden sein.', { title: 'Zuordnung nicht möglich', type: 'warning' });
+    const assignment = setTraceIcpAssignment(entryId, reportId);
+    if (!assignment.ok) {
+        await appAlert(assignment.error, { title: 'Zuordnung nicht möglich', type: 'warning' });
         renderIcpPage();
         return;
     }
-    if (currentEntry && nextEntry && currentEntry.id !== nextEntry.id) {
-        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'Zuordnung nicht möglich', type: 'warning' });
-        renderIcpPage();
-        return;
-    }
-    if (currentEntry) {
-        currentEntry.sourceIcpReportId = '';
-        currentEntry.icp = {};
-        currentEntry.updatedAt = Date.now();
-    }
-    if (nextEntry) {
-        nextEntry.sourceIcpReportId = String(report.id);
-        nextEntry.icp = getTraceIcpValuesForHistoryEntry(report);
-        nextEntry.updatedAt = Date.now();
-    }
-    syncStoredTraceIcpAssignments(state);
+    const report = assignment.report || getIcpReportsSorted(true).find(item => String(item.id) === String(reportId));
+    const nextEntry = assignment.entry;
     try {
         localStorage.setItem('reef-tools-pending-trace-icp-assignment', JSON.stringify({
             aquariumId: activeAquariumId,
-            reportId: String(report.id),
+            reportId: String(report?.id || reportId || ''),
             entryId: nextEntry ? String(nextEntry.id) : '',
             at: Date.now()
         }));
     } catch (err) {}
-    saveDB();
+    saveDB(false);
+    storeImmediateTraceState();
     renderIcpPage();
-    renderTraceExportInputs();
     renderTraceCalculator();
     showToast(nextEntry ? 'ICP und Trace-Mischung verknüpft' : 'ICP-Zuordnung entfernt', 'success');
     // Die Auswahl darf nicht auf einen langsamen IndexedDB-/Cloud-Schreibvorgang warten.
@@ -17383,22 +17465,11 @@ async function editTraceHistoryEntry(id) {
         return;
     }
     const assignedIcpReportId = String(values.sourceIcpReportId || '').trim();
-    const existingAssignment = getTraceIcpAssignmentEntry(assignedIcpReportId);
-    if (existingAssignment && existingAssignment.id !== entry.id) {
-        await appAlert('Diese ICP ist bereits einer anderen Trace-Mischung zugeordnet. Bitte löse die bestehende Zuordnung zuerst.', { title: 'ICP bereits verknüpft', type: 'warning' });
+    const assignment = setTraceIcpAssignment(entry.id, assignedIcpReportId);
+    if (!assignment.ok) {
+        await appAlert(assignment.error, { title: 'Zuordnung nicht möglich', type: 'warning' });
         return;
     }
-    const assignedIcp = assignedIcpReportId
-        ? getIcpReportsSorted(true).find(report => report.id === assignedIcpReportId)
-        : null;
-    entry.sourceIcpReportId = assignedIcpReportId;
-    if (assignedIcp) entry.icp = getTraceIcpValuesForHistoryEntry(assignedIcp);
-    else if (isReefManagerArchive) entry.icp = {};
-    // Die zugeordnete ICP wird sofort zur Berechnungsbasis. Ohne Zuordnung fällt
-    // der Rechner wieder auf die letzte vollständig zugeordnete Historien-ICP zurück.
-    state.icpSourceEntryId = assignedIcp && hasTraceCalculatorIcpValues(entry) ? entry.id : '';
-    state.selectedIcpReportId = assignedIcpReportId;
-    state.icp = assignedIcp ? { ...entry.icp } : {};
     entry.includeInCalculation = values.includeInCalculation !== 'no';
     entry.calculationLocked = isReefManagerArchive && !assignedIcpReportId;
     entry.mixtureDate = String(values.mixtureDate || '').trim() || entry.mixtureDate || getTodayDateInputValue();
@@ -17450,7 +17521,14 @@ function deleteTraceHistoryEntry(id) {
     const entry = state.history.find(item => item.id === id);
     if (!entry) return;
     if (!confirm(`Historien-Eintrag vom ${formatTraceMixtureDate(entry)} löschen?`)) return;
+    const removedReportId = String(entry.sourceIcpReportId || '');
     state.history = state.history.filter(item => item.id !== id);
+    if (
+        String(state.icpSourceEntryId || '') === String(id)
+        || (removedReportId && String(state.selectedIcpReportId || '') === removedReportId)
+    ) {
+        syncTraceActiveIcpFromHistory(state);
+    }
     syncStoredTraceIcpAssignments(state);
     saveDB();
     renderIcpPage();
@@ -17508,7 +17586,9 @@ function restoreTraceCalculatorDetailsState(root, detailsState) {
 function renderTraceCalculator() {
     const root = document.getElementById('traceCalculatorResult');
     if (!root) return;
-    const detailsState = captureTraceCalculatorDetailsState(root);
+    const historyRoot = document.getElementById('traceCalculatorHistory');
+    const resultDetailsState = captureTraceCalculatorDetailsState(root);
+    const historyDetailsState = captureTraceCalculatorDetailsState(historyRoot);
     const scrollTop = window.scrollY;
     const state = ensureTraceCalculatorState();
     syncTraceCalculatorConfigUi();
@@ -17559,7 +17639,8 @@ function renderTraceCalculator() {
         </div>
     `;
     renderTraceCalculatorHistory();
-    restoreTraceCalculatorDetailsState(root, detailsState);
+    restoreTraceCalculatorDetailsState(root, resultDetailsState);
+    restoreTraceCalculatorDetailsState(historyRoot, historyDetailsState);
     if (Number.isFinite(scrollTop)) window.scrollTo({ top: scrollTop, behavior: 'auto' });
     saveDB(false);
 }
@@ -23592,10 +23673,9 @@ async function deleteIcpReport(reportId) {
         entry.updatedAt = Date.now();
     });
     if (String(traceState.selectedIcpReportId || '') === String(reportId)) {
-        traceState.selectedIcpReportId = '';
-        traceState.icpSourceEntryId = '';
-        traceState.icp = {};
+        syncTraceActiveIcpFromHistory(traceState);
     }
+    syncStoredTraceIcpAssignments(traceState);
     if (icpUiState.selectedReportId === reportId) icpUiState.selectedReportId = null;
     if (icpUiState.editingReportId === reportId) icpUiState.editingReportId = null;
     saveDB();

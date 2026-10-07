@@ -11236,6 +11236,7 @@ body.theme-badman.party-mode .card {
 
 .trace-reuse-body {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-3);
     min-width: 0;
     max-width: 100%;
@@ -12966,7 +12967,16 @@ body.theme-badman.party-mode .card {
     .trace-reuse-mode-grid,
     .trace-reuse-inputs,
     .trace-reuse-result-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
+        min-width: 0;
+        width: 100%;
+    }
+
+    .trace-reuse-choice,
+    .trace-reuse-choice .trace-input-with-unit,
+    .trace-reuse-choice input {
+        min-width: 0;
+        max-width: 100%;
     }
 
     .trace-reuse-panel > summary {
