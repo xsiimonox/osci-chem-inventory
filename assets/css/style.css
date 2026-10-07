@@ -22893,7 +22893,7 @@ body.theme-girl .app-footer {
     }
 
     .mobile-bottom-nav .mobile-nav-label {
-        display: none !important;
+        display: block;
     }
 
     .mobile-bottom-nav button .nav-icon {

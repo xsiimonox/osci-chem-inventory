@@ -4286,7 +4286,7 @@ function getMenuOrder() {
 }
 
 function getDefaultMobileQuickTabs() {
-    return ['lager', 'tools', 'logbuch', 'korallen'];
+    return ['lager', 'trace-export', 'icp', 'tools'];
 }
 
 function getHiddenMenuTabs() {
@@ -4508,6 +4508,7 @@ function applyMenuOrder() {
         });
     }
     renderMobileBottomNav(order);
+    window.ReefWorkspaceUI?.groupNavigation();
     const activeTab = getActiveTabId();
     document.querySelectorAll('.mobile-bottom-nav button').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === activeTab);
@@ -8484,6 +8485,7 @@ function switchWarehouse(id) {
     saveDB(false);
     renderCurrentWarehouseViews();
     if (WAREHOUSE_WRITE_TAB_IDS.has(getActiveTabId()) && isWarehouseReadOnlyView()) showTab('lager');
+    document.dispatchEvent(new Event('reeftools-context-change'));
 }
 
 function switchAquarium(id) {
@@ -8498,6 +8500,7 @@ function switchAquarium(id) {
     overlayActiveAquariumData();
     saveDB(false);
     renderCurrentWarehouseViews();
+    document.dispatchEvent(new Event('reeftools-context-change'));
 }
 
 async function createAquarium() {
@@ -13248,7 +13251,8 @@ function toggleFavoriteProduct(item) {
     filterLager();
 }
 
-function renderProductCard(cat, item) {
+function renderProductCard(cat, item, warningItems = new Set()) {
+    if (window.ReefWorkspaceUI) return window.ReefWorkspaceUI.renderCard(cat, item, warningItems);
     let stock = db.inventory[cat][item] || 0;
     let stockG = getGrams(item, stock);
     let showMassSubline = itemUsesVolume(item);
@@ -13456,7 +13460,11 @@ function filterLager() {
     const selectedCategory = categoryFilter ? categoryFilter.value : 'all';
     const alertItems = new Set(getStockAlerts().map(alert => alert.item));
     
-    listContainer.innerHTML = '';
+    const openKeys = [...listContainer.querySelectorAll('details[open]')].map(details => {
+        const card = details.closest('[data-name]');
+        return card ? JSON.stringify([card.dataset.category, card.dataset.name]) : '';
+    });
+    const sections = [];
     renderStockAlerts(alertsContainer);
 
     const favoriteRows = [];
@@ -13468,12 +13476,12 @@ function filterLager() {
             if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
             if (!item.toLowerCase().includes(term)) continue;
-            favoriteRows.push(renderProductCard(cat, item));
+            favoriteRows.push(renderProductCard(cat, item, alertItems));
             matchedItems.add(`${cat}\u0000${item}`);
         }
     }
     if (lagerQuickFilter === 'all' && favoriteRows.length > 0) {
-        listContainer.innerHTML += `<section class="inventory-category-section"><h2 class="category-title">Favoriten</h2><div class="inventory-card-grid">${favoriteRows.join('')}</div></section>`;
+        sections.push(`<section class="inventory-category-section"><h2 class="category-title">Favoriten</h2><div class="inventory-card-grid">${favoriteRows.join('')}</div></section>`);
     }
     
     for (let cat in catalog) {
@@ -13485,18 +13493,21 @@ function filterLager() {
         
         for (let item in catalog[cat]) {
             if (!shouldShowCatalogProduct(cat, item)) continue;
+            if (lagerQuickFilter === 'all' && matchedItems.has(`${cat}\u0000${item}`)) continue;
             if (lagerQuickFilter === 'favorites' && !isFavoriteProduct(item)) continue;
             if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (item.toLowerCase().includes(term)) {
                 hasItems = true;
-                catHTML += renderProductCard(cat, item);
+                catHTML += renderProductCard(cat, item, alertItems);
                 matchedItems.add(`${cat}\u0000${item}`);
             }
         }
         if (hasItems) {
-            listContainer.innerHTML += `<section class="inventory-category-section"><h2 class="category-title">${escapeHtml(cat)}</h2><div class="inventory-card-grid">${catHTML}</div></section>`;
+            sections.push(`<section class="inventory-category-section"><h2 class="category-title">${escapeHtml(cat)}</h2><div class="inventory-card-grid">${catHTML}</div></section>`);
         }
     }
+    listContainer.innerHTML = sections.join('');
+    window.ReefWorkspaceUI?.mountInventory(listContainer, openKeys);
     const matchCount = matchedItems.size;
     const filtersActive = Boolean(term || selectedCategory !== 'all' || lagerQuickFilter !== 'all');
     const visibleCategoryCount = getVisibleCatalogCategoryNames().length;
@@ -23487,6 +23498,7 @@ function previewIcpImport() {
             </div>
             ${renderIcpImportMetaPreview(analysis.metadata)}
             ${renderIcpImportWarnings(analysis.warnings)}
+            ${window.ReefWorkspaceUI?.icpFeedback(rows) || ''}
             <div class="icp-preview-groups">
                 ${groupIcpValuesBySection(rows).map(([section, values]) => `
                     <div class="icp-preview-group">
@@ -26245,6 +26257,7 @@ function runPostBootstrapDomSetup() {
 
 function closeModal() {
     const modal = document.getElementById('modal');
+    if (modal.querySelector('#proceed-conflict-btn')) crPasteBookingBusy = false;
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
     releaseBodyScrollLock('modal');
@@ -26484,6 +26497,7 @@ async function fillCRDemoData() {
         if (!confirmed) return;
     }
     pasteArea.value = demoCRPasteExample;
+    pasteArea.dispatchEvent(new Event('input', { bubbles: true }));
     previewCRPaste();
     pasteArea.focus();
     showToast('C&R Demo-Daten eingetragen.', 'success');
@@ -26687,7 +26701,9 @@ function previewCRPaste() {
     renderCustomCrRecipeAdjustment();
 }
 
+let crPasteBookingBusy = false;
 function processCRPaste() {
+    if (crPasteBookingBusy || !requireWarehouseWriteAccess('C&R auslagern')) return;
     const text = document.getElementById('cr-paste-area').value;
     const rows = parseCRPasteAmounts(text);
     if (rows.length < crOrder.length) return alert("Fehler: Format ungültig.");
@@ -26698,7 +26714,10 @@ function processCRPaste() {
         .map(row => ({ ...row, amount: adjustmentByItem.get(row.item)?.adjustedAmount ?? row.amount }))
         .filter(row => row.amount > 0)
         .map(row => ({ cat: row.cat, item: row.item, amount: row.amount }));
-    executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
+    const resolvedQueue = expandQueueWithInterchangeableStock(queue);
+    if (!resolvedQueue || !resolvedQueue.length) return;
+    crPasteBookingBusy = true;
+    executeQueueWithConflictHandling(resolvedQueue, 0);
 }
 
 function parseCRPasteAmounts(text) {
@@ -27363,17 +27382,29 @@ function auslagernMischung(typ) {
     executeQueueWithConflictHandling(expandQueueWithInterchangeableStock(queue), 0);
 }
 
-function executeQueueWithConflictHandling(queue, index) {
-    if (!requireWarehouseWriteAccess('Diese Lagerbuchung')) return;
+async function executeQueueWithConflictHandling(queue, index, warehouseId = activeWarehouseId) {
+    if (warehouseId !== activeWarehouseId || !requireWarehouseWriteAccess('Diese Lagerbuchung')) {
+        crPasteBookingBusy = false;
+        showToast('Lagerbuchung gestoppt. Bitte das ursprüngliche Lager auswählen.', 'warning');
+        return;
+    }
     if (!Array.isArray(queue)) return;
     if (index >= queue.length) {
         saveDB();
-        const pasteArea = document.getElementById('cr-paste-area');
+        const persisted = await flushPendingPersistence('cr-booking', false);
+        if (!persisted) {
+            showToast('Buchung im Arbeitsspeicher, lokale Speicherung fehlgeschlagen. Bitte Backup sichern.', 'warning');
+            return;
+        }
+        const isCrPasteBooking = crPasteBookingBusy;
+        crPasteBookingBusy = false;
+        const pasteArea = isCrPasteBooking ? document.getElementById('cr-paste-area') : null;
         if (pasteArea) {
             pasteArea.value = '';
             previewCRPaste();
         }
         alert("Werte erfolgreich verarbeitet!");
+        if (isCrPasteBooking) document.dispatchEvent(new Event('reeftools-cr-complete'));
         closeModal();
         showTab('lager');
         checkAndNotifyStockAlerts();
@@ -27385,16 +27416,22 @@ function executeQueueWithConflictHandling(queue, index) {
     
     if (stock - amount < 0) {
         showConflictModal(cat, item, amount, stock, () => {
+            if (warehouseId !== activeWarehouseId) {
+                crPasteBookingBusy = false;
+                closeModal();
+                showToast('Lager wurde gewechselt. Buchung abgebrochen.', 'warning');
+                return;
+            }
             db.inventory[cat][item] = 0;
             db.stats[item] = (db.stats[item] || 0) + stock;
             addLog(cat, item, 'out', stock);
-            executeQueueWithConflictHandling(queue, index + 1);
+            executeQueueWithConflictHandling(queue, index + 1, warehouseId);
         });
     } else {
         db.inventory[cat][item] -= amount;
         db.stats[item] = (db.stats[item] || 0) + amount;
         addLog(cat, item, 'out', amount);
-        executeQueueWithConflictHandling(queue, index + 1);
+        executeQueueWithConflictHandling(queue, index + 1, warehouseId);
     }
 }
 
