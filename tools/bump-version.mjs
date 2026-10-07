@@ -16,7 +16,7 @@ const cachebuster = `${nextVersion.slice(1)}-release`;
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const write = (file, content) => fs.writeFileSync(path.join(root, file), content);
 
-const htmlFiles = ['index.html', 'anleitung.html', 'privacy.html', 'impressum.html'];
+const htmlFiles = ['index.html', 'anleitung.html', 'privacy.html', 'impressum.html', 'wave/demo.html'];
 for (const htmlPath of htmlFiles) {
   let html = read(htmlPath);
   html = html
@@ -25,7 +25,9 @@ for (const htmlPath of htmlFiles) {
     .replace(/assets\/js\/lighting-sim\.js\?v=[^"]+/g, `assets/js/lighting-sim.js?v=${cachebuster}`)
     .replace(/assets\/js\/app\.js\?v=[^"]+/g, `assets/js/app.js?v=${cachebuster}`);
   html = html.replace(/assets\/js\/workspace-ui\.js\?v=[^"]+/g, `assets/js/workspace-ui.js?v=${cachebuster}`);
+  html = html.replace(/assets\/js\/theme\.js\?v=[^"]+/g, `assets/js/theme.js?v=${cachebuster}`);
   html = html.replace(/assets\/css\/workspace-ui\.css\?v=[^"]+/g, `assets/css/workspace-ui.css?v=${cachebuster}`);
+  html = html.replace(/assets\/css\/design-system\.css\?v=[^"]+/g, `assets/css/design-system.css?v=${cachebuster}`);
 
   if (htmlPath === 'index.html') {
     html = html.replace(/<span class="version-badge">v\d+\.\d+\.\d+<\/span>/, `<span class="version-badge">${nextVersion}</span>`);

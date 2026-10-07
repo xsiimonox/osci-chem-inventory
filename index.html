@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reef.Storage&Tools</title>
+    <meta name="theme-color" content="#101719">
+    <title>ReefTools</title>
+    <script src="assets/js/theme.js?v=3.6.0-release"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.5.1-release">
-    <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.5.1-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.6.0-release">
+    <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.0-release">
+    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.0-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -27,8 +30,8 @@
         <div class="header-main">
             <div class="header-title-block">
                 <div class="header-title-container">
-                    <h1>Reef.Storage&Tools</h1>
-                    <span class="version-badge">v3.5.1</span>
+                    <h1>ReefTools</h1>
+                    <span class="version-badge">v3.6.0</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -51,8 +54,7 @@
                         </div>
                     </div>
                     <button type="button" class="header-quick-sync-button header-demo-button" onclick="openDemoProfileSettings()" aria-label="Demo-Profil öffnen">Demo</button>
-                    <button type="button" class="header-quick-sync-button header-support-button" onclick="openProjectSupportSettings()" aria-label="Entwickler mit einer Spende unterstützen">Entwickler unterstützen</button>
-                    <a href="anleitung.html" class="header-quick-sync-button header-help-link" data-help-page="guide" aria-label="Hilfe und Anleitung öffnen">Hilfe</a>
+                    <a href="anleitung.html" class="btn btn-secondary header-quick-sync-button header-help-link" data-help-page="guide" aria-label="Hilfe und Anleitung öffnen">Hilfe</a>
                 </div>
             </div>
             <div class="header-icon-actions">
@@ -86,6 +88,7 @@
             <span>Navigation</span>
             <button class="close-menu" onclick="toggleMenu()" aria-label="Navigation schließen">✕</button>
         </div>
+        <button type="button" class="btn-primary nav-support-button header-support-button" onclick="openProjectSupportSettings()" aria-label="Entwickler mit einer Spende unterstützen">Entwickler unterstützen</button>
         <div class="nav-links">
             <button onclick="selectTab('uebersicht')" id="tab-uebersicht">Übersicht</button>
             <button onclick="selectTab('lager')" class="active" id="tab-lager">Lager</button>
@@ -2067,12 +2070,11 @@
                 <div>
                     <span class="section-eyebrow">App konfigurieren</span>
                     <h2 id="settingsPageTitle">Einstellungen</h2>
-                    <p>Alle Bereiche bleiben standardmäßig geschlossen. Öffne nur die Einstellung, die du gerade brauchst.</p>
                 </div>
                 <div class="settings-page-actions">
-                    <button type="button" class="btn-primary btn-animated settings-assistant-link" onclick="openSetupAssistant()">Einrichtungsassistent starten</button>
-                    <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe &amp; Anleitung öffnen</button>
-                    <button type="button" class="btn-primary btn-animated settings-showcase-link" onclick="openTradeFairShowcase()">Messe-Übersicht</button>
+                    <button type="button" class="btn-secondary btn-animated settings-assistant-link" onclick="openSetupAssistant()">Einrichten</button>
+                    <button type="button" class="btn-secondary btn-animated settings-help-link" onclick="openLegalModal('guide')">Hilfe</button>
+                    <button type="button" class="btn-secondary btn-animated settings-showcase-link" onclick="openTradeFairShowcase()">Messe-Übersicht</button>
                 </div>
             </section>
 
@@ -2415,11 +2417,11 @@
                 <div class="input-group">
                     <label for="themeSelect">Farbschema der App wechseln:</label>
                     <select id="themeSelect" onchange="applyTheme(this.value)">
-                        <option value="default">Standard Design (Dark)</option>
-                        <option value="light">Light Mode ☀️</option>
-                        <option value="girl">Girl Edition 🎀</option>
-                        <option value="mint">Ocean Mint 🌊</option>
-                        <option value="badman">BADMAN Shark 🦈</option>
+                        <option value="default">Reef Lab · Graphit</option>
+                        <option value="light">Reef Lab · Hell</option>
+                        <option value="girl">Reef Lab · Rosé</option>
+                        <option value="mint">Reef Lab · Mint</option>
+                        <option value="badman">Reef Lab · Koralle</option>
                     </select>
                 </div>
 
@@ -2427,7 +2429,7 @@
                     <summary>
                         <span>
                             <strong>Eigene Designfarben</strong>
-                            <small>Färbt Akzente, Flächen, Rahmen und Navigation dezent mit.</small>
+                            <small>Individuelle Akzentfarben</small>
                         </span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
@@ -2445,7 +2447,7 @@
                         <div class="custom-color-preview" aria-hidden="true">
                             <span></span>
                             <strong>Designvorschau</strong>
-                            <small>Akzent · Fläche · Navigation</small>
+                            <small>Primär · Sekundär</small>
                         </div>
                         <button type="button" class="btn-secondary btn-animated" onclick="resetCustomThemeColors()">Eigene Farben zurücksetzen</button>
                     </div>
@@ -2686,9 +2688,9 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.5.1-release"></script>
-    <script src="assets/js/app.js?v=3.5.1-release"></script>
-    <script src="assets/js/workspace-ui.js?v=3.5.1-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.6.0-release"></script>
+    <script src="assets/js/app.js?v=3.6.0-release"></script>
+    <script src="assets/js/workspace-ui.js?v=3.6.0-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

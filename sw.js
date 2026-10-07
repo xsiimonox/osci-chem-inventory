@@ -1,11 +1,13 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v351-release';
+const CACHE_NAME = 'reef-storage-tools-cache-v360-release';
 const CORE_ASSETS = [
   './',
   './index.html',
   './assets/css/style.css',
   './assets/css/workspace-ui.css',
+  './assets/css/design-system.css',
   './assets/js/app.js',
   './assets/js/workspace-ui.js',
+  './assets/js/theme.js',
   './assets/js/lighting-sim.js',
   './assets/js/sangokai-data.js',
   './manifest.json',
@@ -56,7 +58,9 @@ self.addEventListener('fetch', (e) => {
           return response;
         })
         .catch(async () => {
-          const cached = await caches.match(e.request);
+          const releaseCache = await caches.open(CACHE_NAME);
+          // Versioned URLs share the core assets of this release when offline.
+          const cached = await releaseCache.match(e.request) || await releaseCache.match(e.request, { ignoreSearch: true });
           if (cached) return cached;
           if (e.request.mode === 'navigate') return caches.match('./index.html');
           return new Response('', { status: 503, statusText: 'Offline' });

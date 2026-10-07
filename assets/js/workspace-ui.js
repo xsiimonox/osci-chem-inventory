@@ -94,9 +94,18 @@
         buttons.forEach(button => (['einstellungen', 'log', 'statistik', 'masseneingang', 'nachbestellen'].includes(button.dataset.tab) ? utility : work).append(button));
         if (!utility.querySelector('[data-workspace-export]')) {
             const backup = document.createElement('button'); backup.type = 'button'; backup.dataset.workspaceExport = ''; backup.textContent = 'Projekt exportieren'; backup.onclick = () => exportData();
-            const help = document.createElement('a'); help.href = 'anleitung.html'; help.textContent = 'Hilfe'; help.className = 'workspace-help-link';
-            utility.append(backup, help);
+            utility.append(backup);
         }
+        const extras = document.querySelector('.nav-menu-utility');
+        if (extras) document.querySelectorAll('.header-demo-button,.header-help-link,.community-project-badge').forEach(element => {
+            if (element.parentElement !== extras) extras.append(element);
+        });
+    }
+    function observeChrome() {
+        const header = document.getElementById('appHeader');
+        if (header && window.ResizeObserver) new ResizeObserver(() => {
+            document.documentElement.style.setProperty('--measured-header-height', `${header.getBoundingClientRect().height}px`);
+        }).observe(header);
     }
     function wizard(root, panels, name, validate) {
         if (!root || root.dataset.wizardMounted) return;
@@ -189,5 +198,5 @@
         }
     }
     window.ReefWorkspaceUI = { renderCard, mountInventory, icpFeedback, groupNavigation, initWizards };
-    document.addEventListener('DOMContentLoaded', () => { initWizards(); groupNavigation(); if (document.getElementById('lager-container')) filterLager(); });
+    document.addEventListener('DOMContentLoaded', () => { initWizards(); groupNavigation(); observeChrome(); if (document.getElementById('lager-container')) filterLager(); });
 }());

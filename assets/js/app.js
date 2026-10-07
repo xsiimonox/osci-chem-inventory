@@ -9833,76 +9833,26 @@ function getCustomThemeColors() {
     };
 }
 
-const CUSTOM_THEME_VARIABLES = [
-    '--accent',
-    '--primary',
-    '--accent-strong',
-    '--secondary',
-    '--app-bg',
-    '--nav-bg',
-    '--surface-card',
-    '--surface-raised',
-    '--surface-overlay',
-    '--border-color',
-    '--bg',
-    '--card-bg',
-    '--border',
-    '--focus-ring'
-];
-
 function clearCustomThemeVariables(target) {
-    if (!target?.style) return;
-    CUSTOM_THEME_VARIABLES.forEach(variable => target.style.removeProperty(variable));
+    ReefTheme.clearColors(target);
 }
 
 function getComputedThemeValue(name, fallback = '') {
     return getComputedStyle(document.body).getPropertyValue(name).trim() || fallback;
 }
 
-function readBaseThemeColors() {
-    return {
-        bg: getComputedThemeValue('--app-bg', '#07151b'),
-        nav: getComputedThemeValue('--nav-bg', '#0b2028'),
-        card: getComputedThemeValue('--surface-card', '#102a33'),
-        raised: getComputedThemeValue('--surface-raised', '#173740'),
-        overlay: getComputedThemeValue('--surface-overlay', '#173740'),
-        border: getComputedThemeValue('--border-color', '#2b4a53')
-    };
-}
-
-function setThemeColorVariables(target, colors, baseColors = readBaseThemeColors()) {
-    if (!target?.style) return;
-    clearCustomThemeVariables(target);
-    const primary = colors.primary || colors.secondary;
-    if (primary) {
-        const secondary = colors.secondary || primary;
-        target.style.setProperty('--accent', primary);
-        target.style.setProperty('--primary', primary);
-        target.style.setProperty('--accent-strong', `color-mix(in srgb, ${primary} 72%, #000)`);
-        target.style.setProperty('--secondary', secondary);
-        target.style.setProperty('--app-bg', `color-mix(in srgb, ${primary} 8%, ${baseColors.bg})`);
-        target.style.setProperty('--nav-bg', `color-mix(in srgb, ${primary} 12%, ${baseColors.nav})`);
-        target.style.setProperty('--surface-card', `color-mix(in srgb, ${primary} 8%, ${baseColors.card})`);
-        target.style.setProperty('--surface-raised', `color-mix(in srgb, ${secondary} 10%, ${baseColors.raised})`);
-        target.style.setProperty('--surface-overlay', `color-mix(in srgb, ${secondary} 12%, ${baseColors.overlay})`);
-        target.style.setProperty('--border-color', `color-mix(in srgb, ${primary} 26%, ${baseColors.border})`);
-        target.style.setProperty('--bg', 'var(--app-bg)');
-        target.style.setProperty('--card-bg', 'var(--surface-card)');
-        target.style.setProperty('--border', 'var(--border-color)');
-        target.style.setProperty('--focus-ring', `0 0 0 3px color-mix(in srgb, ${primary} 38%, transparent)`);
-    } else {
-        clearCustomThemeVariables(target);
-    }
+function setThemeColorVariables(target, colors) {
+    ReefTheme.setColors(target, colors);
 }
 
 function applyCustomThemeColors() {
     const colors = getCustomThemeColors();
     clearCustomThemeVariables(document.documentElement);
     clearCustomThemeVariables(document.body);
-    const baseColors = readBaseThemeColors();
-    setThemeColorVariables(document.documentElement, colors, baseColors);
-    setThemeColorVariables(document.body, colors, baseColors);
+    setThemeColorVariables(document.documentElement, colors);
+    setThemeColorVariables(document.body, colors);
     document.body.classList.toggle('custom-theme-colors-active', Boolean(colors.primary || colors.secondary));
+    ReefTheme.updateLinks(db.theme || 'default', colors);
     syncCustomThemeColorInputs();
 }
 
@@ -9936,12 +9886,7 @@ function resetCustomThemeColors() {
 }
 
 function applyTheme(themeName, shouldSave = true) {
-    // Alle alten Design-Klassen vom Body entfernen
-    document.body.classList.remove('theme-girl', 'theme-mint', 'theme-badman', 'theme-light');
-    
-    if (themeName !== 'default') {
-        document.body.classList.add('theme-' + themeName);
-    }
+    ReefTheme.setMode(themeName);
     
     db.theme = themeName;
     try {
@@ -9949,20 +9894,13 @@ function applyTheme(themeName, shouldSave = true) {
     } catch (error) {
         // The app theme still works when browser storage is unavailable.
     }
-    document.querySelectorAll('.app-footer a[href^="impressum.html"], .app-footer a[href^="privacy.html"]').forEach(link => {
-        const page = link.getAttribute('href').split('?')[0];
-        link.setAttribute('href', `${page}?theme=${encodeURIComponent(themeName)}`);
-    });
     if (shouldSave) saveDB();
     applyCustomThemeColors();
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', getComputedThemeValue('--app-bg', '#101719'));
     
     // Dropdown-Auswahl im Menü synchronisieren, falls geladen
     const themeSelect = document.getElementById('themeSelect');
     if (themeSelect) themeSelect.value = themeName;
-}
-
-function getLegalModalThemeParam() {
-    return encodeURIComponent(db.theme || 'default');
 }
 
 Object.assign(window, {
@@ -9980,7 +9918,7 @@ function openLegalModal(page = 'impressum') {
     const normalized = page === 'privacy' ? 'privacy' : (page === 'guide' ? 'guide' : 'impressum');
     const pageFile = normalized === 'privacy' ? 'privacy.html' : (normalized === 'guide' ? 'anleitung.html' : 'impressum.html');
     title.textContent = normalized === 'privacy' ? 'Datenschutzerklärung' : (normalized === 'guide' ? 'Anleitung' : 'Impressum');
-    frame.src = `${pageFile}?theme=${getLegalModalThemeParam()}&embed=app-modal`;
+    frame.src = ReefTheme.pageUrl(pageFile, db.theme, getCustomThemeColors(), true);
     modal.hidden = false;
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
@@ -11802,10 +11740,10 @@ function renderWavePumpDemoSettings() {
             </div>
             <div class="wave-demo-actions">
                 <button type="button" class="btn-secondary btn-animated" onclick="lockWavePumpDemo()">Demo sperren</button>
-                <a class="btn-secondary" href="wave/demo.html" target="_blank" rel="noopener noreferrer">In neuem Tab öffnen</a>
+                <a class="btn-secondary" href="${escapeHtml(ReefTheme.pageUrl('wave/demo.html', db.theme, getCustomThemeColors()))}" target="_blank" rel="noopener noreferrer">In neuem Tab öffnen</a>
             </div>
             <div class="wave-demo-frame-wrap">
-                <iframe class="wave-demo-frame" src="wave/demo.html" title="Wave Pumpensteuerung Demo" loading="eager" referrerpolicy="no-referrer"></iframe>
+                <iframe class="wave-demo-frame" src="${escapeHtml(ReefTheme.pageUrl('wave/demo.html', db.theme, getCustomThemeColors()))}" title="Wave Pumpensteuerung Demo" loading="eager" referrerpolicy="no-referrer"></iframe>
             </div>
         </div>
     `;

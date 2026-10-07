@@ -1,50 +1,185 @@
-:root {
-    --stock-empty: #ef7887;
-    --stock-critical: #ef7887;
-    --stock-warning: #f3c35b;
-    --stock-optimal: #54d3a8;
+
+[data-stock-status="empty"], [data-stock-status="critical"] {
+    --stock-color:var(--stock-critical);
 }
-[data-stock-status="empty"], [data-stock-status="critical"] { --stock-color: var(--stock-critical); }
-[data-stock-status="warning"] { --stock-color: var(--stock-warning); }
-[data-stock-status="optimal"] { --stock-color: var(--stock-optimal); }
-.inventory-view-switch { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border: 0; margin: 0; padding: 0; }
-.inventory-view-switch legend { font-size: 12px; color: var(--text-muted); }
-.inventory-view-switch label { display: flex; align-items: center; gap: 6px; min-height: 44px; cursor: pointer; }
-#lager-container .inventory-card-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); align-items: start; }
-#lager-container .inventory-card--lean { padding: 14px; min-width: 0; border-radius: 8px; gap: 12px; }
-.inventory-card--lean h3 { font-size: 16px; overflow-wrap: anywhere; }
-.inventory-card--lean .inventory-card-head { align-items: start; }
-.inventory-symbol { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 14px; flex-shrink: 0; }
-.inventory-card--lean .stock { font-size: 22px; }
-.stock-status { border-inline-start: 4px solid var(--stock-color); padding-inline-start: 8px; font-size: 13px; }
-.inventory-card--lean meter { display: block; width: 100%; height: 12px; accent-color: var(--stock-color); }
-.inventory-card--lean .inventory-card-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.inventory-card--lean .inventory-card-actions button { min-height: 44px; padding: 8px; font-size: 14px; border-radius: 8px; }
-.inventory-card--lean .product-history { display: block; margin: 0; }
-.inventory-card--lean .product-history summary { min-height: 44px; display: flex; align-items: center; }
-.inventory-card--lean .inventory-facts { display: grid; grid-template-columns: minmax(0, 1fr); }
-.inventory-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.inventory-detail-actions button { min-height: 44px; border-radius: 8px; padding: 8px; }
-.icp-match-feedback { display: grid; gap: 6px; border-inline-start: 4px solid var(--stock-color); padding: 12px; margin-block: 12px; }
-.workspace-step-nav { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-block: 12px; }
-.workspace-step-nav button { min-width: 0; min-height: 44px; padding: 8px; border-radius: 8px; font-size: 14px; overflow-wrap: anywhere; }
-.workspace-step-nav button[aria-current="step"] { border: 2px solid var(--primary, #54d3a8); background: var(--bg-secondary); }
-.workspace-step-footer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
-.workspace-step-footer button { min-height: 44px; border-radius: 8px; }
-.workspace-step-error { grid-column: 1 / -1; color: var(--stock-critical); margin: 0; }
-.workspace-step-error:empty { display: none; }
-[data-wizard-mounted] [hidden] { display: none !important; }
-.nav-work-group, .nav-utility-group { display: grid; gap: 6px; width: 100%; }
-.nav-group-label { color: var(--text-muted); font-size: 12px; padding: 12px 8px 4px; }
-.nav-utility-group { border-top: 1px solid var(--border); margin-top: 12px; }
-.workspace-help-link { display: flex; align-items: center; min-height: 44px; padding: 12px; color: var(--text); border-radius: 8px; }
-.status-badge--success { color: var(--stock-optimal); border-color: var(--stock-optimal); }
-.status-badge--warning, .trace-history-status-start, .trace-history-status-missing { border-color: var(--stock-warning); }
-.status-badge--danger { color: var(--stock-critical); border-color: var(--stock-critical); }
-.trace-history-status { border-radius: 8px; }
+[data-stock-status="warning"] {
+    --stock-color:var(--stock-warning);
+}
+[data-stock-status="optimal"] {
+    --stock-color:var(--stock-optimal);
+}
+.inventory-view-switch {
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:12px;
+    border:0;
+    margin:0;
+    padding:0;
+}
+.inventory-view-switch legend {
+    font-size:12px;
+    color:var(--text-muted);
+}
+.inventory-view-switch label {
+    display:flex;
+    align-items:center;
+    gap:6px;
+    min-height:44px;
+    cursor:pointer;
+}
+#lager-container .inventory-card-grid {
+    grid-template-columns:repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+    align-items:start;
+}
+#lager-container .inventory-card--lean {
+    padding:14px;
+    min-width:0;
+    border-radius:var(--radius-md);
+    gap:12px;
+}
+.inventory-card--lean h3 {
+    font-size:16px;
+    overflow-wrap:anywhere;
+}
+.inventory-card--lean .inventory-card-head {
+    align-items:start;
+}
+.inventory-symbol {
+    padding:4px 8px;
+    border:1px solid var(--border);
+    border-radius:var(--radius-md);
+    font-size:14px;
+    flex-shrink:0;
+}
+.inventory-card--lean .stock {
+    font-size:22px;
+}
+.stock-status {
+    border-inline-start:4px solid var(--stock-color);
+    padding-inline-start:8px;
+    font-size:13px;
+}
+.inventory-card--lean meter {
+    display:block;
+    width:100%;
+    height:12px;
+    accent-color:var(--stock-color);
+}
+.inventory-card--lean .inventory-card-actions {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+}
+.inventory-card--lean .inventory-card-actions button {
+    min-height:44px;
+    padding:8px;
+}
+.inventory-card--lean .product-history {
+    display:block;
+    margin:0;
+}
+.inventory-card--lean .product-history summary {
+    min-height:44px;
+    display:flex;
+    align-items:center;
+}
+.inventory-card--lean .inventory-facts {
+    display:grid;
+    grid-template-columns:minmax(0, 1fr);
+}
+.inventory-detail-actions {
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+}
+.inventory-detail-actions button {
+    min-height:44px;
+    padding:8px;
+}
+.icp-match-feedback {
+    display:grid;
+    gap:6px;
+    border-inline-start:4px solid var(--stock-color);
+    padding:12px;
+    margin-block:12px;
+}
+.workspace-step-nav {
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:8px;
+    margin-block:12px;
+}
+.workspace-step-nav button {
+    min-width:0;
+    min-height:44px;
+    padding:8px;
+    overflow-wrap:anywhere;
+}
+
+.workspace-step-footer {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+    margin-top:16px;
+}
+.workspace-step-footer button {
+    min-height:44px;
+}
+.workspace-step-error {
+    grid-column:1 / -1;
+    color:var(--stock-critical);
+    margin:0;
+}
+.workspace-step-error:empty {
+    display:none;
+}
+[data-wizard-mounted] [hidden] {
+    display:none!important;
+}
+.nav-work-group, .nav-utility-group {
+    display:grid;
+    gap:6px;
+    width:100%;
+}
+.nav-group-label {
+    color:var(--text-muted);
+    font-size:12px;
+    padding:12px 8px 4px;
+}
+.nav-utility-group {
+    border-top:1px solid var(--border);
+    margin-top:12px;
+}
+.workspace-help-link {
+    display:flex;
+    align-items:center;
+    min-height:44px;
+    padding:12px;
+    color:var(--text);
+    border-radius:var(--radius-md);
+}
+.status-badge--success {
+    color:var(--stock-optimal);
+    border-color:var(--stock-optimal);
+}
+.status-badge--warning, .trace-history-status-start, .trace-history-status-missing {
+    border-color:var(--stock-warning);
+}
+.status-badge--danger {
+    color:var(--stock-critical);
+    border-color:var(--stock-critical);
+}
+.trace-history-status {
+    border-radius:var(--radius-md);
+}
 @media (max-width: 767px) {
-    .mobile-bottom-nav button .mobile-nav-label { display: block; font-size: 10px; line-height: 1.3; white-space: normal; }
-    .mobile-bottom-nav button { flex-direction: column; gap: 4px; min-width: 0; }
-    .workspace-step-nav { gap: 4px; }
-    .workspace-step-nav button { font-size: 12px; padding: 8px 4px; }
+    
+    
+    .workspace-step-nav {
+    gap:4px;
+}
+    .workspace-step-nav button {
+    padding:8px 4px;
+}
 }
