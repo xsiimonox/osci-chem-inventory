@@ -669,6 +669,7 @@ const CORAL_PLACEMENT_PROFILES = [
 ];
 const AQUARIUM_FIELD_KEYS = [
     'volumeLiters',
+    'supplyProfile',
     'implementationLog',
     'logBookCategories',
     'logBookEntries',
@@ -1324,7 +1325,7 @@ const TOOL_SECTION_DEFINITIONS = [
     { id: 'dosieren-und-messwerte', label: 'Dosierung, Verbrauch & Messen', hint: 'KH/Ca, Testabgleich, Nährstoffe und tägliche Dosierung' },
     { id: 'salinitaet-und-wasserwechsel', label: 'Salinität & Wasserwechsel', hint: 'Salzgehalt, Nettovolumen, Wasserwechsel und Adsorber' },
     { id: 'c-und-r-und-mischen', label: 'Mischen & Rezepte', hint: 'Meerwasser, C&R-Lösungen, Natriumchlorid und Makro-Elemente', osciOnly: true },
-    { id: 'sangokai-a-z', label: 'Sangokai A-Z', hint: 'Assistent und Originalquelle zum Nachschlagen' },
+    { id: 'sangokai-mengen-und-mischen', label: 'Sangokai: Mengen & Mischen', hint: 'Reine Mengen- und Verdünnungsberechnungen ohne Anwendungsempfehlung' },
     { id: 'community-und-hilfe', label: 'Hilfe & Quellen', hint: 'Anleitung, OSCI Motion Links, Meerwasser-Lexikon und Buchtipps' }
 ];
 const TAB_LABELS = {
@@ -1362,6 +1363,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'fauna-marin-traces': 'fauna marin balling trace 1 2 3 strontium sr molybdaen mo jod iod kanister restwert icp dosierung',
     'barium-lithium-und-molybdaen-direkt-ausgleichen': 'trace einzelkorrektur barium ba lithium li molybdaen molybdän mo icp zielwert direkt ausgleichen dosieren',
     'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
+    'balling-pulver-rechner': 'balling faunamarin fauna marin pulver natriumhydrogencarbonat natriumcarbonat calciumchlorid dihydrat magnesiumchlorid hexahydrat magnesiumsulfat heptahydrat kh ca mg salzlösung ansetzen dosieren',
     'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
     'tagesdosierung-wirkung': 'wasserwert wasserwerte dosierpumpe dosierung täglich tagesdosis konzentration produktwirkung kh calcium ca',
     'test-korrekturfaktor': 'wasserwert wasserwerte heimtest referenz icp kalibrieren abgleich messfehler korrektur',
@@ -1377,12 +1379,13 @@ const TOOL_SEARCH_KEYWORDS = {
     'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
     'c-und-r-natriumchlorid-aus-nacl-pulver': 'nacl natriumchlorid salz pulver lösung ansetzen mischen',
     'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen',
-    'sangokai-a-z-assistent': 'wissen hilfe ratgeber nachschlagen frage pdf sangokai',
+    'sangokai-mengen-und-mischen': 'sangokai balance kh calcium ca-1 ca-2 mischung verdünnung mengenrechnung konzentrat lager produkt',
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
 const TOOL_DEFINITIONS = [
     { id: 'barium-lithium-und-molybdaen-direkt-ausgleichen', label: 'Barium, Lithium & Molybdän direkt ausgleichen', sectionId: 'dosieren-und-messwerte' },
     { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur', sectionId: 'dosieren-und-messwerte' },
+    { id: 'balling-pulver-rechner', label: 'Balling & Pulver', sectionId: 'dosieren-und-messwerte' },
     { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag', sectionId: 'dosieren-und-messwerte' },
     { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung', sectionId: 'dosieren-und-messwerte' },
     { id: 'test-korrekturfaktor', label: 'Test Korrekturfaktor', sectionId: 'dosieren-und-messwerte' },
@@ -1399,7 +1402,7 @@ const TOOL_DEFINITIONS = [
     { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
     { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', sectionId: 'c-und-r-und-mischen', osciOnly: true },
     { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
-    { id: 'sangokai-a-z-assistent', label: 'Sangokai A-Z Assistent', sectionId: 'sangokai-a-z' },
+    { id: 'sangokai-mengen-und-mischen', label: 'Sangokai Mengen & Mischen', sectionId: 'sangokai-mengen-und-mischen' },
     { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen', sectionId: 'community-und-hilfe' }
 ];
 const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
@@ -1412,7 +1415,41 @@ function isOsciProductCategory(category) {
 
 function shouldShowCatalogProduct(category, item) {
     if (!isOsciFeaturesEnabled() && isOsciProductCategory(category)) return false;
+    const provider = getSupplyProviderForCategory(category);
+    if (provider && !isSupplyProviderEnabled(provider)) return false;
+    if (provider === 'sangokai' && !isSangokaiCategoryEnabled(category)) return false;
     return !isProductHidden(item);
+}
+
+function getSupplyProviderForCategory(category) {
+    const value = String(category || '');
+    if (value.startsWith('SANGOKAI')) return 'sangokai';
+    if (value.startsWith('Fauna Marin')) return 'fauna-marin';
+    if (/balling pulver/i.test(value)) return 'own-powder';
+    if (isOsciProductCategory(value)) return 'osci';
+    return null;
+}
+
+function isSupplyProviderEnabled(provider) {
+    return getActiveSupplyProfile().providers.includes(provider);
+}
+
+function isSangokaiCategoryEnabled(category) {
+    const profile = getActiveSupplyProfile();
+    const enabledModules = profile.sangokaiModules;
+    const text = String(category || '').replace(/^SANGOKAI\s*/i, '').toLocaleLowerCase('de');
+    const moduleAliases = {
+        'nano-basis': ['nano basis'],
+        individual: ['individual'],
+        balance: ['balance'],
+        start: ['start'],
+        basis: ['basis'],
+        hed: ['hed'],
+        clean: ['clean']
+    };
+    return enabledModules.some(id => (moduleAliases[id] || [id]).some(alias =>
+        text.split('/').some(part => part.trim() === alias)
+    ));
 }
 
 function getVisibleCatalogCategoryNames() {
@@ -3099,7 +3136,7 @@ function createDemoAppState() {
         demoProfile: true,
         demoCreatedAt: new Date().toISOString(),
         activeWarehouseId: mainWarehouse.id,
-        activeAquariumId: 'demo-aquarium',
+        activeAquariumId: 'aquarium-main',
         pendingDeletedRemoteIds: [],
         communityMapProfileDraft: {},
         warehouses: {
@@ -3107,11 +3144,11 @@ function createDemoAppState() {
             [reserveWarehouse.id]: reserveWarehouse
         },
         aquariums: {
-            'demo-aquarium': {
-                id: 'demo-aquarium',
-                name: 'Demo Riff 440',
-                createdAt: demoDate(120, 8, 0),
-                data: createDemoAquariumData()
+            'aquarium-main': {
+                id: 'aquarium-main',
+                name: 'Hauptaquarium',
+                createdAt: new Date().toISOString(),
+                data: createAquariumData()
             }
         }
     };
@@ -3174,7 +3211,7 @@ async function restoreOwnProfileFromDemo() {
     if (!confirmed) return;
     appState = migrateToWarehouseState(returnRecord.payload);
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
-    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+    activeAquariumId = appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
     appState.activeWarehouseId = activeWarehouseId;
     appState.activeAquariumId = activeAquariumId;
     db = normalizeWarehouseData(getActiveWarehouse()?.data || {});
@@ -3346,7 +3383,7 @@ function validateProjectBackupPayload(payload = {}) {
         warnings.push(...result.warnings.map(warning => `Lager "${warehouse.name || id}": ${warning}`));
     });
     const aquariums = Object.entries(data.aquariums || {});
-    if (!aquariums.length) warnings.push('Es ist kein Aquarium im Backup enthalten. Die App kann ein Standard-Aquarium erzeugen.');
+    if (!aquariums.length) warnings.push('Es ist kein Aquarium im Backup enthalten; dieser Zustand bleibt beim Wiederherstellen erhalten.');
     aquariums.forEach(([id, aquarium]) => {
         if (!aquarium || typeof aquarium !== 'object') {
             warnings.push(`Aquarium "${id}" hat ein ungewöhnliches Format.`);
@@ -3552,7 +3589,7 @@ async function restoreProjectBackupFromGoogleDrive() {
         setDemoProfileActive(false);
         await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
         activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
-        activeAquariumId = parsed.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+        activeAquariumId = appState.aquariums[parsed.activeAquariumId] ? parsed.activeAquariumId : appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
         appState.activeWarehouseId = activeWarehouseId;
         appState.activeAquariumId = activeAquariumId;
         const active = getActiveWarehouse();
@@ -3980,7 +4017,7 @@ async function restoreLocalSnapshot(snapshotId, ask = true) {
     }
     appState = migrateToWarehouseState(snapshot.payload);
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
-    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+    activeAquariumId = appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
     const active = getActiveWarehouse();
     if (active) db = normalizeWarehouseData(active.data);
     overlayActiveAquariumData();
@@ -4302,7 +4339,7 @@ function getHiddenMenuTabs() {
 function isMenuTabHidden(tabId) {
     if (ALWAYS_VISIBLE_TABS.has(tabId)) return false;
     if (tabId === 'uebersicht' && !isOverviewEnabled()) return true;
-    if (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled()) return true;
+    if (OSCI_ONLY_TAB_IDS.has(tabId) && (!isOsciFeaturesEnabled() || !isSupplyProviderEnabled('osci'))) return true;
     return getHiddenMenuTabs().includes(tabId);
 }
 
@@ -4887,9 +4924,42 @@ function getAquariumVolumeFromSource(source = {}) {
     return value || 500;
 }
 
+const SUPPLY_PROVIDER_OPTIONS = [
+    ['osci', 'OSCI Motion'],
+    ['fauna-marin', 'Fauna Marin'],
+    ['sangokai', 'SANGOKAI'],
+    ['own-powder', 'Eigene Pulver / Rezepte']
+];
+const SANGOKAI_MODULE_OPTIONS = [
+    ['start', 'START'],
+    ['basis', 'BASIS'],
+    ['nano-basis', 'NANO BASIS'],
+    ['hed', 'HED'],
+    ['balance', 'BALANCE'],
+    ['individual', 'INDIVIDUAL'],
+    ['clean', 'CLEAN']
+];
+
+function normalizeSupplyProfile(source = {}) {
+    const filtersConfigured = source.filtersConfigured === true;
+    const providers = filtersConfigured && Array.isArray(source.providers)
+        ? source.providers
+        : SUPPLY_PROVIDER_OPTIONS.map(([id]) => id);
+    const modules = filtersConfigured && Array.isArray(source.sangokaiModules)
+        ? source.sangokaiModules
+        : SANGOKAI_MODULE_OPTIONS.map(([id]) => id);
+    return {
+        filtersConfigured,
+        providers: [...new Set(providers.filter(id => SUPPLY_PROVIDER_OPTIONS.some(([key]) => key === id)))],
+        sangokaiModules: [...new Set(modules.filter(id => SANGOKAI_MODULE_OPTIONS.some(([key]) => key === id)))],
+        calculators: cloneSerializable(source.calculators || {})
+    };
+}
+
 function createAquariumData(source = {}) {
     return {
         volumeLiters: getAquariumVolumeFromSource(source),
+        supplyProfile: normalizeSupplyProfile(source.supplyProfile || {}),
         implementationLog: cloneSerializable(source.implementationLog || source.dosePlanArchive || []),
         logBookCategories: cloneSerializable(source.logBookCategories || ['Technik', 'Wartung', 'Versorgung', 'Nährstoffkontrolle', 'Wasserwechsel', 'Korallenbesatz', 'Fischbesatz', 'Sonstiges']),
         logBookEntries: cloneSerializable(source.logBookEntries || []),
@@ -5028,8 +5098,10 @@ function stripAquariumFieldsFromWarehouseData(data = {}) {
 
 function normalizeProjectStateAfterRestore(rawState = {}) {
     const state = cloneSerializable(rawState || {});
-    const hadAquariums = state.aquariums && typeof state.aquariums === 'object' && Object.keys(state.aquariums).length > 0;
-    const legacyAquariumData = hadAquariums ? {} : extractLegacyAquariumDataFromWarehouses(state);
+    const hasAquariumCollection = Object.prototype.hasOwnProperty.call(state, 'aquariums')
+        && state.aquariums && typeof state.aquariums === 'object' && !Array.isArray(state.aquariums);
+    const hasAquariums = hasAquariumCollection && Object.keys(state.aquariums).length > 0;
+    const legacyAquariumData = hasAquariumCollection ? {} : extractLegacyAquariumDataFromWarehouses(state);
 
     if (!state.warehouses || typeof state.warehouses !== 'object' || Array.isArray(state.warehouses)) {
         state.warehouses = {};
@@ -5053,7 +5125,7 @@ function normalizeProjectStateAfterRestore(rawState = {}) {
         state.activeWarehouseId = 'main';
     }
 
-    if (!state.aquariums || typeof state.aquariums !== 'object' || Array.isArray(state.aquariums) || !Object.keys(state.aquariums).length) {
+    if (!hasAquariumCollection) {
         state.aquariums = {
             'aquarium-main': {
                 id: 'aquarium-main',
@@ -5064,25 +5136,27 @@ function normalizeProjectStateAfterRestore(rawState = {}) {
         };
         state.activeAquariumId = 'aquarium-main';
     } else {
-        Object.entries(state.aquariums).forEach(([id, aquarium]) => {
-            if (!aquarium || typeof aquarium !== 'object') {
-                state.aquariums[id] = createAquariumRecord('Aquarium', {});
-                state.aquariums[id].id = id;
-                return;
-            }
-            aquarium.id = aquarium.id || id;
-            aquarium.name = aquarium.name || 'Aquarium';
-            aquarium.createdAt = aquarium.createdAt || new Date().toISOString();
-            aquarium.data = normalizeAquariumData(aquarium.data || {});
-        });
+        if (hasAquariums) {
+            Object.entries(state.aquariums).forEach(([id, aquarium]) => {
+                if (!aquarium || typeof aquarium !== 'object') {
+                    state.aquariums[id] = createAquariumRecord('Aquarium', {});
+                    state.aquariums[id].id = id;
+                    return;
+                }
+                aquarium.id = aquarium.id || id;
+                aquarium.name = aquarium.name || 'Aquarium';
+                aquarium.createdAt = aquarium.createdAt || new Date().toISOString();
+                aquarium.data = normalizeAquariumData(aquarium.data || {});
+            });
+        } else {
+            state.activeAquariumId = null;
+        }
     }
 
     if (!state.warehouses[state.activeWarehouseId]) {
         state.activeWarehouseId = Object.keys(state.warehouses)[0] || 'main';
     }
-    if (!state.aquariums[state.activeAquariumId]) {
-        state.activeAquariumId = Object.keys(state.aquariums)[0] || 'aquarium-main';
-    }
+    if (!state.aquariums[state.activeAquariumId]) state.activeAquariumId = Object.keys(state.aquariums)[0] || null;
     state.version = state.version || 1;
     if (!Array.isArray(state.pendingDeletedRemoteIds)) state.pendingDeletedRemoteIds = [];
     if (!state.communityMapProfileDraft) state.communityMapProfileDraft = {};
@@ -5154,12 +5228,12 @@ function syncActiveWarehouseDataFromDb(markDirty = true) {
 }
 
 function overlayActiveAquariumData() {
-    const aquarium = getActiveAquarium();
-    if (!aquarium) return;
-    aquarium.data = normalizeAquariumData(aquarium.data);
     AQUARIUM_FIELD_KEYS.forEach(key => {
         delete db[key];
     });
+    const aquarium = getActiveAquarium();
+    if (!aquarium) return;
+    aquarium.data = normalizeAquariumData(aquarium.data);
     AQUARIUM_FIELD_KEYS.forEach(key => {
         db[key] = cloneSerializable(aquarium.data[key]);
     });
@@ -5281,11 +5355,7 @@ async function initDB() {
     });
 
     const firstWarehouseData = Object.values(appState.warehouses)[0]?.data || parsed || {};
-    if (!appState.aquariums || Object.keys(appState.aquariums).length === 0) {
-        const aquariumRecord = createAquariumRecord('Hauptaquarium', firstWarehouseData);
-        aquariumRecord.id = 'aquarium-main';
-        appState.aquariums = { 'aquarium-main': aquariumRecord };
-    }
+    if (!appState.aquariums || typeof appState.aquariums !== 'object' || Array.isArray(appState.aquariums)) appState.aquariums = {};
     Object.entries(appState.aquariums).forEach(([id, aquarium]) => {
         aquarium.id = id;
         if (!aquarium.name) aquarium.name = 'Aquarium';
@@ -5296,8 +5366,7 @@ async function initDB() {
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses)[0];
     if (!appState.warehouses[activeWarehouseId]) activeWarehouseId = Object.keys(appState.warehouses)[0];
     appState.activeWarehouseId = activeWarehouseId;
-    activeAquariumId = appState.activeAquariumId || Object.keys(appState.aquariums)[0];
-    if (!appState.aquariums[activeAquariumId]) activeAquariumId = Object.keys(appState.aquariums)[0];
+    activeAquariumId = appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums)[0] || null;
     appState.activeAquariumId = activeAquariumId;
 
     const warehouse = getActiveWarehouse();
@@ -8501,6 +8570,7 @@ function switchAquarium(id) {
     saveDB(false);
     renderCurrentWarehouseViews();
     document.dispatchEvent(new Event('reeftools-context-change'));
+    initSangokaiQuantityTools();
 }
 
 async function createAquarium() {
@@ -8559,6 +8629,7 @@ async function editAquariumVolume() {
     saveDB();
     renderCurrentWarehouseViews();
     syncAquariumVolumeInputs(volume);
+    initSangokaiQuantityTools();
     showToast(`Aquariumgröße auf ${volume} L gesetzt`, 'success');
 }
 
@@ -8651,14 +8722,29 @@ function renameAquarium() {
     renderAquariumWorkspacePanels();
 }
 
-function deleteAquarium() {
+async function deleteAquarium() {
     const aquarium = getActiveAquarium();
     if (!aquarium) return;
     const ids = Object.keys(appState.aquariums || {});
-    if (ids.length <= 1) return alert('Es muss mindestens ein Aquarium vorhanden bleiben.');
-    if (!confirm(`Aquarium "${aquarium.name}" wirklich löschen? Logbuch, Messwerte, ToDos und Tool-Daten dieses Aquariums werden entfernt.`)) return;
+    const firstConfirmation = await appConfirm(`Möchtest du das Aquarium "${aquarium.name}" wirklich löschen?`, {
+        title: 'Aquarium löschen',
+        type: 'warning',
+        confirmText: 'Weiter',
+        cancelText: 'Abbrechen'
+    });
+    if (!firstConfirmation) return;
+
+    const lastAquariumNotice = ids.length === 1 ? ' Danach ist kein Aquarium angelegt.' : '';
+    const secondConfirmation = await appConfirm(`Das löscht "${aquarium.name}" endgültig, einschließlich Logbuch, Messwerten, ToDos und Tool-Daten.${lastAquariumNotice}`, {
+        title: 'Löschen endgültig bestätigen',
+        type: 'warning',
+        confirmText: 'Endgültig löschen',
+        cancelText: 'Abbrechen'
+    });
+    if (!secondConfirmation) return;
+
     delete appState.aquariums[aquarium.id];
-    activeAquariumId = Object.keys(appState.aquariums)[0];
+    activeAquariumId = Object.keys(appState.aquariums)[0] || null;
     appState.activeAquariumId = activeAquariumId;
     overlayActiveAquariumData();
     saveDB(false);
@@ -8735,26 +8821,27 @@ function jsArg(value) {
 
 function renderAquariumWorkspacePanels() {
     const aquarium = getActiveAquarium();
-    const options = Object.values(appState?.aquariums || {}).map(entry => `
+    const aquariumList = Object.values(appState?.aquariums || {});
+    const options = aquariumList.length ? aquariumList.map(entry => `
         <option value="${entry.id}" ${entry.id === activeAquariumId ? 'selected' : ''}>${escapeHtml(entry.name)}</option>
-    `).join('');
+    `).join('') : '<option value="" selected>Kein Aquarium angelegt</option>';
     const panelHtml = (selectId) => `
         <div class="aquarium-workspace-head">
             <div>
                 <span>Aktives Aquarium</span>
-                <strong>${escapeHtml(aquarium?.name || 'Aquarium')}</strong>
-                <small class="aquarium-workspace-volume">${escapeHtml(String(getActiveAquariumVolumeLiters()))} L effektives Nettovolumen</small>
+                <strong>${escapeHtml(aquarium?.name || 'Kein Aquarium angelegt')}</strong>
+                <small class="aquarium-workspace-volume">${aquarium ? `${escapeHtml(String(getActiveAquariumVolumeLiters()))} L effektives Nettovolumen` : 'Aquariumdaten und aquariumspezifische Funktionen sind inaktiv.'}</small>
             </div>
             <div class="aquarium-workspace-actions">
                 <button type="button" onclick="createAquarium()">Neu</button>
-                <button type="button" onclick="renameAquarium()">Umbenennen</button>
-                <button type="button" onclick="editAquariumVolume()">Größe ändern</button>
-                <button type="button" onclick="deleteAquarium()">Löschen</button>
+                <button type="button" onclick="renameAquarium()" ${aquarium ? '' : 'disabled'}>Umbenennen</button>
+                <button type="button" onclick="editAquariumVolume()" ${aquarium ? '' : 'disabled'}>Größe ändern</button>
+                <button type="button" onclick="deleteAquarium()" ${aquarium ? '' : 'disabled'}>Löschen</button>
             </div>
         </div>
         <div class="aquarium-workspace-select">
             <select id="${selectId}" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln">${options}</select>
-            <small>Tools, Logbuch, ToDos und Messwerte folgen dem Aquarium. Neue Rechner übernehmen die Aquariumgröße automatisch.</small>
+            <small>${aquarium ? 'Tools, Logbuch, ToDos und Messwerte folgen dem Aquarium. Neue Rechner übernehmen die Aquariumgröße automatisch.' : 'Du kannst ReefTools auch ohne Aquarium verwenden. Über „Neu“ legst du jederzeit eines an.'}</small>
         </div>
     `;
     const toolsPanel = document.getElementById('toolsAquariumPanel');
@@ -9054,6 +9141,7 @@ function renderActiveTabContent(tabId) {
         if(tabId === 'cr-export') {
             syncCRPreferredUnitUI();
             renderCRRoutineSelection();
+            renderCRMixingOverview();
             setupPriority4CalculatorUI();
         }
         if(tabId === 'statistik') renderStats();
@@ -9393,6 +9481,9 @@ function renderSettingsCardOnDemand(card, force = false) {
     }
     if (targetCard.classList.contains('settings-card-dashboard')) {
         runSettingsRender('Dashboard-Einstellungen', renderDashboardSettingsPanel);
+    }
+    if (targetCard.classList.contains('settings-card-supply-profile')) {
+        runSettingsRender('Versorgungsprofil', renderSupplyProfileSettings);
     }
     if (targetCard.classList.contains('settings-card-development')) {
         runSettingsRender('Entwicklungsbereich', renderDevelopmentSettingsGate);
@@ -12816,6 +12907,467 @@ function sendTestNotification() {
     showLocalNotification("OSCI Lager Test", "Die lokale Benachrichtigung funktioniert.");
 }
 
+function getActiveSupplyProfile() {
+    db.supplyProfile = normalizeSupplyProfile(db.supplyProfile || {});
+    return db.supplyProfile;
+}
+
+function renderSupplyProfileSettings() {
+    const container = document.getElementById('supplyProfileSettings');
+    if (!container) return;
+    const profile = getActiveSupplyProfile();
+    const providers = SUPPLY_PROVIDER_OPTIONS.map(([id, label]) => `
+        <label class="supply-profile-option">
+            <input type="checkbox" ${profile.providers.includes(id) ? 'checked' : ''} onchange="updateSupplyProfileSelection('providers', '${id}', this.checked)">
+            <span>${escapeHtml(label)}</span>
+        </label>
+    `).join('');
+    const modules = SANGOKAI_MODULE_OPTIONS.map(([id, label]) => `
+        <label class="supply-profile-option">
+            <input type="checkbox" ${profile.sangokaiModules.includes(id) ? 'checked' : ''} onchange="updateSupplyProfileSelection('sangokaiModules', '${id}', this.checked)">
+            <span>${escapeHtml(label)}</span>
+        </label>
+    `).join('');
+    container.innerHTML = `
+        <p class="hint supply-profile-aquarium">Aktives Aquarium: <strong>${escapeHtml(getActiveAquarium()?.name || 'Aquarium')}</strong></p>
+        <fieldset class="supply-profile-fieldset">
+            <legend>Genutzte Versorgungssysteme und Produktquellen</legend>
+            <div class="supply-profile-options">${providers}</div>
+        </fieldset>
+        <fieldset class="supply-profile-fieldset">
+            <legend>SANGOKAI-Produktgruppen im Einsatz</legend>
+            <div class="supply-profile-options">${modules}</div>
+        </fieldset>
+        <p class="hint">Die Auswahl filtert Lagerprodukte und passende System-Rechner. Nicht ausgewählte Inhalte werden nur ausgeblendet, nicht gelöscht. Mehrere Quellen können gleichzeitig aktiv sein.</p>
+        <p class="hint">Profil und Rechnerwerte werden lokal gespeichert und sind im vollständigen Google-Drive-Projektbackup enthalten. Für eine Cloud-Sicherung muss Google Drive verbunden und der Upload bzw. Auto-Sync aktiviert sein.</p>
+    `;
+}
+
+function updateSupplyProfileSelection(group, id, enabled) {
+    if (!['providers', 'sangokaiModules'].includes(group)) return;
+    const validOptions = group === 'providers' ? SUPPLY_PROVIDER_OPTIONS : SANGOKAI_MODULE_OPTIONS;
+    if (!validOptions.some(([key]) => key === id)) return;
+    const profile = getActiveSupplyProfile();
+    const values = new Set(profile[group]);
+    if (enabled) values.add(id);
+    else values.delete(id);
+    profile[group] = [...values];
+    profile.filtersConfigured = true;
+    saveDB();
+    refreshFeatureVisibility();
+    renderSupplyProfileSettings();
+}
+
+function getSangokaiCalculatorState() {
+    const profile = getActiveSupplyProfile();
+    if (!profile.calculators.sangokai || typeof profile.calculators.sangokai !== 'object') profile.calculators.sangokai = {};
+    return profile.calculators.sangokai;
+}
+
+function initSangokaiQuantityTools() {
+    const state = getSangokaiCalculatorState();
+    const aquariumVolume = Number(getActiveAquarium()?.data?.volumeLiters);
+    ['kh', 'ca'].forEach(kind => {
+        const saved = state[kind] || {};
+        const prefix = kind === 'kh' ? 'sangokaiKh' : 'sangokaiCa';
+        [['Volume', 'volumeLiters'], ['Current', 'currentValue'], ['Target', 'targetValue']].forEach(([suffix, key]) => {
+            const input = document.getElementById(`${prefix}${suffix}`);
+            if (!input) return;
+            if (key === 'volumeLiters') {
+                input.value = Number.isFinite(aquariumVolume) && aquariumVolume > 0 ? String(aquariumVolume) : '';
+                return;
+            }
+            if (saved[key] !== undefined) input.value = saved[key];
+        });
+        state[kind] = saved;
+        updateSangokaiQuantityCalculation(kind, false);
+    });
+    const dilution = state.dilution || {};
+    const product = document.getElementById('sangokaiDilutionProduct');
+    const volume = document.getElementById('sangokaiDilutionVolume');
+    if (product) product.value = dilution.product || (dilution.concentrateFactor ? 'ca-1' : 'kh');
+    if (volume) volume.value = dilution.packages ?? dilution.finalVolumeMl ?? '1';
+    updateSangokaiDilutionCalculation(false);
+    initSangokaiDoseTracker();
+}
+
+function formatSangokaiAmount(value, decimals = 2) {
+    return Number(value).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+}
+
+function changeSangokaiDilutionProduct(product) {
+    const volume = document.getElementById('sangokaiDilutionVolume');
+    if (volume) volume.value = product === 'kh' ? '1' : '5000';
+    updateSangokaiDilutionCalculation();
+}
+
+function getSangokaiDoseTrackerState() {
+    const state = getSangokaiCalculatorState();
+    if (!state.doseTracker || typeof state.doseTracker !== 'object') state.doseTracker = {};
+    if (!state.doseTracker.form || typeof state.doseTracker.form !== 'object') state.doseTracker.form = {};
+    if (!state.doseTracker.forms || typeof state.doseTracker.forms !== 'object') state.doseTracker.forms = {};
+    if (!state.doseTracker.defaults || typeof state.doseTracker.defaults !== 'object') state.doseTracker.defaults = {};
+    if (state.doseTracker.form.product && !state.doseTracker.forms[state.doseTracker.form.product]) {
+        state.doseTracker.forms[state.doseTracker.form.product] = state.doseTracker.form;
+    }
+    const product = state.doseTracker.form.product || 'kh';
+    const activeForm = state.doseTracker.forms[product] || state.doseTracker.form;
+    if (!state.doseTracker.defaults[product]) {
+        state.doseTracker.defaults[product] = {
+            targetValue: activeForm.targetValue ?? '',
+            targetDays: activeForm.targetDays ?? '',
+            maxChangePercent: activeForm.maxChangePercent ?? '',
+            mode: activeForm.mode || 'gradual'
+        };
+    }
+    ['targetValue', 'targetDays', 'maxChangePercent', 'mode'].forEach(key => {
+        if (activeForm[key] === undefined) activeForm[key] = state.doseTracker.defaults[product][key] ?? '';
+    });
+    state.doseTracker.form = activeForm;
+    state.doseTracker.forms[product] = activeForm;
+    if (!Array.isArray(state.doseTracker.measurements)) state.doseTracker.measurements = [];
+    return state.doseTracker;
+}
+
+function initSangokaiDoseTracker() {
+    const tracker = getSangokaiDoseTrackerState();
+    const form = tracker.forms[tracker.form.product || 'kh'] || tracker.form;
+    const fields = {
+        sangokaiDoseElement: form.product || 'kh',
+        sangokaiDoseDate: form.at || formatDateTimeLocal(),
+        sangokaiDoseValue: form.value ?? '',
+        sangokaiDoseIntervalMl: form.doseMlPerDay ?? '',
+        sangokaiDoseMode: form.mode || 'gradual',
+        sangokaiDoseTarget: form.targetValue ?? '',
+        sangokaiDoseTargetDays: form.targetDays ?? '',
+        sangokaiDoseMaxChange: form.maxChangePercent ?? '',
+        sangokaiDoseEditingId: form.editingId ?? ''
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    });
+    tracker.form = form;
+    updateSangokaiDoseTracker(false);
+}
+
+function readSangokaiDoseTrackerForm() {
+    return {
+        product: document.getElementById('sangokaiDoseElement')?.value || 'kh',
+        at: document.getElementById('sangokaiDoseDate')?.value || '',
+        value: document.getElementById('sangokaiDoseValue')?.value ?? '',
+        doseMlPerDay: document.getElementById('sangokaiDoseIntervalMl')?.value ?? '',
+        mode: document.getElementById('sangokaiDoseMode')?.value || 'gradual',
+        targetValue: document.getElementById('sangokaiDoseTarget')?.value ?? '',
+        targetDays: document.getElementById('sangokaiDoseTargetDays')?.value ?? '',
+        maxChangePercent: document.getElementById('sangokaiDoseMaxChange')?.value ?? '',
+        editingId: document.getElementById('sangokaiDoseEditingId')?.value || ''
+    };
+}
+
+function updateSangokaiDoseTracker(persist = true) {
+    const tracker = getSangokaiDoseTrackerState();
+    const form = readSangokaiDoseTrackerForm();
+    tracker.form = form;
+    tracker.forms[form.product] = form;
+    tracker.defaults[form.product] = {
+        targetValue: form.targetValue,
+        targetDays: form.targetDays,
+        maxChangePercent: form.maxChangePercent,
+        mode: form.mode
+    };
+    const isKh = form.product === 'kh';
+    const valueLabel = document.getElementById('sangokaiDoseValueLabel');
+    const doseLabel = document.getElementById('sangokaiDoseIntervalLabel');
+    const targetLabel = document.getElementById('sangokaiDoseTargetLabel');
+    const productSelect = document.getElementById('sangokaiDoseElement');
+    if (valueLabel) valueLabel.textContent = isKh ? 'Gemessene KH (°dKH)' : 'Gemessenes Calcium (mg/L)';
+    if (doseLabel) doseLabel.textContent = isKh ? 'KH-Gebrauchslösung im Messzeitraum (ml/Tag)' : 'Ca-1-Gebrauchslösung im Messzeitraum (ml/Tag; Ca-2 gleich dosiert)';
+    if (targetLabel) targetLabel.textContent = isKh ? 'Dein KH-Zielwert (°dKH)' : 'Dein Calcium-Zielwert (mg/L)';
+    if (productSelect) productSelect.disabled = Boolean(form.editingId);
+    const saveButton = document.getElementById('sangokaiDoseSaveButton');
+    if (saveButton) saveButton.textContent = form.editingId ? 'Messung aktualisieren' : 'Messung speichern';
+    const cancelButton = document.getElementById('sangokaiDoseCancelEditButton');
+    if (cancelButton) cancelButton.hidden = !form.editingId;
+    if (persist) saveDB();
+
+    const result = document.getElementById('sangokaiDoseTrackerResult');
+    const historyContainer = document.getElementById('sangokaiDoseTrackerHistory');
+    if (!result || !historyContainer) return;
+    const measurements = tracker.measurements
+        .filter(entry => entry.product === form.product)
+        .slice()
+        .sort((a, b) => new Date(a.at) - new Date(b.at));
+    const tankLiters = Number(getActiveAquarium()?.data?.volumeLiters);
+    if (measurements.length < 2) {
+        result.innerHTML = `<p class="field-help">Noch ${2 - measurements.length} weitere Messung(en) für einen Verbrauchs- und Dosierabgleich erfassen.</p>`;
+    } else {
+        try {
+            if (!Number.isFinite(tankLiters) || tankLiters <= 0) throw new Error('Für die Berechnung bitte zuerst ein aktives Aquarium mit Nettovolumen anlegen.');
+            if (!window.SangokaiCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+            const calculation = window.SangokaiCalculations.calculateBalanceDoseAdjustment({
+                product: form.product,
+                volumeLiters: tankLiters,
+                measurements,
+                targetValue: form.targetValue,
+                targetDays: form.targetDays,
+                maxChangePercent: form.maxChangePercent,
+                mode: form.mode
+            });
+            const unit = isKh ? '°dKH' : 'mg/L';
+            const wasLimited = Math.abs(calculation.nextDoseMl - calculation.uncappedDoseMl) > 0.000001;
+            const resultRows = form.mode === 'immediate-stabilize'
+                ? `<div class="tool-row"><span><strong>Einmaliger Sofortausgleich</strong><small>Aus letzter Messung ${formatSangokaiAmount(calculation.latestValue, 3)} ${unit} bis zum Ziel ${formatSangokaiAmount(calculation.targetValue, 3)} ${unit}${form.product === 'ca' ? ' · Ca-1 und gleiches Volumen Ca-2' : ''}</small></span><span>${formatSangokaiAmount(calculation.correctionMl)} ml${form.product === 'ca' ? ` + ${formatSangokaiAmount(calculation.pairedCorrectionMl)} ml Ca-2` : ''}</span></div>
+                <div class="tool-row"><span><strong>Stabilisierende Tagesdosis</strong><small>Ermittelter Verbrauch, ohne weitere Sollwert-Annäherung</small></span><span>${formatSangokaiAmount(calculation.nextDoseMl)} ml/Tag</span></div>`
+                : `<div class="tool-row"><span><strong>Berechnete Dosis ohne Begrenzung</strong><small>Ziel ${formatSangokaiAmount(calculation.targetValue, 2)} ${unit} in den verbleibenden ${formatSangokaiAmount(calculation.targetDays, 0)} Tagen</small></span><span>${formatSangokaiAmount(calculation.uncappedDoseMl)} ml/Tag</span></div>
+                <div class="tool-row"><span><strong>Nächster Tageswert</strong><small>Änderung ${calculation.doseChangePercent >= 0 ? '+' : ''}${formatSangokaiAmount(calculation.doseChangePercent, 1)} % · Limit ±${formatSangokaiAmount(calculation.maxChangePercent, 1)} %</small></span><span>${formatSangokaiAmount(calculation.nextDoseMl)} ml/Tag</span></div>`;
+            result.innerHTML = `<div class="tool-result">
+                <div class="tool-row"><span><strong>Gemessener Verlauf</strong><small>Nettoänderung über die gespeicherten Messintervalle</small></span><span>${calculation.observedChangePerDay >= 0 ? '+' : ''}${formatSangokaiAmount(calculation.observedChangePerDay, 4)} ${unit}/Tag</span></div>
+                <div class="tool-row"><span><strong>Ermittelter Verbrauch</strong><small>Aus ${calculation.measurementCount} Messungen über ${formatSangokaiAmount(calculation.intervalDays, 1)} Tage</small></span><span>${formatSangokaiAmount(calculation.consumptionPerDay, 4)} ${unit}/Tag</span></div>
+                ${resultRows}
+                <p class="field-help">Die Einmalmenge ist getrennt von der Tagesdosis. Der Prozentgrenzwert beschränkt nur den Wechsel der laufenden Tagesdosis, nicht den einmaligen Ausgleich.</p>
+                ${wasLimited ? '<p class="field-help">Das Prozentlimit begrenzt die Änderung der Tagesdosis. Nach der nächsten Messung neu berechnen.</p>' : ''}
+            </div>`;
+        } catch (error) {
+            result.innerHTML = `<p class="field-help">${escapeHtml(error.message)}</p>`;
+        }
+    }
+    historyContainer.innerHTML = measurements.length
+        ? `<h5>Gespeicherte ${isKh ? 'KH' : 'Ca'}-Messungen (${measurements.length})</h5><div class="sangokai-dose-history-list">${measurements.slice().reverse().map(entry => `<div class="sangokai-dose-history-row"><span><strong>${escapeHtml(formatWarehouseDate(entry.at))}</strong><small>${formatSangokaiAmount(entry.value, 3)} ${isKh ? '°dKH' : 'mg/L'} · ${formatSangokaiAmount(entry.doseMlPerDay)} ml/Tag im Messzeitraum</small></span><div class="sangokai-dose-history-actions"><button type="button" class="btn-secondary" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} bearbeiten" onclick='editSangokaiDoseMeasurement(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-danger" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} löschen" title="Messung löschen" onclick='deleteSangokaiDoseMeasurement(${jsArg(entry.id)})'>Löschen</button></div></div>`).join('')}</div>`
+        : '<p class="field-help">Noch keine Messungen gespeichert.</p>';
+}
+
+function changeSangokaiDoseProduct(product) {
+    const tracker = getSangokaiDoseTrackerState();
+    const currentForm = readSangokaiDoseTrackerForm();
+    tracker.forms[currentForm.product] = currentForm;
+    const nextForm = tracker.forms[product] || {
+        product,
+        at: formatDateTimeLocal(),
+        value: '',
+        doseMlPerDay: '',
+        mode: 'gradual',
+        targetValue: '',
+        targetDays: '',
+        maxChangePercent: ''
+    };
+    const defaults = tracker.defaults[product] || {};
+    ['targetValue', 'targetDays', 'maxChangePercent', 'mode'].forEach(key => {
+        if (nextForm[key] === undefined || nextForm[key] === '') nextForm[key] = defaults[key] ?? '';
+    });
+    nextForm.editingId = '';
+    const fields = {
+        sangokaiDoseDate: nextForm.at,
+        sangokaiDoseValue: nextForm.value,
+        sangokaiDoseIntervalMl: nextForm.doseMlPerDay,
+        sangokaiDoseMode: nextForm.mode || 'gradual',
+        sangokaiDoseTarget: nextForm.targetValue,
+        sangokaiDoseTargetDays: nextForm.targetDays,
+        sangokaiDoseMaxChange: nextForm.maxChangePercent
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value ?? '';
+    });
+    tracker.form = nextForm;
+    tracker.forms[product] = nextForm;
+    saveDB();
+    updateSangokaiDoseTracker(false);
+}
+
+function saveSangokaiDoseMeasurement() {
+    const form = readSangokaiDoseTrackerForm();
+    const value = Number(String(form.value).replace(',', '.'));
+    const dose = Number(String(form.doseMlPerDay).replace(',', '.'));
+    const at = new Date(form.at);
+    if (!form.at || !Number.isFinite(at.getTime())) return showToast('Bitte ein gültiges Messdatum eintragen.', 'warning');
+    if (!Number.isFinite(value) || value < 0) return showToast('Bitte einen gültigen Messwert ab 0 eintragen.', 'warning');
+    if (!Number.isFinite(dose) || dose < 0) return showToast('Bitte eine gültige Tagesdosis ab 0 eintragen.', 'warning');
+    const tracker = getSangokaiDoseTrackerState();
+    const atIso = at.toISOString();
+    const editingId = form.editingId || '';
+    const duplicate = tracker.measurements.some(entry => entry.product === form.product && entry.at === atIso && String(entry.id) !== String(editingId));
+    if (duplicate) return showToast('Für diesen Zeitpunkt gibt es bereits eine Messung. Wähle einen anderen Zeitpunkt.', 'warning');
+    const existing = editingId ? tracker.measurements.find(entry => String(entry.id) === String(editingId)) : null;
+    if (existing) Object.assign(existing, { product: form.product, at: atIso, value, doseMlPerDay: dose });
+    else tracker.measurements.push({ id: createWarehouseId(), product: form.product, at: atIso, value, doseMlPerDay: dose });
+    const valueInput = document.getElementById('sangokaiDoseValue');
+    if (valueInput) valueInput.value = '';
+    const editingInput = document.getElementById('sangokaiDoseEditingId');
+    if (editingInput) editingInput.value = '';
+    const dateInput = document.getElementById('sangokaiDoseDate');
+    if (dateInput) dateInput.value = formatDateTimeLocal();
+    tracker.form = readSangokaiDoseTrackerForm();
+    tracker.forms[form.product] = tracker.form;
+    saveDB();
+    updateSangokaiDoseTracker(false);
+    showToast(existing ? 'Messung aktualisiert.' : 'Messung im Aquariumprofil gespeichert.', 'success');
+}
+
+function editSangokaiDoseMeasurement(id) {
+    const tracker = getSangokaiDoseTrackerState();
+    const entry = tracker.measurements.find(item => String(item.id) === String(id));
+    if (!entry) return;
+    const form = {
+        ...(tracker.forms[entry.product] || {}),
+        product: entry.product,
+        at: formatDateTimeLocal(entry.at),
+        value: String(entry.value),
+        doseMlPerDay: String(entry.doseMlPerDay),
+        editingId: String(entry.id)
+    };
+    tracker.form = form;
+    tracker.forms[entry.product] = form;
+    const fields = {
+        sangokaiDoseElement: form.product,
+        sangokaiDoseDate: form.at,
+        sangokaiDoseValue: form.value,
+        sangokaiDoseIntervalMl: form.doseMlPerDay,
+        sangokaiDoseTarget: form.targetValue ?? tracker.defaults[entry.product]?.targetValue ?? '',
+        sangokaiDoseTargetDays: form.targetDays ?? tracker.defaults[entry.product]?.targetDays ?? '',
+        sangokaiDoseMaxChange: form.maxChangePercent ?? tracker.defaults[entry.product]?.maxChangePercent ?? '',
+        sangokaiDoseEditingId: form.editingId
+    };
+    Object.entries(fields).forEach(([fieldId, value]) => {
+        const input = document.getElementById(fieldId);
+        if (input) input.value = value;
+    });
+    saveDB();
+    updateSangokaiDoseTracker(false);
+    document.getElementById('sangokaiDoseValue')?.focus();
+}
+
+function cancelSangokaiDoseMeasurementEdit() {
+    const tracker = getSangokaiDoseTrackerState();
+    if (!document.getElementById('sangokaiDoseEditingId')?.value) return;
+    const product = document.getElementById('sangokaiDoseElement')?.value || 'kh';
+    const previous = tracker.forms[product] || tracker.form;
+    const defaults = tracker.defaults[product] || {};
+    const form = {
+        product,
+        at: formatDateTimeLocal(),
+        value: '',
+        doseMlPerDay: previous.doseMlPerDay ?? '',
+        targetValue: defaults.targetValue ?? previous.targetValue ?? '',
+        targetDays: defaults.targetDays ?? previous.targetDays ?? '',
+        maxChangePercent: defaults.maxChangePercent ?? previous.maxChangePercent ?? '',
+        editingId: ''
+    };
+    tracker.form = form;
+    tracker.forms[form.product] = form;
+    const fields = {
+        sangokaiDoseElement: form.product,
+        sangokaiDoseDate: form.at || formatDateTimeLocal(),
+        sangokaiDoseValue: form.value ?? '',
+        sangokaiDoseIntervalMl: form.doseMlPerDay ?? '',
+        sangokaiDoseTarget: form.targetValue ?? tracker.defaults[form.product]?.targetValue ?? '',
+        sangokaiDoseTargetDays: form.targetDays ?? tracker.defaults[form.product]?.targetDays ?? '',
+        sangokaiDoseMaxChange: form.maxChangePercent ?? tracker.defaults[form.product]?.maxChangePercent ?? '',
+        sangokaiDoseEditingId: ''
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = value;
+    });
+    saveDB();
+    updateSangokaiDoseTracker(false);
+}
+
+async function deleteSangokaiDoseMeasurement(id) {
+    const confirmed = await appConfirm('Diese Messung aus dem BALANCE-Verlauf löschen?', {
+        title: 'Messung löschen',
+        type: 'warning',
+        confirmText: 'Löschen',
+        cancelText: 'Abbrechen'
+    });
+    if (!confirmed) return;
+    const tracker = getSangokaiDoseTrackerState();
+    tracker.measurements = tracker.measurements.filter(entry => String(entry.id) !== String(id));
+    const editingId = document.getElementById('sangokaiDoseEditingId');
+    if (editingId?.value && String(editingId.value) === String(id)) {
+        const form = readSangokaiDoseTrackerForm();
+        form.editingId = '';
+        form.at = formatDateTimeLocal();
+        if (editingId) editingId.value = '';
+        const dateInput = document.getElementById('sangokaiDoseDate');
+        if (dateInput) dateInput.value = form.at;
+        tracker.form = form;
+        tracker.forms[form.product] = form;
+    }
+    saveDB();
+    updateSangokaiDoseTracker(false);
+}
+
+function updateSangokaiQuantityCalculation(kind, persist = true) {
+    const isKh = kind === 'kh';
+    const prefix = isKh ? 'sangokaiKh' : 'sangokaiCa';
+    const fields = {
+        volumeLiters: document.getElementById(`${prefix}Volume`)?.value ?? '',
+        currentValue: document.getElementById(`${prefix}Current`)?.value ?? '',
+        targetValue: document.getElementById(`${prefix}Target`)?.value ?? ''
+    };
+    if (persist) {
+        const state = getSangokaiCalculatorState();
+        state[kind] = fields;
+        saveDB();
+    }
+    const result = document.getElementById(isKh ? 'sangokaiKhResult' : 'sangokaiCaResult');
+    if (!result) return;
+    if (Object.values(fields).some(value => String(value).trim() === '')) {
+        result.textContent = 'Volumen, Istwert und Zielwert eingeben.';
+        return;
+    }
+    try {
+        if (!window.SangokaiCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+        const calculation = window.SangokaiCalculations.calculateBalanceQuantity({
+            product: kind,
+            ...fields
+        });
+        result.innerHTML = isKh
+            ? `<strong>Rechnerische Menge: ${formatSangokaiAmount(calculation.primaryMl)} ml Gebrauchslösung</strong><small>${formatSangokaiAmount(calculation.increase, 2)} °dKH Differenz · ${formatSangokaiAmount(calculation.rule.mlPer100LitersPerDkh)} ml / 100 L je 1 °dKH · Herstellerangabe geprüft ${calculation.rule.verifiedAt}</small>`
+            : `<strong>Ca-1: ${formatSangokaiAmount(calculation.primaryMl)} ml · Ca-2: ${formatSangokaiAmount(calculation.pairedMl)} ml Gebrauchslösung</strong><small>${formatSangokaiAmount(calculation.increase, 2)} mg/L Differenz · ${formatSangokaiAmount(calculation.rule.mlPer100LitersPerMgL)} ml / 100 L je 1 mg/L; Ca-2 laut Hersteller in gleicher Menge · geprüft ${calculation.rule.verifiedAt}</small>`;
+    } catch (error) {
+        result.textContent = error.message;
+    }
+}
+
+function updateSangokaiDilutionCalculation(persist = true) {
+    const product = document.getElementById('sangokaiDilutionProduct')?.value || 'kh';
+    const volumeInput = document.getElementById('sangokaiDilutionVolume');
+    const volumeValue = volumeInput?.value ?? '';
+    const label = document.getElementById('sangokaiDilutionVolumeLabel');
+    const result = document.getElementById('sangokaiDilutionResult');
+    const isKhPowder = product === 'kh';
+    if (label) label.textContent = isKhPowder ? 'Anzahl vollständiger KH-Gebinde' : 'Gewünschtes Endvolumen (ml)';
+    if (volumeInput) {
+        volumeInput.min = isKhPowder ? '1' : '0.1';
+        volumeInput.step = isKhPowder ? '1' : 'any';
+        volumeInput.inputMode = isKhPowder ? 'numeric' : 'decimal';
+    }
+    if (persist) {
+        const state = getSangokaiCalculatorState();
+        state.dilution = isKhPowder ? { product, packages: volumeValue } : { product, finalVolumeMl: volumeValue };
+        saveDB();
+    }
+    if (!result) return;
+    if (String(volumeValue).trim() === '') {
+        result.textContent = isKhPowder ? 'Anzahl der vollständigen KH-Gebinde eingeben.' : 'Gewünschtes Endvolumen eingeben.';
+        return;
+    }
+    try {
+        if (!window.SangokaiCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+        if (isKhPowder) {
+            const values = window.SangokaiCalculations.calculateBalanceWorkingSolution({ product, packages: volumeValue });
+            result.innerHTML = `<strong>${formatSangokaiAmount(values.packageCount)} vollständige(s) KH-Gebinde → ${formatSangokaiAmount(values.finalVolumeMl / 1000)} L Gebrauchslösung</strong><small>${escapeHtml(values.waterInstruction)} Laut Herstellerangabe das Pulver vollständig ansetzen.</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
+        } else {
+            const values = window.SangokaiCalculations.calculateBalanceWorkingSolution({ product, finalVolumeMl: volumeValue, concentrateFactor: 5 });
+            result.innerHTML = `<strong>${formatSangokaiAmount(values.concentrateMl)} ml ${product === 'ca-1' ? 'Ca-1' : 'Ca-2'}-Konzentrat + ${formatSangokaiAmount(values.waterMl)} ml Wasser</strong><small>Ergibt ${formatSangokaiAmount(values.finalVolumeMl)} ml Endvolumen bei 5-facher Verdünnung · Ca-1 und Ca-2 separat ansetzen · Anleitung geprüft ${values.rule.verifiedAt}</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
+        }
+    } catch (error) {
+        result.textContent = error.message;
+    }
+}
+
 function renderCustomProductSettings() {
     const categorySelect = document.getElementById('customProductCategory');
     const list = document.getElementById('custom-products-list');
@@ -12874,6 +13426,65 @@ function toggleCustomProductUnitFields() {
         if (!group) return;
         group.classList.toggle('disabled-field', Boolean(isPieceUnit));
     });
+}
+
+const inventoryStarterPresets = {
+    'own-balling-powders': [
+        { name: 'Natriumhydrogencarbonat (NaHCO₃)', cat: 'Balling Pulver', sizeUnit: 'g' },
+        { name: 'Natriumcarbonat (Na₂CO₃)', cat: 'Balling Pulver', sizeUnit: 'g' },
+        { name: 'Calciumchlorid-Dihydrat (CaCl₂·2H₂O)', cat: 'Balling Pulver', sizeUnit: 'g' },
+        { name: 'Magnesiumchlorid-Hexahydrat (MgCl₂·6H₂O)', cat: 'Balling Pulver', sizeUnit: 'g' },
+        { name: 'Magnesiumsulfat-Heptahydrat (MgSO₄·7H₂O)', cat: 'Balling Pulver', sizeUnit: 'g' }
+    ],
+    'fauna-marin': [
+        { name: 'Fauna Marin KH Mix', cat: 'Fauna Marin Pulver', sizeUnit: 'g' },
+        { name: 'Fauna Marin CA Mix', cat: 'Fauna Marin Pulver', sizeUnit: 'g' },
+        { name: 'Fauna Marin MG Mix', cat: 'Fauna Marin Pulver', sizeUnit: 'g' },
+        { name: 'Fauna Marin Balling Light Trace 1', cat: 'Fauna Marin Trace', sizeUnit: 'ml' },
+        { name: 'Fauna Marin Balling Light Trace 2', cat: 'Fauna Marin Trace', sizeUnit: 'ml' },
+        { name: 'Fauna Marin Balling Light Trace 3', cat: 'Fauna Marin Trace', sizeUnit: 'ml' },
+        ...['S', 'Se', 'Rb', 'Cu', 'Zn', 'Cr', 'Co', 'Fe', 'I', 'Li', 'Mn', 'Mo', 'Ni', 'V', 'Ba'].map(element => ({
+            name: `Fauna Marin Trace ${element}`,
+            cat: 'Fauna Marin Trace',
+            sizeUnit: 'ml'
+        }))
+    ],
+    'sangokai': (window.SANGOKAI_PRODUCT_CATALOG?.products || []).map(product => ({
+        name: product.name,
+        cat: product.category,
+        sizeUnit: product.sizeUnit,
+        manufacturer: product.manufacturer,
+        productVersion: product.productVersion,
+        sourceUrl: product.sourceUrl,
+        sourceRetrievedAt: product.sourceRetrievedAt
+    }))
+};
+
+function loadInventoryStarterPreset(presetId) {
+    const products = inventoryStarterPresets[presetId];
+    if (!products) return;
+    if (!Array.isArray(db.customProducts)) db.customProducts = [];
+
+    let added = 0;
+    products.forEach(product => {
+        const existsInCatalog = catalogHasItem(product.name);
+        const existsAsCustom = db.customProducts.some(entry => entry.name === product.name);
+        if (existsInCatalog || existsAsCustom) return;
+
+        const entry = { ...product, sizes: [], sizesOriginal: [], density: 1 };
+        db.customProducts.push(entry);
+        if (!db.inventory[entry.cat]) db.inventory[entry.cat] = {};
+        if (db.inventory[entry.cat][entry.name] === undefined) db.inventory[entry.cat][entry.name] = 0;
+        if (db.stats[entry.name] === undefined) db.stats[entry.name] = 0;
+        added++;
+    });
+
+    applyCustomProductsToCatalog();
+    saveDB();
+    renderCustomProductSettings();
+    renderLager();
+    initBulkProductSelect();
+    showToast(added ? `${added} Produkte ergänzt. Bestehende Bestände blieben unverändert.` : 'Alle Produkte dieser Startliste sind bereits vorhanden.', added ? 'success' : 'info');
 }
 
 function addCustomProduct() {
@@ -18247,6 +18858,7 @@ function initToolSection(sectionId, force = false) {
         runToolInit('Nutrition Rechner', renderNutritionCalculator);
         runToolInit('Dosierwirkung', initDoseImpactCalculator);
         runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
+        runToolInit('Balling & Pulver', renderBallingPowderCalculator);
         runToolInit('Verbrauch', renderConsumptionCalculator);
         runToolInit('Testkorrektur', renderTestCorrectionTool);
         runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
@@ -18290,8 +18902,8 @@ function initToolSection(sectionId, force = false) {
         return;
     }
 
-    if (sectionId === 'sangokai-a-z') {
-        runToolInit('Sangokai Assistent', renderSangokaiAssistant);
+    if (sectionId === 'sangokai-mengen-und-mischen') {
+        runToolInit('Sangokai Mengen & Mischen', initSangokaiQuantityTools);
         return;
     }
 
@@ -18411,7 +19023,12 @@ function getHiddenToolIds() {
 
 function isToolHidden(toolId) {
     const tool = TOOL_DEFINITIONS.find(entry => entry.id === toolId);
-    return getHiddenToolIds().includes(toolId)
+    const profile = getActiveSupplyProfile();
+    const providerHidden = (toolId === 'fauna-marin-traces' && !profile.providers.includes('fauna-marin'))
+        || (toolId === 'sangokai-mengen-und-mischen' && (!profile.providers.includes('sangokai') || !profile.sangokaiModules.includes('balance')))
+        || (tool?.osciOnly && !profile.providers.includes('osci'));
+    return providerHidden
+        || getHiddenToolIds().includes(toolId)
         || isToolSectionHidden(tool?.sectionId)
         || (!isOsciFeaturesEnabled() && OSCI_ONLY_TOOL_IDS.has(toolId));
 }
@@ -18434,6 +19051,11 @@ function applyToolVisibility() {
     document.querySelectorAll('#tools .tool-card-grid > .card[data-tool-id]').forEach(card => {
         card.classList.toggle('tool-user-hidden', isToolHidden(card.dataset.toolId));
     });
+    const ballingCard = document.querySelector('#tools .balling-powder-card');
+    if (ballingCard) {
+        const profile = getActiveSupplyProfile();
+        ballingCard.classList.toggle('tool-user-hidden', !profile.providers.some(id => ['fauna-marin', 'own-powder'].includes(id)));
+    }
     document.querySelectorAll('#tools .tool-section').forEach(section => {
         const sectionId = section.dataset.sectionId || '';
         const visibleCards = Array.from(section.querySelectorAll('.tool-card-grid > .card[data-tool-id]'))
@@ -18528,7 +19150,6 @@ function getToolTileVisual(toolId, title = '') {
         'meerwasser-aus-c-und-r-anmischen': { icon: 'MW', subtitle: 'Meerwasser mischen' },
         'c-und-r-natriumchlorid-aus-nacl-pulver': { icon: 'Na', subtitle: 'NaCl Loesung ansetzen' },
         'makro-elemente-anmischen': { icon: 'ME', subtitle: 'Makros vorbereiten' },
-        'sangokai-a-z-assistent': { icon: 'AZ', subtitle: 'PDF Wissen suchen' },
         'hilfreiche-quellen': { icon: 'Q', subtitle: 'Links und Wissen' }
     };
     return map[toolId] || { icon: (title || 'T').slice(0, 2).toUpperCase(), subtitle: 'Tool oeffnen' };
@@ -19716,6 +20337,119 @@ function renderSalifertKhConverter() {
     renderSalifertConverter();
 }
 
+const ballingPowderSalts = {
+    'KH': [
+        { id: 'nahco3', name: 'Natriumhydrogencarbonat (NaHCO₃)', molarMass: 84.0066, equivalents: 1, elementFraction: null },
+        { id: 'na2co3', name: 'Natriumcarbonat (Na₂CO₃)', molarMass: 105.9888, equivalents: 2, elementFraction: null }
+    ],
+    'Ca': [
+        { id: 'cacl2-2h2o', name: 'Calciumchlorid-Dihydrat (CaCl₂·2H₂O)', molarMass: 147.014, elementFraction: 40.078 / 147.014 }
+    ],
+    'Mg': [
+        { id: 'mgcl2-6h2o', name: 'Magnesiumchlorid-Hexahydrat (MgCl₂·6H₂O)', molarMass: 203.303, elementFraction: 24.305 / 203.303 },
+        { id: 'mgso4-7h2o', name: 'Magnesiumsulfat-Heptahydrat (MgSO₄·7H₂O)', molarMass: 246.47, elementFraction: 24.305 / 246.47 }
+    ]
+};
+
+const faunaBallingLightEffects = {
+    'KH': { increase: 0.5, unit: 'dKH' },
+    'Ca': { increase: 11, unit: 'mg/l' },
+    'Mg': { increase: 5, unit: 'mg/l' }
+};
+
+function renderBallingPowderCalculator() {
+    const result = document.getElementById('ballingPowderResult');
+    const modeEl = document.getElementById('ballingCalcMode');
+    const elementEl = document.getElementById('ballingCalcElement');
+    const powderEl = document.getElementById('ballingCalcPowder');
+    if (!result || !modeEl || !elementEl || !powderEl) return;
+
+    const mode = modeEl.value;
+    const element = elementEl.value;
+    const liters = Number(document.getElementById('ballingCalcLiters')?.value);
+    const current = Number(document.getElementById('ballingCalcCurrent')?.value);
+    const target = Number(document.getElementById('ballingCalcTarget')?.value);
+    const days = Math.max(1, Number(document.getElementById('ballingCalcDays')?.value) || 1);
+    const powderField = document.getElementById('ballingPowderField');
+    const stockGramsField = document.getElementById('ballingSolutionFields');
+    const stockVolumeField = document.getElementById('ballingSolutionVolumeField');
+    const faunaStockVolumeField = document.getElementById('ballingFaunaStockVolumeField');
+    powderField.hidden = mode !== 'direct' && mode !== 'solution';
+    stockGramsField.hidden = mode !== 'solution';
+    stockVolumeField.hidden = mode !== 'solution';
+    if (faunaStockVolumeField) faunaStockVolumeField.hidden = mode !== 'fauna' || element !== 'Mg';
+
+    const salts = ballingPowderSalts[element] || [];
+    const previousPowder = powderEl.value;
+    powderEl.innerHTML = salts.map(salt => `<option value="${salt.id}">${escapeHtml(salt.name)}</option>`).join('');
+    if (salts.some(salt => salt.id === previousPowder)) powderEl.value = previousPowder;
+
+    if (!(liters > 0) || !Number.isFinite(current) || !Number.isFinite(target) || current < 0 || target < 0) {
+        result.innerHTML = '<p class="hint">Bitte Aquariumvolumen sowie gültige aktuelle und gewünschte Werte eintragen.</p>';
+        return;
+    }
+    const difference = target - current;
+    if (difference <= 0) {
+        result.innerHTML = `<p class="hint">${difference < 0 ? 'Der Zielwert liegt unter dem aktuellen Wert. Dieser Rechner berechnet nur Erhöhungen.' : 'Aktueller Wert und Zielwert sind gleich; es ist keine Korrektur nötig.'}</p>`;
+        return;
+    }
+
+    if (mode === 'fauna') {
+        const effect = faunaBallingLightEffects[element];
+        const faunaMgVolume = Number(document.getElementById('ballingFaunaStockVolume')?.value ?? 5);
+        if (element === 'Mg' && !(faunaMgVolume > 0)) {
+            result.innerHTML = '<p class="hint">Bitte das tatsächliche Endvolumen der Magnesiumlösung größer als 0 Liter eintragen.</p>';
+            return;
+        }
+        const stockVolumeFactor = element === 'Mg' ? faunaMgVolume / 5 : 1;
+        const totalMl = (difference / effect.increase) * (liters / 100) * 10 * stockVolumeFactor;
+        const preparation = element === 'KH'
+            ? `<section class="balling-preparation"><h4>Ansatz für den 5-L-Kanister</h4><ul><li>500 g Balling Light Carbonate-Mix</li><li>In ca. 3 L Osmosewasser vollständig lösen, dann mit Osmosewasser auf insgesamt 5 L auffüllen</li><li>Optional: 25 ml Balling Light Trace 3 zugeben</li></ul></section>`
+            : element === 'Ca'
+                ? `<section class="balling-preparation"><h4>Ansatz für den 5-L-Kanister</h4><ul><li>3 L Osmosewasser zuerst vorlegen, dann 2,0 kg Calcium-Mix einrühren</li><li>Optional: je 25 ml Balling Light Trace 1 und Trace 2 zugeben</li><li>Mit Osmosewasser auf insgesamt 5 L auffüllen</li></ul><p class="field-help">Beim Auflösen erwärmt sich die Lösung spürbar.</p></section>`
+                : `<section class="balling-preparation"><h4>Ansatz Magnesiumlösung</h4><ul><li>2,0 kg Balling Light Magnesium-Mix in 3 L Osmosewasser lösen</li><li>Mit Osmosewasser bis zum Rand auffüllen; das Endvolumen kann etwas über 5 L liegen</li><li>Keine Trace-Produkte zugeben</li></ul><p class="field-help">Die Dosis unten wird anhand des eingetragenen Endvolumens auf die Hersteller-Referenz von 5 L skaliert. <a href="https://www.faunamarin.de/wp-content/uploads/2020/10/FM_HTU_Balling_Light_System_DE.pdf" target="_blank" rel="noopener noreferrer">Fauna Marin Anleitung</a></p></section>`;
+        result.innerHTML = `
+            ${preparation}
+            <div class="tool-row"><span><strong>Fauna Marin Balling Light</strong><small>Hersteller-Rechner: 10 ml / 100 L erhöhen ${element === 'KH' ? 'KH' : element === 'Ca' ? 'Calcium' : 'Magnesium'} um ${effect.increase} ${effect.unit}.</small></span><span>${totalMl.toFixed(2)} ml gesamt</span></div>
+            <div class="tool-row"><span><strong>Aufgeteilt</strong><small>${days} Tage · fertige Gebrauchslösung${element === 'Mg' ? ` · ${faunaMgVolume.toFixed(1)} L Endvolumen` : ''}</small></span><span>${(totalMl / days).toFixed(2)} ml / Tag</span></div>
+            <p class="field-help">Rezeptangaben gemäß Packungsanleitung. <a href="https://lab.faunamarin.de/de/calc-balling-light" target="_blank" rel="noopener noreferrer">Fauna Marin Original-Rechner</a></p>
+        `;
+        return;
+    }
+
+    const salt = salts.find(entry => entry.id === powderEl.value) || salts[0];
+    const grams = element === 'KH'
+        ? difference * liters * 0.357 * (salt.molarMass / salt.equivalents) / 1000
+        : difference * liters / (1000 * salt.elementFraction);
+    const name = escapeHtml(salt.name);
+    if (mode === 'direct') {
+        const dailyGrams = grams / days;
+        const caution = salt.id === 'na2co3'
+            ? 'Natriumcarbonat hebt den pH stärker an als Natriumhydrogencarbonat; vorsichtig dosieren.'
+            : element === 'Mg' ? 'Einzelsalz-Dosierung verändert auch Chlorid bzw. Sulfat. Für die laufende Versorgung ein abgestimmtes Balling-Rezept verwenden.' : 'Die berechnete Menge schrittweise zugeben und den Messwert kontrollieren.';
+        result.innerHTML = `
+            <div class="tool-row"><span><strong>${name}</strong><small>${current} → ${target} ${element === 'KH' ? 'dKH' : 'mg/l'} · ${liters.toFixed(0)} L</small></span><span>${grams.toFixed(2)} g gesamt</span></div>
+            <div class="tool-row"><span><strong>Aufgeteilt</strong><small>${days} Tage</small></span><span>${dailyGrams.toFixed(2)} g / Tag</span></div>
+            <p class="field-help">${caution} Rechnerische Werte setzen reines Salz mit genau der angegebenen Hydratform voraus.</p>
+        `;
+        return;
+    }
+
+    const stockGrams = Number(document.getElementById('ballingCalcStockGrams')?.value);
+    const stockMl = Number(document.getElementById('ballingCalcStockMl')?.value);
+    if (!(stockGrams > 0) || !(stockMl > 0)) {
+        result.innerHTML = '<p class="hint">Für eine Lösungsdosierung bitte Ansatzmenge in Gramm und fertiges Lösungsvolumen eintragen.</p>';
+        return;
+    }
+    const totalMl = grams / stockGrams * stockMl;
+    result.innerHTML = `
+        <div class="tool-row"><span><strong>Für den Ansatz</strong><small>${name} · ${liters.toFixed(0)} L Aquarium</small></span><span>${grams.toFixed(2)} g Pulver</span></div>
+        <div class="tool-row"><span><strong>Dosierung der eigenen Lösung</strong><small>${stockGrams.toFixed(2)} g in ${stockMl.toFixed(0)} ml fertigem Lösungsvolumen · ${days} Tage</small></span><span>${totalMl.toFixed(2)} ml gesamt</span></div>
+        <div class="tool-row"><span><strong>Pro Tag</strong><small>Gleichmäßig aufteilen</small></span><span>${(totalMl / days).toFixed(2)} ml / Tag</span></div>
+        <p class="field-help">Einzelsalz-Rechnung, kein vollständiges Balling-Rezept. Für Mg beachten: Die Wahl des Salzes beeinflusst Chlorid-/Sulfatbilanz und ersetzt kein abgestimmtes Rezept.</p>
+    `;
+}
+
 function getMajorCorrectionUnit(element) {
     return element === 'KH' ? 'dKH' : 'mg/l';
 }
@@ -19773,15 +20507,48 @@ function syncMajorCorrectionInputsFromSettings(force = false) {
     if (force && preset) {
         const currentEl = document.getElementById('majorCorrectionCurrent');
         const targetEl = document.getElementById('majorCorrectionTarget');
-        if (currentEl && Number.isFinite(Number(preset.currentValue))) currentEl.value = preset.currentValue;
-        if (targetEl && Number.isFinite(Number(preset.targetValue))) targetEl.value = preset.targetValue;
+        const defaults = preset.element === 'Ca' ? { current: 400, target: 420 } : { current: 7, target: 7.5 };
+        if (currentEl) currentEl.value = Number.isFinite(Number(preset.currentValue)) ? preset.currentValue : defaults.current;
+        if (targetEl) targetEl.value = Number.isFinite(Number(preset.targetValue)) ? preset.targetValue : defaults.target;
     }
 }
 
 function initMajorCorrectionCalculator() {
     populateMajorCorrectionPresetSelect();
+    updateMajorCorrectionPresetBuilder();
     syncMajorCorrectionInputsFromSettings(true);
     renderMajorCorrectionCalculator();
+}
+
+function updateMajorCorrectionPresetBuilder() {
+    const element = document.getElementById('majorCorrectionCustomElement')?.value || 'KH';
+    const label = document.getElementById('majorCorrectionCustomIncreaseLabel');
+    const increase = document.getElementById('majorCorrectionCustomIncrease');
+    if (label) label.textContent = `Erhöhung (${getMajorCorrectionUnit(element)})`;
+    if (increase) increase.value = element === 'KH' ? '0.5' : '11';
+}
+
+function saveMajorCorrectionPreset() {
+    const name = (document.getElementById('majorCorrectionCustomName')?.value || '').trim();
+    const element = document.getElementById('majorCorrectionCustomElement')?.value || 'KH';
+    const referenceMl = Number(document.getElementById('majorCorrectionCustomReferenceMl')?.value);
+    const referenceLiters = Number(document.getElementById('majorCorrectionCustomReferenceLiters')?.value);
+    const increase = Number(document.getElementById('majorCorrectionCustomIncrease')?.value);
+    if (!name || !(referenceMl > 0) || !(referenceLiters > 0) || !(increase > 0) || !Number.isFinite(referenceMl + referenceLiters + increase)) {
+        showToast('Bitte Name und gültige Referenzwerte für das Preset eintragen', 'warning');
+        return;
+    }
+    const settings = getDoseImpactSettings();
+    const preset = { id: `custom-${Date.now()}`, name, element, referenceMl, referenceLiters, increase };
+    settings.customPresets.push(preset);
+    getMajorCorrectionSettings().selectedPresetId = preset.id;
+    saveDB();
+    populateMajorCorrectionPresetSelect();
+    syncMajorCorrectionInputsFromSettings(true);
+    renderMajorCorrectionCalculator();
+    const nameInput = document.getElementById('majorCorrectionCustomName');
+    if (nameInput) nameInput.value = '';
+    showToast('Eigenes KH-/Calcium-Preset gespeichert', 'success');
 }
 
 function selectMajorCorrectionPreset() {
@@ -19885,7 +20652,11 @@ function renderConsumptionCalculator() {
 const doseImpactBuiltInPresets = [
     { id: 'osci-kh-tag', name: 'OSCI KH Tag', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, currentValue: 7, targetValue: 7.5, locked: true },
     { id: 'osci-kh-nacht', name: 'OSCI KH Nacht', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 1, currentValue: 7, targetValue: 7.5, locked: true },
-    { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true }
+    { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true },
+    { id: 'sangokai-kh', name: 'SANGOKAI chem-balance KH', element: 'KH', referenceMl: 40, referenceLiters: 100, increase: 1, currentValue: 7, targetValue: 7.5, locked: true },
+    { id: 'sangokai-ca', name: 'SANGOKAI chem-balance CA', element: 'Ca', referenceMl: 2.5, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true },
+    { id: 'fauna-kh', name: 'Fauna Marin Balling Light KH', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, currentValue: 7, targetValue: 7.5, locked: true },
+    { id: 'fauna-ca', name: 'Fauna Marin Balling Light Calcium', element: 'Ca', referenceMl: 10, referenceLiters: 100, increase: 11, currentValue: 400, targetValue: 420, locked: true }
 ];
 
 function getDoseImpactUnit(element) {
@@ -26326,10 +27097,10 @@ function showConflictModal(cat, item, required, current, proceedCallback) {
     acquireBodyScrollLock('modal');
 }
 
-function addLog(cat, item, action, amount) {
+function addLog(cat, item, action, amount, metadata = {}) {
     if(!db.logs) db.logs = [];
     const now = Date.now();
-    const log = { id: createWarehouseId(), cat, item, action, amount, timestamp: now, time: now };
+    const log = { id: createWarehouseId(), cat, item, action, amount, timestamp: now, time: now, ...metadata };
     db.logs.push(log);
     if (db.logs.length > 200) db.logs.shift();
     return log;
@@ -26399,6 +27170,110 @@ function renderCRRoutineSelection() {
     if (badge) badge.textContent = selected;
     const description = document.getElementById('crRoutineDescription');
     if (description) description.textContent = crRoutineDescriptions[selected];
+}
+
+function renderCRMixingOverview() {
+    const container = document.getElementById('crMixingOverview');
+    const count = document.getElementById('crMixingOverviewCount');
+    if (!container || !count) return;
+    const previouslyOpenBatch = container.querySelector('.cr-mixing-batch[open]')?.dataset.batchId || '';
+    const groups = new Map();
+    (db.logs || []).forEach(log => {
+        // Only show complete recipe bookings; standalone stock movements are not mixing batches.
+        if (log.action !== 'out' || log.mixingBatchType !== 'cr' || !log.mixingBatchId || !log.id) return;
+        const key = log.mixingBatchId;
+        if (!groups.has(key)) groups.set(key, { key, logs: [], routine: log.mixingRoutine || '' });
+        groups.get(key).logs.push(log);
+    });
+    const batches = [...groups.values()]
+        .map(batch => {
+            batch.logs.sort((a, b) => String(a.item).localeCompare(String(b.item), 'de'));
+            batch.timestamp = Math.max(...batch.logs.map(log => new Date(getLogTime(log) || 0).getTime() || 0));
+            batch.ingredients = [...batch.logs.reduce((items, log) => {
+                const ingredient = items.get(log.item) || { item: log.item, logs: [], amount: 0, requiredAmount: 0, missingAmount: 0 };
+                ingredient.logs.push(log);
+                ingredient.amount += Number(log.amount) || 0;
+                ingredient.requiredAmount += Number.isFinite(Number(log.mixingRequiredAmount)) ? Math.max(0, Number(log.mixingRequiredAmount)) : Number(log.amount) || 0;
+                ingredient.missingAmount += Math.max(0, Number(log.mixingMissingAmount) || 0);
+                items.set(log.item, ingredient);
+                return items;
+            }, new Map()).values()];
+            batch.requiredAmount = batch.ingredients.reduce((sum, ingredient) => sum + ingredient.requiredAmount, 0);
+            batch.mixedAmount = batch.ingredients.reduce((sum, ingredient) => sum + (ingredient.logs.every(log => log.mixingDone === true) ? ingredient.amount : 0), 0);
+            batch.missingAmount = batch.ingredients.reduce((sum, ingredient) => sum + ingredient.missingAmount, 0);
+            batch.progress = batch.requiredAmount > 0 ? Math.min(100, Math.round(batch.mixedAmount / batch.requiredAmount * 100)) : 0;
+            return batch;
+        })
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 8);
+    count.textContent = batches.length ? `${batches.length} ${batches.length === 1 ? 'Charge' : 'Chargen'}` : 'Noch keine Rezeptcharge';
+    if (!batches.length) {
+        container.innerHTML = '<p class="cr-mixing-empty">Nach einer gemeinsamen C&amp;R-Rezeptauslagerung findest du hier die Zutaten zum Abhaken. Einzelne Lagerbuchungen werden nicht aufgeführt.</p>';
+        return;
+    }
+    container.innerHTML = `<div class="cr-mixing-batches">${batches.map((batch, index) => {
+        const complete = batch.progress === 100 && batch.missingAmount <= 0.0001;
+        const rows = batch.ingredients.map(ingredient => {
+            const checked = ingredient.logs.every(log => log.mixingDone === true);
+            const unavailable = ingredient.amount <= 0 && ingredient.missingAmount > 0;
+            const ids = ingredient.logs.map(log => log.id);
+            const logIdArgs = jsArg(ids);
+            const checkedAttr = checked ? 'checked' : '';
+            const amountLabel = ingredient.missingAmount > 0.0001
+                ? `Ausgelagert: ${formatCRPreferredAmountHtml(ingredient.item, ingredient.amount).plain} · Benötigt: ${formatCRPreferredAmountHtml(ingredient.item, ingredient.requiredAmount).plain}`
+                : formatCRPreferredAmountHtml(ingredient.item, ingredient.amount).plain;
+            const missingLabel = ingredient.missingAmount > 0.0001 ? `<small class="cr-mixing-shortage">Fehlbestand: ${formatCRPreferredAmountHtml(ingredient.item, ingredient.missingAmount).plain}</small>` : '';
+            return `<label class="cr-mixing-item ${checked ? 'is-mixed' : ''} ${ingredient.missingAmount > 0.0001 ? 'has-shortage' : ''}">
+                <input type="checkbox" data-log-ids="${escapeHtml(JSON.stringify(ids))}" ${checkedAttr} ${unavailable ? 'disabled' : ''} onchange='setCRMixingItem(${logIdArgs}, this.checked)' aria-label="${checked ? 'Bereits gemischt' : 'Als gemischt markieren'}: ${escapeHtml(ingredient.item)}">
+                <span class="cr-mixing-item-name"><strong>${escapeHtml(ingredient.item)}</strong><small>${amountLabel}</small>${missingLabel}</span>
+                <span class="cr-mixing-item-state">${unavailable ? 'Nicht ausgelagert' : checked ? 'Gemischt' : 'Offen'}</span>
+            </label>`;
+        }).join('');
+        const title = `C&amp;R-Rezept${batch.routine ? ` · ${escapeHtml(batch.routine)}` : ''}`;
+        const batchIsOpen = batch.key === previouslyOpenBatch || (!previouslyOpenBatch && index === 0 && document.getElementById('crMixingOverviewDetails')?.open && !complete);
+        return `<details class="cr-mixing-batch ${complete ? 'is-complete' : ''}" data-batch-id="${escapeHtml(batch.key)}" ${batchIsOpen ? 'open' : ''}>
+            <summary><span class="cr-mixing-batch-title"><strong>${title}</strong><small>${escapeHtml(formatWarehouseDate(batch.timestamp))}${batch.missingAmount > 0.0001 ? ' · Fehlbestand bei Zutaten' : ''}</small></span><span class="cr-mixing-progress">${batch.progress}% gemischt</span></summary>
+            <div class="cr-mixing-progress-track" role="progressbar" aria-label="Mischfortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${batch.progress}"><span style="width:${batch.progress}%"></span></div>
+            <div class="cr-mixing-checklist">${rows}</div>
+        </details>`;
+    }).join('')}</div>`;
+}
+
+async function setCRMixingItem(logIds, checked) {
+    const ids = Array.isArray(logIds) ? logIds : [logIds];
+    const entries = (db.logs || []).filter(log => ids.includes(log.id));
+    if (!entries.length) return;
+    const keepChecklistPosition = () => {
+        const current = [...document.querySelectorAll('#crMixingOverview input[data-log-ids]')]
+            .find(input => JSON.parse(input.dataset.logIds || '[]').some(id => ids.includes(id)));
+        const top = current?.getBoundingClientRect().top;
+        renderCRMixingOverview();
+        const next = [...document.querySelectorAll('#crMixingOverview input[data-log-ids]')]
+            .find(input => JSON.parse(input.dataset.logIds || '[]').some(id => ids.includes(id)));
+        next?.focus({ preventScroll: true });
+        if (next && Number.isFinite(top)) {
+            requestAnimationFrame(() => {
+                const shift = next.getBoundingClientRect().top - top;
+                if (Math.abs(shift) > 1) window.scrollBy(0, shift);
+            });
+        }
+    };
+    if (!checked && entries.some(log => log.mixingDone === true)) {
+        const confirmed = await appConfirm('Diesen bereits abgehakten Bestandteil wieder als offen markieren?', {
+            title: 'Mischschritt zurücksetzen',
+            confirmText: 'Wieder öffnen',
+            cancelText: 'Abbrechen'
+        });
+        if (!confirmed) {
+            keepChecklistPosition();
+            return;
+        }
+    }
+    entries.forEach(log => { log.mixingDone = Boolean(checked); });
+    saveDB();
+    const persisted = await flushPendingPersistence('cr-mixing-checklist', false);
+    if (!persisted) showToast('Der Mischschritt ist vorgemerkt, konnte aber noch nicht sicher gespeichert werden.', 'warning', 5200);
+    keepChecklistPosition();
 }
 
 function selectCRRoutine(routine) {
@@ -26641,8 +27516,15 @@ function processCRPaste() {
         .map(row => ({ cat: row.cat, item: row.item, amount: row.amount }));
     const resolvedQueue = expandQueueWithInterchangeableStock(queue);
     if (!resolvedQueue || !resolvedQueue.length) return;
+    const mixingBatchId = createWarehouseId();
+    const mixingQueue = resolvedQueue.map(entry => ({
+        ...entry,
+        mixingBatchId,
+        mixingBatchType: 'cr',
+        mixingRoutine: getCRRoutine()
+    }));
     crPasteBookingBusy = true;
-    executeQueueWithConflictHandling(resolvedQueue, 0);
+    executeQueueWithConflictHandling(mixingQueue, 0);
 }
 
 function parseCRPasteAmounts(text) {
@@ -27328,10 +28210,25 @@ async function executeQueueWithConflictHandling(queue, index, warehouseId = acti
             pasteArea.value = '';
             previewCRPaste();
         }
-        alert("Werte erfolgreich verarbeitet!");
-        if (isCrPasteBooking) document.dispatchEvent(new Event('reeftools-cr-complete'));
+        if (isCrPasteBooking) {
+            showToast('C&R-Auslagerung gespeichert. Du kannst jetzt die Zutaten abhaken.', 'success', 4200);
+            document.dispatchEvent(new Event('reeftools-cr-complete'));
+        } else {
+            alert("Werte erfolgreich verarbeitet!");
+        }
         closeModal();
-        showTab('lager');
+        if (isCrPasteBooking) {
+            renderCRMixingOverview();
+            const overview = document.getElementById('crMixingOverviewDetails');
+            if (overview) {
+                overview.open = true;
+                const newestBatch = overview.querySelector('.cr-mixing-batch');
+                if (newestBatch) newestBatch.open = true;
+                requestAnimationFrame(() => overview.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+            }
+        } else {
+            showTab('lager');
+        }
         checkAndNotifyStockAlerts();
         return;
     }
@@ -27349,13 +28246,25 @@ async function executeQueueWithConflictHandling(queue, index, warehouseId = acti
             }
             db.inventory[cat][item] = 0;
             db.stats[item] = (db.stats[item] || 0) + stock;
-            addLog(cat, item, 'out', stock);
+            addLog(cat, item, 'out', stock, {
+                mixingBatchId: queue[index].mixingBatchId,
+                mixingBatchType: queue[index].mixingBatchType,
+                mixingRoutine: queue[index].mixingRoutine,
+                mixingRequiredAmount: amount,
+                mixingMissingAmount: Math.max(0, amount - stock)
+            });
             executeQueueWithConflictHandling(queue, index + 1, warehouseId);
         });
     } else {
         db.inventory[cat][item] -= amount;
         db.stats[item] = (db.stats[item] || 0) + amount;
-        addLog(cat, item, 'out', amount);
+        addLog(cat, item, 'out', amount, {
+            mixingBatchId: queue[index].mixingBatchId,
+            mixingBatchType: queue[index].mixingBatchType,
+            mixingRoutine: queue[index].mixingRoutine,
+            mixingRequiredAmount: amount,
+            mixingMissingAmount: 0
+        });
         executeQueueWithConflictHandling(queue, index + 1, warehouseId);
     }
 }
@@ -27757,7 +28666,7 @@ function importData() {
                 if (!confirm(`Projekt-Backup "${sourceName}" komplett wiederherstellen? Der aktuelle Stand dieses Geräts wird dadurch ersetzt.`)) return;
                 appState = migrateToWarehouseState(importPayload);
                 activeWarehouseId = importPayload.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
-                activeAquariumId = importPayload.activeAquariumId || appState.activeAquariumId || Object.keys(appState.aquariums || {})[0] || 'aquarium-main';
+                activeAquariumId = appState.aquariums[importPayload.activeAquariumId] ? importPayload.activeAquariumId : appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
                 appState.activeWarehouseId = activeWarehouseId;
                 appState.activeAquariumId = activeAquariumId;
                 const active = getActiveWarehouse();

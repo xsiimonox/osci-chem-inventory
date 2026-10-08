@@ -23,6 +23,8 @@ for (const htmlPath of htmlFiles) {
     .replace(/assets\/css\/style\.css\?v=[^"]+/g, `assets/css/style.css?v=${cachebuster}`)
     .replace(/assets\/js\/sangokai-data\.js\?v=[^"]+/g, `assets/js/sangokai-data.js?v=${cachebuster}`)
     .replace(/assets\/js\/lighting-sim\.js\?v=[^"]+/g, `assets/js/lighting-sim.js?v=${cachebuster}`)
+    .replace(/assets\/js\/sangokai-calculations\.js\?v=[^"]+/g, `assets/js/sangokai-calculations.js?v=${cachebuster}`)
+    .replace(/assets\/js\/sangokai-product-catalog\.js\?v=[^"]+/g, `assets/js/sangokai-product-catalog.js?v=${cachebuster}`)
     .replace(/assets\/js\/app\.js\?v=[^"]+/g, `assets/js/app.js?v=${cachebuster}`);
   html = html.replace(/assets\/js\/workspace-ui\.js\?v=[^"]+/g, `assets/js/workspace-ui.js?v=${cachebuster}`);
   html = html.replace(/assets\/js\/theme\.js\?v=[^"]+/g, `assets/js/theme.js?v=${cachebuster}`);
