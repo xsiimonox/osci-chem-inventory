@@ -4,21 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reeftools.de Anleitung</title>
-    <script>
-        try {
-            const supportedThemes = new Set(['default', 'light', 'girl', 'mint', 'badman']);
-            const params = new URLSearchParams(location.search);
-            const requestedTheme = params.get('theme');
-            const embedded = params.get('embed') === 'app-modal';
-            const storedTheme = localStorage.getItem('reeftools_theme_v1');
-            const theme = supportedThemes.has(requestedTheme) ? requestedTheme : storedTheme;
-            if (theme && theme !== 'default') document.documentElement.classList.add(`theme-${theme}`);
-            window.addEventListener('DOMContentLoaded', () => {
-                if (embedded) document.documentElement.classList.add('legal-embedded', 'guide-embedded');
-            });
-        } catch (error) {}
-    </script>
-    <link rel="stylesheet" href="assets/css/style.css?v=3.5.0-release">
+    <script src="assets/js/theme.js?v=3.6.0-release" data-theme-page></script>
+    <link rel="stylesheet" href="assets/css/style.css?v=3.6.0-release">
+    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.0-release">
 </head>
 <body class="guide-page">
     <main class="guide-shell">
@@ -143,7 +131,7 @@
             </div>
             <figure class="guide-figure">
                 <img loading="lazy" decoding="async" src="docs-assets/trace.png" alt="Screenshot des Trace Rechners">
-                <figcaption>Trace-Rechner mit Historie und Reef Manager Import.</figcaption>
+                <figcaption>Trace-Rechner mit den Schritten Planung, ICP und Rezept.</figcaption>
             </figure>
         </section>
 

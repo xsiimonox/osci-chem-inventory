@@ -5,6 +5,26 @@
     try { preferences = JSON.parse(localStorage.getItem(prefKey) || '{}'); } catch { preferences = {}; }
     if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {};
     const labels = { empty: 'Leer', critical: 'Kritisch', warning: 'Knapp', optimal: 'Ausreichend' };
+    const productColorByFormula = {
+        B: 'blue', CACL2: 'blue', SRCL2: 'blue',
+        KBR: 'violet', KCL: 'violet', K2SO4: 'violet', MGCL2: 'violet', MGSO4: 'violet',
+        NACL: 'lilac', NA2SO4: 'lilac', NAF: 'orange'
+    };
+    const categoryProductColors = {
+        'Makro Elements': 'gray',
+        Kationen: 'green',
+        Anionen: 'orange',
+        'Nutrition Elements': 'pale-yellow'
+    };
+    function productColor(cat, item) {
+        const formula = /\(([^)]+)\)/.exec(item)?.[1]?.replace(/\s+/g, '').toUpperCase();
+        if (formula && productColorByFormula[formula]) return productColorByFormula[formula];
+        const name = item.trim().toLowerCase();
+        if (name === 'magnesium') return 'violet';
+        if (name === 'calcium') return 'blue';
+        if (name === 'kh tag' || name === 'kh nacht') return 'gray';
+        return categoryProductColors[cat] || 'neutral';
+    }
     function persist() {
         try { localStorage.setItem(prefKey, JSON.stringify(preferences)); return true; }
         catch { showToast('Ansicht konnte nicht lokal gespeichert werden.', 'warning'); return false; }
@@ -18,13 +38,13 @@
         const status = stock <= 0 ? 'empty' : !disabled && threshold > 0 && stock <= threshold
             ? 'critical' : !disabled && warningItems.has(item) ? 'warning' : 'optimal';
         const capacity = Number(preferences.capacities?.[capacityKey(cat, item)] || 0);
-        const symbol = /\(([^)]+)\)/.exec(item)?.[1] || '';
-        return `<article class="card inventory-card inventory-card--lean" data-name="${escapeHtml(item)}" data-category="${escapeHtml(cat)}" data-stock-status="${status}">
-            <header class="inventory-card-head"><div class="inventory-product-copy"><span class="inventory-category">${escapeHtml(cat)}</span><h3>${escapeHtml(item)}</h3></div>${symbol ? `<span class="inventory-symbol">${escapeHtml(symbol)}</span>` : ''}</header>
-            <div class="inventory-stock-row"><strong class="stock">${formatItemAmount(item, stock)}</strong><span class="stock-status">${labels[status]}</span></div>
-            ${capacity > 0 ? `<meter min="0" max="${capacity}" value="${Math.max(0, Math.min(stock, capacity))}" aria-label="Füllstand ${escapeHtml(item)}">${Math.round(stock / capacity * 100)} %</meter><small>${Math.round(stock / capacity * 100)} % der Kapazität${stock > capacity ? ' · über Kapazität' : ''}</small>` : ''}
-            <div class="btn-group inventory-card-actions">${isWarehouseReadOnlyView() ? '<button type="button" disabled>Nur Ansicht</button>' : `<button type="button" class="btn-primary" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button><button type="button" class="btn-secondary" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>`}</div>
-            <details class="product-history" data-lazy-stock-details><summary>Verlauf & Prognose</summary><div data-stock-details></div></details>
+        const symbol = /\(([^)]+)\)/.exec(item)?.[1] || ({ Calcium: 'CA', Magnesium: 'MG', 'KH Nacht': 'KH', 'KH Tag': 'KH' }[item] || '');
+        const displayName = symbol ? item.replace(/\s*\([^)]+\)\s*$/, '') : item;
+        const favoriteMarker = isFavoriteProduct(item) ? '<span class="inventory-favorite-marker" aria-label="Favorit" title="Favorit">★</span>' : '';
+        return `<article class="card inventory-card inventory-card--lean" data-name="${escapeHtml(item)}" data-category="${escapeHtml(cat)}" data-stock-status="${status}" data-product-color="${productColor(cat, item)}">
+            <button type="button" class="inventory-product-toggle" data-stock-toggle aria-expanded="false" title="${escapeHtml(cat)} · Produkt öffnen"><span class="inventory-product-copy"><span class="inventory-color-mark" aria-hidden="true"></span><strong>${escapeHtml(displayName)}</strong>${symbol ? `<span class="inventory-symbol">${escapeHtml(symbol)}</span>` : ''}${favoriteMarker}</span><span class="inventory-stock-row"><strong class="stock">${formatItemAmount(item, stock)}</strong><span class="stock-status">${labels[status]}</span></span></button>
+            <details class="product-history" data-lazy-stock-details><summary aria-label="Aktionen und Details für ${escapeHtml(item)}"><span aria-hidden="true">›</span></summary><div class="inventory-history-body"><div class="btn-group inventory-card-actions">${isWarehouseReadOnlyView() ? '<button type="button" disabled>Nur Ansicht</button>' : `<button type="button" class="btn-primary" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "in")'>Einlagern</button><button type="button" class="btn-secondary" onclick='openModal(${jsArg(cat)}, ${jsArg(item)}, "out")'>Auslagern</button>`}</div><div data-stock-details></div></div></details>
+            ${capacity > 0 ? `<div class="inventory-meter"><meter min="0" max="${capacity}" value="${Math.max(0, Math.min(stock, capacity))}" aria-label="Füllstand ${escapeHtml(item)}">${Math.round(stock / capacity * 100)} %</meter><small>${Math.round(stock / capacity * 100)} % der Kapazität${stock > capacity ? ' · über Kapazität' : ''}</small></div>` : ''}
         </article>`;
     }
     function loadDetails(details) {
@@ -49,26 +69,85 @@
         };
     }
     function mountInventory(root, openKeys = []) {
-        let switcher = document.querySelector('#lager .inventory-view-switch');
-        if (!switcher) {
-            switcher = document.createElement('fieldset');
-            switcher.className = 'inventory-view-switch';
-            switcher.innerHTML = '<legend>Ansicht</legend><label><input type="radio" name="inventoryView" value="compact"> Kompakt</label><label><input type="radio" name="inventoryView" value="detail"> Details</label>';
-            document.querySelector('#lager .warehouse-filter-foot')?.prepend(switcher);
-            switcher.addEventListener('change', event => {
-                preferences.view = event.target.value; persist();
-                root.querySelectorAll('details').forEach(details => { details.open = false; });
-                filterLager();
-            });
-        }
-        const mode = preferences.view === 'detail' ? 'detail' : 'compact';
-        switcher.querySelectorAll('input').forEach(input => { input.checked = input.value === mode; });
-        root.dataset.view = mode;
+        mountStockControls(root);
+        document.querySelector('#lager .inventory-view-switch')?.remove();
+        root.dataset.view = 'list';
         root.querySelectorAll('[data-lazy-stock-details]').forEach(details => {
             const card = details.closest('[data-name]');
-            details.addEventListener('toggle', () => loadDetails(details));
-            details.open = mode === 'detail' || openKeys.includes(JSON.stringify([card.dataset.category, card.dataset.name]));
+            const toggle = card.querySelector('[data-stock-toggle]');
+            toggle.onclick = () => { details.open = !details.open; };
+            card.onclick = event => {
+                if (!event.target.closest('button, details')) details.open = !details.open;
+            };
+            details.addEventListener('toggle', () => {
+                toggle.setAttribute('aria-expanded', String(details.open));
+                loadDetails(details);
+            });
+            details.open = openKeys.includes(JSON.stringify([card.dataset.category, card.dataset.name]));
+            toggle.setAttribute('aria-expanded', String(details.open));
             loadDetails(details);
+        });
+    }
+    function mountStockControls(root) {
+        let sort = document.getElementById('inventorySort');
+        if (!sort) {
+            const field = document.createElement('div');
+            field.className = 'toolbar-field';
+            field.innerHTML = '<label for="inventorySort">Sortierung</label><select id="inventorySort"><option value="category">Kategorie</option><option value="name">Name A–Z</option><option value="fill-low">Füllstand aufsteigend</option><option value="fill-high">Füllstand absteigend</option></select>';
+            document.querySelector('#lager .lager-toolbar')?.append(field);
+            sort = field.querySelector('select');
+            sort.setAttribute('aria-label', 'Lagerbestand sortieren');
+            sort.title = 'Füllstand relativ zur hinterlegten Kapazität; Produkte ohne Kapazität zuletzt';
+            sort.value = preferences.sort || 'category';
+            sort.onchange = () => { preferences.sort = sort.value; persist(); filterLager(); };
+        }
+        const cards = [...root.querySelectorAll('.inventory-card')];
+        if (sort.value !== 'category') {
+            const fill = card => {
+                const cat = card.dataset.category, item = card.dataset.name;
+                const capacity = Number(preferences.capacities?.[capacityKey(cat, item)] || 0);
+                return capacity > 0 ? Number(db.inventory[cat]?.[item] || 0) / capacity : null;
+            };
+            cards.sort((a, b) => {
+                const names = a.dataset.name.localeCompare(b.dataset.name, 'de', { numeric: true });
+                if (sort.value === 'name') return names;
+                const x = fill(a), y = fill(b);
+                if (x === null || y === null) return x === y ? names : x === null ? 1 : -1;
+                return (sort.value === 'fill-high' ? y - x : x - y) || names;
+            });
+            root.replaceChildren();
+            const grid = document.createElement('div'); grid.className = 'inventory-card-grid';
+            grid.append(...cards); root.append(grid);
+        }
+        let quick = document.getElementById('inventoryQuickBooking');
+        if (!quick) {
+            quick = document.createElement('details'); quick.id = 'inventoryQuickBooking';
+            quick.className = 'inventory-quick-booking';
+            quick.innerHTML = '<summary>Produkt buchen</summary><div class="inventory-quick-booking-fields"><div class="toolbar-field"><label for="inventoryBookingProduct">Produkt</label><select id="inventoryBookingProduct"><option value="">Produkt auswählen</option></select></div><button type="button" class="btn-primary" data-book="in">Einlagern</button><button type="button" class="btn-secondary" data-book="out">Auslagern</button></div>';
+            document.querySelector('#lager .warehouse-filter-panel')?.append(quick);
+            quick.addEventListener('click', event => {
+                const button = event.target.closest('[data-book]');
+                const value = quick.querySelector('select').value;
+                if (!button || !value || isWarehouseReadOnlyView()) return;
+                const [cat, item] = JSON.parse(value); openModal(cat, item, button.dataset.book);
+            });
+            quick.querySelector('select').onchange = () => {
+                preferences.bookingProduct = quick.querySelector('select').value; persist();
+                quick.querySelectorAll('[data-book]').forEach(button => {
+                    button.hidden = !quick.querySelector('select').value;
+                    button.disabled = !quick.querySelector('select').value || isWarehouseReadOnlyView();
+                });
+            };
+            quick.querySelector('select').setAttribute('aria-label', 'Produkt für Ein- oder Auslagerung auswählen');
+        }
+        const products = cards.map(card => ({ cat: card.dataset.category, item: card.dataset.name }));
+        products.sort((a, b) => a.item.localeCompare(b.item, 'de'));
+        const select = quick.querySelector('select');
+        select.innerHTML = '<option value="">Produkt auswählen</option>' + products.map(({ cat, item }) => `<option value="${escapeHtml(JSON.stringify([cat, item]))}">${escapeHtml(item)} · ${escapeHtml(cat)}</option>`).join('');
+        select.value = preferences.bookingProduct || '';
+        quick.querySelectorAll('[data-book]').forEach(button => {
+            button.hidden = !select.value;
+            button.disabled = !select.value || isWarehouseReadOnlyView();
         });
     }
     function icpFeedback(rows) {

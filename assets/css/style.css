@@ -3110,9 +3110,6 @@ body.theme-mint.party-mode .card {
     border-radius:var(--radius-md);
     transition:background 0.2s ease;
 }
-.toolbar-field:focus-within {
-    background:var(--accent);
-}
 .toolbar-field-compact {
     flex:0 0 auto;
 }

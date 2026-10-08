@@ -32,12 +32,37 @@ function inspectView(selector = '.tab-content.active') {
     const radii = [...new Set(controls.map(element => getComputedStyle(element).borderTopLeftRadius))];
     const inconsistent = controls.filter(element => getComputedStyle(element).borderTopLeftRadius !== '8px').map(label);
     const clipped = controls.filter(element => element.tagName === 'BUTTON' && ['hidden','clip'].includes(getComputedStyle(element).overflowY) && element.scrollHeight > element.clientHeight + 2).map(label);
-    return { id: root.id, width: innerWidth, overflow, radii, inconsistent, clipped, controlCount: controls.length, documentWidth: document.documentElement.scrollWidth };
+    const shifted = [...root.querySelectorAll('.cr-routine-option,.trace-osci-workflow-step,.trace-history-status-action,.measurement-list-button,.icp-value-row,.global-search-result')].filter(visible).filter(element => {
+        const style = getComputedStyle(element);
+        return style.justifyContent === 'center' || ['left','start'].includes(style.textAlign) === false;
+    }).map(label);
+    const choiceInsets = [...root.querySelectorAll('.cr-routine-option,.trace-osci-workflow-step')].filter(visible).filter(element => {
+        const rect = element.getBoundingClientRect(), style = getComputedStyle(element);
+        const expected = rect.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft);
+        return [...element.children].some(child => Math.abs(child.getBoundingClientRect().left - expected) > 1);
+    }).map(label);
+    const parentOverflow = controls.filter(element => {
+        if (scroller(element) || ['absolute','fixed'].includes(getComputedStyle(element).position)) return false;
+        const parent = element.parentElement, rect = element.getBoundingClientRect(), bounds = parent.getBoundingClientRect();
+        if (!bounds.width || getComputedStyle(parent).display === 'contents') return false;
+        return rect.left < bounds.left - 1 || rect.right > bounds.right + 1;
+    }).map(label);
+    const summaries = [...root.querySelectorAll('details > summary')].filter(visible).filter(element => !element.closest('.product-history[data-lazy-stock-details]'));
+    const unframedHeadings = summaries.filter(element => {
+        const style = getComputedStyle(element);
+        return style.borderTopLeftRadius !== '8px' || ['Top','Right','Bottom','Left'].some(side => parseFloat(style[`border${side}Width`]) < 1) || style.backgroundColor === 'rgba(0, 0, 0, 0)';
+    }).map(label);
+    const items = [...root.querySelectorAll('.inventory-card:not(.inventory-card--lean),.tool-tile-card,.icp-report-card,.coral-card,.global-search-result,.modal-content,.app-dialog-panel')].filter(visible);
+    const unframedItems = items.filter(element => {
+        const style = getComputedStyle(element);
+        return style.borderTopLeftRadius !== '8px' || ['Top','Right','Bottom','Left'].some(side => parseFloat(style[`border${side}Width`]) < 1);
+    }).map(label);
+    return { id: root.id, width: innerWidth, overflow, radii, inconsistent, clipped, shifted, choiceInsets, parentOverflow, unframedHeadings, unframedItems, headingCount: summaries.length, itemCount: items.length, controlCount: controls.length, documentWidth: document.documentElement.scrollWidth };
 }
 function record(result, phase) {
     result.phase = phase;
     checks.push(result);
-    if (result.overflow.length || result.inconsistent.length || result.clipped.length || result.documentWidth > result.width + 1) failures.push(result);
+    if (result.overflow.length || result.inconsistent.length || result.clipped.length || result.shifted.length || result.choiceInsets.length || result.parentOverflow.length || result.unframedHeadings.length || result.unframedItems.length || result.documentWidth > result.width + 1) failures.push(result);
 }
 try {
     await page.goto(url, { waitUntil: 'networkidle' });
@@ -47,7 +72,7 @@ try {
         try { await loadDemoProfile(); } finally { window.appConfirm = confirm; }
     });
     await page.waitForTimeout(600);
-    for (const width of [320, 390, 768, 1440]) {
+    for (const width of [320, 390, 671, 768, 1440]) {
         await page.setViewportSize({ width, height: width < 768 ? 844 : 1000 });
         for (const tab of tabs) {
             await page.evaluate(id => selectTab(id), tab);
@@ -181,6 +206,15 @@ try {
         }));
         checks.push(firstOffline);
         if (!firstOffline.moduleLoaded || !firstOffline.appLoaded || firstOffline.background !== 'rgb(16, 23, 25)') failures.push(firstOffline);
+        for (const width of [320,671,1440]) {
+            await firstLoad.setViewportSize({ width, height: 900 });
+            for (const id of ['tools','icp']) {
+                await firstLoad.evaluate(id => selectTab(id), id);
+                await firstLoad.waitForTimeout(250);
+                record(await firstLoad.evaluate(inspectView), 'empty-profile');
+                await firstLoad.screenshot({ path: `${output}/empty-${id}-${width}.png` });
+            }
+        }
     } finally { await fresh.close(); }
     const styledUrl = await page.evaluate(() => ReefTheme.pageUrl('privacy.html', 'light', { primary: '#8e3a58', secondary: '#316e80' }, true));
     await page.goto(styledUrl, { waitUntil: 'networkidle' });

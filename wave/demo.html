@@ -4,21 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Reeftools Wave Demo</title>
+  <script src="../assets/js/theme.js?v=3.6.0-release" data-theme-page></script>
   <style>
     :root {
       color-scheme: dark;
-      --bg: #071013;
-      --panel: #10191d;
-      --panel-2: #152126;
-      --panel-3: #0c171b;
-      --text: #eef7f8;
-      --muted: #9fb2b8;
-      --line: #26383e;
-      --a: #4fd8c9;
+      --panel: var(--surface-card);
+      --panel-2: var(--surface-raised);
+      --panel-3: var(--app-bg);
+      --muted: var(--text-secondary);
+      --line: var(--border-color);
+      --a: var(--accent);
       --b: #7fa8ff;
-      --danger: #ff6868;
-      --warn: #f2c76b;
-      --ok: #66e39e;
+      --warn: var(--status-warning);
+      --ok: var(--status-success);
       font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
@@ -133,6 +131,22 @@
       .tools { display: grid; grid-template-columns: 1fr 1fr; }
       .tools button, .tools .button { width: 100%; }
     }
+  </style>
+  <link rel="stylesheet" href="../assets/css/design-system.css?v=3.6.0-release">
+  <style>
+    body { background: var(--app-bg); }
+    h1 { font-size: var(--font-heading); font-weight: 600; }
+    h2, h3, .metric strong { font-weight: 600; }
+    .metric strong { font-size: var(--font-section); }
+    .surface, .metric, .pump-card, .preset-row, .schedule-row, .hint-box, .notice, .pill, .badge { border-radius: var(--radius-md); box-shadow: none; }
+    .surface, .pill { background: var(--surface-card); }
+    .surface { border: 0; border-top: 1px solid var(--border-color); border-radius: 0; }
+    button.primary { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
+    button.danger, .notice { background: var(--surface-raised); color: var(--status-danger); border-color: var(--status-danger); }
+    .hint-box { background: var(--surface-raised); color: var(--status-warning); border-color: var(--border-color); }
+    .dot { box-shadow: none; }
+    .wave-canvas { background: var(--app-bg); border-radius: var(--radius-md); }
+    .wave-canvas::before { display: none; }
   </style>
 </head>
 <body>

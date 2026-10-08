@@ -50,6 +50,18 @@ const result = await page.evaluate(() => {
   const baseScale = getTraceCalculatorScale({ tankLiters: 500, days: 40 });
   const enlargedScale = getTraceCalculatorScale({ tankLiters: 800, days: 40 });
   const longerScale = getTraceCalculatorScale({ tankLiters: 500, days: 80 });
+  const traceState = ensureTraceCalculatorState();
+  delete traceState.config.interval;
+  delete traceState.config.stocking;
+  const syncPlanningSelects = () => {
+    ['traceCalcInterval','traceCalcStocking'].forEach(id => delete document.getElementById(id).dataset.traceCalcSynced);
+    syncTraceCalculatorConfigUi();
+    return [document.getElementById('traceCalcInterval').value, document.getElementById('traceCalcStocking').value];
+  };
+  const planningDefaults = syncPlanningSelects();
+  traceState.config.interval = 'weekly';
+  traceState.config.stocking = 'weak';
+  const savedPlanningChoices = syncPlanningSelects();
 
   return {
     hanna: hannaText.includes('0.0491 mg/l'),
@@ -57,6 +69,8 @@ const result = await page.evaluate(() => {
     khNight,
     calcium,
     scales: { baseScale, enlargedScale, longerScale },
+    planningDefaults,
+    savedPlanningChoices,
     noInvalidResults: !/\b(?:NaN|undefined)\b/.test(`${hannaText} ${khTag.result} ${khNight.result} ${calcium.result}`)
   };
 });
@@ -71,6 +85,8 @@ const ok = result.hanna
   && result.scales.baseScale === 1
   && result.scales.enlargedScale === 1.6
   && result.scales.longerScale === 2
+  && result.planningDefaults.join(',') === 'monthly,normal'
+  && result.savedPlanningChoices.join(',') === 'weekly,weak'
   && result.noInvalidResults
   && errors.length === 0;
 

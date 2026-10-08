@@ -25,12 +25,13 @@ try {
         toggleFavoriteProduct(name);
         return count === 33;
     });
-    await page.locator('[name="inventoryView"][value="detail"]').check();
-    checks.details = await page.locator('#lager-container details[open]').count() > 0;
+    checks.listDefault = await page.locator('#lager-container').getAttribute('data-view') === 'list'
+        && await page.locator('#lager .inventory-view-switch').count() === 0;
+    await page.locator('#lager-container [data-stock-toggle]').first().click();
+    checks.productDetails = await page.locator('#lager-container details[open]').count() === 1
+        && await page.locator('#lager-container .inventory-card-actions').first().isVisible();
     await page.reload({ waitUntil: 'networkidle' });
-    checks.viewPersisted = await page.locator('[name="inventoryView"][value="detail"]').isChecked();
-    await page.locator('[name="inventoryView"][value="compact"]').check();
-    checks.compactClosed = await page.locator('#lager-container details[open]').count() === 0;
+    checks.productDetailsStartClosed = await page.locator('#lager-container details[open]').count() === 0;
     await page.locator('#lager-container .product-history summary').first().click();
     await page.evaluate(() => { window.originalAuditPrompt = window.appPrompt; window.appPrompt = async () => '200'; });
     await page.locator('#lager-container [data-stock-capacity]').first().click();

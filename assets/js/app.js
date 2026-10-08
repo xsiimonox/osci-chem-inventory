@@ -13286,33 +13286,26 @@ function renderLager() {
             .join('');
         container.innerHTML = `
             <section class="warehouse-page-head">
-                <div>
-                    <small>Lagerverwaltung</small>
-                    <h2>Lagerbestand</h2>
-                    <p>Alle Buchungen wirken auf <strong id="activeWarehouseName">das aktive Lager</strong>.</p>
-                    <div class="osci-system-note" id="warehouseOsciSystemNote">${escapeHtml(getWarehouseSystemNote())}</div>
-                </div>
-                <div class="warehouse-head-actions">
-                    <button type="button" class="btn btn-primary" onclick="openSmartStockModal('in')">Einlagern</button>
-                    <button type="button" class="btn btn-secondary" onclick="openSmartStockModal('out')">Auslagern</button>
-                </div>
+                <h2>Lagerbestand</h2>
+                <strong id="activeWarehouseName">Hauptlager</strong>
             </section>
-            <section class="warehouse-control-card">
-                <div class="warehouse-control-head">
-                    <div>
-                        <span>Aktives Lager</span>
-                        <strong>Lager auswählen und verwalten</strong>
+            <details class="warehouse-manager">
+                <summary>Lager verwalten</summary>
+                <section class="warehouse-control-card">
+                    <div class="warehouse-control-head">
+                        <div><span>Aktives Lager</span><strong>Lager auswählen und verwalten</strong></div>
+                        <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
                     </div>
-                    <div class="warehouse-access-badge" id="warehouseAccessBadge">Eigenes Lager</div>
-                </div>
-                <div class="warehouse-switcher">
-                    <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
-                    <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen" aria-label="Neues Lager erstellen">Neu</button>
-                    <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen" aria-label="Aktuelles Lager umbenennen">✎</button>
-                    <button type="button" class="warehouse-delete-button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen" aria-label="Aktuelles Lager löschen">×</button>
-                </div>
-                <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
-            </section>
+                    <div class="warehouse-switcher">
+                        <select id="warehouseSelect" onchange="switchWarehouse(this.value)" aria-label="Lager wechseln"></select>
+                        <button type="button" onclick="createWarehouse()" title="Neues Lager erstellen" aria-label="Neues Lager erstellen">Neu</button>
+                        <button type="button" onclick="renameWarehouse()" title="Aktuelles Lager umbenennen" aria-label="Aktuelles Lager umbenennen">✎</button>
+                        <button type="button" class="warehouse-delete-button" onclick="deleteWarehouse()" title="Aktuelles Lager löschen" aria-label="Aktuelles Lager löschen">×</button>
+                    </div>
+                    <div class="warehouse-meta" id="warehouseMeta">Lager wird geladen ...</div>
+                    <div class="osci-system-note" id="warehouseOsciSystemNote">${escapeHtml(getWarehouseSystemNote())}</div>
+                </section>
+            </details>
             <section class="warehouse-filter-panel" aria-label="Lager durchsuchen und filtern">
                 <div class="lager-toolbar">
                     <div class="toolbar-field">
@@ -13328,19 +13321,22 @@ function renderLager() {
                         </select>
                     </div>
                 </div>
-                <div class="warehouse-filter-foot">
+                <details class="warehouse-quick-filters">
+                    <summary>Weitere Filter</summary>
                     <div class="lager-filter-chips" aria-label="Schnellfilter">
                         <button type="button" class="active" data-filter="all" aria-pressed="true" onclick="setLagerQuickFilter('all')">Alle</button>
                         <button type="button" data-filter="low" aria-pressed="false" onclick="setLagerQuickFilter('low')">Knapp</button>
                         <button type="button" data-filter="favorites" aria-pressed="false" onclick="setLagerQuickFilter('favorites')">Favoriten</button>
                     </div>
-                    <div class="warehouse-filter-result">
-                        <span id="lager-result-count" aria-live="polite">Bestand wird geladen</span>
-                        <button type="button" id="lager-filter-reset" class="btn btn-ghost" onclick="resetLagerFilters()" hidden>Filter zurücksetzen</button>
-                    </div>
-                </div>
+                </details>
             </section>
-            <div id="stock-alerts"></div>
+            <div class="inventory-list-meta">
+                <div id="stock-alerts"></div>
+                <div class="warehouse-filter-result">
+                    <span id="lager-result-count" aria-live="polite">Bestand wird geladen</span>
+                    <button type="button" id="lager-filter-reset" class="btn btn-ghost" onclick="resetLagerFilters()" hidden>Filter zurücksetzen</button>
+                </div>
+            </div>
             <div id="lager-container"></div>
             <div id="lager-empty-state" class="empty-state warehouse-empty-state" hidden>
                 <strong class="empty-state-title">Keine Produkte gefunden</strong>
@@ -13405,23 +13401,8 @@ function filterLager() {
     const sections = [];
     renderStockAlerts(alertsContainer);
 
-    const favoriteRows = [];
     const matchedItems = new Set();
-    for (let cat in catalog) {
-        for (let item in catalog[cat]) {
-            if (!shouldShowCatalogProduct(cat, item)) continue;
-            if (!isFavoriteProduct(item)) continue;
-            if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
-            if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
-            if (!item.toLowerCase().includes(term)) continue;
-            favoriteRows.push(renderProductCard(cat, item, alertItems));
-            matchedItems.add(`${cat}\u0000${item}`);
-        }
-    }
-    if (lagerQuickFilter === 'all' && favoriteRows.length > 0) {
-        sections.push(`<section class="inventory-category-section"><h2 class="category-title">Favoriten</h2><div class="inventory-card-grid">${favoriteRows.join('')}</div></section>`);
-    }
-    
+
     for (let cat in catalog) {
         if (!isOsciFeaturesEnabled() && isOsciProductCategory(cat)) continue;
         if (selectedCategory !== 'all' && selectedCategory !== cat) continue;
@@ -13431,7 +13412,6 @@ function filterLager() {
         
         for (let item in catalog[cat]) {
             if (!shouldShowCatalogProduct(cat, item)) continue;
-            if (lagerQuickFilter === 'all' && matchedItems.has(`${cat}\u0000${item}`)) continue;
             if (lagerQuickFilter === 'favorites' && !isFavoriteProduct(item)) continue;
             if (lagerQuickFilter === 'low' && !alertItems.has(item)) continue;
             if (item.toLowerCase().includes(term)) {
@@ -13477,9 +13457,7 @@ function renderStockAlerts(container) {
 
     if (alerts.length === 0) {
         container.innerHTML = `
-            <div class="alert-summary success">
-                Keine kritischen Artikel im gewählten Warnzeitraum von ${warningWeeks} Wochen.
-            </div>
+            <div class="alert-summary success">Keine Bestandswarnungen</div>
         `;
         return;
     }
@@ -13501,7 +13479,7 @@ function renderStockAlerts(container) {
     }).join('');
 
     container.innerHTML = `
-        <details class="alert-summary" ${alerts.length <= 3 ? 'open' : ''}>
+        <details class="alert-summary">
             <summary class="alert-title">
                 <span>Bestandswarnungen (${alerts.length})</span>
                 <span class="alert-summary-hint">anzeigen</span>
@@ -14520,8 +14498,8 @@ function syncTraceCalculatorConfigUi() {
     const config = state.config;
     const setters = [
         ['traceCalcTankLiters', config.tankLiters],
-        ['traceCalcInterval', config.interval],
-        ['traceCalcStocking', config.stocking],
+        ['traceCalcInterval', config.interval || 'monthly'],
+        ['traceCalcStocking', config.stocking || 'normal'],
         ['traceCalcDays', config.days],
         ['traceCalcDailyDose', config.dailyDoseMl],
         ['traceCalcBottleMax', config.bottleMaxMl],
