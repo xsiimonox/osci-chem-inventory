@@ -8898,6 +8898,11 @@ function selectTab(tabId) {
     setMenuOpenState(false, false);
 }
 
+function collapseTabDetails(tab) {
+    if (!tab) return;
+    tab.querySelectorAll('details[open]').forEach(details => { details.open = false; });
+}
+
 let designMotionObserver = null;
 
 function refreshDesignMotionTargets(scope = document.querySelector('.tab-content.active')) {
@@ -8963,6 +8968,9 @@ function showTab(tabId, historyMode = 'replace') {
     const targetBtn = document.getElementById('tab-' + tabId);
     if (!targetTab || !targetBtn) tabId = 'lager';
 
+    const previousTab = document.querySelector('.tab-content.active');
+    if (previousTab && previousTab.id !== tabId) collapseTabDetails(previousTab);
+
     document.querySelectorAll('.tab-content').forEach(el => {
         el.classList.remove('active');
         el.setAttribute('aria-hidden', 'true');
@@ -9010,6 +9018,7 @@ function showTab(tabId, historyMode = 'replace') {
     saveDB(false);
     renderActiveTabContent(tabId);
     if (tabId === 'tools') {
+        collapseTabDetails(document.getElementById('tools'));
         openToolFromRoute(route.toolId);
     }
     scheduleTextFitPass();
