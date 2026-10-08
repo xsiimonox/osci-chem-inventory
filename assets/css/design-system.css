@@ -534,6 +534,32 @@ tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-raised) 
     #lager .inventory-quick-booking-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     #lager .inventory-quick-booking-fields .toolbar-field { grid-column: 1 / -1; }
 }
+
+/* Dense summary headers need room to wrap on narrow phones. */
+@media (max-width: 520px) {
+    #trace-export .trace-history-summary {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 8px;
+    }
+    #trace-export .trace-history-summary > span:first-child,
+    #trace-export .trace-history-summary-side { width: 100%; min-width: 0; }
+    #trace-export .trace-history-summary-side {
+        align-items: flex-start;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 6px 10px;
+    }
+    #trace-export .trace-history-summary small,
+    #trace-export .trace-history-count { flex: 1 1 auto; min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+    #icp .icp-history-summary { align-items: stretch; flex-direction: column; gap: 8px; }
+    #icp .icp-history-summary > div,
+    #icp .icp-history-summary-side { width: 100%; min-width: 0; }
+    #icp .icp-history-summary-side { align-items: center; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+    #icp .icp-history-summary-meta { white-space: normal; overflow-wrap: anywhere; }
+    #tools .tool-section-summary > span:first-child { flex: 1 1 auto; min-width: 0; }
+}
 .inventory-card--lean .stock { background: transparent; padding: 0; color: var(--text-primary); font-size: var(--font-value); font-weight: 500; }
 .inventory-card--lean .inventory-card-actions button { background: transparent; color: var(--text-primary); border-color: var(--border-color); }
 .inventory-symbol { background: var(--surface-raised); color: var(--accent); border: 0; border-radius: var(--radius-sm); }
