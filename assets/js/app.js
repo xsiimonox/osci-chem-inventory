@@ -12423,12 +12423,12 @@ function initCustomCursor() {
         requestAnimationFrame(animate);
     };
 
-    document.addEventListener('mousemove', move, { passive: true });
-    document.addEventListener('mouseleave', () => document.body.classList.remove('cursor-visible'));
-    document.addEventListener('mouseenter', () => document.body.classList.add('cursor-visible'));
-    document.addEventListener('mousedown', () => document.body.classList.add('cursor-down'));
-    document.addEventListener('mouseup', () => document.body.classList.remove('cursor-down'));
-    document.addEventListener('mouseover', event => {
+    document.addEventListener('pointermove', move, { passive: true });
+    document.addEventListener('pointerleave', () => document.body.classList.remove('cursor-visible'));
+    document.addEventListener('pointerenter', () => document.body.classList.add('cursor-visible'));
+    document.addEventListener('pointerdown', () => document.body.classList.add('cursor-down'));
+    document.addEventListener('pointerup', () => document.body.classList.remove('cursor-down'));
+    document.addEventListener('pointerover', event => {
         document.body.classList.toggle('cursor-hover', Boolean(event.target.closest('button, a, input, select, textarea, summary, label, .resource-link-card')));
     });
     requestAnimationFrame(animate);
@@ -13065,6 +13065,56 @@ function readSangokaiDoseTrackerForm() {
     };
 }
 
+function renderSangokaiDoseTrendChart(measurements, targetValue, product) {
+    const points = measurements
+        .map(entry => ({ ...entry, value: Number(entry.value), time: new Date(entry.at).getTime() }))
+        .filter(entry => Number.isFinite(entry.value) && Number.isFinite(entry.time))
+        .sort((left, right) => left.time - right.time);
+    if (points.length < 2) return '';
+
+    const target = String(targetValue ?? '').trim() === '' ? null : Number(String(targetValue).replace(',', '.'));
+    const validTarget = Number.isFinite(target) ? target : null;
+    const values = points.map(point => point.value);
+    if (validTarget !== null) values.push(validTarget);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max((max - min) * 0.16, product === 'kh' ? 0.08 : 2);
+    const low = min - padding;
+    const high = max + padding;
+    const width = 720;
+    const height = 240;
+    const left = 72;
+    const right = 22;
+    const top = 18;
+    const bottom = 42;
+    const plotWidth = width - left - right;
+    const plotHeight = height - top - bottom;
+    const timeSpan = Math.max(1, points[points.length - 1].time - points[0].time);
+    const coords = points.map(point => ({
+        ...point,
+        x: left + ((point.time - points[0].time) / timeSpan) * plotWidth,
+        y: top + ((high - point.value) / (high - low)) * plotHeight
+    }));
+    const path = coords.map((point, index) => `${index ? 'L' : 'M'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+    const unit = product === 'kh' ? '°dKH' : 'mg/L';
+    const yFor = value => top + ((high - value) / (high - low)) * plotHeight;
+    const gridValues = [high, (high + low) / 2, low];
+    const dateLabel = time => new Date(time).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+    const digits = product === 'kh' ? 2 : 0;
+    return `<section class="sangokai-dose-trend" aria-label="Messwertverlauf">
+        <div class="sangokai-dose-trend-head"><strong>Messwertverlauf</strong><span>${points.length} Messungen · ${escapeHtml(unit)}</span></div>
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${product === 'kh' ? 'KH' : 'Calcium'}-Messverlauf mit ${validTarget === null ? 'Messpunkten' : `Sollwert ${formatSangokaiAmount(validTarget, digits)} ${escapeHtml(unit)}`} ">
+            ${gridValues.map(value => `<g><line x1="${left}" y1="${yFor(value).toFixed(1)}" x2="${width - right}" y2="${yFor(value).toFixed(1)}" class="sangokai-dose-grid"></line><text x="${left - 10}" y="${(yFor(value) + 4).toFixed(1)}" text-anchor="end" class="sangokai-dose-axis-label">${formatSangokaiAmount(value, digits)}</text></g>`).join('')}
+            ${validTarget === null ? '' : `<line x1="${left}" y1="${yFor(validTarget).toFixed(1)}" x2="${width - right}" y2="${yFor(validTarget).toFixed(1)}" class="sangokai-dose-target-line"></line><text x="${width - right}" y="${(yFor(validTarget) - 7).toFixed(1)}" text-anchor="end" class="sangokai-dose-target-label">Ziel ${formatSangokaiAmount(validTarget, digits)}</text>`}
+            <path d="${path}" pathLength="1" class="sangokai-dose-trend-line"></path>
+            ${coords.map(point => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4.5" class="sangokai-dose-trend-point"><title>${formatSangokaiAmount(point.value, digits)} ${escapeHtml(unit)} · ${escapeHtml(dateLabel(point.time))}</title></circle>`).join('')}
+            <text x="${left}" y="${height - 12}" class="sangokai-dose-axis-label">${escapeHtml(dateLabel(points[0].time))}</text>
+            <text x="${width - right}" y="${height - 12}" text-anchor="end" class="sangokai-dose-axis-label">${escapeHtml(dateLabel(points[points.length - 1].time))}</text>
+        </svg>
+        <p class="field-help">Gestrichelt: dein eingestellter Sollwert. Die Grafik zeigt Messungen, keine Prognose.</p>
+    </section>`;
+}
+
 function updateSangokaiDoseTracker(persist = true) {
     const tracker = getSangokaiDoseTrackerState();
     const form = readSangokaiDoseTrackerForm();
@@ -13133,7 +13183,7 @@ function updateSangokaiDoseTracker(persist = true) {
         }
     }
     historyContainer.innerHTML = measurements.length
-        ? `<h5>Gespeicherte ${isKh ? 'KH' : 'Ca'}-Messungen (${measurements.length})</h5><div class="sangokai-dose-history-list">${measurements.slice().reverse().map(entry => `<div class="sangokai-dose-history-row"><span><strong>${escapeHtml(formatWarehouseDate(entry.at))}</strong><small>${formatSangokaiAmount(entry.value, 3)} ${isKh ? '°dKH' : 'mg/L'} · ${formatSangokaiAmount(entry.doseMlPerDay)} ml/Tag im Messzeitraum</small></span><div class="sangokai-dose-history-actions"><button type="button" class="btn-secondary" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} bearbeiten" onclick='editSangokaiDoseMeasurement(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-danger" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} löschen" title="Messung löschen" onclick='deleteSangokaiDoseMeasurement(${jsArg(entry.id)})'>Löschen</button></div></div>`).join('')}</div>`
+        ? `${renderSangokaiDoseTrendChart(measurements, form.targetValue, form.product)}<h5>Gespeicherte ${isKh ? 'KH' : 'Ca'}-Messungen (${measurements.length})</h5><div class="sangokai-dose-history-list">${measurements.slice().reverse().map(entry => `<div class="sangokai-dose-history-row"><span><strong>${escapeHtml(formatWarehouseDate(entry.at))}</strong><small>${formatSangokaiAmount(entry.value, 3)} ${isKh ? '°dKH' : 'mg/L'} · ${formatSangokaiAmount(entry.doseMlPerDay)} ml/Tag im Messzeitraum</small></span><div class="sangokai-dose-history-actions"><button type="button" class="btn-secondary" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} bearbeiten" onclick='editSangokaiDoseMeasurement(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-danger" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} löschen" title="Messung löschen" onclick='deleteSangokaiDoseMeasurement(${jsArg(entry.id)})'>Löschen</button></div></div>`).join('')}</div>`
         : '<p class="field-help">Noch keine Messungen gespeichert.</p>';
 }
 
