@@ -581,22 +581,27 @@
         const fallback = document.getElementById('phytoScoop3dFallback');
         if (!canvas || !fallback) return;
         if (!scoopViewer) scoopViewer = createScoopViewer(canvas, document.getElementById('phytoScoopResetView'), fallback);
-        if (scoopViewer) scoopViewer.setModel(makeMesh(calc), calc);
+        const handleLength = Number(document.getElementById('phytoScoopHandleLength')?.value ?? handleLengthMm);
+        if (scoopViewer) scoopViewer.setModel(makeMesh(calc, null, '', handleLength), calc);
         else fallback.hidden = false;
         updateHolder();
     }
 
     function update() {
         const input = document.getElementById('phytoScoopLiters');
+        const handleLengthInput = document.getElementById('phytoScoopHandleLength');
         const result = document.getElementById('phytoScoopResult');
         const download = document.getElementById('phytoScoopDownload');
         if (!input || !result || !download) return;
         const liters = Number(input.value);
-        const valid = Number.isFinite(liters) && liters >= 50 && liters <= Number.MAX_SAFE_INTEGER;
-        input.setCustomValidity(valid ? '' : 'Bitte mindestens 50 Liter Aquariumvolumen eingeben.');
-        download.disabled = !valid;
-        if (!valid) {
-            result.innerHTML = '<p class="phyto-scoop-error">Der PhytoDose-Rechner ist für Aquarien ab 50 Litern ausgelegt. Bitte gib mindestens 50 Liter ein.</p>';
+        const volumeValid = Number.isFinite(liters) && liters >= 50 && liters <= Number.MAX_SAFE_INTEGER;
+        const handleLength = Number(handleLengthInput?.value ?? handleLengthMm);
+        const handleLengthValid = Number.isFinite(handleLength) && handleLength >= 5 && handleLength <= 200;
+        input.setCustomValidity(volumeValid ? '' : 'Bitte mindestens 50 Liter Aquariumvolumen eingeben.');
+        handleLengthInput?.setCustomValidity(handleLengthValid ? '' : 'Bitte eine Stiellänge zwischen 5 und 200 mm eingeben.');
+        download.disabled = !volumeValid || !handleLengthValid;
+        if (!volumeValid || !handleLengthValid) {
+            result.innerHTML = `<p class="phyto-scoop-error">${!volumeValid ? 'Der PhytoDose-Rechner ist für Aquarien ab 50 Litern ausgelegt. Bitte gib mindestens 50 Liter ein.' : 'Bitte wähle eine Stiellänge zwischen 5 und 200 mm.'}</p>`;
             return;
         }
         const calc = calculate(liters);
@@ -604,9 +609,9 @@
         const splits = `<div class="phyto-scoop-split ${calc.scoopCount > 1 ? 'phyto-scoop-split--multiple' : ''}" role="status" aria-live="polite"><span class="phyto-scoop-split-count">${fmt(calc.scoopCount, 0)}×</span><span><strong>Du brauchst ${scoopPhrase}</strong><small>pro Anwendung</small></span></div>`;
         const adjustedDiameter = calc.innerRadiusMm * 2;
         const diameterNote = adjustedDiameter < innerDiameterMm - 0.01 ? ` · Innen-Ø ${fmt(adjustedDiameter, 1)} mm (für mind. 5 mm Füllhöhe angepasst)` : ` · Innen-Ø ${fmt(innerDiameterMm, 1)} mm`;
-        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>PhytoCoral gesamt</span><strong>${fmt(calc.massG, 3)} g</strong></div><div><span>Gesamtvolumen</span><strong>${fmt(calc.totalMl, 3)} ml</strong></div></div>${splits}<p class="phyto-scoop-detail">Je Löffel: ${fmt(calc.perScoopG, 3)} g · ${fmt(calc.perScoopMl, 3)} ml · Becherhöhe ${fmt(calc.outerCupHeight, 1)} mm${diameterNote}</p>`;
+        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>PhytoCoral gesamt</span><strong>${fmt(calc.massG, 3)} g</strong></div><div><span>Gesamtvolumen</span><strong>${fmt(calc.totalMl, 3)} ml</strong></div></div>${splits}<p class="phyto-scoop-detail">Je Löffel: ${fmt(calc.perScoopG, 3)} g · ${fmt(calc.perScoopMl, 3)} ml · Becherhöhe ${fmt(calc.outerCupHeight, 1)} mm · Stiel ${fmt(handleLength, 0)} mm${diameterNote}</p>`;
         renderPreview(calc);
-        download.onclick = () => downloadStl(calc);
+        download.onclick = () => downloadStl(calc, handleLength);
     }
 
     function addPolygonPrism(triangles, outline, zBottom, zTop) {
@@ -725,7 +730,7 @@
         // rounded grip end so no character protrudes past the handle outline.
         const labelClearanceMm = 10;
         const minimumLabelLength = Math.max(labelWidth, nameWidth) + labelClearanceMm;
-        const liquidHandleLength = capacityLabel ? Math.max(requestedHandleLengthMm, minimumLabelLength) : handleLengthMm;
+        const liquidHandleLength = capacityLabel ? Math.max(requestedHandleLengthMm, minimumLabelLength) : requestedHandleLengthMm;
         const activeHandleWidth = capacityLabel ? 18 : handleWidthMm;
         // Start the wider handle inside the cup's 1.5 mm wall, not inside the
         // liquid cavity, then flare gradually out to the full grip width.
@@ -841,11 +846,11 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
-    function downloadStl(calc) {
-        const triangles = makeMesh(calc);
+    function downloadStl(calc, requestedHandleLengthMm = handleLengthMm) {
+        const triangles = makeMesh(calc, null, '', requestedHandleLengthMm);
         const buffer = new ArrayBuffer(84 + triangles.length * 50);
         const view = new DataView(buffer);
-        const header = `PhytoDose ${calc.liters} L | ${calc.scoopCount} scoop(s) | ${fmt(calc.outerCupHeight, 2)} mm cup height`;
+        const header = `PhytoDose ${calc.liters} L | ${calc.scoopCount} scoop(s) | ${fmt(calc.outerCupHeight, 2)} mm cup height | ${fmt(requestedHandleLengthMm, 0)} mm handle`;
         for (let i = 0; i < 80; i++) view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
         view.setUint32(80, triangles.length, true);
         let offset = 84;
@@ -895,6 +900,7 @@
         const input = document.getElementById('phytoScoopLiters');
         if (!input) return;
         input.addEventListener('input', update);
+        document.getElementById('phytoScoopHandleLength')?.addEventListener('input', update);
         document.getElementById('phytoHolderCount')?.addEventListener('input', updateHolder);
         document.getElementById('liquidScoopMl')?.addEventListener('input', updateLiquidScoop);
         document.getElementById('liquidScoopHandleLength')?.addEventListener('input', updateLiquidScoop);

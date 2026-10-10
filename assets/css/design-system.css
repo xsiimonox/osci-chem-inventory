@@ -913,167 +913,113 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
 }
 @media (prefers-reduced-motion: reduce) { #app #cr-export .cr-waterchange-summary-action { transition: none; } }
 
-/* Compact, data-backed mobile-first dashboard. */
-#app #uebersicht .dashboard-home {
-    width: min(100%, 920px);
-    margin: 0 auto;
-    padding: 4px 0 28px;
-    display: grid;
-    gap: 18px;
+/* App launcher: shared feature accents use the existing theme and product palette. */
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar) { --launcher-color: var(--accent); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="blue"] { --launcher-color: var(--launcher-blue, var(--product-blue)); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="green"] { --launcher-color: var(--launcher-green, var(--product-green)); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="violet"] { --launcher-color: var(--launcher-violet, var(--product-violet)); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="orange"] { --launcher-color: var(--launcher-orange, var(--product-orange)); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="yellow"] { --launcher-color: var(--status-warning); }
+:is(.dashboard-app-tile,.dashboard-launcher-status,.workspace-app-bar)[data-color="muted"] { --launcher-color: var(--text-secondary); }
+html:is(.theme-light,.theme-girl) { --launcher-blue: #2469a3; --launcher-green: #287645; --launcher-violet: #8648ad; --launcher-orange: #935313; }
+
+#app #uebersicht .dashboard-launcher { width: min(100%, 980px); margin: 0 auto; padding: 0 0 24px; }
+#app #uebersicht .dashboard-launcher-aquarium { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+#app #uebersicht .dashboard-aquarium-copy { display: grid; gap: 2px; min-width: 0; }
+#app #uebersicht .dashboard-aquarium-copy > span { color: var(--text-secondary); font-size: 10px; text-transform: uppercase; }
+#app #uebersicht .dashboard-aquarium-copy > strong { font-size: 15px; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-aquarium-copy > small { font-size: 11px; color: var(--text-secondary); }
+#app #uebersicht :is(.dashboard-aquarium-picker,.dashboard-aquarium-manage) { flex: 0 0 40px; width: 40px; height: 40px; min-height: 40px; display: grid; place-items: center; padding: 0; border: 1px solid var(--border-color); border-radius: var(--radius-control); background: var(--surface-raised); }
+#app #uebersicht .dashboard-aquarium-picker { position: relative; font-size: 20px; }
+#app #uebersicht .dashboard-aquarium-picker select { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+#app #uebersicht .dashboard-aquarium-picker:focus-within { outline: 2px solid var(--accent); outline-offset: 3px; }
+#app #uebersicht .dashboard-aquarium-manage .nav-icon { width: 19px; height: 19px; }
+#app #uebersicht .dashboard-aquarium-create { flex: 0 0 auto; max-width: 45%; padding: 8px 10px; font-size: var(--font-caption); }
+#app #uebersicht .dashboard-launcher-heading { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin: 20px 1px 14px; }
+#app #uebersicht .dashboard-launcher-heading h2 { margin: 0 0 4px; font-size: 25px; line-height: 1.2; }
+#app #uebersicht .dashboard-launcher-heading p { margin: 0; font-size: 12px; color: var(--text-secondary); }
+#app #uebersicht .dashboard-launcher-edit { flex: 0 0 auto; border: 0; padding: 5px; font-size: var(--font-caption); color: var(--accent); background: transparent; }
+#app #uebersicht .dashboard-launcher-status-strip { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; margin-bottom: 20px; }
+#app #uebersicht .dashboard-launcher-status { display: flex; align-items: center; justify-content: flex-start; gap: 9px; min-width: 0; min-height: 66px; padding: 10px; text-align: left; border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+#app #uebersicht .dashboard-launcher-status:only-child { grid-column: 1 / -1; }
+#app #uebersicht :is(.dashboard-app-tile,.dashboard-launcher-status) { white-space: normal; }
+#app #uebersicht .dashboard-status-icon { flex: 0 0 30px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: var(--radius-md); background: color-mix(in srgb,var(--launcher-color) 14%,var(--surface-card)); color: var(--launcher-color); font-weight: 600; font-variant-numeric: tabular-nums; }
+#app #uebersicht .dashboard-status-icon .nav-icon { width: 19px; height: 19px; }
+#app #uebersicht .dashboard-launcher-status > span:last-child { display: grid; gap: 2px; min-width: 0; }
+#app #uebersicht .dashboard-launcher-status strong { font-size: 12px; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-launcher-status small { font-size: 11px; line-height: 1.35; color: var(--text-secondary); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-launcher-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 1px 10px; }
+#app #uebersicht .dashboard-launcher-section-head h3 { margin: 0; font-size: 14px; }
+#app #uebersicht .dashboard-launcher-section-head > span { color: var(--text-secondary); font-size: 11px; }
+#app #uebersicht .dashboard-launcher-search { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 11px; margin: 0 0 10px; border: 1px solid var(--border-color); border-radius: var(--radius-control); background: var(--app-bg); }
+#app #uebersicht .dashboard-launcher-search > span { color: var(--text-secondary); font-size: 22px; }
+#app #uebersicht .dashboard-launcher-search input { flex: 1; min-width: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; border: 0; outline: 0; box-shadow: none; background: transparent; }
+#app #uebersicht .dashboard-launcher-search:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 2px; }
+#app #uebersicht .dashboard-launcher-filters { display: flex; gap: 6px; overflow-x: auto; padding: 3px 3px 9px; margin: 0 -3px 5px; scrollbar-width: none; }
+#app #uebersicht .dashboard-launcher-filters::-webkit-scrollbar { display: none; }
+#app #uebersicht .dashboard-launcher-filter { flex: 0 0 auto; min-height: 40px; padding: 7px 10px; font-size: 11px; color: var(--text-secondary); background: var(--surface-raised); }
+#app #uebersicht .dashboard-launcher-filter[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb,var(--accent) 12%,var(--surface-card)); }
+#app #uebersicht .dashboard-app-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+#app #uebersicht .dashboard-app-tile { position: relative; display: grid; grid-template-rows: 43px auto 1fr; align-items: start; align-content: start; justify-items: start; gap: 8px; min-width: 0; min-height: 134px; padding: 11px; text-align: left; color: var(--text-primary); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); transition: border-color 150ms ease,background-color 150ms ease,transform 150ms ease; }
+#app #uebersicht .dashboard-app-tile[hidden] { display: none; }
+#app #uebersicht .dashboard-app-tile:is(:hover,:focus-visible):not(:disabled) { border-color: var(--launcher-color); background: var(--surface-raised); }
+#app #uebersicht .dashboard-app-tile:active:not(:disabled) { transform: scale(.98); }
+#app #uebersicht .dashboard-app-icon { width: 43px; height: 43px; display: grid; place-items: center; justify-self: start; margin: 0; border-radius: var(--radius-md); background: color-mix(in srgb,var(--launcher-color) 15%,var(--surface-card)); color: var(--launcher-color); }
+#app #uebersicht .dashboard-app-icon .nav-icon { width: 24px; height: 24px; }
+#app #uebersicht .dashboard-app-tile > strong { display: block; min-width: 0; margin: 0; font-size: 12px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-app-tile > small { display: block; min-width: 0; margin: 0; font-size: 11px; line-height: 1.35; color: var(--text-secondary); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-app-open { position: absolute; top: 21px; right: 9px; color: var(--text-secondary); font-size: 18px; line-height: 1; }
+#app #uebersicht .dashboard-launcher-empty { display: grid; justify-items: center; gap: 12px; padding: 24px 12px; text-align: center; color: var(--text-secondary); }
+#app #uebersicht .dashboard-launcher-empty[hidden] { display: none; }
+#app #uebersicht .dashboard-launcher-additional { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); scroll-margin-top: calc(var(--measured-header-height, var(--header-height)) + 16px); }
+#app #uebersicht .dashboard-launcher-additional[hidden] { display: none; }
+#app #uebersicht .dashboard-additional-close { flex: 0 0 40px; width: 40px; height: 40px; padding: 0; font-size: 22px; }
+#app #uebersicht a.dashboard-app-tile { text-decoration: none; }
+#app #uebersicht .dashboard-launcher-insights { margin-top: 24px; border-top: 1px solid var(--border-color); }
+#app #uebersicht .dashboard-launcher-insights > summary { display: flex; align-items: center; padding: 16px 1px; cursor: pointer; }
+#app #uebersicht .dashboard-launcher-insights > summary > span { display: grid; gap: 3px; min-width: 0; }
+#app #uebersicht .dashboard-launcher-insights > summary strong { font-size: var(--font-body); }
+#app #uebersicht .dashboard-launcher-insights > summary small { color: var(--text-secondary); font-size: 11px; }
+#app #uebersicht .dashboard-launcher-insights-content { display: grid; gap: 16px; padding-bottom: 16px; }
+#app #uebersicht .dashboard-launcher-insights-content > * { margin-block: 0; }
+
+.header-brand-icon { flex: 0 0 auto; width: 32px; height: 32px; border-radius: var(--radius-md); object-fit: contain; }
+#app .workspace-app-bar { display: flex; align-items: center; gap: 8px; margin: 16px 24px 0; }
+#app .workspace-app-bar[hidden] { display: none; }
+#app .workspace-home-button { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; min-height: 40px; padding: 0; font-size: 25px; }
+#app .workspace-app-icon { flex: 0 0 40px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: var(--radius-md); color: var(--launcher-color); background: color-mix(in srgb,var(--launcher-color) 15%,var(--surface-card)); }
+#app .workspace-app-icon .nav-icon { width: 22px; height: 22px; }
+#app .workspace-app-title { display: grid; gap: 1px; min-width: 0; }
+#app .workspace-app-title strong { font-size: var(--font-body); overflow-wrap: anywhere; }
+#app .workspace-app-title small { color: var(--text-secondary); font-size: 11px; }
+
+@media (min-width: 700px) {
+    #app #uebersicht .dashboard-app-grid { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; }
+    #app #uebersicht .dashboard-app-tile { min-height: 148px; padding: 16px; }
+    #app #uebersicht .dashboard-app-tile > strong { font-size: var(--font-body); }
+    #app #uebersicht .dashboard-app-tile > small { font-size: var(--font-caption); }
+    #app #uebersicht .dashboard-app-open { top: 26px; right: 14px; }
+    #app #uebersicht .dashboard-launcher-status { min-height: 72px; }
 }
-#app #uebersicht .dashboard-home-heading {
-    display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 16px;
+@media (max-width: 767px) {
+    #app #uebersicht .dashboard-launcher-search input { font-size: 16px; }
+    #app .workspace-app-bar { margin-inline: 16px; }
+    .header-brand-icon { width: 26px; height: 26px; }
 }
-#app #uebersicht .dashboard-home-heading h2 { margin: 3px 0 4px; font-size: 1.65rem; }
-#app #uebersicht .dashboard-home-heading p { margin: 0; color: var(--text-secondary); }
-#app #uebersicht .dashboard-home-heading-actions { display: flex; gap: 8px; }
-#app #uebersicht .dashboard-home-heading-actions .btn { min-height: 40px; }
-#app #uebersicht .dashboard-home-aquarium,
-#app #uebersicht .dashboard-home-stock,
-#app #uebersicht .dashboard-home-recent,
-#app #uebersicht .dashboard-home-more {
-    min-width: 0;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-card);
-    background: var(--surface-card);
+@media (max-width: 360px) {
+    #app #uebersicht .dashboard-app-grid { gap: 6px; }
+    #app #uebersicht .dashboard-app-tile { padding: 9px; grid-template-rows: 39px auto 1fr; }
+    #app #uebersicht .dashboard-app-icon { width: 39px; height: 39px; }
+    #app #uebersicht .dashboard-app-tile > strong { font-size: 11px; }
+    #app #uebersicht .dashboard-app-tile > small { font-size: 10px; }
+    #app #uebersicht .dashboard-launcher-status { gap: 7px; padding: 9px; }
+    #app #uebersicht .dashboard-launcher-heading h2 { font-size: 23px; }
+    #appHeader h1 { font-size: 16px; }
+    #appHeader .header-title-container { gap: 3px; }
+    #appHeader .header-title-container .version-badge { font-size: 9px; }
+    .header-brand-icon { width: 22px; height: 22px; }
 }
-#app #uebersicht .dashboard-home-aquarium {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 14px 16px;
-}
-#app #uebersicht .dashboard-home-aquarium-copy { display: grid; min-width: 0; gap: 2px; }
-#app #uebersicht .dashboard-home-aquarium-copy > span { color: var(--text-secondary); font-size: var(--font-caption); text-transform: uppercase; }
-#app #uebersicht .dashboard-home-aquarium-copy > strong { font-size: 1rem; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-aquarium-copy > small { color: var(--text-secondary); }
-#app #uebersicht .dashboard-home-aquarium-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
-#app #uebersicht .dashboard-home-aquarium-controls select { min-width: 130px; max-width: 220px; min-height: 40px; padding-block: 7px; }
-#app #uebersicht .dashboard-home-aquarium-manage { display: grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 8px; }
-#app #uebersicht .dashboard-home-aquarium-manage .nav-icon { width: 18px; height: 18px; }
-#app #uebersicht .dashboard-home-attention {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px 14px;
-    padding: 11px 14px;
-    border: 1px solid color-mix(in srgb, var(--status-warning) 38%, var(--border-color));
-    border-radius: var(--radius-card);
-    background: color-mix(in srgb, var(--status-warning) 7%, var(--surface-card));
-}
-#app #uebersicht .dashboard-home-attention > strong { color: var(--status-warning); margin-right: auto; }
-#app #uebersicht .dashboard-home-attention button,
-#app #uebersicht .dashboard-home-link { border: 0; background: transparent; color: var(--accent); padding: 4px; min-height: 32px; }
-#app #uebersicht .dashboard-home-section { min-width: 0; }
-#app #uebersicht .dashboard-home-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 1px 9px; }
-#app #uebersicht .dashboard-home-section-head h3 { margin: 0; font-size: 1rem; }
-#app #uebersicht .dashboard-home-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-#app #uebersicht .dashboard-home-metric {
-    display: grid;
-    align-content: start;
-    gap: 5px;
-    min-width: 0;
-    min-height: 94px;
-    padding: 12px 11px;
-    text-align: left;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-card);
-    background: var(--surface-card);
-}
-#app #uebersicht .dashboard-home-metric:hover,
-#app #uebersicht .dashboard-home-quick:hover,
-#app #uebersicht .dashboard-home-stock-row:hover,
-#app #uebersicht .dashboard-home-recent:hover { border-color: var(--accent); }
-#app #uebersicht .dashboard-home-metric-label { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--font-caption); }
-#app #uebersicht .dashboard-home-metric-label i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
-#app #uebersicht .dashboard-home-metric strong { min-width: 0; font-size: 1.12rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-metric small { color: var(--text-secondary); font-size: 0.7rem; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-stock { overflow: hidden; }
-#app #uebersicht .dashboard-home-stock-head { display: flex; justify-content: space-between; gap: 8px; padding: 12px 14px; }
-#app #uebersicht .dashboard-home-stock-head strong { font-size: var(--font-body); }
-#app #uebersicht .dashboard-home-stock-head span { color: var(--text-secondary); font-size: var(--font-caption); text-align: right; }
-#app #uebersicht .dashboard-home-stock-row {
-    display: grid;
-    grid-template-columns: 38px minmax(0, 1fr) max-content 14px;
-    align-items: center;
-    gap: 9px;
-    width: 100%;
-    min-width: 0;
-    min-height: 58px;
-    padding: 9px 14px;
-    text-align: left;
-    border: 0;
-    border-top: 1px solid var(--border-color);
-    border-radius: 0;
-    background: transparent;
-}
-#app #uebersicht .dashboard-home-stock-symbol { color: var(--accent); font-size: var(--font-small); font-weight: 600; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-stock-name,
-#app #uebersicht .dashboard-home-stock-amount { display: grid; gap: 2px; min-width: 0; }
-#app #uebersicht .dashboard-home-stock-name strong { font-size: var(--font-small); font-weight: 550; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-stock-name small,
-#app #uebersicht .dashboard-home-stock-amount small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-stock-amount { text-align: right; white-space: nowrap; }
-#app #uebersicht .dashboard-home-stock-amount strong { font-size: var(--font-small); font-variant-numeric: tabular-nums; }
-#app #uebersicht .dashboard-home-stock-amount.is-warning small,
-#app #uebersicht .dashboard-home-stock-amount.is-warning strong,
-#app #uebersicht .dashboard-home-stock-amount.is-empty small { color: var(--status-warning); }
-#app #uebersicht .dashboard-home-stock-chevron { color: var(--text-secondary); font-size: 1.25rem; text-align: right; }
-#app #uebersicht .dashboard-home-empty { padding: 8px 14px 14px; margin: 0; color: var(--text-secondary); }
-#app #uebersicht .dashboard-home-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-#app #uebersicht .dashboard-home-quick {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-    min-height: 70px;
-    padding: 11px;
-    text-align: left;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-card);
-    background: var(--surface-card);
-}
-#app #uebersicht .dashboard-home-quick-icon,
-#app #uebersicht .dashboard-home-recent-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--accent); }
-#app #uebersicht .dashboard-home-quick-icon .nav-icon,
-#app #uebersicht .dashboard-home-recent-icon .nav-icon { width: 19px; height: 19px; }
-#app #uebersicht .dashboard-home-quick-copy { display: grid; gap: 2px; min-width: 0; }
-#app #uebersicht .dashboard-home-quick-copy strong { font-size: var(--font-small); line-height: 1.25; overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-quick-copy small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-recent { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 66px; padding: 12px; text-align: left; }
-#app #uebersicht .dashboard-home-recent > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; flex: 1; }
-#app #uebersicht .dashboard-home-recent strong { font-size: var(--font-small); overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-recent small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
-#app #uebersicht .dashboard-home-recent-kind { flex: 0 0 auto; color: var(--accent); font-size: var(--font-caption); }
-#app #uebersicht .dashboard-home-more > summary { display: flex; align-items: center; min-height: 58px; padding: 12px 14px; }
-#app #uebersicht .dashboard-home-more > summary span { display: grid; gap: 3px; min-width: 0; }
-#app #uebersicht .dashboard-home-more > summary strong { font-size: var(--font-body); }
-#app #uebersicht .dashboard-home-more > summary small { color: var(--text-secondary); font-size: var(--font-caption); }
-#app #uebersicht .dashboard-home-more-content { display: grid; gap: 14px; padding: 0 14px 14px; }
-#app #uebersicht .dashboard-home-more-content > :last-child { margin-bottom: 0; }
-@media (max-width: 520px) {
-    #app #uebersicht .dashboard-home { gap: 15px; }
-    #app #uebersicht .dashboard-home-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
-    #app #uebersicht .dashboard-home-heading-actions { width: 100%; }
-    #app #uebersicht .dashboard-home-heading-actions .btn { flex: 1; }
-    #app #uebersicht .dashboard-home-aquarium { align-items: flex-start; padding: 12px; }
-    #app #uebersicht .dashboard-home-aquarium-controls { max-width: 54%; }
-    #app #uebersicht .dashboard-home-aquarium-controls select { min-width: 0; max-width: 100%; }
-    #app #uebersicht .dashboard-home-metrics { gap: 6px; }
-    #app #uebersicht .dashboard-home-metric { padding: 10px 8px; min-height: 88px; }
-    #app #uebersicht .dashboard-home-metric strong { font-size: 1rem; }
-    #app #uebersicht .dashboard-home-stock-row { grid-template-columns: 32px minmax(0, 1fr) max-content 10px; gap: 7px; padding-inline: 10px; }
-    #app #uebersicht .dashboard-home-quick-grid { gap: 7px; }
-    #app #uebersicht .dashboard-home-quick { gap: 7px; padding: 9px; }
-    #app #uebersicht .dashboard-home-quick-icon { flex-basis: 30px; width: 30px; height: 30px; }
-    #app #uebersicht .dashboard-home-quick-icon .nav-icon { width: 17px; height: 17px; }
-}
-@media (max-width: 350px) {
-    #app #uebersicht .dashboard-home-metric-label { font-size: 0.68rem; }
-    #app #uebersicht .dashboard-home-metric strong { font-size: 0.94rem; }
-    #app #uebersicht .dashboard-home-quick-grid { grid-template-columns: minmax(0, 1fr); }
+@media (prefers-reduced-motion: reduce) {
+    #app #uebersicht .dashboard-app-tile { transition: none; }
+    #app #uebersicht .dashboard-app-tile:active:not(:disabled) { transform: none; }
 }

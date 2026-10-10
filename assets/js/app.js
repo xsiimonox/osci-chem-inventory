@@ -1359,8 +1359,20 @@ const TAB_LABELS = {
     nachbestellen: 'Nachbestellen',
     einstellungen: 'Einstellungen'
 };
+const DASHBOARD_APP_GROUPS = ['Alle', 'Versorgung', 'Messen', 'Werkzeuge', 'Dokumentation'];
+const DASHBOARD_APPS = [
+    { tab: 'lager', label: 'Lager', hint: 'Bestände & Buchungen', group: 'Versorgung', color: 'mint', keywords: 'produkte einlagern auslagern' },
+    { tab: 'cr-export', label: 'OSCI C&R', hint: 'Liste prüfen & buchen', group: 'Versorgung', color: 'green', keywords: 'rezepte anmischen auslagern wasserwechsel' },
+    { tab: 'trace-export', label: 'OSCI Trace', hint: 'Spurenelemente berechnen', group: 'Versorgung', color: 'blue', keywords: 'kationen anionen icp mischen' },
+    { tab: 'icp', label: 'ICP & Messwerte', hint: 'Analysen und Verläufe', group: 'Messen', color: 'violet', keywords: 'wasserwerte import labor' },
+    { tab: 'tools', label: 'Rechner & Mischen', hint: 'Mengen und Lösungen', group: 'Werkzeuge', color: 'orange', keywords: 'balling fauna sangokai kh ca phytodose löffel salinität' },
+    { tab: 'logbuch', label: 'Logbuch', hint: 'Messungen & Pflege', group: 'Dokumentation', color: 'yellow', keywords: 'aufgaben todos dosierung dokumentieren' },
+    { tab: 'statistik', label: 'Statistik', hint: 'Verbrauch & Entwicklung', group: 'Messen', color: 'blue', keywords: 'diagramme prognose bestand' },
+    { tab: 'korallen', label: 'Korallen', hint: 'Bestand dokumentieren', group: 'Dokumentation', color: 'green', keywords: 'ableger fotos katalog' },
+    { tab: 'mehr', label: 'Weitere Bereiche', hint: 'Einstellungen & Hilfe', group: 'Werkzeuge', color: 'muted', keywords: 'backup export protokoll wareneingang nachbestellen' }
+];
 const TAB_RENDER_HEALTH = {
-    uebersicht: { selectors: ['.dashboard-panel', '.dashboard-widget', '.dashboard-tile'], minText: 18 },
+    uebersicht: { selectors: ['.dashboard-app-grid', '.dashboard-panel', '.dashboard-widget'], minText: 18 },
     lager: { selectors: ['.warehouse-control-card', '.inventory-category-section', '.inventory-card-grid'], minText: 18 },
     'cr-export': { selectors: ['.workflow-page', '.cr-workflow', '.card'], minText: 12 },
     'trace-export': { selectors: ['.trace-workstep', '.workflow-card', '.trace-calculator'], minText: 18 },
@@ -4341,7 +4353,7 @@ function getMenuOrder() {
 }
 
 function getDefaultMobileQuickTabs() {
-    return ['lager', 'trace-export', 'icp', 'tools'];
+    return ['uebersicht', 'lager', 'tools', 'logbuch'];
 }
 
 function getHiddenMenuTabs() {
@@ -7085,7 +7097,7 @@ function renderDashboardSettingsPanel() {
     const widgetRows = [
         ['stock', 'Kritische Produkte', 'Zeigt knappe Lagerartikel und führt direkt ins Lager.'],
         ['todos', 'Nächste Aufgabe', 'Zeigt die nächste fällige Erinnerung aus dem Logbuch.'],
-        ['tests', 'Wassertest-Kachel', 'Zeigt den letzten gespeicherten Messzeitpunkt.'],
+        ['tests', 'Letzte ICP', 'Zeigt die letzte gespeicherte ICP des aktiven Aquariums.'],
         ['measurements', 'Messwert-Diagramme', 'Zeigt die ausgewählten Messwerte als Kurven.'],
         ['logs', 'Letzte Buchung', 'Zeigt Protokoll und letzten Logbucheintrag.'],
         ['corals', 'Korallen im Fokus', 'Zeigt den Korallenbestand und öffnet direkt den Korallenkatalog.']
@@ -7099,7 +7111,7 @@ function renderDashboardSettingsPanel() {
         <div class="dashboard-settings-panel">
             <div class="dashboard-settings-block">
                 <div class="dashboard-settings-head">
-                    <strong>Kacheln auf der Übersicht</strong>
+                    <strong>Einblicke auf der Übersicht</strong>
                     <small>„Korallen im Fokus“ kannst du hier gezielt ein- oder ausblenden.</small>
                 </div>
                 <div class="dashboard-settings-grid">
@@ -7456,11 +7468,11 @@ function renderDashboardExpanded() {
                     <span class="status-badge status-badge--info">Entwurf</span>
                 </div>
                 <div class="dashboard-config-body">
-                    <h3>Widgets anzeigen</h3>
+                    <h3>Einblicke anzeigen</h3>
                     <div class="dashboard-widget-grid">
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.stock ? 'checked' : ''} onchange="toggleDashboardWidget('stock', this.checked)"><span>Bestand</span></label>
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.todos ? 'checked' : ''} onchange="toggleDashboardWidget('todos', this.checked)"><span>ToDos</span></label>
-                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.tests ? 'checked' : ''} onchange="toggleDashboardWidget('tests', this.checked)"><span>Wassertests</span></label>
+                        <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.tests ? 'checked' : ''} onchange="toggleDashboardWidget('tests', this.checked)"><span>Letzte ICP</span></label>
                         ${showOsmoseFeature ? `<label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.osmose ? 'checked' : ''} onchange="toggleDashboardWidget('osmose', this.checked)"><span>Osmose</span></label>` : ''}
                         ${showDosingFeature ? `<label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.dosing ? 'checked' : ''} onchange="toggleDashboardWidget('dosing', this.checked)"><span>Vorratsbehälter</span></label>` : ''}
                         <label class="dashboard-chip-toggle"><input type="checkbox" ${settings.widgets.measurements ? 'checked' : ''} onchange="toggleDashboardWidget('measurements', this.checked)"><span>Diagramme</span></label>
@@ -7553,173 +7565,162 @@ function renderDashboardExpanded() {
     renderAquariumWorkspacePanels();
 }
 
+let dashboardAppSearch = '';
+let dashboardAppGroup = 'Alle';
+
+function getDashboardApps() {
+    return DASHBOARD_APPS.filter(app => app.tab === 'mehr' || !isMenuTabHidden(app.tab));
+}
+
+function filterDashboardApps(query = dashboardAppSearch, group = dashboardAppGroup) {
+    dashboardAppSearch = query;
+    dashboardAppGroup = DASHBOARD_APP_GROUPS.includes(group) ? group : 'Alle';
+    const container = document.getElementById('uebersicht');
+    if (!container) return;
+    const terms = query.trim().toLocaleLowerCase('de-DE').split(/\s+/).filter(Boolean);
+    let count = 0;
+    container.querySelectorAll('[data-dashboard-app]').forEach(tile => {
+        const visible = (dashboardAppGroup === 'Alle' || tile.dataset.group === dashboardAppGroup)
+            && terms.every(term => tile.dataset.search.includes(term));
+        tile.hidden = !visible;
+        if (visible) count++;
+    });
+    container.querySelectorAll('[data-dashboard-group]').forEach(button => {
+        const selected = button.dataset.dashboardGroup === dashboardAppGroup;
+        button.classList.toggle('active', selected);
+        button.setAttribute('aria-pressed', String(selected));
+    });
+    const status = container.querySelector('#dashboardAppCount');
+    if (status) status.textContent = `${count} ${count === 1 ? 'Bereich' : 'Bereiche'}`;
+    const empty = container.querySelector('#dashboardAppEmpty');
+    if (empty) empty.hidden = count > 0;
+}
+
+function openDashboardApp(tabId) {
+    if (tabId === 'mehr') {
+        const additional = document.getElementById('dashboardAdditionalApps');
+        if (additional) {
+            additional.hidden = false;
+            additional.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            document.getElementById('dashboardAdditionalTitle')?.focus({ preventScroll: true });
+        }
+        return;
+    }
+    if (!APP_TAB_IDS.includes(tabId) || isMenuTabHidden(tabId)) return;
+    selectTab(tabId);
+    window.scrollTo({ top: 0, behavior: 'instant' });
+}
+
+function renderWorkspaceAppBar(tabId) {
+    const bar = document.getElementById('workspaceAppBar');
+    if (!bar) return;
+    bar.hidden = tabId === 'uebersicht';
+    if (bar.hidden) return;
+    const app = DASHBOARD_APPS.find(entry => entry.tab === tabId);
+    bar.dataset.color = app?.color || 'muted';
+    bar.innerHTML = `
+        <button type="button" class="workspace-home-button" onclick="selectTab('uebersicht'); window.scrollTo({ top: 0, behavior: 'instant' })" aria-label="Zur Übersicht" title="Zur Übersicht">‹</button>
+        <span class="workspace-app-icon">${getTabIconMarkup(tabId)}</span>
+        <span class="workspace-app-title"><strong>${escapeHtml(app?.label || TAB_LABELS[tabId])}</strong><small>${escapeHtml(app?.group || 'Verwaltung')}</small></span>
+    `;
+}
+
 function renderDashboard() {
     const container = document.getElementById('uebersicht');
     if (!container) return;
-
+    const moreWasOpen = Boolean(container.querySelector('.dashboard-launcher-insights')?.open);
     renderDashboardExpanded();
+    const retainedSections = ['.dashboard-config', '.dashboard-panels', '.dashboard-measurements-grid', '.dashboard-backup-reminder']
+        .flatMap(selector => [...container.querySelectorAll(`:scope > ${selector}`)]);
 
     const aquarium = getActiveAquarium();
-    const warehouse = getActiveWarehouse();
     const aquariumList = Object.values(appState?.aquariums || {});
     const settings = getDashboardRenderSettings();
     const isEditing = Boolean(dashboardEditDraft);
     const alerts = getStockAlerts();
-    const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
-    const recentLog = getRecentLogBookEntry();
-    const lastLog = (db.logs || []).slice().reverse()[0];
-    const aquariumVolume = Number(aquarium?.data?.volumeLiters);
-    const aquariumOptions = aquariumList.length
-        ? aquariumList.map(entry => `<option value="${escapeHtml(entry.id)}" ${entry.id === activeAquariumId ? 'selected' : ''}>${escapeHtml(entry.name || 'Aquarium')}</option>`).join('')
-        : '<option value="" selected>Kein Aquarium angelegt</option>';
-
-    const metricCards = ['KH', 'CA', 'MG'].map(typeId => {
-        const entry = getMeasurementEntries()
-            .filter(item => item.typeId === typeId && item.value !== null && item.value !== undefined && Number.isFinite(Number(item.value)))
-            .sort((a, b) => new Date(b.at) - new Date(a.at))[0];
-        const labels = { KH: 'KH', CA: 'Calcium', MG: 'Magnesium' };
-        const value = entry ? formatMeasurementEntryValue(entry) : 'Noch kein Wert';
-        const date = entry ? formatWarehouseDate(entry.at) : 'Messung im Logbuch erfassen';
-        return `
-            <button type="button" class="dashboard-home-metric" onclick="openDashboardDestination('${entry ? 'measurement-list' : 'measurement'}', '${typeId}')" aria-label="${labels[typeId]}: ${escapeHtml(value)}. ${escapeHtml(date)}">
-                <span class="dashboard-home-metric-label"><i></i>${labels[typeId]}</span>
-                <strong>${escapeHtml(value)}</strong>
-                <small>${escapeHtml(date)}</small>
-            </button>
-        `;
-    }).join('');
-
-    const catalogProducts = Object.entries(catalog).flatMap(([cat, items]) => Object.keys(items)
-        .filter(item => shouldShowCatalogProduct(cat, item))
-        .map(item => ({ cat, item, stock: Number(db.inventory?.[cat]?.[item]) || 0 })));
-    const productByName = new Map(catalogProducts.map(product => [product.item, product]));
-    const preferredProducts = ['Calcium', 'KH Tag', 'KH Nacht', 'Magnesium', 'Natriumhydrogencarbonat (NaHCO₃)', 'Natriumcarbonat (Na₂CO₃)', 'Calciumchlorid-Dihydrat (CaCl₂·2H₂O)', 'Phosphor (P)', 'Lanthan (La)', 'Stickstoff (N)'];
-    const preferredStock = preferredProducts.map(name => productByName.get(name)).filter(Boolean);
-    const fallbackStock = [...preferredStock, ...catalogProducts.filter(product => !preferredProducts.includes(product.item))].slice(0, 3);
-    const stockRows = (alerts.length
-        ? alerts.slice(0, 3).map(alert => ({ ...alert, stock: Number(alert.stock) || 0, isAlert: true }))
-        : fallbackStock.map(product => ({ ...product, isAlert: false })))
-        .map(product => {
-            const symbol = extractIcpSymbol(product.item) || ({ Calcium: 'Ca', 'KH Tag': 'KH', 'KH Nacht': 'KH', Magnesium: 'Mg' }[product.item] || '•');
-            const isEmpty = product.stock <= 0;
-            const status = product.isAlert ? (isEmpty ? 'Leer' : 'Knapp') : (isEmpty ? 'Leer' : product.cat);
-            const statusClass = product.isAlert ? 'is-warning' : (isEmpty ? 'is-empty' : '');
-            return `
-                <button type="button" class="dashboard-home-stock-row" onclick="selectTab('lager'); setTimeout(() => focusProductInLager(${jsArg(product.item)}), 80)">
-                    <span class="dashboard-home-stock-symbol">${escapeHtml(symbol)}</span>
-                    <span class="dashboard-home-stock-name"><strong>${escapeHtml(product.item)}</strong><small>${escapeHtml(product.cat)}</small></span>
-                    <span class="dashboard-home-stock-amount ${statusClass}"><strong>${escapeHtml(formatItemAmount(product.item, product.stock))}</strong><small>${escapeHtml(status)}</small></span>
-                    <span class="dashboard-home-stock-chevron" aria-hidden="true">›</span>
-                </button>
-            `;
-        }).join('');
-
-    const quickLinks = [
-        { tab: 'trace-export', label: 'OSCI Trace', hint: 'Trace berechnen' },
-        { tab: 'icp', label: 'ICP', hint: 'Messwerte & Analysen' },
-        { tab: 'tools', label: 'Rechner & Mischen', hint: 'Werkzeuge öffnen' },
-        { tab: 'logbuch', label: 'Logbuch', hint: 'Eintrag dokumentieren' },
-        { tab: 'cr-export', label: 'OSCI C&R', hint: 'Liste prüfen & buchen' },
-        { tab: 'statistik', label: 'Statistik', hint: 'Verbrauch ansehen' }
-    ].filter(item => !isMenuTabHidden(item.tab)).slice(0, 4);
-
-    const recentActivity = recentLog
-        ? { title: recentLog.title || recentLog.category || 'Logbucheintrag', detail: formatWarehouseDate(recentLog.at || recentLog.createdAt), kind: 'Logbuch' }
-        : lastLog
-            ? { title: `${lastLog.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${lastLog.item}`, detail: `${formatItemAmount(lastLog.item, lastLog.amount)} · ${formatWarehouseDate(getLogTime(lastLog))}`, kind: 'Lager' }
-            : null;
-
-    const retainedSections = [
-        '.dashboard-config',
-        '.dashboard-panels',
-        '.dashboard-measurements-grid',
-        '.dashboard-backup-reminder'
-    ].flatMap(selector => [...container.querySelectorAll(`:scope > ${selector}`)]);
+    const latestIcp = getIcpReportsSorted()[0];
+    const volume = Number(aquarium?.data?.volumeLiters);
+    const apps = getDashboardApps();
+    const additionalApps = DEFAULT_MENU_ORDER.filter(tabId => tabId !== 'uebersicht'
+        && !DASHBOARD_APPS.some(app => app.tab === tabId) && !isMenuTabHidden(tabId));
+    const groups = DASHBOARD_APP_GROUPS.filter(group => group === 'Alle' || apps.some(app => app.group === group));
+    if (!groups.includes(dashboardAppGroup)) dashboardAppGroup = 'Alle';
+    const aquariumOptions = aquariumList.map(entry => `<option value="${escapeHtml(entry.id)}" ${entry.id === activeAquariumId ? 'selected' : ''}>${escapeHtml(entry.name || 'Aquarium')}</option>`).join('');
+    const statusCards = [
+        settings.widgets.stock && !isMenuTabHidden('lager') ? `
+            <button type="button" class="dashboard-launcher-status" data-color="yellow" onclick="openDashboardApp('lager')">
+                <span class="dashboard-status-icon">${alerts.length}</span>
+                <span><strong>Lagerhinweise</strong><small>${alerts.length ? `${alerts.length} ${alerts.length === 1 ? 'Produkt prüfen' : 'Produkte prüfen'}` : 'Keine Bestandswarnung'}</small></span>
+            </button>` : '',
+        settings.widgets.tests && !isMenuTabHidden('icp') ? `
+            <button type="button" class="dashboard-launcher-status" data-color="blue" onclick="openDashboardApp('icp')">
+                <span class="dashboard-status-icon">${getTabIconMarkup('icp')}</span>
+                <span><strong>Letzte ICP</strong><small>${latestIcp ? escapeHtml(formatWarehouseDate(latestIcp.date || latestIcp.createdAt)) : 'Noch keine Analyse'}</small></span>
+            </button>` : ''
+    ].join('');
 
     container.innerHTML = `
-        <div class="dashboard-home">
-            <section class="dashboard-home-heading">
-                <div>
-                    <span class="section-eyebrow">Übersicht</span>
-                    <h2>Dein Überblick</h2>
-                    <p>${escapeHtml(warehouse?.name || 'Lager')} · Werte, Bestand und Dokumentation an einem Ort.</p>
-                </div>
-                <div class="dashboard-home-heading-actions">
-                    <button type="button" class="btn btn-secondary" onclick="triggerRefresh()" aria-label="Übersicht aktualisieren">Aktualisieren</button>
-                    <button type="button" class="btn btn-secondary" onclick="startDashboardEdit()" ${isEditing ? 'disabled' : ''}>Anpassen</button>
-                </div>
-            </section>
-
-            <section class="dashboard-home-aquarium" aria-label="Aktives Aquarium">
-                <div class="dashboard-home-aquarium-copy">
+        <div class="dashboard-launcher">
+            <section class="dashboard-launcher-aquarium" aria-label="Aktives Aquarium">
+                <div class="dashboard-aquarium-copy">
                     <span>Aktives Aquarium</span>
                     <strong>${escapeHtml(aquarium?.name || 'Kein Aquarium angelegt')}</strong>
-                    <small>${aquarium ? (Number.isFinite(aquariumVolume) && aquariumVolume > 0 ? `${escapeHtml(String(aquariumVolume))} L Nettovolumen` : 'Aquariumvolumen noch nicht hinterlegt') : 'ReefTools lässt sich auch ohne Aquarium nutzen.'}</small>
+                    <small>${aquarium ? (Number.isFinite(volume) && volume > 0 ? `${escapeHtml(String(volume))} L Nettovolumen` : 'Aquariumvolumen offen') : 'Ohne Aquarium nutzbar'}</small>
                 </div>
-                <div class="dashboard-home-aquarium-controls">
-                    ${aquariumList.length ? `<select id="dashboardAquariumSelect" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln">${aquariumOptions}</select>` : '<button type="button" class="btn btn-secondary" onclick="createAquarium()">Aquarium anlegen</button>'}
-                    ${aquarium ? `<button type="button" class="dashboard-home-aquarium-manage" onclick="selectTab('einstellungen')" aria-label="Aquarium verwalten" title="Aquarium verwalten">${getTabIconMarkup('einstellungen')}</button>` : ''}
+                ${aquariumList.length > 1 ? `<div class="dashboard-aquarium-picker"><span aria-hidden="true">⌄</span><select id="dashboardAquariumSelect" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln" title="Aquarium wechseln">${aquariumOptions}</select></div>`
+                    : aquarium ? `<button type="button" class="dashboard-aquarium-manage" onclick="selectTab('einstellungen')" aria-label="Aquarium verwalten" title="Aquarium verwalten">${getTabIconMarkup('einstellungen')}</button>`
+                        : '<button type="button" class="btn-secondary dashboard-aquarium-create" onclick="createAquarium()">Aquarium anlegen</button>'}
+            </section>
+
+            <section class="dashboard-launcher-heading">
+                <div><h2>Dein ReefTools</h2><p>Was möchtest du heute erledigen?</p></div>
+                <button type="button" class="dashboard-launcher-edit" onclick="startDashboardEdit()" ${isEditing ? 'disabled' : ''}>Anpassen</button>
+            </section>
+
+            ${statusCards.trim() ? `<div class="dashboard-launcher-status-strip" aria-label="Aktueller Überblick">${statusCards}</div>` : ''}
+
+            <section class="dashboard-launcher-functions" aria-labelledby="dashboardAppsTitle">
+                <div class="dashboard-launcher-section-head"><h3 id="dashboardAppsTitle">Funktionen</h3><span id="dashboardAppCount" role="status" aria-live="polite"></span></div>
+                <label class="dashboard-launcher-search" for="dashboardAppSearch">
+                    <span aria-hidden="true">⌕</span>
+                    <input id="dashboardAppSearch" type="search" placeholder="Funktion suchen" aria-label="Funktion suchen" autocomplete="off" value="${escapeHtml(dashboardAppSearch)}" oninput="filterDashboardApps(this.value)">
+                </label>
+                <div class="dashboard-launcher-filters" role="group" aria-label="Funktionskategorie">
+                    ${groups.map(group => `<button type="button" class="dashboard-launcher-filter" data-dashboard-group="${group}" aria-pressed="false" onclick="filterDashboardApps(undefined, '${group}')">${group}</button>`).join('')}
+                </div>
+                <div class="dashboard-app-grid">
+                    ${apps.map(app => {
+                        const restricted = WAREHOUSE_WRITE_TAB_IDS.has(app.tab) && isWarehouseReadOnlyView();
+                        const search = `${app.label} ${app.hint} ${app.group} ${app.keywords}`.toLocaleLowerCase('de-DE');
+                        return `<button type="button" class="dashboard-app-tile" data-dashboard-app="${app.tab}" data-group="${app.group}" data-color="${app.color}" data-search="${escapeHtml(search)}" onclick="openDashboardApp('${app.tab}')" ${restricted ? 'disabled title="Für diesen Bereich brauchst du Schreibzugriff auf das Lager"' : ''}>
+                            <span class="dashboard-app-icon">${app.tab === 'mehr' ? getMoreIconMarkup() : getTabIconMarkup(app.tab)}</span>
+                            <strong>${escapeHtml(app.label)}</strong>
+                            <small>${escapeHtml(app.hint)}</small>
+                            <span class="dashboard-app-open" aria-hidden="true">›</span>
+                        </button>`;
+                    }).join('')}
+                </div>
+                <div id="dashboardAppEmpty" class="dashboard-launcher-empty" hidden><strong>Keine passende Funktion</strong><button type="button" class="btn-secondary" onclick="dashboardAppSearch = ''; dashboardAppGroup = 'Alle'; renderDashboard()">Filter zurücksetzen</button></div>
+            </section>
+
+            <section id="dashboardAdditionalApps" class="dashboard-launcher-additional" aria-labelledby="dashboardAdditionalTitle" hidden>
+                <div class="dashboard-launcher-section-head"><h3 id="dashboardAdditionalTitle" tabindex="-1">Weitere Bereiche</h3><button type="button" class="dashboard-additional-close" onclick="document.getElementById('dashboardAdditionalApps').hidden = true; document.querySelector('[data-dashboard-app=mehr]').focus()" aria-label="Weitere Bereiche schließen">×</button></div>
+                <div class="dashboard-app-grid">
+                    ${additionalApps.map(tabId => `<button type="button" class="dashboard-app-tile" data-color="muted" onclick="openDashboardApp('${tabId}')" ${WAREHOUSE_WRITE_TAB_IDS.has(tabId) && isWarehouseReadOnlyView() ? 'disabled' : ''}><span class="dashboard-app-icon">${getTabIconMarkup(tabId)}</span><strong>${escapeHtml(TAB_LABELS[tabId])}</strong><small>Verwaltung</small><span class="dashboard-app-open" aria-hidden="true">›</span></button>`).join('')}
+                    <a class="dashboard-app-tile" data-color="blue" href="anleitung.html" data-help-page="guide"><span class="dashboard-app-icon">${getTabIconMarkup('logbuch')}</span><strong>Hilfe & Anleitung</strong><small>ReefTools nachlesen</small><span class="dashboard-app-open" aria-hidden="true">›</span></a>
                 </div>
             </section>
 
-            ${(alerts.length || dueTodos.length) ? `
-                <section class="dashboard-home-attention" aria-label="Benötigt Aufmerksamkeit">
-                    <strong>Im Blick behalten</strong>
-                    ${alerts.length ? `<button type="button" onclick="selectTab('lager')">${alerts.length} Bestandswarnung(en)</button>` : ''}
-                    ${dueTodos.length ? `<button type="button" onclick="openDashboardDestination('todos')">${dueTodos.length} fällige Aufgabe(n)</button>` : ''}
-                </section>
-            ` : ''}
-
-            ${settings.widgets.tests ? `
-                <section class="dashboard-home-section" aria-labelledby="dashboardHomeWaterTitle">
-                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeWaterTitle">Wasserwerte</h3><button type="button" class="dashboard-home-link" onclick="selectTab('logbuch')">Messverlauf&nbsp; ›</button></div>
-                    <div class="dashboard-home-metrics">${metricCards}</div>
-                </section>
-            ` : ''}
-
-            ${settings.widgets.stock ? `
-                <section class="dashboard-home-section" aria-labelledby="dashboardHomeStockTitle">
-                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeStockTitle">Lager im Blick</h3><button type="button" class="dashboard-home-link" onclick="selectTab('lager')">Zum Lager&nbsp; ›</button></div>
-                    <div class="dashboard-home-stock">
-                        <div class="dashboard-home-stock-head"><strong>Bestandsübersicht</strong><span>${alerts.length ? `${alerts.length} Hinweis(e)` : `${catalogProducts.length} Produkte sichtbar`}</span></div>
-                        ${stockRows || '<p class="dashboard-home-empty">Für das aktive System sind noch keine Lagerprodukte sichtbar.</p>'}
-                    </div>
-                </section>
-            ` : ''}
-
-            <section class="dashboard-home-section" aria-labelledby="dashboardHomeQuickTitle">
-                <div class="dashboard-home-section-head"><h3 id="dashboardHomeQuickTitle">Schnellzugriff</h3></div>
-                <div class="dashboard-home-quick-grid">
-                    ${quickLinks.map(item => `
-                        <button type="button" class="dashboard-home-quick" onclick="selectTab('${item.tab}')">
-                            <span class="dashboard-home-quick-icon">${getTabIconMarkup(item.tab)}</span>
-                            <span class="dashboard-home-quick-copy"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.hint)}</small></span>
-                            <span class="dashboard-home-stock-chevron" aria-hidden="true">›</span>
-                        </button>
-                    `).join('')}
-                </div>
-            </section>
-
-            ${settings.widgets.logs ? `
-                <section class="dashboard-home-section" aria-labelledby="dashboardHomeRecentTitle">
-                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeRecentTitle">Zuletzt dokumentiert</h3><button type="button" class="dashboard-home-link" onclick="selectTab('${recentActivity?.kind === 'Lager' ? 'log' : 'logbuch'}')">Alle Einträge&nbsp; ›</button></div>
-                    <button type="button" class="dashboard-home-recent" onclick="selectTab('${recentActivity?.kind === 'Lager' ? 'log' : 'logbuch'}')">
-                        <span class="dashboard-home-recent-icon">${getTabIconMarkup(recentActivity?.kind === 'Lager' ? 'lager' : 'logbuch')}</span>
-                        <span><strong>${escapeHtml(recentActivity?.title || 'Noch keine Einträge')}</strong><small>${escapeHtml(recentActivity?.detail || 'Messungen, Pflege und Buchungen werden hier zusammengefasst.')}</small></span>
-                        <span class="dashboard-home-recent-kind">${escapeHtml(recentActivity?.kind || 'Logbuch')}</span>
-                    </button>
-                </section>
-            ` : ''}
-
-            <details class="dashboard-home-more" ${isEditing ? 'open' : ''}>
-                <summary><span><strong>Weitere Einblicke</strong><small>Aufgaben, Trends, Korallen und zusätzliche Dashboard-Kacheln</small></span></summary>
-                <div class="dashboard-home-more-content"></div>
+            <details class="dashboard-launcher-insights" ${isEditing || moreWasOpen ? 'open' : ''}>
+                <summary><span><strong>Weitere Einblicke</strong><small>Aufgaben, Trends und Dokumentation</small></span></summary>
+                <div class="dashboard-launcher-insights-content"></div>
             </details>
         </div>
     `;
-
-    const moreContent = container.querySelector('.dashboard-home-more-content');
+    const moreContent = container.querySelector('.dashboard-launcher-insights-content');
     retainedSections.forEach(section => moreContent?.appendChild(section));
+    filterDashboardApps();
+    if (isEditing) container.querySelector('.dashboard-config')?.scrollIntoView({ block: 'start', behavior: 'smooth' });
 }
 
 function formatDashboardDateParts(value) {
@@ -9263,6 +9264,7 @@ function showTab(tabId, historyMode = 'replace') {
     });
     const activePageTitle = document.getElementById('activePageTitle');
     if (activePageTitle) activePageTitle.textContent = TAB_LABELS[tabId] || tabId;
+    renderWorkspaceAppBar(tabId);
     const header = document.getElementById('appHeader');
     if (header) header.classList.toggle('warehouse-tools-hidden', tabId !== 'lager');
     document.body.dataset.activeTab = tabId;
@@ -9522,6 +9524,7 @@ function getTextFitMinimumScale(element) {
 
 function fitTextElement(element) {
     if (!element || !element.isConnected) return;
+    if (element.matches('.dashboard-app-tile, .dashboard-launcher-status')) return;
     const rect = element.getBoundingClientRect();
     if (rect.width < 12 || rect.height < 8) return;
 

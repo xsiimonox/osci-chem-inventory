@@ -58,6 +58,20 @@ Auch der Hover-Akzent wird in die Richtung angepasst, die den Textkontrast erhae
 Fehlerzustand. Labels und native Formfelder behalten ihre vorhandene Semantik.
 Die bestehenden Dialoge verwenden dieselben Controls und Tokens.
 
+## App-Startseite
+
+Die Uebersicht verwendet `dashboard-launcher` und die zentralen
+`DASHBOARD_APPS`-Definitionen in `assets/js/app.js`. App-Kacheln oeffnen die
+vorhandenen Bereiche ueber dieselbe Navigation und beachten deren Sichtbarkeit
+und Schreibrechte. Suche und Gruppenfilter filtern die Einstiegskacheln.
+
+`dashboard-app-tile`, die Statusfelder und `workspace-app-bar` teilen sich die
+Feature-Farben aus dem Design-System. Helle Themes verwenden kontraststaerkere
+Icon-Farben. Strukturierte Kacheltexte umbrechen statt der globalen Textskalierung.
+Mobil stehen drei Kacheln nebeneinander, ab 700 px vier. Die Arbeitsbereiche
+haben einen direkten Rueckweg zur Uebersicht. Bestehende Diagramme und
+Dashboard-Einstellungen bleiben unter Weitere Einblicke erreichbar.
+
 Seitenabschnitte sind ungerahmt und durch Abstand/Linien gegliedert. `card`
 ist fuer einzelne wiederholte Eintraege oder tatsaechlich gerahmte Werkzeuge
 gedacht. Keine neue Karte um eine bestehende Kartensammlung legen. Tabellen

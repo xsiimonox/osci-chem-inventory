@@ -25,7 +25,7 @@
     <link rel="apple-touch-icon" href="assets/img/icon.png">
     <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
-    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release">
+    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release&amp;ui=launcher-v1">
     <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.38-release">
 </head>
 <body>
@@ -45,6 +45,7 @@
         <div class="header-main">
             <div class="header-title-block">
                 <div class="header-title-container">
+                    <img class="header-brand-icon" src="assets/img/icon.png" alt="" width="32" height="32">
                     <h1>ReefTools</h1>
                     <span class="version-badge">v3.6.19</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
@@ -146,6 +147,7 @@
     </div>
 
     <main id="app" tabindex="-1">
+        <div id="workspaceAppBar" class="workspace-app-bar" aria-label="Aktiver Arbeitsbereich" hidden></div>
         <div id="uebersicht" class="tab-content active"></div>
         <div id="lager" class="tab-content" aria-hidden="true"></div>
 
@@ -1449,8 +1451,9 @@
                             <div class="phyto-scoop-layout">
                                 <div class="phyto-scoop-controls">
                                     <div class="input-group phyto-scoop-volume-input"><label for="phytoScoopLiters">Aquariumvolumen</label><div class="phyto-scoop-input-wrap"><input id="phytoScoopLiters" type="number" min="50" step="any" value="100" inputmode="decimal" aria-describedby="phytoScoopVolumeHint"><span>Liter</span></div><small id="phytoScoopVolumeHint">Mindestens 50 Liter · Nettovolumen deines Aquariums</small></div>
+                                    <div class="input-group phyto-scoop-volume-input"><label for="phytoScoopHandleLength">Stiellänge ab Becherwand</label><div class="phyto-scoop-input-wrap"><input id="phytoScoopHandleLength" type="number" min="5" max="200" step="1" value="50" inputmode="numeric" aria-describedby="phytoScoopHandleLengthHint"><span>mm</span></div><small id="phytoScoopHandleLengthHint">Wähle 5 bis 200 mm passend zu deinem Dosierbehälter.</small></div>
                                     <div id="phytoScoopResult" class="phyto-scoop-result" aria-live="polite"></div>
-                                    <div class="phyto-scoop-specs"><strong>Feste Maße &amp; Druckform</strong><span>Standard-Innen-Ø 17,5 mm · Wand 1,5 mm · Innenbodenradius bis 1,5 mm</span><span>Bei weniger als 5 mm Füllhöhe wird der Durchmesser für eine gut messbare Mindesthöhe angepasst.</span><span>Stiel 50 × 6 × 3 mm · rundes Griffende</span><span>Becherhöhe maximal 20 mm · Stiel und Boden liegen plan auf</span><span>Das Rundungsvolumen wird bei der Berechnung berücksichtigt.</span></div>
+                                    <div class="phyto-scoop-specs"><strong>Maße &amp; Druckform</strong><span>Standard-Innen-Ø 17,5 mm · Wand 1,5 mm · Innenbodenradius bis 1,5 mm</span><span>Bei weniger als 5 mm Füllhöhe wird der Durchmesser für eine gut messbare Mindesthöhe angepasst.</span><span>Variable Stiellänge · 6 × 3 mm · rundes Griffende</span><span>Becherhöhe maximal 20 mm · Stiel und Boden liegen plan auf</span><span>Das Rundungsvolumen wird bei der Berechnung berücksichtigt.</span></div>
                                     <button type="button" class="btn-primary btn-animated phyto-scoop-download" id="phytoScoopDownload">STL herunterladen</button>
                                 </div>
                                 <section class="phyto-scoop-preview-wrap" aria-label="Interaktive 3D-Vorschau">
@@ -2961,7 +2964,7 @@
     <script src="assets/js/lighting-sim.js?v=3.6.17-release"></script>
     <script src="assets/js/sangokai-product-catalog.js?v=3.6.17-release"></script>
     <script src="assets/js/sangokai-calculations.js?v=3.6.17-release"></script>
-    <script src="assets/js/app.js?v=3.6.19-release"></script>
+    <script src="assets/js/app.js?v=3.6.19-release&amp;ui=launcher-v1"></script>
     <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
     <script src="assets/js/phyto-scoop.js?v=3.6.38-release"></script>
     <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>
