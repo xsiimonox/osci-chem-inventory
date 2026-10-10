@@ -697,6 +697,7 @@ const AQUARIUM_FIELD_KEYS = [
     'feedNutrientLog',
     'osmoseTank',
     'traceDraft',
+    'crPostWaterChangeCalculator',
     'reefManagerTraceImport',
     'reefManagerAquariumLiters',
     'traceCalculator',
@@ -4990,6 +4991,7 @@ function createAquariumData(source = {}) {
         feedNutrientLog: cloneSerializable(source.feedNutrientLog || []),
         osmoseTank: cloneSerializable(source.osmoseTank || { capacityLiters: 50, currentLiters: 50, warnDays: 2, usageLog: [], lastAlertSignature: '', lastAlertAt: 0 }),
         traceDraft: cloneSerializable(source.traceDraft || {}),
+        crPostWaterChangeCalculator: cloneSerializable(source.crPostWaterChangeCalculator || null),
         reefManagerTraceImport: cloneSerializable(source.reefManagerTraceImport || null),
         reefManagerAquariumLiters: source.reefManagerAquariumLiters || '',
         traceCalculator: cloneSerializable(source.traceCalculator || null),
@@ -9158,6 +9160,7 @@ function renderActiveTabContent(tabId) {
             syncCRPreferredUnitUI();
             renderCRRoutineSelection();
             renderCRMixingOverview();
+            renderCRPostWaterChangeCalculator();
             setupPriority4CalculatorUI();
         }
         if(tabId === 'statistik') renderStats();
@@ -27376,6 +27379,108 @@ function renderCRRoutineSelection() {
     if (description) description.textContent = crRoutineDescriptions[selected];
 }
 
+function getCRPostWaterChangeCalculatorState() {
+    const activeVolume = Number(getActiveAquarium()?.data?.volumeLiters);
+    const saved = db.crPostWaterChangeCalculator && typeof db.crPostWaterChangeCalculator === 'object'
+        ? db.crPostWaterChangeCalculator
+        : {};
+    const state = db.crPostWaterChangeCalculator = {
+        tankLiters: saved.tankLiters ?? (Number.isFinite(activeVolume) && activeVolume > 0 ? activeVolume : ''),
+        tankVolumeCustom: Boolean(saved.tankVolumeCustom),
+        replacementLiters: saved.replacementLiters ?? '',
+        currentKh: saved.currentKh ?? '',
+        targetKh: saved.targetKh ?? '7.5',
+        khSolution: saved.khSolution === 'osci-kh-nacht' ? 'osci-kh-nacht' : 'osci-kh-tag'
+    };
+    if (!state.tankVolumeCustom && Number.isFinite(activeVolume) && activeVolume > 0) {
+        state.tankLiters = activeVolume;
+    }
+    return state;
+}
+
+function calculateCRPostWaterChangeCorrection({ tankLiters, replacementLiters, currentKh, targetKh, khSolution }) {
+    const values = [tankLiters, replacementLiters, currentKh, targetKh].map(Number);
+    if (values.some(value => !Number.isFinite(value) || value < 0) || values[0] <= 0 || values[1] <= 0 || values[1] > values[0]) return null;
+    const [liters, exchangeLiters, khBefore, khGoal] = values;
+    const khPreset = doseImpactBuiltInPresets.find(preset => preset.id === (khSolution === 'osci-kh-nacht' ? 'osci-kh-nacht' : 'osci-kh-tag'));
+    const khAfter = khBefore * (liters - exchangeLiters) / liters;
+    const khDifference = khGoal - khAfter;
+    return {
+        khDifference,
+        khDoseMl: khDifference > 0.005 ? khDifference / khPreset.increase * khPreset.referenceMl * liters / khPreset.referenceLiters : 0,
+        khPreset,
+        tankLiters: liters,
+        replacementLiters: exchangeLiters,
+        khBefore,
+        khAfter,
+        khGoal
+    };
+}
+
+function renderCRPostWaterChangeCalculator() {
+    const details = document.getElementById('crWaterChangeCalculator');
+    if (!details) return;
+    const state = getCRPostWaterChangeCalculatorState();
+    const fields = {
+        crPostChangeTankVolume: state.tankLiters,
+        crPostChangeReplacementVolume: state.replacementLiters,
+        crPostChangeCurrentKh: state.currentKh,
+        crPostChangeTargetKh: state.targetKh,
+        crPostChangeKhSolution: state.khSolution
+    };
+    Object.entries(fields).forEach(([id, value]) => {
+        const input = document.getElementById(id);
+        if (input) input.value = String(value);
+    });
+    const khSelect = document.getElementById('crPostChangeKhSolution');
+    if (khSelect) {
+        [...khSelect.options].forEach(option => {
+            const preset = doseImpactBuiltInPresets.find(entry => entry.id === option.value);
+            if (preset) option.textContent = `${preset.name} · ${preset.referenceMl} ml / ${preset.referenceLiters} L = +${preset.increase} °dKH`;
+        });
+    }
+    updateCRPostWaterChangeCalculator(false);
+}
+
+function updateCRPostWaterChangeCalculator(persist = true) {
+    const result = document.getElementById('crPostWaterChangeResult');
+    if (!result) return;
+    const state = getCRPostWaterChangeCalculatorState();
+    const values = {
+        tankLiters: document.getElementById('crPostChangeTankVolume')?.value ?? '',
+        replacementLiters: document.getElementById('crPostChangeReplacementVolume')?.value ?? '',
+        currentKh: document.getElementById('crPostChangeCurrentKh')?.value ?? '',
+        targetKh: document.getElementById('crPostChangeTargetKh')?.value ?? '7.5',
+        khSolution: document.getElementById('crPostChangeKhSolution')?.value ?? 'osci-kh-tag'
+    };
+    Object.assign(state, values, {
+        tankVolumeCustom: state.tankVolumeCustom || String(values.tankLiters) !== String(getActiveAquarium()?.data?.volumeLiters ?? '')
+    });
+    if (persist) saveDB(false);
+
+    const previewResult = document.getElementById('crPostWaterChangePreview');
+    if ([values.tankLiters, values.replacementLiters, values.currentKh, values.targetKh].some(value => String(value).trim() === '')) {
+        const message = '<p class="field-help">Aquariumvolumen, C&amp;R-Austauschvolumen, KH-Vorherwert und KH-Sollwert eintragen. Der Sollwert ist auf 7,5 °dKH voreingestellt.</p>';
+        result.innerHTML = message;
+        if (previewResult) previewResult.innerHTML = message;
+        return;
+    }
+    const calculation = calculateCRPostWaterChangeCorrection(values);
+    if (!calculation) {
+        const message = '<p class="field-help" role="alert">Bitte prüfe die Werte. Das Austauschvolumen muss größer als 0 und darf nicht größer als das Aquariumvolumen sein; Mess- und Sollwerte dürfen nicht negativ sein.</p>';
+        result.innerHTML = message;
+        if (previewResult) previewResult.innerHTML = message;
+        return;
+    }
+    const fmt = (value, digits = 2) => Number(value).toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    const output = `<div class="cr-waterchange-result-summary"><strong>Erwarteter KH-Wert nach C&amp;R</strong><span>${fmt(calculation.tankLiters, 0)} L Aquarium · ${fmt(calculation.replacementLiters, 2)} L Austausch</span></div>
+        <div class="cr-waterchange-doses">
+            <div class="cr-waterchange-dose"><span><strong>KH nach dem Wechsel</strong><small>${fmt(calculation.khBefore, 2)} → ${fmt(calculation.khAfter, 2)} °dKH · Soll ${fmt(calculation.khGoal, 2)}</small></span><b>${calculation.khDifference > 0.005 ? `${fmt(calculation.khDoseMl, 2)} ml ${escapeHtml(calculation.khPreset.name)}` : calculation.khDifference < -0.005 ? 'Über Soll · keine Zugabe' : 'Am Soll · 0 ml'}</b></div>
+        </div>`;
+    result.innerHTML = output;
+    if (previewResult) previewResult.innerHTML = output;
+}
+
 function renderCRMixingOverview() {
     const container = document.getElementById('crMixingOverview');
     const count = document.getElementById('crMixingOverviewCount');
@@ -27652,6 +27757,7 @@ function previewCRPaste() {
     if (!text.trim()) {
         previewContainer.hidden = true;
         renderCustomCrRecipeAdjustment();
+        updateCRPostWaterChangeCalculator(false);
         return;
     }
 
@@ -27659,6 +27765,7 @@ function previewCRPaste() {
         previewContainer.hidden = false;
         previewList.innerHTML = '<div class="workflow-message workflow-message--error" role="alert"><strong>Eingabe unvollständig</strong><span>Format unvollständig oder ungültig. Bitte ganze Zeile einfügen.</span></div>';
         renderCustomCrRecipeAdjustment();
+        updateCRPostWaterChangeCalculator(false);
         return;
     }
 
@@ -27703,6 +27810,7 @@ function previewCRPaste() {
     previewList.innerHTML = html;
     previewContainer.hidden = false;
     renderCustomCrRecipeAdjustment();
+    updateCRPostWaterChangeCalculator(false);
 }
 
 let crPasteBookingBusy = false;

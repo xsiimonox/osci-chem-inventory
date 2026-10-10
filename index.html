@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release">
-    <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.30-release">
+    <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.38-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -169,6 +169,44 @@
                 </summary>
                 <div class="cr-mixing-overview-content" id="crMixingOverview" aria-live="polite"></div>
             </details>
+            <details class="card workflow-card cr-waterchange-calculator" id="crWaterChangeCalculator">
+                <summary class="cr-waterchange-summary">
+                    <span><strong>KH Anpassung nach dem C&amp;R-Wasserwechsel</strong><small>KH-Veränderung und rechnerische OSCI-Ergänzung vorab berechnen</small></span>
+                    <span class="cr-waterchange-summary-action" aria-hidden="true">⌄</span>
+                </summary>
+                <div class="cr-waterchange-body">
+                    <p class="hint">Trage Aquarium- und Austauschvolumen sowie deinen KH-Messwert vor dem C&amp;R ein. Der Rechner schätzt den KH-Wert nach dem Wechsel und zeigt die rechnerische Ergänzung direkt bei der Auslagerungsprüfung.</p>
+                    <div class="cr-waterchange-grid">
+                        <div class="input-group">
+                            <label for="crPostChangeTankVolume">Aquariumvolumen (L)</label>
+                            <input type="number" id="crPostChangeTankVolume" min="1" step="any" inputmode="decimal" oninput="updateCRPostWaterChangeCalculator()">
+                            <small>Wird zunächst aus dem aktiven Aquarium übernommen.</small>
+                        </div>
+                        <div class="input-group">
+                            <label for="crPostChangeReplacementVolume">Gesamtvolumen der C&amp;R-Mischung (L)</label>
+                            <input type="number" id="crPostChangeReplacementVolume" min="0.1" step="any" inputmode="decimal" placeholder="z. B. 40" oninput="updateCRPostWaterChangeCalculator()">
+                            <small>Dieses Volumen wird gegen Aquariumwasser ausgetauscht.</small>
+                        </div>
+                        <div class="input-group">
+                            <label for="crPostChangeKhSolution">KH-Lösung</label>
+                            <select id="crPostChangeKhSolution" onchange="updateCRPostWaterChangeCalculator()">
+                                <option value="osci-kh-tag">OSCI KH Tag</option>
+                                <option value="osci-kh-nacht">OSCI KH Nacht</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label for="crPostChangeCurrentKh">KH vor dem C&amp;R (°dKH)</label>
+                            <input type="number" id="crPostChangeCurrentKh" min="0" step="any" inputmode="decimal" placeholder="z. B. 7,1" oninput="updateCRPostWaterChangeCalculator()">
+                        </div>
+                        <div class="input-group">
+                            <label for="crPostChangeTargetKh">KH-Sollwert (°dKH)</label>
+                            <input type="number" id="crPostChangeTargetKh" min="0" step="any" inputmode="decimal" oninput="updateCRPostWaterChangeCalculator()">
+                        </div>
+                    </div>
+                    <div class="cr-waterchange-result" id="crPostWaterChangeResult" aria-live="polite" aria-atomic="true"></div>
+                    <p class="field-help">Modellannahme: Die C&amp;R-Mischung ersetzt das angegebene Volumen und hat 0 °dKH. Nach dem Wechsel messen und die Schätzung abgleichen.</p>
+                </div>
+            </details>
             <section class="card workflow-card cr-routine-card" aria-labelledby="crRoutineTitle">
                 <div class="cr-routine-head">
                     <div>
@@ -204,6 +242,7 @@
                 <div id="cr-preview-container" class="workflow-preview" hidden>
                     <h4>2. Vorschau und Bestandsprüfung</h4>
                     <div id="cr-preview-list"></div>
+                    <div id="crPostWaterChangePreview" class="cr-waterchange-result" aria-live="polite" aria-atomic="true"></div>
                 </div>
 
                 <div class="workflow-actions">
@@ -1397,7 +1436,7 @@
                 </details>
                 <details class="tool-section" data-section-id="3d-druck-und-werkstatt" open>
                     <summary class="tool-section-summary">
-                        <span><strong>3D-Druck &amp; Werkstatt</strong><small>PhytoDose · individueller Dosierlöffel für dein Aquarium</small></span>
+                        <span><strong>3D-Druck &amp; Werkstatt</strong><small>PhytoDose · Dosierlöffel fürs Aquarium und individuelle Flüssigkeitsmaße</small></span>
                         <span class="settings-accordion-hint" aria-hidden="true"></span>
                     </summary>
                     <div class="tool-card-grid">
@@ -1435,6 +1474,33 @@
                                     <div class="phyto-holder-footer"><span id="phytoHolderFileInfo">Separat druckbar · STL</span><button type="button" class="btn-secondary btn-animated" id="phytoHolderDownload">Löffelhalter-STL herunterladen</button></div>
                                 </section>
                                 <p class="phyto-scoop-note">Die Rechnung verwendet deine Kalibrierung: 2,45 ml Pulver entsprechen 1,5 g. Pulver locker einfüllen und nicht verdichten. Druckmaß und tatsächliche Füllmenge können je nach Drucker und Pulver variieren.</p>
+                            </div>
+                        </section>
+                        <section class="card tool-compact-card phyto-scoop-card liquid-scoop-card" data-tool-id="fluessigkeits-messloeffel-generator" aria-labelledby="liquidScoopTitle">
+                            <div class="phyto-scoop-header">
+                                <div><span class="workflow-eyebrow">LiquidDose · 3D-Messlöffel-Rechner</span><h3 id="liquidScoopTitle">Flüssigkeits-Messlöffel</h3>
+                                <p class="hint">Gib die gewünschte Füllmenge ein. Der Becher wird passend dimensioniert; ml-Angabe und optionaler Flüssigkeitsname sitzen gut lesbar und direkt auf dem verbreiterten Griff.</p></div>
+                                <span class="phyto-scoop-badge">Individuelles Hohlmaß</span>
+                            </div>
+                            <div class="phyto-scoop-layout">
+                                <div class="phyto-scoop-controls">
+                                    <div class="input-group phyto-scoop-volume-input"><label for="liquidScoopMl">Gewünschte Füllmenge</label><div class="phyto-scoop-input-wrap"><input id="liquidScoopMl" type="number" min="0.1" step="any" value="5" inputmode="decimal" aria-describedby="liquidScoopVolumeHint"><span>ml</span></div><small id="liquidScoopVolumeHint">Mindestmenge 0,1 ml · Innenmaß und Höhe passen sich automatisch an.</small></div>
+                                    <div class="input-group phyto-scoop-volume-input liquid-scoop-label-input"><label for="liquidScoopName">Flüssigkeitsname (optional)</label><input class="liquid-scoop-name-field" id="liquidScoopName" type="text" maxlength="24" placeholder="z. B. Kalkwasser" autocomplete="off" aria-describedby="liquidScoopNameHint"><small id="liquidScoopNameHint">Der Name steht zusätzlich unter der 7 mm hohen ml-Angabe.</small></div>
+                                    <div id="liquidScoopResult" class="phyto-scoop-result" aria-live="polite"></div>
+                                    <div class="phyto-scoop-specs"><strong>Form &amp; Druck</strong><span>Runder Messbecher mit abgerundetem Innenboden</span><span>Kompakter Ausgießer gegenüber dem Stiel · Wandstärke mindestens 1,5 mm</span><span>18 mm breiter Griff mit weich auslaufendem Ansatz · Beschriftung direkt auf dem Griff</span><span>Rundere Schrift · 7 mm Zeichenhöhe · 1 mm Strichbreite · 0,6 mm erhaben.</span><span>Die Nennmenge wird bis zur abgesenkten Ausgießerlippe berechnet.</span></div>
+                                    <button type="button" class="btn-primary btn-animated phyto-scoop-download" id="liquidScoopDownload">Flüssigkeitslöffel-STL herunterladen</button>
+                                </div>
+                                <section class="phyto-scoop-preview-wrap" aria-label="Interaktive 3D-Vorschau des Flüssigkeits-Messlöffels">
+                                    <header class="phyto-preview-toolbar"><div><span class="phyto-preview-kicker">LIVE 3D · INTERAKTIV</span><strong>Dein Flüssigkeits-Messlöffel</strong></div><button type="button" id="liquidScoopResetView" class="phyto-preview-reset" aria-label="3D-Ansicht zurücksetzen" title="Ansicht zurücksetzen">⟳</button></header>
+                                    <div id="liquidScoopPreview" class="phyto-scoop-preview" role="group" aria-label="Interaktive Vorschau des Flüssigkeits-Messlöffels">
+                                        <canvas id="liquidScoopCanvas" aria-label="3D-Modell des Flüssigkeits-Messlöffels mit ml-Beschriftung. Mit Maus oder einem Finger ziehen zum Drehen, mit Mausrad oder zwei Fingern zoomen."></canvas>
+                                        <div class="phyto-preview-bed-label"><span aria-hidden="true">▱</span> Flache Druckbett-Auflage · z = 0</div>
+                                        <div id="liquidScoop3dFallback" class="phyto-preview-fallback" hidden>Die 3D-Ansicht wird von diesem Browser nicht unterstützt. Der STL-Download bleibt verfügbar.</div>
+                                        <div class="phyto-preview-legend"><span><i></i> Auf die Menge berechneter Becher</span><span><i></i> Ausgießer am Becherrand</span><span><i></i> Beschriftung direkt auf dem breiten Griff</span></div>
+                                    </div>
+                                    <footer class="phyto-preview-footer"><span><kbd>↔</kbd> Ziehen zum Drehen</span><span><kbd>⌕</kbd> Mausrad oder Pinch zum Zoomen</span><span>3D-Maße in mm</span></footer>
+                                </section>
+                                <p class="phyto-scoop-note">Die STL-Datei enthält ein einteiliges Druckmodell. Die angegebene ml-Menge ist das berechnete Innenvolumen bis zum Rand; Drucktoleranzen und Material können das tatsächliche Volumen leicht verändern.</p>
                             </div>
                         </section>
                     </div>
@@ -2896,7 +2962,7 @@
     <script src="assets/js/sangokai-calculations.js?v=3.6.17-release"></script>
     <script src="assets/js/app.js?v=3.6.26-release"></script>
     <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
-    <script src="assets/js/phyto-scoop.js?v=3.6.31-release"></script>
+    <script src="assets/js/phyto-scoop.js?v=3.6.38-release"></script>
     <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {

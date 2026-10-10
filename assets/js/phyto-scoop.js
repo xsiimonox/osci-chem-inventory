@@ -12,6 +12,49 @@
     const handleHeightMm = 3;
     const innerRadiusMm = innerDiameterMm / 2;
     const fmt = (value, digits = 2) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: digits }).format(value);
+    const liquidLabelGlyphs = {
+        '0':['01110','10001','10011','10101','11001','10001','01110'],
+        '1':['00100','01100','00100','00100','00100','00100','01110'],
+        '2':['01110','10001','00001','00010','00100','01000','11111'],
+        '3':['11110','00001','00001','01110','00001','00001','11110'],
+        '4':['00010','00110','01010','10010','11111','00010','00010'],
+        '5':['11111','10000','10000','11110','00001','00001','11110'],
+        '6':['01110','10000','10000','11110','10001','10001','01110'],
+        '7':['11111','00001','00010','00100','01000','01000','01000'],
+        '8':['01110','10001','10001','01110','10001','10001','01110'],
+        '9':['01110','10001','10001','01111','00001','00001','01110'],
+        'a':['01110','10001','10001','11111','10001','10001','10001'],
+        'b':['11110','10001','10001','11110','10001','10001','11110'],
+        'c':['01111','10000','10000','10000','10000','10000','01111'],
+        'd':['11110','10001','10001','10001','10001','10001','11110'],
+        'e':['11111','10000','10000','11110','10000','10000','11111'],
+        'f':['11111','10000','10000','11110','10000','10000','10000'],
+        'g':['01111','10000','10000','10111','10001','10001','01111'],
+        'h':['10001','10001','10001','11111','10001','10001','10001'],
+        'i':['01110','00100','00100','00100','00100','00100','01110'],
+        'j':['00111','00010','00010','00010','00010','10010','01100'],
+        'k':['10001','10010','10100','11000','10100','10010','10001'],
+        'l':['10000','10000','10000','10000','10000','10000','11111'],
+        'n':['10001','11001','11001','10101','10011','10011','10001'],
+        'o':['01110','10001','10001','10001','10001','10001','01110'],
+        'p':['11110','10001','10001','11110','10000','10000','10000'],
+        'q':['01110','10001','10001','10001','10101','10010','01101'],
+        'r':['11110','10001','10001','11110','10100','10010','10001'],
+        's':['01111','10000','10000','01110','00001','00001','11110'],
+        't':['11111','00100','00100','00100','00100','00100','00100'],
+        'u':['10001','10001','10001','10001','10001','10001','01110'],
+        'v':['10001','10001','10001','10001','10001','01010','00100'],
+        'w':['10001','10001','10001','10101','10101','10101','01010'],
+        'x':['10001','10001','01010','00100','01010','10001','10001'],
+        'y':['10001','10001','01010','00100','00100','00100','00100'],
+        'z':['11111','00001','00010','00100','01000','10000','11111'],
+        ',':['00000','00000','00000','00000','00000','00110','00100'],
+        '.':['00000','00000','00000','00000','00000','00110','00110'],
+        '-':['00000','00000','00000','11111','00000','00000','00000'],
+        '_':['00000','00000','00000','00000','00000','00000','11111'],
+        'm':['10001','11011','10101','10101','10101','10001','10001'],
+        ' ':['00000','00000','00000','00000','00000','00000','00000']
+    };
 
     function roundedFloorVolume(heightMm, radiusMm, bowlRadiusMm) {
         const height = Math.max(0, Math.min(heightMm, radiusMm));
@@ -33,6 +76,51 @@
         if (heightMm <= cornerRadius) return roundedFloorVolume(heightMm, heightMm, bowlRadiusMm);
         return roundedFloorVolume(cornerRadius, cornerRadius, bowlRadiusMm)
             + Math.PI * bowlRadiusMm ** 2 * (heightMm - cornerRadius);
+    }
+
+    function liquidSpoutParameters(fillHeight, cornerRadius) {
+        const availableWallHeight = Math.max(0, fillHeight - cornerRadius);
+        return {
+            halfAngle: Math.PI / 10,
+            reach: Math.min(3, availableWallHeight * 0.8),
+            drop: Math.min(1.5, Math.max(0, availableWallHeight - 0.8))
+        };
+    }
+
+    function liquidSpoutProfile(angle, halfAngle) {
+        // The handle points along +X, so the pour lip is centered on -X.
+        const delta = Math.atan2(Math.sin(angle - Math.PI), Math.cos(angle - Math.PI));
+        return Math.abs(delta) < halfAngle ? Math.cos((delta / halfAngle) * Math.PI / 2) : 0;
+    }
+
+    function liquidVolumeToSpoutLip(fillHeight, bowlRadiusMm) {
+        const cornerRadius = Math.min(innerCornerRadiusMm, bowlRadiusMm, fillHeight);
+        const { halfAngle, reach, drop } = liquidSpoutParameters(fillHeight, cornerRadius);
+        const lipDepth = Math.max(cornerRadius, fillHeight - drop);
+        let volume = roundedFloorVolume(cornerRadius, cornerRadius, bowlRadiusMm);
+        if (lipDepth <= cornerRadius) return volume;
+
+        const areaAtDepth = depth => {
+            const angularSteps = 256;
+            let sumRadiusSquared = 0;
+            for (let i = 0; i < angularSteps; i++) {
+                const angle = (i + 0.5) * Math.PI * 2 / angularSteps;
+                const profile = liquidSpoutProfile(angle, halfAngle);
+                const wallTopDepth = fillHeight - drop * profile;
+                const wallHeight = Math.max(1e-6, wallTopDepth - cornerRadius);
+                const progress = Math.max(0, Math.min(1, (depth - cornerRadius) / wallHeight));
+                const radius = bowlRadiusMm + reach * profile * progress;
+                sumRadiusSquared += radius * radius;
+            }
+            return Math.PI * sumRadiusSquared / angularSteps;
+        };
+
+        const sections = 24;
+        const step = (lipDepth - cornerRadius) / sections;
+        let sum = areaAtDepth(cornerRadius) + areaAtDepth(lipDepth);
+        for (let i = 1; i < sections; i++) sum += (i % 2 ? 4 : 2) * areaAtDepth(cornerRadius + i * step);
+        volume += sum * step / 3;
+        return volume;
     }
 
     const maxVolumePerScoopMm3 = volumeAtFillHeight(maxFillHeightMm);
@@ -71,7 +159,32 @@
         return { liters, massG, totalMl, scoopCount, fillHeight, innerRadiusMm: scoopInnerRadiusMm, cornerRadiusMm: Math.min(innerCornerRadiusMm, scoopInnerRadiusMm, fillHeight), outerCupHeight: fillHeight + floorMm, perScoopMl: totalMl / scoopCount, perScoopG: massG / scoopCount };
     }
 
+    function calculateLiquidScoop(capacityMl) {
+        const targetVolumeMm3 = capacityMl * 1000;
+        const bowlRadiusMm = Math.max(4, Math.cbrt(targetVolumeMm3 / (2 * Math.PI)));
+        let low = 0;
+        let high = Math.max(20, targetVolumeMm3 / (Math.PI * bowlRadiusMm ** 2) + 6);
+        while (liquidVolumeToSpoutLip(high, bowlRadiusMm) < targetVolumeMm3) high *= 2;
+        for (let i = 0; i < 56; i++) {
+            const mid = (low + high) / 2;
+            if (liquidVolumeToSpoutLip(mid, bowlRadiusMm) < targetVolumeMm3) low = mid;
+            else high = mid;
+        }
+        const fillHeight = (low + high) / 2;
+        const cornerRadius = Math.min(innerCornerRadiusMm, bowlRadiusMm, fillHeight);
+        const { drop } = liquidSpoutParameters(fillHeight, cornerRadius);
+        return {
+            capacityMl,
+            innerRadiusMm: bowlRadiusMm,
+            fillHeight,
+            fillDepthAtSpout: fillHeight - drop,
+            cornerRadiusMm: cornerRadius,
+            outerCupHeight: fillHeight + floorMm
+        };
+    }
+
     let scoopViewer = null;
+    let liquidScoopViewer = null;
 
     function mat4Perspective(fov, aspect, near, far) {
         const f = 1 / Math.tan(fov / 2);
@@ -496,7 +609,66 @@
         download.onclick = () => downloadStl(calc);
     }
 
-    function makeMesh(calc) {
+    function addPolygonPrism(triangles, outline, zBottom, zTop) {
+        const center = outline.reduce((sum, point) => [sum[0] + point[0] / outline.length, sum[1] + point[1] / outline.length], [0, 0]);
+        const centerBottom = [center[0], center[1], zBottom];
+        const centerTop = [center[0], center[1], zTop];
+        const bottom = outline.map(([x, y]) => [x, y, zBottom]);
+        const top = outline.map(([x, y]) => [x, y, zTop]);
+        for (let i = 0; i < outline.length; i++) {
+            const next = (i + 1) % outline.length;
+            triangles.push([centerTop, top[i], top[next]], [centerBottom, bottom[next], bottom[i]]);
+            triangles.push([bottom[i], bottom[next], top[next]], [bottom[i], top[next], top[i]]);
+        }
+    }
+
+    function addHandleMarkings(triangles, label, customLabel, handleStartX, handleEndX) {
+        const scale = 1;
+        const embossHeight = 0.6;
+        const addLine = (text, centerY) => {
+            const units = Math.max(0, text.length * 6 - (text ? 1 : 0));
+            const textStartX = (handleStartX + handleEndX - units * scale) / 2;
+            const textStartY = centerY - 3.5 * scale;
+            [...text].forEach((character, characterIndex) => {
+                const glyph = liquidLabelGlyphs[character] || liquidLabelGlyphs[' '];
+                const active = new Set();
+                glyph.forEach((row, rowIndex) => [...row].forEach((pixel, columnIndex) => {
+                    if (pixel === '1') active.add(`${columnIndex},${rowIndex}`);
+                }));
+                const centers = (columnIndex, rowIndex) => [
+                    textStartX + (characterIndex * 6 + columnIndex + 0.5) * scale,
+                    textStartY + (6 - rowIndex + 0.5) * scale
+                ];
+                const radius = 0.5;
+                for (const key of active) {
+                    const [columnIndex, rowIndex] = key.split(',').map(Number);
+                    const [cx, cy] = centers(columnIndex, rowIndex);
+                    addPolygonPrism(triangles, sampleArc(cx, cy, radius, 0, Math.PI * 2, 16), handleHeightMm, handleHeightMm + embossHeight);
+                    // Join adjacent dots with round-ended strokes so diagonals
+                    // and curves read as a smooth monoline instead of square pixels.
+                    for (const [dx, dy] of [[1, 0], [-1, 1], [0, 1], [1, 1]]) {
+                        if (!active.has(`${columnIndex + dx},${rowIndex + dy}`)) continue;
+                        const [x1, y1] = centers(columnIndex + dx, rowIndex + dy);
+                        const angle = Math.atan2(y1 - cy, x1 - cx);
+                        const outline = [];
+                        for (let step = 0; step <= 8; step++) {
+                            const a = angle - Math.PI / 2 + step * Math.PI / 8;
+                            outline.push([x1 + radius * Math.cos(a), y1 + radius * Math.sin(a)]);
+                        }
+                        for (let step = 0; step <= 8; step++) {
+                            const a = angle + Math.PI / 2 + step * Math.PI / 8;
+                            outline.push([cx + radius * Math.cos(a), cy + radius * Math.sin(a)]);
+                        }
+                        addPolygonPrism(triangles, outline, handleHeightMm, handleHeightMm + embossHeight);
+                    }
+                }
+            });
+        };
+        addLine(label, customLabel ? 3.95 : 0);
+        if (customLabel) addLine(customLabel, -3.95);
+    }
+
+    function makeMesh(calc, capacityLabel = null, customLabel = '') {
         const triangles = [];
         const n = 96;
         const filletSteps = 16;
@@ -508,17 +680,26 @@
         const zInner = floorMm;
         const add = (a, b, c) => triangles.push([a, b, c]);
         const p = (r, angle, z) => [r * Math.cos(angle), r * Math.sin(angle), z];
+        // The liquid scoop gets a lowered, outward-pointing lip. Keep its slope
+        // printable by limiting the radial reach to the available wall height.
+        const spout = capacityLabel ? liquidSpoutParameters(calc.fillHeight, cornerRadius) : { halfAngle: 0, reach: 0, drop: 0 };
         for (let i = 0; i < n; i++) {
             const a0 = i * Math.PI * 2 / n, a1 = (i + 1) * Math.PI * 2 / n;
-            const o0 = p(ro, a0, 0), o1 = p(ro, a1, 0), ot0 = p(ro, a0, zTop), ot1 = p(ro, a1, zTop);
+            const profile0 = capacityLabel ? liquidSpoutProfile(a0, spout.halfAngle) : 0;
+            const profile1 = capacityLabel ? liquidSpoutProfile(a1, spout.halfAngle) : 0;
+            const topZ0 = zTop - spout.drop * profile0, topZ1 = zTop - spout.drop * profile1;
+            // Equal offsets on the inner and outer lip preserve the 1.5 mm wall.
+            const topRadiusOuter0 = ro + spout.reach * profile0, topRadiusOuter1 = ro + spout.reach * profile1;
+            const topRadiusInner0 = ri + spout.reach * profile0, topRadiusInner1 = ri + spout.reach * profile1;
+            const o0 = p(ro, a0, 0), o1 = p(ro, a1, 0), ot0 = p(topRadiusOuter0, a0, topZ0), ot1 = p(topRadiusOuter1, a1, topZ1);
             const centerBottom = [0, 0, 0];
             add(o0, o1, ot1); add(o0, ot1, ot0); // outer wall
             add(centerBottom, o1, o0); // underside
 
             const wallStartZ = zInner + cornerRadius;
             const iw0 = p(ri, a0, wallStartZ), iw1 = p(ri, a1, wallStartZ);
-            const it0 = p(ri, a0, zTop), it1 = p(ri, a1, zTop);
-            if (zTop - wallStartZ > 1e-6) {
+            const it0 = p(topRadiusInner0, a0, topZ0), it1 = p(topRadiusInner1, a1, topZ1);
+            if (Math.min(topZ0, topZ1) - wallStartZ > 1e-6) {
                 add(iw0, it1, iw1); add(iw0, it0, it1); // inner wall faces into the bowl
             }
             const f0 = p(floorRadius, a0, zInner), f1 = p(floorRadius, a1, zInner);
@@ -537,16 +718,41 @@
             add(ot0, ot1, it1); add(ot0, it1, it0); // rim
         }
         // Rounded-end handle extrusion sits flush with the bowl bottom at z=0.
-        const x0 = ro - 0.8, xEnd = ro + handleLengthMm, capRadius = handleWidthMm / 2;
+        const liquidTextWidth = text => Math.max(0, text.length * 6 - 1);
+        const labelWidth = capacityLabel ? liquidTextWidth(capacityLabel) : 0;
+        const nameWidth = customLabel ? liquidTextWidth(customLabel) : 0;
+        const liquidHandleLength = capacityLabel ? Math.max(handleLengthMm, Math.max(labelWidth, nameWidth) + 20) : handleLengthMm;
+        const activeHandleWidth = capacityLabel ? 18 : handleWidthMm;
+        // Start the wider handle inside the cup's 1.5 mm wall, not inside the
+        // liquid cavity, then flare gradually out to the full grip width.
+        const x0 = ri + 0.1, xEnd = ro + liquidHandleLength, capRadius = activeHandleWidth / 2;
+        const rootHalfWidth = Math.min(capRadius, Math.sqrt(Math.max(0, ro ** 2 - x0 ** 2)));
         const capSteps = 24;
         const capsuleOutline = radius => {
             const capCenterX = xEnd - radius;
-            const points = [[x0, -radius], [capCenterX, -radius]];
+            const rootRadius = Math.min(rootHalfWidth, radius);
+            const flareEndX = x0 + 9;
+            const points = [[x0, -rootRadius]];
+            for (let step = 1; step <= 8; step++) {
+                const t = step / 8, u = 1 - t;
+                points.push([
+                    u ** 3 * x0 + 3 * u ** 2 * t * (x0 + 2) + 3 * u * t ** 2 * (x0 + 6) + t ** 3 * flareEndX,
+                    u ** 3 * -rootRadius + 3 * u ** 2 * t * -rootRadius + 3 * u * t ** 2 * -radius + t ** 3 * -radius
+                ]);
+            }
+            points.push([capCenterX, -radius]);
             for (let i = 1; i <= capSteps; i++) {
                 const angle = -Math.PI / 2 + i * Math.PI / capSteps;
                 points.push([capCenterX + radius * Math.cos(angle), radius * Math.sin(angle)]);
             }
-            points.push([x0, radius]);
+            points.push([flareEndX, radius]);
+            for (let step = 1; step <= 8; step++) {
+                const t = step / 8, u = 1 - t;
+                points.push([
+                    u ** 3 * flareEndX + 3 * u ** 2 * t * (x0 + 6) + 3 * u * t ** 2 * (x0 + 2) + t ** 3 * x0,
+                    u ** 3 * radius + 3 * u ** 2 * t * radius + 3 * u * t ** 2 * rootRadius + t ** 3 * rootRadius
+                ]);
+            }
             return points;
         };
         const outline = capsuleOutline(capRadius);
@@ -564,7 +770,64 @@
             add(bottom[i], bottom[next], mid[next]); add(bottom[i], mid[next], mid[i]);
             add(mid[i], mid[next], top[next]); add(mid[i], top[next], top[i]);
         }
+        if (capacityLabel) addHandleMarkings(triangles, capacityLabel, customLabel, x0 + 0.8, xEnd - 0.8);
         return triangles;
+    }
+
+    function updateLiquidScoop() {
+        const input = document.getElementById('liquidScoopMl');
+        const nameInput = document.getElementById('liquidScoopName');
+        const result = document.getElementById('liquidScoopResult');
+        const download = document.getElementById('liquidScoopDownload');
+        if (!input || !result || !download) return;
+        const capacityMl = Number(input.value);
+        const valid = Number.isFinite(capacityMl) && capacityMl >= 0.1 && capacityMl <= Number.MAX_SAFE_INTEGER / 1000;
+        input.setCustomValidity(valid ? '' : 'Bitte eine Füllmenge ab 0,1 ml eingeben.');
+        download.disabled = !valid;
+        if (!valid) {
+            result.innerHTML = '<p class="phyto-scoop-error">Bitte gib eine gültige Füllmenge von mindestens 0,1 ml ein.</p>';
+            return;
+        }
+
+        const calc = calculateLiquidScoop(capacityMl);
+        const label = `${fmt(capacityMl, 3)} ml`;
+        const customLabel = (nameInput?.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('de-DE').replace(/ß/g, 'ss').replace(/[^a-z0-9,. _-]/g, '').trim().slice(0, 24);
+        const visibleName = nameInput?.value.trim() || '';
+        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>Nennfüllmenge bis zum Ausgießer</span><strong>${fmt(capacityMl, 3)} ml</strong></div><div><span>Becherhöhe</span><strong>${fmt(calc.outerCupHeight, 1)} mm</strong></div></div><p class="phyto-scoop-detail">Innen-Ø ${fmt(calc.innerRadiusMm * 2, 1)} mm · Fülltiefe bis zur Lippe ${fmt(calc.fillDepthAtSpout, 1)} mm · Beschriftung „${label}“${visibleName ? ` · Name „${visibleName.replace(/[&<>"']/g, '')}“` : ''}</p>`;
+
+        const canvas = document.getElementById('liquidScoopCanvas');
+        const fallback = document.getElementById('liquidScoop3dFallback');
+        if (canvas && fallback) {
+            if (!liquidScoopViewer) liquidScoopViewer = createScoopViewer(canvas, document.getElementById('liquidScoopResetView'), fallback);
+            if (liquidScoopViewer) liquidScoopViewer.setModel(makeMesh(calc, label, customLabel));
+            else fallback.hidden = false;
+        }
+        download.onclick = () => downloadLiquidScoopStl(calc, label, customLabel);
+    }
+
+    function downloadLiquidScoopStl(calc, label, customLabel) {
+        const triangles = makeMesh(calc, label, customLabel);
+        const buffer = new ArrayBuffer(84 + triangles.length * 50);
+        const view = new DataView(buffer);
+        const header = `LiquidDose ${label}${customLabel ? ` | ${customLabel}` : ''} | cup ${fmt(calc.outerCupHeight, 2)} mm`;
+        for (let i = 0; i < 80; i++) view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
+        view.setUint32(80, triangles.length, true);
+        let offset = 84;
+        for (const [a, b, c] of triangles) {
+            const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+            const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+            let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            const length = Math.hypot(nx, ny, nz) || 1;
+            nx /= length; ny /= length; nz /= length;
+            [nx, ny, nz, ...a, ...b, ...c].forEach(value => { view.setFloat32(offset, value, true); offset += 4; });
+            view.setUint16(offset, 0, true); offset += 2;
+        }
+        const url = URL.createObjectURL(new Blob([buffer], { type: 'model/stl' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `liquiddose-messloeffel-${label.toLowerCase().replace(/\s+/g, '-')}${customLabel ? `-${customLabel.replace(/\s+/g, '-')}` : ''}.stl`;
+        document.body.append(anchor); anchor.click(); anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     function downloadStl(calc) {
@@ -622,6 +885,9 @@
         if (!input) return;
         input.addEventListener('input', update);
         document.getElementById('phytoHolderCount')?.addEventListener('input', updateHolder);
+        document.getElementById('liquidScoopMl')?.addEventListener('input', updateLiquidScoop);
+        document.getElementById('liquidScoopName')?.addEventListener('input', updateLiquidScoop);
         update();
+        updateLiquidScoop();
     });
 })();

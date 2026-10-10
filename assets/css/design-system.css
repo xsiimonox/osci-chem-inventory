@@ -870,3 +870,45 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
     #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group { grid-column: auto; }
     #tools .sangokai-calculator-panel .tool-grid > .input-group:last-child { grid-column: auto; }
 }
+
+#app #cr-export .cr-waterchange-calculator { overflow: hidden; margin: 0 0 var(--space-4); padding: 0; }
+#app #cr-export .cr-waterchange-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 64px;
+    padding: 14px 16px;
+    cursor: pointer;
+    list-style: none;
+}
+#app #cr-export .cr-waterchange-summary::-webkit-details-marker { display: none; }
+#app #cr-export .cr-waterchange-summary > span:first-child { display: grid; gap: 3px; min-width: 0; }
+#app #cr-export .cr-waterchange-summary strong { color: var(--text-primary); font-size: var(--font-section); }
+#app #cr-export .cr-waterchange-summary small { color: var(--text-secondary); font-size: var(--font-caption); line-height: 1.4; }
+#app #cr-export .cr-waterchange-summary-action { flex: 0 0 auto; color: var(--text-secondary); transition: transform 160ms ease; }
+#app #cr-export .cr-waterchange-calculator[open] .cr-waterchange-summary-action { transform: rotate(180deg); }
+#app #cr-export .cr-waterchange-calculator[open] > .cr-waterchange-summary { border-bottom: 1px solid var(--border-color); }
+#app #cr-export .cr-waterchange-body { padding: var(--space-4); }
+#app #cr-export .cr-waterchange-body > .hint { max-width: 76ch; margin: 0 0 var(--space-4); }
+#app #cr-export .cr-waterchange-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-4); }
+#app #cr-export .cr-waterchange-grid .input-group { min-width: 0; margin: 0; }
+#app #cr-export .cr-waterchange-grid .input-group > small { display: block; margin-top: var(--space-1); color: var(--text-secondary); font-size: var(--font-caption); }
+#app #cr-export .cr-waterchange-result { min-width: 0; margin-top: var(--space-4); }
+#app #cr-export .cr-waterchange-result-summary { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin-bottom: var(--space-2); }
+#app #cr-export .cr-waterchange-result-summary span { color: var(--text-secondary); font-size: var(--font-caption); }
+#app #cr-export .cr-waterchange-doses { display: grid; gap: var(--space-2); }
+#app #cr-export .cr-waterchange-dose { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-raised); }
+#app #cr-export .cr-waterchange-dose > span { display: grid; gap: var(--space-1); min-width: 0; }
+#app #cr-export .cr-waterchange-dose small { color: var(--text-secondary); overflow-wrap: anywhere; }
+#app #cr-export .cr-waterchange-dose > b { flex: 0 0 auto; color: var(--accent-strong); font-variant-numeric: tabular-nums; }
+#app #cr-export .cr-waterchange-dose.is-over-target > b { color: var(--status-warning); }
+#app #cr-export .cr-waterchange-body > .field-help { margin: var(--space-3) 0 0; }
+@media (max-width: 700px) {
+    #app #cr-export .cr-waterchange-summary { align-items: flex-start; }
+    #app #cr-export .cr-waterchange-body { padding: var(--space-3); }
+    #app #cr-export .cr-waterchange-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
+    #app #cr-export .cr-waterchange-result-summary { display: grid; }
+    #app #cr-export .cr-waterchange-dose { align-items: flex-start; }
+}
+@media (prefers-reduced-motion: reduce) { #app #cr-export .cr-waterchange-summary-action { transition: none; } }

@@ -40,6 +40,8 @@
 .phyto-scoop-input-wrap:focus-within { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .phyto-scoop-input-wrap input { flex:1; min-width:0; width:100%; padding:11px 0; border:0; outline:0; background:transparent; color:var(--text-primary); font:inherit; font-size:1.15rem; font-weight:750; }
 .phyto-scoop-volume-input .phyto-scoop-input-wrap input { margin:0; text-align:center; }
+.liquid-scoop-name-field { box-sizing:border-box; width:100%; min-height:48px; margin:0; padding:11px 14px; border:1px solid color-mix(in srgb, var(--accent) 27%, var(--border-color)); border-radius:var(--radius-md); outline:0; background:color-mix(in srgb, var(--surface-raised) 92%, #071a32); color:var(--text-primary); font:inherit; font-size:1rem; transition:border-color .18s ease,box-shadow .18s ease; }
+.liquid-scoop-name-field:focus { border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
 .phyto-scoop-input-wrap input:focus { box-shadow:none; }
 .phyto-scoop-input-wrap > span { padding-left:10px; color:var(--text-secondary); font-size:.88rem; font-weight:700; }
 .phyto-scoop-volume-input > small { color:var(--text-secondary); font-size:.72rem; }
