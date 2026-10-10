@@ -1,8 +1,7 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v3626-release';
+const CACHE_NAME = 'reef-storage-tools-cache-v3627-release';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './phytodose.html',
   './assets/css/style.css',
   './assets/css/workspace-ui.css',
   './assets/css/design-system.css',
@@ -19,7 +18,6 @@ const CORE_ASSETS = [
   './manifest.json',
   './version.json',
   './assets/img/icon.png',
-  './assets/img/phytodose-flyer-share.jpg',
   './assets/img/badman.svg',
   './anleitung.html',
   './privacy.html',

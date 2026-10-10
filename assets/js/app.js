@@ -19386,9 +19386,6 @@ function ensureToolLinkButton(card, toolId, toolTitle) {
 }
 
 function getToolShareUrl(toolId) {
-    if (toolId === 'phytocoral-loeffel-generator') {
-        return new URL('phytodose.html', window.location.href).href;
-    }
     const basePath = `${window.location.origin}${window.location.pathname}`;
     return `${basePath}${getToolRouteHash(toolId)}`;
 }
