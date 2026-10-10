@@ -804,71 +804,92 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
 #app .tab-content details.field-info > summary:focus-visible { border-color: var(--accent); color: var(--accent); }
 .field-info > p { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 8; width: min(280px, calc(100vw - 56px)); margin: 0; padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); color: var(--text-primary); box-shadow: var(--shadow-raised, 0 8px 24px rgb(0 0 0 / 28%)); font-size: var(--font-caption); font-weight: 400; line-height: 1.5; }
 .sangokai-dilution-panel { margin-top: var(--space-4); }
-.sangokai-dose-tracker { margin-top: var(--space-4); }
-#tools .tool-grid.sangokai-dose-primary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: end; }
-#tools .sangokai-dose-primary-grid > .input-group:nth-child(-n+3) { grid-column: span 2; }
-#tools .sangokai-dose-primary-grid > .input-group:nth-child(n+4) { grid-column: span 3; }
-#tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group:last-child { grid-column: span 3; }
+#tools .tool-tile-card { scroll-margin-top: calc(var(--measured-header-height, var(--header-height)) + 12px); }
+#app #tools .tool-card-grid > .dose-tracker-card:not(.tool-tile-collapsed) { grid-column: 1 / -1; width: 100%; max-width: none; }
+.dose-tracker-card { container: dosing / inline-size; }
+.dose-tracker-panel { min-width: 0; }
+#tools .dose-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: var(--space-3); }
+#tools .dose-primary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#tools .dose-fields > .input-group { grid-column: auto; min-width: 0; margin-bottom: 0; }
+#app #tools .dose-tracker-panel .input-group :is(input,select) { width: 100%; min-width: 0; height: 44px; min-height: 44px; margin: 0; }
+#app #tools .dose-tracker-panel .tool-result { max-width: none; }
+#app #tools .dose-tracker-card > h3 { flex-wrap: wrap; }
+#app #tools .dose-tracker-card > h3 .tool-tile-toggle { justify-content: flex-start; }
+.dose-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+.dose-actions button { flex: 0 1 auto; min-height: 44px; }
+.dose-solution-context { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); margin-block: var(--space-3); }
+.dose-solution-context .field-help { flex: 1 1 240px; margin: 0; }
+.dose-solution-context button { min-height: 40px; }
+.dose-product-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.app-dialog.is-dose-product .app-dialog-panel { width: min(100%, 640px); max-width: 640px; }
+.app-dialog-fields.has-dose-product-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; gap: var(--space-3); }
+.has-dose-product-fields > .form-field { min-width: 0; }
+.has-dose-product-fields > .dose-product-full, .dose-product-preview { grid-column: 1 / -1; }
+#appDialog .has-dose-product-fields :is(input, select) { height: 44px; min-height: 44px; margin: 0; font-size: var(--font-body); }
+.has-dose-product-fields .field-description { overflow-wrap: anywhere; }
+.dose-product-preview { margin: var(--space-2) 0 0; padding-block: var(--space-3); border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: var(--font-small); line-height: 1.5; overflow-wrap: anywhere; }
+.dose-product-preview.is-valid { color: var(--accent); }
+.dose-balling-batch { margin-top: var(--space-3); padding-block: var(--space-3); border-block: 1px solid var(--border-color); }
+.dose-balling-batch > strong { display: block; margin-bottom: var(--space-3); }
+.dose-calculation-warning { color: var(--status-warning); }
 .sangokai-calculator-panel .tool-result { max-width: none; }
 .tool-compact-card[data-tool-id="sangokai-mengen-und-mischen"] .sangokai-submenu { margin-top: var(--space-3); }
-.sangokai-dose-options { margin-top: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
-.sangokai-dose-options > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3); cursor: pointer; list-style: none; }
-.sangokai-dose-options > summary::-webkit-details-marker { display: none; }
-.sangokai-dose-options > summary > span:first-child { display: grid; gap: var(--space-1); min-width: 0; }
-.sangokai-dose-options > summary strong { font-size: var(--font-body); font-weight: 600; }
-.sangokai-dose-options > summary small { color: var(--text-secondary); font-size: var(--font-small); line-height: 1.4; overflow-wrap: anywhere; }
-.sangokai-dose-options .tool-grid { padding: 0 var(--space-3); }
-.sangokai-dose-options > .field-help { margin: 0; padding: 0 var(--space-3) var(--space-3); }
-.sangokai-dose-options[open] > summary { border-bottom: 1px solid var(--border-color); }
-.sangokai-dose-history { margin-top: var(--space-4); }
-.sangokai-dose-history h5 { margin: 0 0 var(--space-2); }
-.sangokai-dose-history-list { display: grid; }
-.sangokai-dose-trend { min-width: 0; margin: var(--space-4) 0; padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
-.sangokai-dose-trend-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
-.sangokai-dose-trend-head span, .sangokai-dose-trend .field-help { color: var(--text-secondary); font-size: var(--font-caption); }
-.sangokai-dose-trend svg { display: block; width: 100%; height: auto; margin-top: var(--space-2); overflow: visible; }
-.sangokai-dose-grid { stroke: var(--border-color); stroke-width: 1; stroke-dasharray: 3 5; }
-.sangokai-dose-axis-label, .sangokai-dose-target-label { fill: var(--text-secondary); font-size: 12px; }
-.sangokai-dose-target-line { stroke: var(--warning); stroke-width: 2; stroke-dasharray: 6 5; }
-.sangokai-dose-trend-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: sangokai-dose-draw 700ms ease-out forwards; }
-.sangokai-dose-trend-point { fill: var(--accent); stroke: var(--surface-card); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: sangokai-dose-point-in 360ms ease-out both; }
-.sangokai-dose-trend-point:nth-of-type(2) { animation-delay: 50ms; }
-.sangokai-dose-trend .field-help { margin: 0; }
-@keyframes sangokai-dose-draw { to { stroke-dashoffset: 0; } }
-@keyframes sangokai-dose-point-in { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .sangokai-dose-trend-line, .sangokai-dose-trend-point { animation: none; stroke-dashoffset: 0; } }
-.sangokai-dose-history-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--border-color); }
-.sangokai-dose-history-row > span { display: grid; gap: var(--space-1); min-width: 0; }
-.sangokai-dose-history-row small { color: var(--text-secondary); overflow-wrap: anywhere; }
-.sangokai-dose-history-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); flex: 0 0 auto; }
-.sangokai-dose-history-actions button { min-width: 96px; }
+.dose-options { margin-top: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+.dose-options > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3); cursor: pointer; list-style: none; }
+.dose-options > summary::-webkit-details-marker { display: none; }
+.dose-options > summary > span:first-child { display: grid; gap: var(--space-1); min-width: 0; }
+.dose-options > summary strong { font-size: var(--font-body); font-weight: 600; }
+.dose-options > summary small { color: var(--text-secondary); font-size: var(--font-small); line-height: 1.4; overflow-wrap: anywhere; }
+.dose-options .dose-fields { padding: 0 var(--space-3); }
+.dose-options > .field-help { margin: 0; padding: 0 var(--space-3) var(--space-3); }
+.dose-options[open] > summary { border-bottom: 1px solid var(--border-color); }
+.dose-history { margin-top: var(--space-4); }
+.dose-history h5 { margin: 0 0 var(--space-2); }
+.dose-history-list { display: grid; }
+.dose-trend { min-width: 0; margin: var(--space-4) 0; padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+.dose-trend-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.dose-trend-head span, .dose-trend .field-help { color: var(--text-secondary); font-size: var(--font-caption); }
+.dose-trend svg { display: block; width: 100%; height: auto; margin-top: var(--space-2); overflow: visible; }
+.dose-grid { stroke: var(--border-color); stroke-width: 1; stroke-dasharray: 3 5; }
+.dose-axis-label, .dose-target-label { fill: var(--text-secondary); font-size: 12px; }
+.dose-target-line { stroke: var(--warning); stroke-width: 2; stroke-dasharray: 6 5; }
+.dose-trend-line { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; animation: dose-draw 700ms ease-out forwards; }
+.dose-trend-point { fill: var(--accent); stroke: var(--surface-card); stroke-width: 2; transform-box: fill-box; transform-origin: center; animation: dose-point-in 360ms ease-out both; }
+.dose-trend-point:nth-of-type(2) { animation-delay: 50ms; }
+.dose-trend .field-help { margin: 0; }
+@keyframes dose-draw { to { stroke-dashoffset: 0; } }
+@keyframes dose-point-in { from { opacity: 0; transform: scale(.65); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dose-trend-line, .dose-trend-point { animation: none; stroke-dashoffset: 0; } }
+.dose-history-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3) 0; border-top: 1px solid var(--border-color); }
+.dose-history-row > span { display: grid; gap: var(--space-1); min-width: 0; }
+.dose-history-row small { color: var(--text-secondary); overflow-wrap: anywhere; }
+.dose-history-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); flex: 0 0 auto; }
+.dose-history-actions button { min-width: 96px; }
 .sangokai-calculation-note { margin-top: var(--space-4); }
-@media (max-width: 480px) { .sangokai-dose-axis-label, .sangokai-dose-target-label { font-size: 30px; } }
+@media (max-width: 480px) { .dose-axis-label, .dose-target-label { font-size: 30px; } }
 .sangokai-calculation-note span { display: block; }
 .resource-inline-link { display: inline-block; margin: 0 var(--space-3) var(--space-1) 0; color: var(--accent-strong); }
-.major-correction-custom-preset { margin-block: var(--space-4); padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-raised); }
-.major-correction-custom-preset summary { cursor: pointer; font-weight: 600; }
-.major-correction-custom-preset .field-help { margin-block: var(--space-2) var(--space-3); }
-.major-correction-custom-preset > button { width: 100%; margin-top: var(--space-3); }
+@media (max-width: 480px) { .app-dialog-fields.has-dose-product-fields { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 767px) { #appDialog .has-dose-product-fields :is(input, select) { font-size: 16px; } }
 @media (max-width: 700px) {
     .sangokai-balance-calculators { grid-template-columns: minmax(0, 1fr); }
     .supply-profile-fieldset { padding: var(--space-3); }
-    .major-correction-custom-preset { padding: var(--space-3); }
-    .sangokai-dose-history-row { align-items: stretch; flex-direction: column; gap: var(--space-2); }
-    .sangokai-dose-history-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .sangokai-dose-history-actions button { min-width: 0; width: 100%; }
+    .dose-history-row { align-items: stretch; flex-direction: column; gap: var(--space-2); }
+    .dose-history-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dose-history-actions button { min-width: 0; width: 100%; }
 }
 @container sangokai (max-width: 900px) {
     .sangokai-balance-calculators { grid-template-columns: minmax(0, 1fr); }
-    #tools .tool-grid.sangokai-dose-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group { grid-column: span 1; }
-    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group:last-child { grid-column: 1 / -1; }
 }
 @container sangokai (max-width: 520px) {
-    #tools .tool-grid.sangokai-dose-primary-grid,
     #tools .sangokai-calculator-panel .tool-grid { grid-template-columns: minmax(0, 1fr); }
-    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group { grid-column: auto; }
     #tools .sangokai-calculator-panel .tool-grid > .input-group:last-child { grid-column: auto; }
+}
+@container dosing (max-width: 700px) { #tools .dose-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container dosing (max-width: 480px) {
+    #tools .dose-fields, #tools .dose-primary-grid { grid-template-columns: minmax(0, 1fr); }
+    #app #tools .dose-tracker-card:not(.tool-tile-collapsed) > h3 .tool-tile-toggle { flex-basis: 100%; }
+    .dose-actions button { width: 100%; }
 }
 
 #app #cr-export .cr-waterchange-calculator { overflow: hidden; margin: 0 0 var(--space-4); padding: 0; }

@@ -25,7 +25,7 @@
     <link rel="apple-touch-icon" href="assets/img/icon.png">
     <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
-    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release&amp;ui=launcher-v1">
+    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release&amp;ui=launcher-v1&amp;calc=dosing-products-v2">
     <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.38-release">
 </head>
 <body>
@@ -585,6 +585,43 @@
                             </div>
                             <div id="traceDirectElementsCalculator"></div>
                         </div>
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed dose-tracker-card" data-tool-id="kh-ca-messverlauf-tagesdosis">
+                            <h3 id="doseTrackerTitle">KH / Ca: Messverlauf &amp; Tagesdosis <button type="button" class="tool-inline-fav" data-tool-id="kh-ca-messverlauf-tagesdosis">☆ Fav</button></h3>
+                            <section class="dose-tracker-panel" aria-labelledby="doseTrackerTitle">
+                                <p class="hint" id="doseAquariumContext"></p>
+                                <div class="dose-fields dose-primary-grid">
+                                    <div class="input-group"><div class="field-label-row"><label for="doseElement">Wert</label><details class="field-info"><summary aria-label="Info zur Messreihe" title="Info zur Messreihe">i</summary><p>KH und Calcium werden getrennt erfasst und ausgewertet.</p></details></div><select id="doseElement" onchange="changeDoseProduct(this.value)"><option value="kh">KH (°dKH)</option><option value="ca">Calcium (mg/L)</option></select></div>
+                                    <div class="input-group"><div class="field-label-row"><label for="doseSolution">Verwendete Lösung</label><details class="field-info"><summary aria-label="Info zur Lösung" title="Info zur Lösung">i</summary><p>Die Produktwirkung gilt für die fertig angesetzte Lösung nach dem jeweiligen Rezept, nicht für Pulver oder Konzentrat. Bei einem Wechsel innerhalb des Messzeitraums ist kein eindeutiger Verbrauch berechenbar.</p></details></div><select id="doseSolution" onchange="updateDoseTracker(true)"></select></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="doseValueLabel" for="doseValue">Gemessene KH (°dKH)</label><details class="field-info"><summary aria-label="Info zum Messwert" title="Info zum Messwert">i</summary><p>Trage hier den aktuell gemessenen Wert ein. Für einen Verbrauchsvergleich werden mindestens zwei Messungen benötigt.</p></details></div><input type="number" id="doseValue" min="0" step="any" inputmode="decimal" oninput="updateDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="doseIntervalLabel" for="doseIntervalMl">Tagesdosis im Messzeitraum (ml/Tag)</label><details class="field-info"><summary aria-label="Info zur Tagesdosis" title="Info zur Tagesdosis">i</summary><p>Durchschnittliche tägliche Menge, die seit der vorherigen Messung tatsächlich dosiert wurde. So wird die Zufuhr beim Verbrauchsvergleich berücksichtigt.</p></details></div><input type="number" id="doseIntervalMl" min="0" step="any" inputmode="decimal" oninput="updateDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="doseTargetLabel" for="doseTarget">Dein KH-Sollwert (°dKH)</label><details class="field-info"><summary aria-label="Info zum Sollwert" title="Info zum Sollwert">i</summary><p>Dein selbst gewählter Zielwert. Er wird für die Berechnung gespeichert; ReefTools gibt keine Empfehlung für einen passenden Wert.</p></details></div><input type="number" id="doseTarget" min="0" step="any" inputmode="decimal" oninput="updateDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label for="doseMode">Berechnung</label><details class="field-info"><summary aria-label="Info zur Berechnung" title="Info zur Berechnung">i</summary><p>Schrittweise angleichen passt die laufende Tagesdosis rechnerisch an. Sofortausgleich berechnet zusätzlich die Einmalmenge bis zum Sollwert.</p></details></div><select id="doseMode" onchange="updateDoseTracker(true)"><option value="gradual">Dosis schrittweise angleichen</option><option value="immediate-stabilize">Sofortausgleich + stabilisieren</option></select></div>
+                                </div>
+                                <div id="doseBallingBatchFields" class="dose-balling-batch" hidden>
+                                    <strong id="doseBallingBatchLabel"></strong>
+                                    <div class="dose-fields">
+                                        <div class="input-group"><div class="field-label-row"><label for="doseFinalVolumeMl">Fertiges Lösungsvolumen (ml)</label><details class="field-info"><summary aria-label="Info zum Lösungsvolumen" title="Info zum Lösungsvolumen">i</summary><p>Das tatsächliche Volumen nach vollständigem Auflösen eintragen. 5 Liter Osmosewasser plus Pulver ergeben nicht exakt 5000 ml fertige Lösung. Die Rechnung setzt reines Salz voraus.</p></details></div><input id="doseFinalVolumeMl" type="number" min="1" step="any" inputmode="decimal" oninput="updateDoseTracker(true)"></div>
+                                        <div class="input-group" id="doseCalciumSaltField" hidden><label for="doseCalciumSalt">Calciumchlorid-Form</label><select id="doseCalciumSalt" onchange="updateDoseTracker(true)"><option value="">Bitte bestätigen</option><option value="dihydrate">Calciumchlorid-Dihydrat</option><option value="anhydrous">Calciumchlorid, wasserfrei</option></select></div>
+                                    </div>
+                                </div>
+                                <div class="dose-solution-context"><p id="doseSolutionInfo" class="field-help"></p><div class="dose-product-actions"><button id="doseAddProductButton" type="button" class="btn-secondary" onclick="openDosePresetBuilder(event)"><span aria-hidden="true">+</span> Eigenes Produkt</button><button id="doseEditProductButton" type="button" class="btn-secondary" onclick="openDosePresetBuilder(event, true)" hidden>Produkt bearbeiten</button></div></div>
+                                <details class="dose-options">
+                                    <summary><span><strong>Weitere Einstellungen</strong><small id="doseOptionsSummary">Messzeitpunkt · Annäherung 10 Tage · Dosislimit ±10 %</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
+                                    <div class="dose-fields">
+                                        <div class="input-group"><div class="field-label-row"><label for="doseDate">Messdatum und Uhrzeit</label><details class="field-info"><summary aria-label="Info zum Messzeitpunkt" title="Info zum Messzeitpunkt">i</summary><p>Wird automatisch auf jetzt gesetzt. Ändere den Zeitpunkt, wenn du eine frühere Messung nachträgst.</p></details></div><input type="datetime-local" id="doseDate" oninput="updateDoseTracker(true)"></div>
+                                        <div class="input-group"><div class="field-label-row"><label for="doseTargetDays">Annäherungszeitraum (Tage)</label><details class="field-info"><summary aria-label="Info zum Annäherungszeitraum" title="Info zum Annäherungszeitraum">i</summary><p>Systemvorgabe sind 10 Tage. Der Wert bestimmt nur den Rechenzeitraum für die schrittweise Annäherung.</p></details></div><input type="number" id="doseTargetDays" min="1" step="1" inputmode="numeric" oninput="updateDoseTracker(true)"></div>
+                                        <div class="input-group"><div class="field-label-row"><label for="doseMaxChange">Maximale Dosisänderung je Schritt (%)</label><details class="field-info"><summary aria-label="Info zum Dosislimit" title="Info zum Dosislimit">i</summary><p>Systemvorgabe sind 10 %. Das begrenzt die rechnerische Änderung zwischen den erfassten Tagesdosen.</p></details></div><input type="number" id="doseMaxChange" min="0" max="100" step="1" inputmode="numeric" oninput="updateDoseTracker(true)"></div>
+                                        <div class="input-group"><div class="field-label-row"><label for="doseCorrectionMl">Einmalzugaben im Messzeitraum (ml)</label><details class="field-info"><summary aria-label="Info zu Einmalzugaben" title="Info zu Einmalzugaben">i</summary><p>Zusätzlich zur Tagesdosis tatsächlich zugegebene Menge derselben Lösung seit der vorherigen Messung, etwa ein Sofortausgleich. Ohne diese Angabe würde der Verbrauch zu niedrig berechnet.</p></details></div><input type="number" id="doseCorrectionMl" min="0" step="any" value="0" inputmode="decimal" oninput="updateDoseTracker(true)"></div>
+                                    </div>
+                                    <p class="field-help">Vorgabe: 10 Tage und höchstens 10 % Änderung je Berechnungsschritt. Du kannst beides hier anpassen. Das begrenzt nur den Rechenwert und ist keine Dosierempfehlung.</p>
+                                </details>
+                                <input type="hidden" id="doseEditingId">
+                                <div class="dose-actions"><button type="button" class="btn-primary btn-animated" id="doseSaveButton" onclick="saveDoseMeasurement()">Messung speichern</button><button type="button" class="btn-secondary btn-animated" id="doseCancelEditButton" onclick="cancelDoseMeasurementEdit()" hidden>Bearbeitung abbrechen</button></div>
+                                <div id="doseTrackerResult" class="tool-result" aria-live="polite"></div>
+                                <div id="doseTrackerHistory" class="dose-history"></div>
+                                <p class="field-help">Rechenwerte aus deinen Eingaben, keine Dosierempfehlung. Wasserwechsel und andere nicht erfasste Einflüsse können den Verbrauch verfälschen. KH und Ca werden unabhängig gerechnet; andere Bestandteile der Versorgung werden nicht bewertet.</p>
+                            </section>
+                        </div>
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>KH / Ca Korrektur <button type="button" class="tool-inline-fav" data-tool-id="kh-ca-korrektur">☆ Fav</button></h3>
                             <p class="hint">Aktuellen Wert, Zielwert und Produktwirkung eintragen. So bleibt der Rechner mit jedem Produkt nutzbar.</p>
@@ -614,21 +651,10 @@
                                     <input type="number" id="majorCorrectionDays" min="1" step="1" value="3" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                             </div>
-                            <details class="tool-subsection major-correction-custom-preset">
-                                <summary>Eigenes KH- / Calcium-Preset anlegen</summary>
-                                <p class="field-help">Trage die Produktwirkung laut Herstellerangabe oder eigener Messung ein. Die Referenzmenge bezieht sich auf das Referenzvolumen.</p>
-                                <div class="tool-grid">
-                                    <div class="input-group"><label for="majorCorrectionCustomName">Preset-Name</label><input id="majorCorrectionCustomName" type="text" maxlength="60" placeholder="z. B. Mein KH-Produkt"></div>
-                                    <div class="input-group"><label for="majorCorrectionCustomElement">Parameter</label><select id="majorCorrectionCustomElement" onchange="updateMajorCorrectionPresetBuilder()"><option value="KH">KH (dKH)</option><option value="Ca">Calcium (mg/l)</option></select></div>
-                                    <div class="input-group"><label for="majorCorrectionCustomReferenceMl">Referenzmenge (ml)</label><input id="majorCorrectionCustomReferenceMl" type="number" min="0.001" step="0.1" value="10"></div>
-                                    <div class="input-group"><label for="majorCorrectionCustomReferenceLiters">Referenzvolumen (L)</label><input id="majorCorrectionCustomReferenceLiters" type="number" min="1" step="1" value="100"></div>
-                                    <div class="input-group"><label id="majorCorrectionCustomIncreaseLabel" for="majorCorrectionCustomIncrease">Erhöhung (dKH)</label><input id="majorCorrectionCustomIncrease" type="number" min="0.0001" step="0.01" value="0.5"></div>
-                                </div>
-                                <button type="button" class="btn-secondary btn-animated" onclick="saveMajorCorrectionPreset()">Eigenes Preset speichern</button>
-                            </details>
                             <div class="btn-group calculator-actions">
+                                <button type="button" class="btn-secondary" onclick="openCustomDoseProductBuilder(event, {source: 'correction'})"><span aria-hidden="true">+</span> Eigenes Produkt</button>
+                                <button type="button" id="majorCorrectionEditProductButton" class="btn-secondary" onclick="openCustomDoseProductBuilder(event, {source: 'correction', presetId: document.getElementById('majorCorrectionPreset').value})" disabled>Produkt bearbeiten</button>
                                 <button class="btn-secondary btn-animated" onclick="saveMajorCorrectionDefaults()">Auswahl speichern</button>
-                                <button class="btn-out btn-animated" onclick="openToolFavorite('tagesdosierung-wirkung')">Presets bearbeiten</button>
                             </div>
                             <div id="majorCorrectionResult"></div>
                         </div>
@@ -762,6 +788,7 @@
                                 </div>
                             </div>
                             <div class="btn-group calculator-actions">
+                                <button type="button" class="btn-secondary" onclick="openCustomDoseProductBuilder(event, {source: 'impact'})"><span aria-hidden="true">+</span> Eigenes Produkt</button>
                                 <button class="btn-secondary btn-animated" onclick="saveDoseImpactPreset()">Preset speichern</button>
                                 <button class="btn-out btn-animated" onclick="resetDoseImpactPresets()">Eigene Presets zurücksetzen</button>
                             </div>
@@ -1357,35 +1384,6 @@
                                 </div>
                                 <div id="sangokaiDilutionResult" class="tool-result" aria-live="polite"></div>
                                 <a href="https://sangokai.org/?page_id=5802" target="_blank" rel="noopener noreferrer" class="resource-inline-link">Offizielle BALANCE-Anleitung</a>
-                            </section>
-                                </div>
-                            </details>
-                            <details class="sangokai-submenu" data-sangokai-submenu="dose-history">
-                                <summary><span><strong>BALANCE Messverlauf &amp; Tagesdosis</strong><small>Messwert erfassen, Tagesdosis berechnen und Verlauf speichern</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
-                                <div class="sangokai-submenu-content">
-                            <section class="sangokai-calculator-panel sangokai-dose-tracker" aria-labelledby="sangokaiDoseTrackerTitle">
-                                <h4 id="sangokaiDoseTrackerTitle">BALANCE Messverlauf &amp; Tagesdosis</h4>
-                                <p class="hint">Einfach den Messwert und die durchschnittliche Tagesdosis seit der letzten Messung eintragen. Datum und Rechenparameter sind bereits vorbelegt. Ab zwei Messungen berechnet ReefTools den Verlauf.</p>
-                                <div class="tool-grid sangokai-dose-primary-grid">
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseElement">Wert</label><details class="field-info"><summary aria-label="Info zur Messreihe" title="Info zur Messreihe">i</summary><p>KH und Calcium werden getrennt erfasst und ausgewertet.</p></details></div><select id="sangokaiDoseElement" onchange="changeSangokaiDoseProduct(this.value)"><option value="kh">KH (°dKH)</option><option value="ca">Calcium (mg/L)</option></select></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseValueLabel" for="sangokaiDoseValue">Gemessene KH (°dKH)</label><details class="field-info"><summary aria-label="Info zum Messwert" title="Info zum Messwert">i</summary><p>Trage hier den aktuell gemessenen Wert ein. Für einen Verbrauchsvergleich werden mindestens zwei Messungen benötigt.</p></details></div><input type="number" id="sangokaiDoseValue" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseIntervalLabel" for="sangokaiDoseIntervalMl">Tagesdosis im Messzeitraum (ml/Tag)</label><details class="field-info"><summary aria-label="Info zur Tagesdosis" title="Info zur Tagesdosis">i</summary><p>Durchschnittliche tägliche Menge, die seit der vorherigen Messung tatsächlich dosiert wurde. So wird die Zufuhr beim Verbrauchsvergleich berücksichtigt.</p></details></div><input type="number" id="sangokaiDoseIntervalMl" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseTargetLabel" for="sangokaiDoseTarget">Dein KH-Sollwert (°dKH)</label><details class="field-info"><summary aria-label="Info zum Sollwert" title="Info zum Sollwert">i</summary><p>Dein selbst gewählter Zielwert. Er wird für die Berechnung gespeichert; ReefTools gibt keine Empfehlung für einen passenden Wert.</p></details></div><input type="number" id="sangokaiDoseTarget" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMode">Berechnung</label><details class="field-info"><summary aria-label="Info zur Berechnung" title="Info zur Berechnung">i</summary><p>Schrittweise angleichen passt die laufende Tagesdosis rechnerisch an. Sofortausgleich berechnet zusätzlich die Einmalmenge bis zum Sollwert.</p></details></div><select id="sangokaiDoseMode" onchange="updateSangokaiDoseTracker(true)"><option value="gradual">Dosis schrittweise angleichen</option><option value="immediate-stabilize">Sofortausgleich + stabilisieren</option></select></div>
-                                </div>
-                                <details class="sangokai-dose-options">
-                                    <summary><span><strong>Weitere Einstellungen</strong><small id="sangokaiDoseOptionsSummary">Messzeitpunkt · Annäherung 10 Tage · Dosislimit ±10 %</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
-                                    <div class="tool-grid">
-                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseDate">Messdatum und Uhrzeit</label><details class="field-info"><summary aria-label="Info zum Messzeitpunkt" title="Info zum Messzeitpunkt">i</summary><p>Wird automatisch auf jetzt gesetzt. Ändere den Zeitpunkt, wenn du eine frühere Messung nachträgst.</p></details></div><input type="datetime-local" id="sangokaiDoseDate" oninput="updateSangokaiDoseTracker(true)"></div>
-                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseTargetDays">Annäherungszeitraum (Tage)</label><details class="field-info"><summary aria-label="Info zum Annäherungszeitraum" title="Info zum Annäherungszeitraum">i</summary><p>Systemvorgabe sind 10 Tage. Der Wert bestimmt nur den Rechenzeitraum für die schrittweise Annäherung.</p></details></div><input type="number" id="sangokaiDoseTargetDays" min="1" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
-                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMaxChange">Maximale Dosisänderung je Schritt (%)</label><details class="field-info"><summary aria-label="Info zum Dosislimit" title="Info zum Dosislimit">i</summary><p>Systemvorgabe sind 10 %. Das begrenzt die rechnerische Änderung zwischen den erfassten Tagesdosen.</p></details></div><input type="number" id="sangokaiDoseMaxChange" min="0" max="100" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    </div>
-                                    <p class="field-help">Vorgabe: 10 Tage und höchstens 10 % Änderung je Berechnungsschritt. Du kannst beides hier anpassen. Das begrenzt nur den Rechenwert und ist keine Dosierempfehlung.</p>
-                                </details>
-                                <input type="hidden" id="sangokaiDoseEditingId">
-                                <div class="btn-group calculator-actions"><button type="button" class="btn-primary btn-animated" id="sangokaiDoseSaveButton" onclick="saveSangokaiDoseMeasurement()">Messung speichern</button><button type="button" class="btn-secondary btn-animated" id="sangokaiDoseCancelEditButton" onclick="cancelSangokaiDoseMeasurementEdit()" hidden>Bearbeitung abbrechen</button></div>
-                                <div id="sangokaiDoseTrackerResult" class="tool-result" aria-live="polite"></div>
-                                <div id="sangokaiDoseTrackerHistory" class="sangokai-dose-history"></div>
                             </section>
                                 </div>
                             </details>
@@ -2963,8 +2961,9 @@
 
     <script src="assets/js/lighting-sim.js?v=3.6.17-release"></script>
     <script src="assets/js/sangokai-product-catalog.js?v=3.6.17-release"></script>
-    <script src="assets/js/sangokai-calculations.js?v=3.6.17-release"></script>
-    <script src="assets/js/app.js?v=3.6.19-release&amp;ui=launcher-v1"></script>
+    <script src="assets/js/dosing-calculations.js?v=dosing-products-v2"></script>
+    <script src="assets/js/sangokai-calculations.js?v=3.6.17-release&amp;calc=dosing-products-v2"></script>
+    <script src="assets/js/app.js?v=3.6.19-release&amp;ui=launcher-v1&amp;calc=dosing-products-v2"></script>
     <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
     <script src="assets/js/phyto-scoop.js?v=3.6.38-release"></script>
     <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>

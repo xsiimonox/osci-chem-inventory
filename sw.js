@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v3644-launcher-v1';
+const CACHE_NAME = 'reef-storage-tools-cache-v3644-launcher-dosing-products-v2';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -13,6 +13,7 @@ const CORE_ASSETS = [
   './assets/js/workspace-ui.js',
   './assets/js/theme.js',
   './assets/js/lighting-sim.js',
+  './assets/js/dosing-calculations.js',
   './assets/js/sangokai-calculations.js',
   './assets/js/sangokai-product-catalog.js',
   './manifest.json',

@@ -1391,6 +1391,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'fauna-marin-traces': 'fauna marin balling trace 1 2 3 strontium sr molybdaen mo jod iod kanister restwert icp dosierung',
     'barium-lithium-und-molybdaen-direkt-ausgleichen': 'trace einzelkorrektur barium ba lithium li molybdaen molybdän mo icp zielwert direkt ausgleichen dosieren',
     'kh-ca-korrektur': 'wasserwert wasserwerte alkalinität karbonathärte calcium ca zielwert anheben ausgleichen dosieren korrektur',
+    'kh-ca-messverlauf-tagesdosis': 'kh ca calcium messverlauf tagesdosis dosierhistorie verbrauch trend balling hans werner fauna osci sangokai stabilisieren',
     'balling-pulver-rechner': 'balling faunamarin fauna marin pulver natriumhydrogencarbonat natriumcarbonat calciumchlorid dihydrat magnesiumchlorid hexahydrat magnesiumsulfat heptahydrat kh ca mg salzlösung ansetzen dosieren',
     'verbrauch-pro-tag': 'wasserwert wasserwerte tagesverbrauch verbrauch differenz verlust fall messwerte kh ca mg no3 po4',
     'tagesdosierung-wirkung': 'wasserwert wasserwerte dosierpumpe dosierung täglich tagesdosis konzentration produktwirkung kh calcium ca',
@@ -1413,6 +1414,7 @@ const TOOL_SEARCH_KEYWORDS = {
 const TOOL_DEFINITIONS = [
     { id: 'barium-lithium-und-molybdaen-direkt-ausgleichen', label: 'Barium, Lithium & Molybdän direkt ausgleichen', sectionId: 'dosieren-und-messwerte' },
     { id: 'kh-ca-korrektur', label: 'KH / Ca Korrektur', sectionId: 'dosieren-und-messwerte' },
+    { id: 'kh-ca-messverlauf-tagesdosis', label: 'KH / Ca: Messverlauf & Tagesdosis', sectionId: 'dosieren-und-messwerte' },
     { id: 'balling-pulver-rechner', label: 'Balling & Pulver', sectionId: 'dosieren-und-messwerte' },
     { id: 'verbrauch-pro-tag', label: 'Verbrauch pro Tag', sectionId: 'dosieren-und-messwerte' },
     { id: 'tagesdosierung-wirkung', label: 'Tagesdosierung Wirkung', sectionId: 'dosieren-und-messwerte' },
@@ -8747,6 +8749,9 @@ function switchAquarium(id) {
     renderCurrentWarehouseViews();
     document.dispatchEvent(new Event('reeftools-context-change'));
     initSangokaiQuantityTools();
+    initDoseImpactCalculator();
+    initMajorCorrectionCalculator();
+    initDoseTracker();
 }
 
 async function createAquarium() {
@@ -8806,6 +8811,7 @@ async function editAquariumVolume() {
     renderCurrentWarehouseViews();
     syncAquariumVolumeInputs(volume);
     initSangokaiQuantityTools();
+    initDoseTracker();
     showToast(`Aquariumgröße auf ${volume} L gesetzt`, 'success');
 }
 
@@ -13136,6 +13142,7 @@ function updateSupplyProfileSelection(group, id, enabled) {
     refreshFeatureVisibility();
     refreshMacroRecipeOptions();
     renderSupplyProfileSettings();
+    initDoseTracker();
 }
 
 function getSangokaiCalculatorState() {
@@ -13168,10 +13175,9 @@ function initSangokaiQuantityTools() {
     if (product) product.value = dilution.product || (dilution.concentrateFactor ? 'ca-1' : 'kh');
     if (volume) volume.value = dilution.packages ?? dilution.finalVolumeMl ?? '1';
     updateSangokaiDilutionCalculation(false);
-    initSangokaiDoseTracker();
 }
 
-function formatSangokaiAmount(value, decimals = 2) {
+function formatCalculatorAmount(value, decimals = 2) {
     return Number(value).toLocaleString('de-DE', { minimumFractionDigits: 0, maximumFractionDigits: decimals });
 }
 
@@ -13181,77 +13187,138 @@ function changeSangokaiDilutionProduct(product) {
     updateSangokaiDilutionCalculation();
 }
 
-function getSangokaiDoseTrackerState() {
-    const state = getSangokaiCalculatorState();
-    if (!state.doseTracker || typeof state.doseTracker !== 'object') state.doseTracker = {};
-    if (!state.doseTracker.form || typeof state.doseTracker.form !== 'object') state.doseTracker.form = {};
-    if (!state.doseTracker.forms || typeof state.doseTracker.forms !== 'object') state.doseTracker.forms = {};
-    if (!state.doseTracker.defaults || typeof state.doseTracker.defaults !== 'object') state.doseTracker.defaults = {};
-    if (state.doseTracker.form.product && !state.doseTracker.forms[state.doseTracker.form.product]) {
-        state.doseTracker.forms[state.doseTracker.form.product] = state.doseTracker.form;
+function getDoseTrackerPresets(product) {
+    const profile = db.supplyProfile || getActiveSupplyProfile();
+    const element = product === 'kh' ? 'KH' : 'Ca';
+    const providers = { osci: 'osci', fauna: 'fauna-marin', sangokai: 'sangokai' };
+    const presets = getDoseImpactPresets().filter(preset => preset.element === element && (!preset.locked
+        || profile.providers.includes(preset.provider || providers[preset.id.split('-')[0]])));
+    if (profile.providers.includes('own-powder')) {
+        presets.push({ id: `hans-werner-${product}`, name: `Hans-Werner-Balling ${element}`, element, requiresBatch: true });
     }
-    const product = state.doseTracker.form.product || 'kh';
-    const activeForm = state.doseTracker.forms[product] || state.doseTracker.form;
-    if (!state.doseTracker.defaults[product]) {
-        state.doseTracker.defaults[product] = {
-            targetValue: activeForm.targetValue ?? '',
-            targetDays: activeForm.targetDays || '10',
-            maxChangePercent: activeForm.maxChangePercent || '10',
-            mode: activeForm.mode || 'gradual'
-        };
-    }
-    const defaults = state.doseTracker.defaults[product];
-    defaults.targetDays = defaults.targetDays || activeForm.targetDays || '10';
-    defaults.maxChangePercent = defaults.maxChangePercent || activeForm.maxChangePercent || '10';
-    defaults.mode = defaults.mode || activeForm.mode || 'gradual';
-    ['targetValue', 'targetDays', 'maxChangePercent', 'mode'].forEach(key => {
-        if (activeForm[key] === undefined || (key !== 'targetValue' && activeForm[key] === '')) {
-            activeForm[key] = defaults[key] ?? '';
-        }
-    });
-    state.doseTracker.form = activeForm;
-    state.doseTracker.forms[product] = activeForm;
-    if (!Array.isArray(state.doseTracker.measurements)) state.doseTracker.measurements = [];
-    return state.doseTracker;
+    return presets;
 }
 
-function initSangokaiDoseTracker() {
-    const tracker = getSangokaiDoseTrackerState();
+function getDoseTrackerState() {
+    const calculators = getActiveSupplyProfile().calculators;
+    const legacy = calculators.sangokai?.doseTracker;
+    if (!calculators.dosing || typeof calculators.dosing !== 'object') {
+        calculators.dosing = legacy ? cloneSerializable(legacy) : {};
+        if (legacy) {
+            calculators.dosing.migratedFromSangokai = true;
+            const tracker = calculators.dosing;
+            [tracker.form, ...Object.values(tracker.forms || {})].filter(Boolean).forEach(form => {
+                form.solutionId = `sangokai-${form.product || 'kh'}`;
+            });
+            (tracker.measurements || []).forEach(entry => {
+                entry.solution = cloneSerializable(doseImpactBuiltInPresets.find(preset => preset.id === `sangokai-${entry.product}`));
+                entry.legacyVolume = true;
+            });
+        }
+    }
+    if (legacy) delete calculators.sangokai.doseTracker;
+    const tracker = calculators.dosing;
+    tracker.schemaVersion = 2;
+    if (!tracker.form || typeof tracker.form !== 'object') tracker.form = {};
+    if (!tracker.forms || typeof tracker.forms !== 'object') tracker.forms = {};
+    if (!tracker.defaults || typeof tracker.defaults !== 'object') tracker.defaults = {};
+    if (!Array.isArray(tracker.measurements)) tracker.measurements = [];
+    const product = tracker.form.product === 'ca' ? 'ca' : 'kh';
+    const form = tracker.forms[product] || tracker.form;
+    form.product = product;
+    const defaults = tracker.defaults[product] || {};
+    form.targetValue ??= defaults.targetValue ?? (product === 'kh' ? '7.5' : '420');
+    form.targetDays = form.targetDays || defaults.targetDays || '10';
+    form.maxChangePercent = form.maxChangePercent ?? defaults.maxChangePercent ?? '10';
+    form.mode = form.mode || defaults.mode || 'gradual';
+    form.correctionMl ??= '0';
+    const presets = getDoseTrackerPresets(product);
+    if (!form.editingId && !presets.some(preset => preset.id === form.solutionId)) {
+        form.solutionId = form.solutionId === undefined ? presets[0]?.id || '' : '';
+    }
+    tracker.form = form;
+    tracker.forms[product] = form;
+    return tracker;
+}
+
+function getSelectedDoseSolution(form, tracker) {
+    const editing = form.editingId ? tracker.measurements.find(entry => String(entry.id) === String(form.editingId)) : null;
+    if (editing?.solution) return cloneSerializable(editing.solution);
+    const preset = getDoseTrackerPresets(form.product).find(entry => entry.id === form.solutionId);
+    if (!preset) throw new Error('Bitte eine Lösung auswählen oder ein eigenes Produktpreset anlegen.');
+    if (!preset.requiresBatch) return cloneSerializable(preset);
+    const isKh = form.product === 'kh';
+    const salt = isKh ? ballingPowderSalts.KH[0]
+        : form.calciumSalt === 'dihydrate' ? ballingPowderSalts.Ca[0]
+            : form.calciumSalt === 'anhydrous' ? { elementFraction: 40.078 / 110.984 } : null;
+    if (!salt) throw new Error('Bitte die Hydratform deines Calciumchlorids bestätigen.');
+    if (!window.DosingCalculations) throw new Error('Der Tagesdosis-Rechner konnte nicht geladen werden.');
+    const powderGrams = HANS_WERNER_BALLING_RECIPES[isKh ? 'KH' : 'Ca'].gramsPerFiveLiters;
+    return { ...preset, ...window.DosingCalculations.calculatePowderSolution({
+        product: form.product, powderGrams, finalVolumeMl: form.finalVolumeMl, ...salt
+    }), powderGrams, finalVolumeMl: Number(form.finalVolumeMl), calciumSalt: form.calciumSalt };
+}
+
+function populateDoseTrackerSolutionSelect(form, tracker) {
+    const select = document.getElementById('doseSolution');
+    if (!select) return;
+    const presets = getDoseTrackerPresets(form.product);
+    const editing = tracker.measurements.find(entry => String(entry.id) === String(form.editingId));
+    if (editing?.solution && !presets.some(preset => preset.id === editing.solution.id)) presets.push(editing.solution);
+    select.innerHTML = `<option value="">${presets.length ? 'Lösung auswählen' : 'Eigenes Produkt erforderlich'}</option>`
+        + presets.map(preset => `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.name)}</option>`).join('');
+    select.value = form.solutionId || '';
+    select.disabled = Boolean(form.editingId);
+}
+
+function initDoseTracker() {
+    const migrationNeeded = Boolean(db.supplyProfile?.calculators?.sangokai?.doseTracker);
+    const tracker = getDoseTrackerState();
     const form = tracker.forms[tracker.form.product || 'kh'] || tracker.form;
     const fields = {
-        sangokaiDoseElement: form.product || 'kh',
-        sangokaiDoseDate: form.at || formatDateTimeLocal(),
-        sangokaiDoseValue: form.value ?? '',
-        sangokaiDoseIntervalMl: form.doseMlPerDay ?? '',
-        sangokaiDoseMode: form.mode || 'gradual',
-        sangokaiDoseTarget: form.targetValue ?? '',
-        sangokaiDoseTargetDays: form.targetDays ?? '',
-        sangokaiDoseMaxChange: form.maxChangePercent ?? '',
-        sangokaiDoseEditingId: form.editingId ?? ''
+        doseElement: form.product || 'kh',
+        doseSolution: form.solutionId || '',
+        doseDate: form.at || formatDateTimeLocal(),
+        doseValue: form.value ?? '',
+        doseIntervalMl: form.doseMlPerDay ?? '',
+        doseMode: form.mode || 'gradual',
+        doseTarget: form.targetValue ?? '',
+        doseTargetDays: form.targetDays ?? '',
+        doseMaxChange: form.maxChangePercent ?? '',
+        doseCorrectionMl: form.correctionMl ?? '0',
+        doseFinalVolumeMl: form.finalVolumeMl ?? '',
+        doseCalciumSalt: form.calciumSalt ?? '',
+        doseEditingId: form.editingId ?? ''
     };
+    populateDoseTrackerSolutionSelect(form, tracker);
     Object.entries(fields).forEach(([id, value]) => {
         const input = document.getElementById(id);
         if (input) input.value = value;
     });
     tracker.form = form;
-    updateSangokaiDoseTracker(false);
+    updateDoseTracker(false);
+    if (migrationNeeded) saveDB(false);
 }
 
-function readSangokaiDoseTrackerForm() {
+function readDoseTrackerForm() {
     return {
-        product: document.getElementById('sangokaiDoseElement')?.value || 'kh',
-        at: document.getElementById('sangokaiDoseDate')?.value || '',
-        value: document.getElementById('sangokaiDoseValue')?.value ?? '',
-        doseMlPerDay: document.getElementById('sangokaiDoseIntervalMl')?.value ?? '',
-        mode: document.getElementById('sangokaiDoseMode')?.value || 'gradual',
-        targetValue: document.getElementById('sangokaiDoseTarget')?.value ?? '',
-        targetDays: document.getElementById('sangokaiDoseTargetDays')?.value ?? '',
-        maxChangePercent: document.getElementById('sangokaiDoseMaxChange')?.value ?? '',
-        editingId: document.getElementById('sangokaiDoseEditingId')?.value || ''
+        product: document.getElementById('doseElement')?.value || 'kh',
+        solutionId: document.getElementById('doseSolution')?.value || '',
+        at: document.getElementById('doseDate')?.value || '',
+        value: document.getElementById('doseValue')?.value ?? '',
+        doseMlPerDay: document.getElementById('doseIntervalMl')?.value ?? '',
+        mode: document.getElementById('doseMode')?.value || 'gradual',
+        targetValue: document.getElementById('doseTarget')?.value ?? '',
+        targetDays: document.getElementById('doseTargetDays')?.value ?? '',
+        maxChangePercent: document.getElementById('doseMaxChange')?.value ?? '',
+        correctionMl: document.getElementById('doseCorrectionMl')?.value ?? '0',
+        finalVolumeMl: document.getElementById('doseFinalVolumeMl')?.value ?? '',
+        calciumSalt: document.getElementById('doseCalciumSalt')?.value ?? '',
+        editingId: document.getElementById('doseEditingId')?.value || ''
     };
 }
 
-function renderSangokaiDoseTrendChart(measurements, targetValue, product) {
+function renderDoseTrendChart(measurements, targetValue, product) {
     const points = measurements
         .map(entry => ({ ...entry, value: Number(entry.value), time: new Date(entry.at).getTime() }))
         .filter(entry => Number.isFinite(entry.value) && Number.isFinite(entry.time))
@@ -13287,23 +13354,23 @@ function renderSangokaiDoseTrendChart(measurements, targetValue, product) {
     const gridValues = [high, (high + low) / 2, low];
     const dateLabel = time => new Date(time).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
     const digits = product === 'kh' ? 2 : 0;
-    return `<section class="sangokai-dose-trend" aria-label="Messwertverlauf">
-        <div class="sangokai-dose-trend-head"><strong>Messwertverlauf</strong><span>${points.length} Messungen · ${escapeHtml(unit)}</span></div>
-        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${product === 'kh' ? 'KH' : 'Calcium'}-Messverlauf mit ${validTarget === null ? 'Messpunkten' : `Sollwert ${formatSangokaiAmount(validTarget, digits)} ${escapeHtml(unit)}`} ">
-            ${gridValues.map(value => `<g><line x1="${left}" y1="${yFor(value).toFixed(1)}" x2="${width - right}" y2="${yFor(value).toFixed(1)}" class="sangokai-dose-grid"></line><text x="${left - 10}" y="${(yFor(value) + 4).toFixed(1)}" text-anchor="end" class="sangokai-dose-axis-label">${formatSangokaiAmount(value, digits)}</text></g>`).join('')}
-            ${validTarget === null ? '' : `<line x1="${left}" y1="${yFor(validTarget).toFixed(1)}" x2="${width - right}" y2="${yFor(validTarget).toFixed(1)}" class="sangokai-dose-target-line"></line><text x="${width - right}" y="${(yFor(validTarget) - 7).toFixed(1)}" text-anchor="end" class="sangokai-dose-target-label">Ziel ${formatSangokaiAmount(validTarget, digits)}</text>`}
-            <path d="${path}" pathLength="1" class="sangokai-dose-trend-line"></path>
-            ${coords.map(point => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4.5" class="sangokai-dose-trend-point"><title>${formatSangokaiAmount(point.value, digits)} ${escapeHtml(unit)} · ${escapeHtml(dateLabel(point.time))}</title></circle>`).join('')}
-            <text x="${left}" y="${height - 12}" class="sangokai-dose-axis-label">${escapeHtml(dateLabel(points[0].time))}</text>
-            <text x="${width - right}" y="${height - 12}" text-anchor="end" class="sangokai-dose-axis-label">${escapeHtml(dateLabel(points[points.length - 1].time))}</text>
+    return `<section class="dose-trend" aria-label="Messwertverlauf">
+        <div class="dose-trend-head"><strong>Messwertverlauf</strong><span>${points.length} Messungen · ${escapeHtml(unit)}</span></div>
+        <svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${product === 'kh' ? 'KH' : 'Calcium'}-Messverlauf mit ${validTarget === null ? 'Messpunkten' : `Sollwert ${formatCalculatorAmount(validTarget, digits)} ${escapeHtml(unit)}`} ">
+            ${gridValues.map(value => `<g><line x1="${left}" y1="${yFor(value).toFixed(1)}" x2="${width - right}" y2="${yFor(value).toFixed(1)}" class="dose-grid"></line><text x="${left - 10}" y="${(yFor(value) + 4).toFixed(1)}" text-anchor="end" class="dose-axis-label">${formatCalculatorAmount(value, digits)}</text></g>`).join('')}
+            ${validTarget === null ? '' : `<line x1="${left}" y1="${yFor(validTarget).toFixed(1)}" x2="${width - right}" y2="${yFor(validTarget).toFixed(1)}" class="dose-target-line"></line><text x="${width - right}" y="${(yFor(validTarget) - 7).toFixed(1)}" text-anchor="end" class="dose-target-label">Ziel ${formatCalculatorAmount(validTarget, digits)}</text>`}
+            <path d="${path}" pathLength="1" class="dose-trend-line"></path>
+            ${coords.map(point => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="4.5" class="dose-trend-point"><title>${formatCalculatorAmount(point.value, digits)} ${escapeHtml(unit)} · ${escapeHtml(dateLabel(point.time))}</title></circle>`).join('')}
+            <text x="${left}" y="${height - 12}" class="dose-axis-label">${escapeHtml(dateLabel(points[0].time))}</text>
+            <text x="${width - right}" y="${height - 12}" text-anchor="end" class="dose-axis-label">${escapeHtml(dateLabel(points[points.length - 1].time))}</text>
         </svg>
         <p class="field-help">Gestrichelt: dein eingestellter Sollwert. Die Grafik zeigt Messungen, keine Prognose.</p>
     </section>`;
 }
 
-function updateSangokaiDoseTracker(persist = true) {
-    const tracker = getSangokaiDoseTrackerState();
-    const form = readSangokaiDoseTrackerForm();
+function updateDoseTracker(persist = true) {
+    const tracker = getDoseTrackerState();
+    const form = readDoseTrackerForm();
     tracker.form = form;
     tracker.forms[form.product] = form;
     tracker.defaults[form.product] = {
@@ -13313,38 +13380,74 @@ function updateSangokaiDoseTracker(persist = true) {
         mode: form.mode
     };
     const isKh = form.product === 'kh';
-    const valueLabel = document.getElementById('sangokaiDoseValueLabel');
-    const doseLabel = document.getElementById('sangokaiDoseIntervalLabel');
-    const targetLabel = document.getElementById('sangokaiDoseTargetLabel');
-    const productSelect = document.getElementById('sangokaiDoseElement');
+    const valueLabel = document.getElementById('doseValueLabel');
+    const doseLabel = document.getElementById('doseIntervalLabel');
+    const targetLabel = document.getElementById('doseTargetLabel');
+    const productSelect = document.getElementById('doseElement');
     if (valueLabel) valueLabel.textContent = isKh ? 'Gemessene KH (°dKH)' : 'Gemessenes Calcium (mg/L)';
-    if (doseLabel) doseLabel.textContent = isKh ? 'KH-Tagesdosis im Messzeitraum (ml/Tag)' : 'Ca-1-Tagesdosis im Messzeitraum (ml/Tag; Ca-2 gleich dosiert)';
+    if (doseLabel) doseLabel.textContent = 'Tagesdosis im Messzeitraum (ml/Tag)';
     if (targetLabel) targetLabel.textContent = isKh ? 'Dein KH-Sollwert (°dKH)' : 'Dein Calcium-Sollwert (mg/L)';
-    const optionsSummary = document.getElementById('sangokaiDoseOptionsSummary');
+    const optionsSummary = document.getElementById('doseOptionsSummary');
     if (optionsSummary) optionsSummary.textContent = `Messzeitpunkt · Annäherung ${String(form.targetDays ?? '').trim() || '10'} Tage · Dosislimit ±${String(form.maxChangePercent ?? '').trim() || '10'} %`;
     if (productSelect) productSelect.disabled = Boolean(form.editingId);
-    const saveButton = document.getElementById('sangokaiDoseSaveButton');
+    const solutionSelect = document.getElementById('doseSolution');
+    if (solutionSelect) solutionSelect.disabled = Boolean(form.editingId);
+    const customSolution = getDoseImpactSettings().customPresets.some(preset => preset.id === form.solutionId);
+    const addProductButton = document.getElementById('doseAddProductButton');
+    const editProductButton = document.getElementById('doseEditProductButton');
+    if (addProductButton) addProductButton.disabled = Boolean(form.editingId);
+    if (editProductButton) {
+        editProductButton.hidden = !customSolution;
+        editProductButton.disabled = Boolean(form.editingId);
+    }
+    const batchFields = document.getElementById('doseBallingBatchFields');
+    if (batchFields) batchFields.hidden = !form.solutionId.startsWith('hans-werner-');
+    const calciumSaltField = document.getElementById('doseCalciumSaltField');
+    if (calciumSaltField) calciumSaltField.hidden = isKh;
+    ['doseFinalVolumeMl', 'doseCalciumSalt'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) input.disabled = Boolean(form.editingId);
+    });
+    const batchLabel = document.getElementById('doseBallingBatchLabel');
+    if (batchLabel) batchLabel.textContent = isKh ? '420 g Natriumhydrogencarbonat + 5 L Osmosewasser' : '358 g Calciumchlorid + 5 L Osmosewasser';
+    const aquariumHint = document.getElementById('doseAquariumContext');
+    const tankLiters = Number(getActiveAquarium()?.data?.volumeLiters);
+    if (aquariumHint) aquariumHint.textContent = `${getActiveAquarium()?.name || 'Kein Aquarium'} · ${tankLiters > 0 ? `${formatCalculatorAmount(tankLiters, 1)} L Nettovolumen` : 'Nettovolumen fehlt'}`;
+    const solutionInfo = document.getElementById('doseSolutionInfo');
+    let solution;
+    let solutionError = '';
+    try {
+        solution = getSelectedDoseSolution(form, tracker);
+        const strength = window.DosingCalculations.solutionStrength(solution, form.product);
+        if (solutionInfo) solutionInfo.textContent = `${solution.name} · 1 ml / 100 L = +${formatCalculatorAmount(strength, 4)} ${isKh ? '°dKH' : 'mg/L'}${solution.pairedProductName ? ' · Ca-1 erfassen, Ca-2 mengenidentisch' : ''}${solution.recipeNote ? ` · ${solution.recipeNote}` : ''}`;
+    } catch (error) {
+        solutionError = error.message;
+        if (solutionInfo) solutionInfo.textContent = solutionError;
+    }
+    const saveButton = document.getElementById('doseSaveButton');
     if (saveButton) saveButton.textContent = form.editingId ? 'Messung aktualisieren' : 'Messung speichern';
-    const cancelButton = document.getElementById('sangokaiDoseCancelEditButton');
+    const cancelButton = document.getElementById('doseCancelEditButton');
     if (cancelButton) cancelButton.hidden = !form.editingId;
     if (persist) saveDB();
 
-    const result = document.getElementById('sangokaiDoseTrackerResult');
-    const historyContainer = document.getElementById('sangokaiDoseTrackerHistory');
+    const result = document.getElementById('doseTrackerResult');
+    const historyContainer = document.getElementById('doseTrackerHistory');
     if (!result || !historyContainer) return;
     const measurements = tracker.measurements
         .filter(entry => entry.product === form.product)
         .slice()
         .sort((a, b) => new Date(a.at) - new Date(b.at));
-    const tankLiters = Number(getActiveAquarium()?.data?.volumeLiters);
-    if (measurements.length < 2) {
+    if (solutionError) {
+        result.innerHTML = `<p class="field-help">${escapeHtml(solutionError)}</p>`;
+    } else if (measurements.length < 2) {
         result.innerHTML = `<p class="field-help">Noch ${2 - measurements.length} weitere Messung(en) für einen Verbrauchs- und Dosierabgleich erfassen.</p>`;
     } else {
         try {
             if (!Number.isFinite(tankLiters) || tankLiters <= 0) throw new Error('Für die Berechnung bitte zuerst ein aktives Aquarium mit Nettovolumen anlegen.');
-            if (!window.SangokaiCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
-            const calculation = window.SangokaiCalculations.calculateBalanceDoseAdjustment({
+            if (!window.DosingCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+            const calculation = window.DosingCalculations.calculateDoseAdjustment({
                 product: form.product,
+                solution,
                 volumeLiters: tankLiters,
                 measurements,
                 targetValue: form.targetValue,
@@ -13355,14 +13458,19 @@ function updateSangokaiDoseTracker(persist = true) {
             const unit = isKh ? '°dKH' : 'mg/L';
             const wasLimited = Math.abs(calculation.nextDoseMl - calculation.uncappedDoseMl) > 0.000001;
             const resultRows = form.mode === 'immediate-stabilize'
-                ? `<div class="tool-row"><span><strong>Einmaliger Sofortausgleich</strong><small>Aus letzter Messung ${formatSangokaiAmount(calculation.latestValue, 3)} ${unit} bis zum Ziel ${formatSangokaiAmount(calculation.targetValue, 3)} ${unit}${form.product === 'ca' ? ' · Ca-1 und gleiches Volumen Ca-2' : ''}</small></span><span>${formatSangokaiAmount(calculation.correctionMl)} ml${form.product === 'ca' ? ` + ${formatSangokaiAmount(calculation.pairedCorrectionMl)} ml Ca-2` : ''}</span></div>
-                <div class="tool-row"><span><strong>Stabilisierende Tagesdosis</strong><small>Ermittelter Verbrauch, ohne weitere Sollwert-Annäherung</small></span><span>${formatSangokaiAmount(calculation.nextDoseMl)} ml/Tag</span></div>`
-                : `<div class="tool-row"><span><strong>Berechnete Dosis ohne Begrenzung</strong><small>Ziel ${formatSangokaiAmount(calculation.targetValue, 2)} ${unit} in den verbleibenden ${formatSangokaiAmount(calculation.targetDays, 0)} Tagen</small></span><span>${formatSangokaiAmount(calculation.uncappedDoseMl)} ml/Tag</span></div>
-                <div class="tool-row"><span><strong>Nächster Tageswert</strong><small>Änderung ${calculation.doseChangePercent >= 0 ? '+' : ''}${formatSangokaiAmount(calculation.doseChangePercent, 1)} % · Limit ±${formatSangokaiAmount(calculation.maxChangePercent, 1)} %</small></span><span>${formatSangokaiAmount(calculation.nextDoseMl)} ml/Tag</span></div>`;
-            result.innerHTML = `<div class="tool-result">
-                <div class="tool-row"><span><strong>Gemessener Verlauf</strong><small>Nettoänderung über die gespeicherten Messintervalle</small></span><span>${calculation.observedChangePerDay >= 0 ? '+' : ''}${formatSangokaiAmount(calculation.observedChangePerDay, 4)} ${unit}/Tag</span></div>
-                <div class="tool-row"><span><strong>Ermittelter Verbrauch</strong><small>Aus ${calculation.measurementCount} Messungen über ${formatSangokaiAmount(calculation.intervalDays, 1)} Tage</small></span><span>${formatSangokaiAmount(calculation.consumptionPerDay, 4)} ${unit}/Tag</span></div>
-                ${resultRows}
+                ? `<div class="tool-row"><span><strong>Einmaliger Sofortausgleich</strong><small>Aus letzter Messung ${formatCalculatorAmount(calculation.latestValue, 3)} ${unit} bis zum Ziel ${formatCalculatorAmount(calculation.targetValue, 3)} ${unit}</small></span><span>${formatCalculatorAmount(calculation.correctionMl)} ml${solution.pairedProductName ? ` + ${formatCalculatorAmount(calculation.pairedCorrectionMl)} ml Ca-2` : ''}</span></div>
+                <div class="tool-row"><span><strong>Stabilisierende Tagesdosis</strong><small>Ermittelter Verbrauch, ohne weitere Sollwert-Annäherung</small></span><span>${formatCalculatorAmount(calculation.nextDoseMl)} ml/Tag</span></div>`
+                : `<div class="tool-row"><span><strong>Berechnete Dosis ohne Begrenzung</strong><small>Ziel ${formatCalculatorAmount(calculation.targetValue, 2)} ${unit} in den verbleibenden ${formatCalculatorAmount(calculation.targetDays, 0)} Tagen</small></span><span>${formatCalculatorAmount(calculation.uncappedDoseMl)} ml/Tag</span></div>
+                <div class="tool-row"><span><strong>Nächster Tageswert</strong><small>Änderung ${calculation.doseChangePercent >= 0 ? '+' : ''}${formatCalculatorAmount(calculation.doseChangePercent, 1)} % · Limit ±${formatCalculatorAmount(calculation.maxChangePercent, 1)} %</small></span><span>${formatCalculatorAmount(calculation.nextDoseMl)} ml/Tag</span></div>`;
+            result.innerHTML = `<div>
+                <div class="tool-row"><span><strong>${escapeHtml(solution.name)}</strong><small>Berechnung aus gespeicherten Messungen · ${formatCalculatorAmount(tankLiters, 1)} L</small></span><span>${isKh ? 'KH' : 'Ca'}</span></div>
+                <div class="tool-row"><span><strong>Gemessener Verlauf</strong><small>Nettoänderung über die gespeicherten Messintervalle</small></span><span>${calculation.observedChangePerDay >= 0 ? '+' : ''}${formatCalculatorAmount(calculation.observedChangePerDay, 4)} ${unit}/Tag</span></div>
+                <div class="tool-row"><span><strong>Ermittelter Verbrauch</strong><small>Aus ${calculation.measurementCount} Messungen über ${formatCalculatorAmount(calculation.intervalDays, 1)} Tage</small></span><span>${formatCalculatorAmount(calculation.consumptionPerDay, 4)} ${unit}/Tag</span></div>
+                ${calculation.negativeConsumption ? '' : resultRows}
+                ${solution.pairedProductName && !calculation.negativeConsumption ? `<p class="field-help">Tagesdosis für Ca-1: ${formatCalculatorAmount(calculation.nextDoseMl)} ml/Tag. Für Ca-2 gilt dieselbe Menge; es wird nicht als zusätzliche Calciumzufuhr gezählt.</p>` : ''}
+                ${calculation.convertedDose ? `<p class="field-help">Die letzte Tagesdosis wurde auf die Wirkung der ausgewählten Lösung und das aktuelle Aquariumvolumen umgerechnet. Das Prozentlimit bezieht sich auf diese vergleichbare Dosierungsbasis von ${formatCalculatorAmount(calculation.currentDoseMl)} ml/Tag.</p>` : ''}
+                ${calculation.negativeConsumption ? '<p class="field-help dose-calculation-warning">Die Messwerte ergeben einen negativen Verbrauch. Prüfe Einmalzugaben, Wasserwechsel, Messfehler und die verwendete Lösung; daraus lässt sich kein verlässlicher Verbrauch ableiten.</p>' : ''}
+                ${measurements.some(entry => entry.legacyVolume) ? '<p class="field-help">Ältere SANGOKAI-Einträge hatten kein gespeichertes Aquariumvolumen. Für diese Intervalle wird das aktuelle Nettovolumen verwendet.</p>' : ''}
                 <p class="field-help">Die Einmalmenge ist getrennt von der Tagesdosis. Der Prozentgrenzwert beschränkt nur den Wechsel der laufenden Tagesdosis, nicht den einmaligen Ausgleich.</p>
                 ${wasLimited ? '<p class="field-help">Das Prozentlimit begrenzt die Änderung der Tagesdosis. Nach der nächsten Messung neu berechnen.</p>' : ''}
             </div>`;
@@ -13371,13 +13479,13 @@ function updateSangokaiDoseTracker(persist = true) {
         }
     }
     historyContainer.innerHTML = measurements.length
-        ? `${renderSangokaiDoseTrendChart(measurements, form.targetValue, form.product)}<h5>Gespeicherte ${isKh ? 'KH' : 'Ca'}-Messungen (${measurements.length})</h5><div class="sangokai-dose-history-list">${measurements.slice().reverse().map(entry => `<div class="sangokai-dose-history-row"><span><strong>${escapeHtml(formatWarehouseDate(entry.at))}</strong><small>${formatSangokaiAmount(entry.value, 3)} ${isKh ? '°dKH' : 'mg/L'} · ${formatSangokaiAmount(entry.doseMlPerDay)} ml/Tag im Messzeitraum</small></span><div class="sangokai-dose-history-actions"><button type="button" class="btn-secondary" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} bearbeiten" onclick='editSangokaiDoseMeasurement(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-danger" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} löschen" title="Messung löschen" onclick='deleteSangokaiDoseMeasurement(${jsArg(entry.id)})'>Löschen</button></div></div>`).join('')}</div>`
+        ? `${renderDoseTrendChart(measurements, form.targetValue, form.product)}<h5>Gespeicherte ${isKh ? 'KH' : 'Ca'}-Messungen (${measurements.length})</h5><div class="dose-history-list">${measurements.slice().reverse().map(entry => `<div class="dose-history-row"><span><strong>${escapeHtml(formatWarehouseDate(entry.at))}</strong><small>${formatCalculatorAmount(entry.value, 3)} ${isKh ? '°dKH' : 'mg/L'} · ${formatCalculatorAmount(entry.doseMlPerDay)} ml/Tag im Messzeitraum</small><small>${escapeHtml(entry.solution?.name || 'Lösung unbekannt')}${Number(entry.correctionMl) > 0 ? ` · ${formatCalculatorAmount(entry.correctionMl)} ml Einmalzugaben` : ''}${entry.volumeLiters ? ` · ${formatCalculatorAmount(entry.volumeLiters, 1)} L` : ''}</small></span><div class="dose-history-actions"><button type="button" class="btn-secondary" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} bearbeiten" onclick='editDoseMeasurement(${jsArg(entry.id)})'>Bearbeiten</button><button type="button" class="btn-danger" aria-label="Messung vom ${escapeHtml(formatWarehouseDate(entry.at))} löschen" title="Messung löschen" onclick='deleteDoseMeasurement(${jsArg(entry.id)})'>Löschen</button></div></div>`).join('')}</div>`
         : '<p class="field-help">Noch keine Messungen gespeichert.</p>';
 }
 
-function changeSangokaiDoseProduct(product) {
-    const tracker = getSangokaiDoseTrackerState();
-    const currentForm = readSangokaiDoseTrackerForm();
+function changeDoseProduct(product) {
+    const tracker = getDoseTrackerState();
+    const currentForm = readDoseTrackerForm();
     const previousProduct = tracker.form?.product || currentForm.product;
     tracker.forms[previousProduct] = { ...currentForm, product: previousProduct };
     const defaults = {
@@ -13392,7 +13500,7 @@ function changeSangokaiDoseProduct(product) {
         value: '',
         doseMlPerDay: '',
         mode: defaults.mode,
-        targetValue: '',
+        targetValue: product === 'kh' ? '7.5' : '420',
         targetDays: defaults.targetDays,
         maxChangePercent: defaults.maxChangePercent
     };
@@ -13400,98 +13508,93 @@ function changeSangokaiDoseProduct(product) {
         if (nextForm[key] === undefined || nextForm[key] === '') nextForm[key] = defaults[key] ?? '';
     });
     nextForm.editingId = '';
-    const fields = {
-        sangokaiDoseDate: nextForm.at,
-        sangokaiDoseValue: nextForm.value,
-        sangokaiDoseIntervalMl: nextForm.doseMlPerDay,
-        sangokaiDoseMode: nextForm.mode || 'gradual',
-        sangokaiDoseTarget: nextForm.targetValue,
-        sangokaiDoseTargetDays: nextForm.targetDays,
-        sangokaiDoseMaxChange: nextForm.maxChangePercent
-    };
-    Object.entries(fields).forEach(([id, value]) => {
-        const input = document.getElementById(id);
-        if (input) input.value = value ?? '';
-    });
     tracker.form = nextForm;
     tracker.forms[product] = nextForm;
+    initDoseTracker();
     saveDB();
-    updateSangokaiDoseTracker(false);
 }
 
-function saveSangokaiDoseMeasurement() {
-    const form = readSangokaiDoseTrackerForm();
+function saveDoseMeasurement() {
+    const form = readDoseTrackerForm();
     const value = Number(String(form.value).replace(',', '.'));
     const dose = Number(String(form.doseMlPerDay).replace(',', '.'));
+    const correctionMl = Number(String(form.correctionMl).replace(',', '.'));
     const at = new Date(form.at);
     if (!form.at || !Number.isFinite(at.getTime())) return showToast('Bitte ein gültiges Messdatum eintragen.', 'warning');
-    if (!Number.isFinite(value) || value < 0) return showToast('Bitte einen gültigen Messwert ab 0 eintragen.', 'warning');
-    if (!Number.isFinite(dose) || dose < 0) return showToast('Bitte eine gültige Tagesdosis ab 0 eintragen.', 'warning');
-    const tracker = getSangokaiDoseTrackerState();
+    if (!String(form.value).trim() || !Number.isFinite(value) || value < 0) return showToast('Bitte einen gültigen Messwert ab 0 eintragen.', 'warning');
+    if (!String(form.doseMlPerDay).trim() || !Number.isFinite(dose) || dose < 0) return showToast('Bitte eine gültige Tagesdosis ab 0 eintragen.', 'warning');
+    if (!String(form.correctionMl).trim() || !Number.isFinite(correctionMl) || correctionMl < 0) return showToast('Bitte gültige Einmalzugaben ab 0 eintragen.', 'warning');
+    const volumeLiters = Number(getActiveAquarium()?.data?.volumeLiters);
+    if (!(volumeLiters > 0) || !Number.isFinite(volumeLiters)) return showToast('Bitte zuerst ein Aquarium mit gültigem Nettovolumen anlegen.', 'warning');
+    const tracker = getDoseTrackerState();
+    let solution;
+    try {
+        solution = getSelectedDoseSolution(form, tracker);
+        window.DosingCalculations.solutionStrength(solution, form.product);
+    } catch (error) {
+        return showToast(error.message, 'warning');
+    }
     const atIso = at.toISOString();
     const editingId = form.editingId || '';
     const duplicate = tracker.measurements.some(entry => entry.product === form.product && entry.at === atIso && String(entry.id) !== String(editingId));
     if (duplicate) return showToast('Für diesen Zeitpunkt gibt es bereits eine Messung. Wähle einen anderen Zeitpunkt.', 'warning');
     const existing = editingId ? tracker.measurements.find(entry => String(entry.id) === String(editingId)) : null;
-    if (existing) Object.assign(existing, { product: form.product, at: atIso, value, doseMlPerDay: dose });
-    else tracker.measurements.push({ id: createWarehouseId(), product: form.product, at: atIso, value, doseMlPerDay: dose });
-    const valueInput = document.getElementById('sangokaiDoseValue');
+    if (editingId && !existing) return showToast('Diese Messung ist nicht mehr vorhanden. Bitte die Bearbeitung abbrechen.', 'warning');
+    const measurement = { product: form.product, at: atIso, value, doseMlPerDay: dose, correctionMl, solution,
+        volumeLiters: existing?.volumeLiters || volumeLiters };
+    if (existing) Object.assign(existing, measurement);
+    else tracker.measurements.push({ id: createWarehouseId(), ...measurement });
+    const valueInput = document.getElementById('doseValue');
     if (valueInput) valueInput.value = '';
-    const editingInput = document.getElementById('sangokaiDoseEditingId');
+    const editingInput = document.getElementById('doseEditingId');
     if (editingInput) editingInput.value = '';
-    const dateInput = document.getElementById('sangokaiDoseDate');
+    const dateInput = document.getElementById('doseDate');
     if (dateInput) dateInput.value = formatDateTimeLocal();
-    tracker.form = readSangokaiDoseTrackerForm();
+    const correctionInput = document.getElementById('doseCorrectionMl');
+    if (correctionInput) correctionInput.value = '0';
+    tracker.form = readDoseTrackerForm();
     tracker.forms[form.product] = tracker.form;
+    initDoseTracker();
     saveDB();
-    updateSangokaiDoseTracker(false);
     showToast(existing ? 'Messung aktualisiert.' : 'Messung im Aquariumprofil gespeichert.', 'success');
 }
 
-function editSangokaiDoseMeasurement(id) {
-    const tracker = getSangokaiDoseTrackerState();
+function editDoseMeasurement(id) {
+    const tracker = getDoseTrackerState();
     const entry = tracker.measurements.find(item => String(item.id) === String(id));
     if (!entry) return;
     const form = {
         ...(tracker.forms[entry.product] || {}),
         product: entry.product,
+        solutionId: entry.solution?.id || '',
+        finalVolumeMl: entry.solution?.finalVolumeMl ?? '',
+        calciumSalt: entry.solution?.calciumSalt ?? '',
         at: formatDateTimeLocal(entry.at),
         value: String(entry.value),
         doseMlPerDay: String(entry.doseMlPerDay),
+        correctionMl: String(entry.correctionMl ?? 0),
         editingId: String(entry.id)
     };
     tracker.form = form;
     tracker.forms[entry.product] = form;
-    const fields = {
-        sangokaiDoseElement: form.product,
-        sangokaiDoseDate: form.at,
-        sangokaiDoseValue: form.value,
-        sangokaiDoseIntervalMl: form.doseMlPerDay,
-        sangokaiDoseTarget: form.targetValue ?? tracker.defaults[entry.product]?.targetValue ?? '',
-        sangokaiDoseTargetDays: form.targetDays ?? tracker.defaults[entry.product]?.targetDays ?? '',
-        sangokaiDoseMaxChange: form.maxChangePercent ?? tracker.defaults[entry.product]?.maxChangePercent ?? '',
-        sangokaiDoseEditingId: form.editingId
-    };
-    Object.entries(fields).forEach(([fieldId, value]) => {
-        const input = document.getElementById(fieldId);
-        if (input) input.value = value;
-    });
+    initDoseTracker();
     saveDB();
-    updateSangokaiDoseTracker(false);
-    document.getElementById('sangokaiDoseValue')?.focus();
+    document.getElementById('doseValue')?.focus();
 }
 
-function cancelSangokaiDoseMeasurementEdit() {
-    const tracker = getSangokaiDoseTrackerState();
-    if (!document.getElementById('sangokaiDoseEditingId')?.value) return;
-    const product = document.getElementById('sangokaiDoseElement')?.value || 'kh';
+function cancelDoseMeasurementEdit() {
+    const tracker = getDoseTrackerState();
+    if (!document.getElementById('doseEditingId')?.value) return;
+    const product = document.getElementById('doseElement')?.value || 'kh';
     const previous = tracker.forms[product] || tracker.form;
     const defaults = tracker.defaults[product] || {};
     const form = {
+        ...previous,
         product,
         at: formatDateTimeLocal(),
         value: '',
         doseMlPerDay: previous.doseMlPerDay ?? '',
+        correctionMl: '0',
         targetValue: defaults.targetValue ?? previous.targetValue ?? '',
         targetDays: defaults.targetDays ?? previous.targetDays ?? '',
         maxChangePercent: defaults.maxChangePercent ?? previous.maxChangePercent ?? '',
@@ -13499,47 +13602,220 @@ function cancelSangokaiDoseMeasurementEdit() {
     };
     tracker.form = form;
     tracker.forms[form.product] = form;
-    const fields = {
-        sangokaiDoseElement: form.product,
-        sangokaiDoseDate: form.at || formatDateTimeLocal(),
-        sangokaiDoseValue: form.value ?? '',
-        sangokaiDoseIntervalMl: form.doseMlPerDay ?? '',
-        sangokaiDoseTarget: form.targetValue ?? tracker.defaults[form.product]?.targetValue ?? '',
-        sangokaiDoseTargetDays: form.targetDays ?? tracker.defaults[form.product]?.targetDays ?? '',
-        sangokaiDoseMaxChange: form.maxChangePercent ?? tracker.defaults[form.product]?.maxChangePercent ?? '',
-        sangokaiDoseEditingId: ''
-    };
-    Object.entries(fields).forEach(([id, value]) => {
-        const input = document.getElementById(id);
-        if (input) input.value = value;
-    });
+    initDoseTracker();
     saveDB();
-    updateSangokaiDoseTracker(false);
 }
 
-async function deleteSangokaiDoseMeasurement(id) {
-    const confirmed = await appConfirm('Diese Messung aus dem BALANCE-Verlauf löschen?', {
+async function deleteDoseMeasurement(id) {
+    const aquariumId = activeAquariumId;
+    const confirmed = await appConfirm('Diese Messung aus dem KH-/Ca-Verlauf löschen?', {
         title: 'Messung löschen',
         type: 'warning',
         confirmText: 'Löschen',
         cancelText: 'Abbrechen'
     });
     if (!confirmed) return;
-    const tracker = getSangokaiDoseTrackerState();
+    if (aquariumId !== activeAquariumId) return showToast('Das aktive Aquarium wurde gewechselt. Die Messung wurde nicht gelöscht.', 'warning');
+    const tracker = getDoseTrackerState();
     tracker.measurements = tracker.measurements.filter(entry => String(entry.id) !== String(id));
-    const editingId = document.getElementById('sangokaiDoseEditingId');
+    const editingId = document.getElementById('doseEditingId');
     if (editingId?.value && String(editingId.value) === String(id)) {
-        const form = readSangokaiDoseTrackerForm();
+        const form = readDoseTrackerForm();
         form.editingId = '';
         form.at = formatDateTimeLocal();
         if (editingId) editingId.value = '';
-        const dateInput = document.getElementById('sangokaiDoseDate');
+        const dateInput = document.getElementById('doseDate');
         if (dateInput) dateInput.value = form.at;
         tracker.form = form;
         tracker.forms[form.product] = form;
     }
     saveDB();
-    updateSangokaiDoseTracker(false);
+    initDoseTracker();
+}
+
+function openDosePresetBuilder(event, edit = false) {
+    return openCustomDoseProductBuilder(event, {
+        source: 'tracker',
+        presetId: edit ? document.getElementById('doseSolution')?.value : null
+    });
+}
+
+function getCustomDosePowderSalts(element) {
+    return (ballingPowderSalts[element] || []).concat(element === 'Ca'
+        ? [{ id: 'cacl2-anhydrous', name: 'Calciumchlorid, wasserfrei', elementFraction: 40.078 / 110.984 }] : [])
+        .map(salt => ({ ...salt, label: salt.name.split(' (')[0] }));
+}
+
+function buildCustomDoseProduct(values) {
+    const name = String(values.name || '').trim();
+    if (!name || name.length > 60) throw new Error('Bitte einen Produktnamen mit höchstens 60 Zeichen eintragen.');
+    if (!['KH', 'Ca'].includes(values.element)) throw new Error('Bitte KH oder Calcium auswählen.');
+    if (!window.DosingCalculations) throw new Error('Die Produktberechnung konnte nicht geladen werden.');
+    const product = values.element === 'KH' ? 'kh' : 'ca';
+    const numeric = value => Number(String(value ?? '').replace(',', '.'));
+    let solution;
+    let recipeNote = '';
+    let configuration;
+    if (values.method === 'reference') {
+        solution = { element: values.element, referenceMl: numeric(values.referenceMl),
+            referenceLiters: numeric(values.referenceLiters), increase: numeric(values.increase) };
+        configuration = { method: 'reference' };
+    } else if (values.method === 'concentration') {
+        solution = window.DosingCalculations.calculateConcentrationSolution({ product, concentration: values.concentration });
+        configuration = { method: 'concentration', concentration: numeric(values.concentration) };
+        recipeNote = `${formatCalculatorAmount(configuration.concentration, 6)} ${product === 'kh' ? 'mmol Ladung/ml Alkalinität' : 'mg Calcium/ml'}`;
+    } else if (values.method === 'powder') {
+        const salt = getCustomDosePowderSalts(values.element).find(entry => entry.id === values.saltId);
+        if (!salt) throw new Error('Bitte das Salz einschließlich der richtigen Hydratform auswählen.');
+        solution = window.DosingCalculations.calculatePowderSolution({ product, powderGrams: values.powderGrams,
+            finalVolumeMl: values.finalVolumeMl, purityPercent: values.purityPercent, ...salt });
+        configuration = { method: 'powder', saltId: salt.id, powderGrams: numeric(values.powderGrams),
+            finalVolumeMl: numeric(values.finalVolumeMl), purityPercent: numeric(values.purityPercent) };
+        recipeNote = `${formatCalculatorAmount(configuration.powderGrams)} g ${salt.name} auf ${formatCalculatorAmount(configuration.finalVolumeMl)} ml fertige Lösung · ${formatCalculatorAmount(configuration.purityPercent)} % Reinheit`;
+    } else {
+        throw new Error('Bitte eine Berechnungsgrundlage auswählen.');
+    }
+    window.DosingCalculations.solutionStrength(solution, product);
+    return { name, ...solution, configuration, recipeNote };
+}
+
+function storeCustomDoseProduct(preset, { presetId = null, source = 'tracker' } = {}) {
+    const settings = getDoseImpactSettings();
+    const index = settings.customPresets.findIndex(entry => entry.id === presetId);
+    if (presetId && index < 0) throw new Error('Das eigene Produkt ist nicht mehr vorhanden.');
+    const saved = { ...preset, id: presetId || `custom-${Date.now()}-${Math.random().toString(36).slice(2, 8)}` };
+    if (index >= 0) settings.customPresets[index] = saved;
+    else settings.customPresets.push(saved);
+    settings.selectedPresetId = saved.id;
+    getMajorCorrectionSettings().selectedPresetId = saved.id;
+    if (source === 'tracker') {
+        const product = saved.element === 'KH' ? 'kh' : 'ca';
+        if (getDoseTrackerState().form.product !== product) changeDoseProduct(product);
+        const tracker = getDoseTrackerState();
+        if (!tracker.form.editingId) {
+            tracker.form.solutionId = saved.id;
+            tracker.forms[product] = tracker.form;
+        }
+    }
+    saveDB();
+    populateDoseImpactPresetSelect();
+    applyDoseImpactPresetToInputs(saved);
+    renderDoseImpactCalculator();
+    populateMajorCorrectionPresetSelect();
+    syncMajorCorrectionInputsFromSettings(source === 'correction');
+    renderMajorCorrectionCalculator();
+    initDoseTracker();
+    return saved;
+}
+
+async function openCustomDoseProductBuilder(event, { source = 'tracker', presetId = null } = {}) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (source === 'tracker' && document.getElementById('doseEditingId')?.value) return;
+    const existing = presetId ? getDoseImpactSettings().customPresets.find(entry => entry.id === presetId) : null;
+    if (presetId && !existing) return showToast('Nur eigene Produkte können bearbeitet werden.', 'warning');
+    const aquariumId = activeAquariumId;
+    const currentPreset = source === 'correction' ? getMajorCorrectionPreset() : getSelectedDoseImpactPreset();
+    const element = existing?.element || (source === 'tracker'
+        ? document.getElementById('doseElement')?.value === 'ca' ? 'Ca' : 'KH' : currentPreset?.element || 'KH');
+    const config = existing?.configuration || {};
+    const response = showAppDialog({
+        kind: 'form', wide: true, eyebrow: 'Dosierprodukte',
+        title: existing ? 'Eigenes Produkt bearbeiten' : 'Eigenes Produkt anlegen',
+        message: 'Produktwirkung der fertig angesetzten Lösung. Gespeicherte Messungen behalten ihre bisherige Konzentration.',
+        confirmText: 'Produkt speichern', fields: [
+            { name: 'name', label: 'Produktname', value: existing?.name || '', placeholder: 'Meine Calciumlösung', required: true },
+            { name: 'element', label: 'Messwert', value: element, options: [{ value: 'KH', label: 'KH (°dKH)' }, { value: 'Ca', label: 'Calcium (mg/L)' }] },
+            { name: 'method', label: 'Berechnungsgrundlage', value: config.method || 'reference', options: [
+                { value: 'reference', label: 'Bekannte Dosierwirkung' },
+                { value: 'concentration', label: 'Wirkstoffkonzentration' },
+                { value: 'powder', label: 'Eigener Pulveransatz' }
+            ] },
+            { name: 'referenceMl', label: 'Dosiermenge (ml)', type: 'number', inputMode: 'decimal', value: existing?.referenceMl ?? '10', required: true },
+            { name: 'referenceLiters', label: 'Aquariumvolumen der Angabe (L)', type: 'number', inputMode: 'decimal', value: existing?.referenceLiters ?? '100', required: true },
+            { name: 'increase', label: 'Erhöhung', type: 'number', inputMode: 'decimal', value: existing?.increase ?? '', required: true },
+            { name: 'concentration', label: 'Wirkstoffkonzentration', type: 'number', inputMode: 'decimal', value: config.concentration ?? '', required: true,
+                description: 'Konzentration des Wirkstoffs, nicht die Masse des Salzes.' },
+            { name: 'saltId', label: 'Salz / Hydratform', value: config.saltId || '', options: getCustomDosePowderSalts(element).map(salt => ({ value: salt.id, label: salt.label })) },
+            { name: 'powderGrams', label: 'Pulvermenge (g)', type: 'number', inputMode: 'decimal', value: config.powderGrams ?? '', required: true },
+            { name: 'finalVolumeMl', label: 'Fertiges Lösungsvolumen (ml)', type: 'number', inputMode: 'decimal', value: config.finalVolumeMl ?? '', required: true,
+                description: 'Endvolumen nach dem Auflösen, nicht die anfängliche Wassermenge.' },
+            { name: 'purityPercent', label: 'Reinheit des gewählten Salzes (%)', type: 'number', inputMode: 'decimal', value: config.purityPercent ?? '100', required: true,
+                description: 'Keine Markenmischung. Reinheit laut Rohstoffangabe für diese Hydratform.' }
+        ]
+    });
+    const dialog = document.getElementById('appDialog');
+    const fields = document.getElementById('appDialogFields');
+    if (!dialog || !fields) return;
+    dialog.classList.add('is-dose-product');
+    fields.classList.add('has-dose-product-fields');
+    const controls = Object.fromEntries([...fields.querySelectorAll('[data-dialog-field]')].map(control => [control.dataset.dialogField, control]));
+    controls.name.maxLength = 60;
+    fields.querySelectorAll('input[type="number"]').forEach(input => { input.min = '0'; input.step = 'any'; });
+    controls.purityPercent.max = '100';
+    const preview = document.createElement('p');
+    preview.className = 'dose-product-preview';
+    preview.setAttribute('role', 'status');
+    preview.setAttribute('aria-live', 'polite');
+    fields.appendChild(preview);
+    const values = () => Object.fromEntries(Object.entries(controls).filter(([, control]) => !control.disabled).map(([name, control]) => [name, control.value]));
+    const refresh = () => {
+        const isKh = controls.element.value === 'KH';
+        const method = controls.method.value;
+        controls.name.placeholder = isKh ? 'Meine KH-Lösung' : 'Meine Calciumlösung';
+        const saltOptions = getCustomDosePowderSalts(controls.element.value);
+        if (!saltOptions.some(salt => salt.id === controls.saltId.value)) {
+            controls.saltId.replaceChildren(...saltOptions.map(salt => new Option(salt.label, salt.id)));
+            if (config.saltId && saltOptions.some(salt => salt.id === config.saltId)) controls.saltId.value = config.saltId;
+        }
+        const groups = { reference: ['referenceMl', 'referenceLiters', 'increase'], concentration: ['concentration'],
+            powder: ['saltId', 'powderGrams', 'finalVolumeMl', 'purityPercent'] };
+        Object.values(groups).flat().forEach(name => {
+            const visible = groups[method]?.includes(name);
+            controls[name].closest('.form-field').hidden = !visible;
+            controls[name].disabled = !visible;
+        });
+        Object.values(controls).forEach(control => control.removeAttribute('aria-invalid'));
+        controls.name.closest('.form-field').classList.add('dose-product-full');
+        controls.concentration.closest('.form-field').classList.add('dose-product-full');
+        controls.purityPercent.closest('.form-field').classList.add('dose-product-full');
+        controls.saltId.closest('.form-field').classList.add('dose-product-full');
+        controls.increase.closest('.form-field').querySelector('label').textContent = `Erhöhung (${isKh ? '°dKH' : 'mg/L'})`;
+        const concentrationField = controls.concentration.closest('.form-field');
+        concentrationField.querySelector('label').textContent = isKh ? 'Alkalinität (mmol Ladung/ml)' : 'Calciumkonzentration (mg Ca/ml)';
+        concentrationField.querySelector('.field-description').textContent = isKh
+            ? 'Alkalinitätsäquivalente je ml Lösung. 1 °dKH entspricht 0,357 mmol Ladung/L.'
+            : 'Elementares Calcium je ml Lösung, nicht mg Calciumchlorid. 1 mg/ml entspricht 1 g Calcium/L.';
+        try {
+            const product = buildCustomDoseProduct(values());
+            const strength = window.DosingCalculations.solutionStrength(product, isKh ? 'kh' : 'ca');
+            preview.textContent = `1 ml / 100 L = +${formatCalculatorAmount(strength, 6)} ${isKh ? '°dKH' : 'mg/L'}${product.recipeNote ? ` · ${product.recipeNote}` : ''}`;
+            preview.classList.add('is-valid');
+        } catch (error) {
+            preview.textContent = error.message;
+            preview.classList.remove('is-valid');
+        }
+        document.getElementById('appDialogError').hidden = true;
+    };
+    fields.addEventListener('input', refresh);
+    fields.addEventListener('change', refresh);
+    refresh();
+    document.getElementById('appDialogConfirm').onclick = () => {
+        if (aquariumId !== activeAquariumId) return showAppDialogInlineError('Das aktive Aquarium wurde gewechselt. Bitte abbrechen und das Produkt erneut öffnen.');
+        const input = readAppDialogValue();
+        if (input === undefined) return;
+        try { closeAppDialog(buildCustomDoseProduct(input)); }
+        catch (error) { showAppDialogInlineError(error.message); }
+    };
+    const preset = await response;
+    fields.removeEventListener('input', refresh);
+    fields.removeEventListener('change', refresh);
+    if (!preset) return;
+    if (aquariumId !== activeAquariumId) return showToast('Das aktive Aquarium wurde gewechselt. Das Produkt wurde nicht gespeichert.', 'warning');
+    try {
+        storeCustomDoseProduct(preset, { presetId, source });
+        showToast(existing ? 'Eigenes Dosierprodukt aktualisiert' : 'Eigenes Dosierprodukt gespeichert', 'success');
+    } catch (error) { showToast(error.message, 'warning'); }
 }
 
 function updateSangokaiQuantityCalculation(kind, persist = true) {
@@ -13568,8 +13844,8 @@ function updateSangokaiQuantityCalculation(kind, persist = true) {
             ...fields
         });
         result.innerHTML = isKh
-            ? `<strong>Rechnerische Menge: ${formatSangokaiAmount(calculation.primaryMl)} ml Gebrauchslösung</strong><small>${formatSangokaiAmount(calculation.increase, 2)} °dKH Differenz · ${formatSangokaiAmount(calculation.rule.mlPer100LitersPerDkh)} ml / 100 L je 1 °dKH · Herstellerangabe geprüft ${calculation.rule.verifiedAt}</small>`
-            : `<strong>Ca-1: ${formatSangokaiAmount(calculation.primaryMl)} ml · Ca-2: ${formatSangokaiAmount(calculation.pairedMl)} ml Gebrauchslösung</strong><small>${formatSangokaiAmount(calculation.increase, 2)} mg/L Differenz · ${formatSangokaiAmount(calculation.rule.mlPer100LitersPerMgL)} ml / 100 L je 1 mg/L; Ca-2 laut Hersteller in gleicher Menge · geprüft ${calculation.rule.verifiedAt}</small>`;
+            ? `<strong>Rechnerische Menge: ${formatCalculatorAmount(calculation.primaryMl)} ml Gebrauchslösung</strong><small>${formatCalculatorAmount(calculation.increase, 2)} °dKH Differenz · ${formatCalculatorAmount(calculation.rule.mlPer100LitersPerDkh)} ml / 100 L je 1 °dKH · Herstellerangabe geprüft ${calculation.rule.verifiedAt}</small>`
+            : `<strong>Ca-1: ${formatCalculatorAmount(calculation.primaryMl)} ml · Ca-2: ${formatCalculatorAmount(calculation.pairedMl)} ml Gebrauchslösung</strong><small>${formatCalculatorAmount(calculation.increase, 2)} mg/L Differenz · ${formatCalculatorAmount(calculation.rule.mlPer100LitersPerMgL)} ml / 100 L je 1 mg/L; Ca-2 laut Hersteller in gleicher Menge · geprüft ${calculation.rule.verifiedAt}</small>`;
     } catch (error) {
         result.textContent = error.message;
     }
@@ -13602,10 +13878,10 @@ function updateSangokaiDilutionCalculation(persist = true) {
         if (!window.SangokaiCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
         if (isKhPowder) {
             const values = window.SangokaiCalculations.calculateBalanceWorkingSolution({ product, packages: volumeValue });
-            result.innerHTML = `<strong>${formatSangokaiAmount(values.packageCount)} vollständige(s) KH-Gebinde → ${formatSangokaiAmount(values.finalVolumeMl / 1000)} L Gebrauchslösung</strong><small>${escapeHtml(values.waterInstruction)} Laut Herstellerangabe das Pulver vollständig ansetzen.</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
+            result.innerHTML = `<strong>${formatCalculatorAmount(values.packageCount)} vollständige(s) KH-Gebinde → ${formatCalculatorAmount(values.finalVolumeMl / 1000)} L Gebrauchslösung</strong><small>${escapeHtml(values.waterInstruction)} Laut Herstellerangabe das Pulver vollständig ansetzen.</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
         } else {
             const values = window.SangokaiCalculations.calculateBalanceWorkingSolution({ product, finalVolumeMl: volumeValue, concentrateFactor: 5 });
-            result.innerHTML = `<strong>${formatSangokaiAmount(values.concentrateMl)} ml ${product === 'ca-1' ? 'Ca-1' : 'Ca-2'}-Konzentrat + ${formatSangokaiAmount(values.waterMl)} ml Wasser</strong><small>Ergibt ${formatSangokaiAmount(values.finalVolumeMl)} ml Endvolumen bei 5-facher Verdünnung · Ca-1 und Ca-2 separat ansetzen · Anleitung geprüft ${values.rule.verifiedAt}</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
+            result.innerHTML = `<strong>${formatCalculatorAmount(values.concentrateMl)} ml ${product === 'ca-1' ? 'Ca-1' : 'Ca-2'}-Konzentrat + ${formatCalculatorAmount(values.waterMl)} ml Wasser</strong><small>Ergibt ${formatCalculatorAmount(values.finalVolumeMl)} ml Endvolumen bei 5-facher Verdünnung · Ca-1 und Ca-2 separat ansetzen · Anleitung geprüft ${values.rule.verifiedAt}</small><a class="resource-inline-link" href="${values.rule.sourceUrl}" target="_blank" rel="noopener noreferrer">Offizielle BALANCE-Anleitung</a>`;
         }
     } catch (error) {
         result.textContent = error.message;
@@ -19102,6 +19378,7 @@ function initToolSection(sectionId, force = false) {
         runToolInit('Nutrition Rechner', renderNutritionCalculator);
         runToolInit('Dosierwirkung', initDoseImpactCalculator);
         runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
+        runToolInit('KH/Ca Messverlauf & Tagesdosis', initDoseTracker);
         runToolInit('Balling & Pulver', renderBallingPowderCalculator);
         runToolInit('Verbrauch', renderConsumptionCalculator);
         runToolInit('Testkorrektur', renderTestCorrectionTool);
@@ -19375,6 +19652,7 @@ function getCanonicalToolId(card, title = null) {
 function getToolTileVisual(toolId, title = '') {
     const map = {
         'kh-ca-korrektur': { icon: 'KH', subtitle: 'Zielwerte anpassen' },
+        'kh-ca-messverlauf-tagesdosis': { icon: 'ml', subtitle: 'Verbrauch und Tagesdosis' },
         'verbrauch-pro-tag': { icon: '24', subtitle: 'Tagesverbrauch rechnen' },
         'tagesdosierung-wirkung': { icon: 'ml', subtitle: 'Dosierwirkung sehen' },
         'test-korrekturfaktor': { icon: 'IC', subtitle: 'Tests abgleichen' },
@@ -19396,6 +19674,11 @@ function getToolTileVisual(toolId, title = '') {
 }
 
 const toolInfoTexts = {
+    'kh-ca-messverlauf-tagesdosis': {
+        summary: 'Berechnet KH-/Ca-Verbrauch und Tagesdosis mit der Wirkung deiner Versorgungslösung.',
+        details: 'Mindestens zwei gespeicherte Messungen mit der tatsächlich dosierten Tagesmenge werden ausgewertet. OSCI, Fauna, SANGOKAI, Hans-Werner-Balling und eigene Produktpresets sind nutzbar. Lösung und Nettovolumen werden pro Messung gespeichert.',
+        note: 'Tagesdosis und Einmalzugaben beziehen sich auf den Zeitraum seit der vorherigen Messung. Wasserwechsel, Messfehler oder ein Produktwechsel innerhalb dieses Zeitraums können die Rechnung verfälschen.'
+    },
     'kh-ca-korrektur': {
         summary: 'Berechnet, wie viel eines KH- oder Calciumprodukts dosiert werden muss, um von einem aktuellen Wert auf einen Zielwert zu kommen.',
         details: 'Du gibst Aquariumvolumen, aktuellen Wert, Zielwert, Produktwirkung und Verteilung auf Tage ein. Die gespeicherten Voreinstellungen helfen, wiederkehrende Produkte schneller zu nutzen.',
@@ -19787,7 +20070,8 @@ function openToolById(toolId, options = {}) {
         try { history.replaceState(null, '', getToolRouteHash(toolId)); } catch(e) {}
     }
     card.classList.remove('tool-deeplink-highlight');
-    card.scrollIntoView({ behavior: 'smooth', block: toolId === 'phytocoral-loeffel-generator' ? 'start' : 'center' });
+    const startAtTop = toolId === 'phytocoral-loeffel-generator' || card.getBoundingClientRect().height > window.innerHeight * 0.75;
+    card.scrollIntoView({ behavior: 'smooth', block: startAtTop ? 'start' : 'center' });
     if (options.highlight) {
         window.requestAnimationFrame(() => {
             card.classList.add('tool-deeplink-highlight');
@@ -20758,7 +21042,7 @@ function getMajorCorrectionUnit(element) {
 function getMajorCorrectionSettings() {
     if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { ...JSON.parse(JSON.stringify(majorCorrectionDefaultSettings)), tankLiters: getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters) };
     if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters);
-    if (!db.majorCorrectionSettings.selectedPresetId) {
+    if (db.majorCorrectionSettings.selectedPresetId === undefined) {
         const legacyStrengths = db.majorCorrectionSettings.strengths || {};
         if (legacyStrengths.Ca === 1 && legacyStrengths.KH !== 0.1) db.majorCorrectionSettings.selectedPresetId = 'osci-calcium';
         else db.majorCorrectionSettings.selectedPresetId = majorCorrectionDefaultSettings.selectedPresetId;
@@ -20769,7 +21053,7 @@ function getMajorCorrectionSettings() {
 function getMajorCorrectionPreset() {
     const settings = getMajorCorrectionSettings();
     const presets = getDoseImpactPresets();
-    return presets.find(preset => preset.id === settings.selectedPresetId) || presets[0];
+    return presets.find(preset => preset.id === settings.selectedPresetId) || null;
 }
 
 function getMajorCorrectionStrengthFromPreset(preset) {
@@ -20786,14 +21070,16 @@ function populateMajorCorrectionPresetSelect() {
     if (!select) return;
     const settings = getMajorCorrectionSettings();
     const presets = getDoseImpactPresets();
-    select.innerHTML = presets
+    select.innerHTML = '<option value="">Produkt auswählen</option>' + presets
         .filter(preset => preset.element === 'KH' || preset.element === 'Ca')
-        .map(preset => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`)
+        .map(preset => `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.name)}</option>`)
         .join('');
     if (!presets.some(preset => preset.id === settings.selectedPresetId)) {
-        settings.selectedPresetId = 'osci-kh-tag';
+        settings.selectedPresetId = '';
     }
     select.value = settings.selectedPresetId;
+    const editButton = document.getElementById('majorCorrectionEditProductButton');
+    if (editButton) editButton.disabled = !getDoseImpactSettings().customPresets.some(preset => preset.id === settings.selectedPresetId);
 }
 
 function syncMajorCorrectionInputsFromSettings(force = false) {
@@ -20816,45 +21102,14 @@ function syncMajorCorrectionInputsFromSettings(force = false) {
 
 function initMajorCorrectionCalculator() {
     populateMajorCorrectionPresetSelect();
-    updateMajorCorrectionPresetBuilder();
     syncMajorCorrectionInputsFromSettings(true);
     renderMajorCorrectionCalculator();
-}
-
-function updateMajorCorrectionPresetBuilder() {
-    const element = document.getElementById('majorCorrectionCustomElement')?.value || 'KH';
-    const label = document.getElementById('majorCorrectionCustomIncreaseLabel');
-    const increase = document.getElementById('majorCorrectionCustomIncrease');
-    if (label) label.textContent = `Erhöhung (${getMajorCorrectionUnit(element)})`;
-    if (increase) increase.value = element === 'KH' ? '0.5' : '11';
-}
-
-function saveMajorCorrectionPreset() {
-    const name = (document.getElementById('majorCorrectionCustomName')?.value || '').trim();
-    const element = document.getElementById('majorCorrectionCustomElement')?.value || 'KH';
-    const referenceMl = Number(document.getElementById('majorCorrectionCustomReferenceMl')?.value);
-    const referenceLiters = Number(document.getElementById('majorCorrectionCustomReferenceLiters')?.value);
-    const increase = Number(document.getElementById('majorCorrectionCustomIncrease')?.value);
-    if (!name || !(referenceMl > 0) || !(referenceLiters > 0) || !(increase > 0) || !Number.isFinite(referenceMl + referenceLiters + increase)) {
-        showToast('Bitte Name und gültige Referenzwerte für das Preset eintragen', 'warning');
-        return;
-    }
-    const settings = getDoseImpactSettings();
-    const preset = { id: `custom-${Date.now()}`, name, element, referenceMl, referenceLiters, increase };
-    settings.customPresets.push(preset);
-    getMajorCorrectionSettings().selectedPresetId = preset.id;
-    saveDB();
-    populateMajorCorrectionPresetSelect();
-    syncMajorCorrectionInputsFromSettings(true);
-    renderMajorCorrectionCalculator();
-    const nameInput = document.getElementById('majorCorrectionCustomName');
-    if (nameInput) nameInput.value = '';
-    showToast('Eigenes KH-/Calcium-Preset gespeichert', 'success');
 }
 
 function selectMajorCorrectionPreset() {
     const settings = getMajorCorrectionSettings();
-    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || 'osci-kh-tag';
+    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value ?? '';
+    populateMajorCorrectionPresetSelect();
     syncMajorCorrectionInputsFromSettings(true);
     saveDB(false);
     renderMajorCorrectionCalculator();
@@ -20955,7 +21210,7 @@ const doseImpactBuiltInPresets = [
     { id: 'osci-kh-nacht', name: 'OSCI KH Nacht', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 1, currentValue: 7, targetValue: 7.5, locked: true },
     { id: 'osci-calcium', name: 'OSCI Calcium', element: 'Ca', referenceMl: 1, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true },
     { id: 'sangokai-kh', name: 'SANGOKAI chem-balance KH', element: 'KH', referenceMl: 40, referenceLiters: 100, increase: 1, currentValue: 7, targetValue: 7.5, locked: true },
-    { id: 'sangokai-ca', name: 'SANGOKAI chem-balance CA', element: 'Ca', referenceMl: 2.5, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, locked: true },
+    { id: 'sangokai-ca', name: 'SANGOKAI chem-balance Ca-1 + Ca-2', element: 'Ca', referenceMl: 2.5, referenceLiters: 100, increase: 1, currentValue: 400, targetValue: 420, pairedProductName: 'sango chem-balance Ca-2', locked: true },
     { id: 'fauna-kh', name: 'Fauna Marin Balling Light KH', element: 'KH', referenceMl: 10, referenceLiters: 100, increase: 0.5, currentValue: 7, targetValue: 7.5, locked: true },
     { id: 'fauna-ca', name: 'Fauna Marin Balling Light Calcium', element: 'Ca', referenceMl: 10, referenceLiters: 100, increase: 11, currentValue: 400, targetValue: 420, locked: true }
 ];
@@ -20969,7 +21224,7 @@ function getDoseImpactSettings() {
         db.doseImpactSettings = { selectedPresetId: 'osci-kh-tag', tankLiters: getActiveAquariumVolumeLiters(100), dailyMl: 10, customPresets: [] };
     }
     if (!Array.isArray(db.doseImpactSettings.customPresets)) db.doseImpactSettings.customPresets = [];
-    if (!db.doseImpactSettings.selectedPresetId) db.doseImpactSettings.selectedPresetId = 'osci-kh-tag';
+    if (db.doseImpactSettings.selectedPresetId === undefined) db.doseImpactSettings.selectedPresetId = 'osci-kh-tag';
     if (!db.doseImpactSettings.tankLiters) db.doseImpactSettings.tankLiters = getActiveAquariumVolumeLiters(100);
     if (db.doseImpactSettings.dailyMl === undefined) db.doseImpactSettings.dailyMl = 10;
     return db.doseImpactSettings;
@@ -20983,7 +21238,7 @@ function getDoseImpactPresets() {
 function getSelectedDoseImpactPreset() {
     const settings = getDoseImpactSettings();
     const presets = getDoseImpactPresets();
-    return presets.find(preset => preset.id === settings.selectedPresetId) || presets[0];
+    return presets.find(preset => preset.id === settings.selectedPresetId) || null;
 }
 
 function populateDoseImpactPresetSelect() {
@@ -20991,26 +21246,25 @@ function populateDoseImpactPresetSelect() {
     if (!select) return;
     const settings = getDoseImpactSettings();
     const presets = getDoseImpactPresets();
-    select.innerHTML = presets
-        .map(preset => `<option value="${preset.id}">${escapeHtml(preset.name)}</option>`)
+    select.innerHTML = '<option value="">Produkt auswählen</option>' + presets
+        .map(preset => `<option value="${escapeHtml(preset.id)}">${escapeHtml(preset.name)}</option>`)
         .join('');
     if (!presets.some(preset => preset.id === settings.selectedPresetId)) {
-        settings.selectedPresetId = presets[0]?.id || 'osci-kh-tag';
+        settings.selectedPresetId = '';
     }
     select.value = settings.selectedPresetId;
 }
 
 function applyDoseImpactPresetToInputs(preset) {
-    if (!preset) return;
     const settings = getDoseImpactSettings();
     const fields = {
-        doseImpactElement: preset.element,
-        doseImpactPresetName: preset.name,
+        doseImpactElement: preset?.element || 'KH',
+        doseImpactPresetName: preset?.name || '',
         doseImpactTankLiters: settings.tankLiters,
         doseImpactDailyMl: settings.dailyMl,
-        doseImpactReferenceMl: preset.referenceMl,
-        doseImpactReferenceLiters: preset.referenceLiters,
-        doseImpactIncrease: preset.increase
+        doseImpactReferenceMl: preset?.referenceMl ?? '',
+        doseImpactReferenceLiters: preset?.referenceLiters ?? '',
+        doseImpactIncrease: preset?.increase ?? ''
     };
     Object.entries(fields).forEach(([id, value]) => {
         const input = document.getElementById(id);
@@ -21026,7 +21280,7 @@ function initDoseImpactCalculator() {
 
 function selectDoseImpactPreset() {
     const settings = getDoseImpactSettings();
-    settings.selectedPresetId = document.getElementById('doseImpactPreset')?.value || 'osci-kh-tag';
+    settings.selectedPresetId = document.getElementById('doseImpactPreset')?.value ?? '';
     applyDoseImpactPresetToInputs(getSelectedDoseImpactPreset());
     saveDB();
     renderDoseImpactCalculator();
@@ -21064,7 +21318,7 @@ function renderDoseImpactCalculator() {
     const weeklyIncrease = dailyIncrease * 7;
     const mlForOneUnit = increasePerMlPer100L ? (1 / increasePerMlPer100L) * (form.tankLiters / 100) : 0;
     const preset = getSelectedDoseImpactPreset();
-    const presetNote = preset?.locked ? 'OSCI Standardpreset' : 'Eigenes gespeichertes Preset';
+    const presetNote = preset?.locked ? 'Produkt-Standardpreset' : 'Eigenes gespeichertes Preset';
     result.innerHTML = `
         <div class="tool-result">
             <div class="tool-row">
@@ -21089,36 +21343,16 @@ function renderDoseImpactCalculator() {
 
 function saveDoseImpactPreset() {
     const form = readDoseImpactForm();
-    if (!form.referenceMl || !form.referenceLiters || !form.increase) {
-        showToast('Bitte gültige Produktwirkung eintragen', 'warning');
-        return;
-    }
     const settings = getDoseImpactSettings();
     const selectedId = document.getElementById('doseImpactPreset')?.value || '';
     const existingCustom = settings.customPresets.find(preset => preset.id === selectedId);
-    const id = existingCustom?.id || `custom-${Date.now()}`;
-    const preset = {
-        id,
-        name: form.name,
-        element: form.element,
-        referenceMl: form.referenceMl,
-        referenceLiters: form.referenceLiters,
-        increase: form.increase
-    };
-    if (existingCustom) {
-        Object.assign(existingCustom, preset);
-    } else {
-        settings.customPresets.push(preset);
-    }
-    settings.selectedPresetId = id;
-    settings.tankLiters = form.tankLiters || settings.tankLiters;
-    settings.dailyMl = form.dailyMl;
-    saveDB();
-    populateDoseImpactPresetSelect();
-    populateMajorCorrectionPresetSelect();
-    renderDoseImpactCalculator();
-    renderMajorCorrectionCalculator();
-    showToast('Dosierwirkungs-Preset gespeichert', 'success');
+    try {
+        const preset = buildCustomDoseProduct({ ...form, method: 'reference' });
+        settings.tankLiters = form.tankLiters || settings.tankLiters;
+        settings.dailyMl = form.dailyMl;
+        storeCustomDoseProduct(preset, { presetId: existingCustom?.id, source: 'impact' });
+        showToast('Dosierwirkungs-Preset gespeichert', 'success');
+    } catch (error) { showToast(error.message, 'warning'); }
 }
 
 function resetDoseImpactPresets() {
@@ -21127,6 +21361,7 @@ function resetDoseImpactPresets() {
     saveDB();
     initDoseImpactCalculator();
     initMajorCorrectionCalculator();
+    initDoseTracker();
     showToast('Eigene Presets zurückgesetzt', 'success');
 }
 
@@ -30136,7 +30371,7 @@ function closeAppDialog(result = null) {
     if (!dialog || !appDialogState) return;
     const { resolve, returnFocus } = appDialogState;
     appDialogState = null;
-    dialog.classList.remove('is-open', 'is-warning', 'is-danger', 'is-success', 'is-wide');
+    dialog.classList.remove('is-open', 'is-warning', 'is-danger', 'is-success', 'is-wide', 'is-dose-product');
     dialog.hidden = true;
     dialog.setAttribute('aria-hidden', 'true');
     releaseBodyScrollLock('app-dialog');
@@ -30147,7 +30382,7 @@ function closeAppDialog(result = null) {
 }
 
 function readAppDialogValue() {
-    const fields = Array.from(document.querySelectorAll('#appDialogFields [data-dialog-field]'));
+    const fields = Array.from(document.querySelectorAll('#appDialogFields [data-dialog-field]')).filter(field => !field.disabled);
     if (!fields.length) return true;
     const values = {};
     for (const field of fields) {
@@ -30189,6 +30424,7 @@ function showAppDialog(options = {}) {
 
     const fieldsMount = document.getElementById('appDialogFields');
     fieldsMount.replaceChildren();
+    fieldsMount.classList.remove('has-dose-product-fields');
     fieldsMount.classList.toggle('has-trace-element-fields', normalizedFields.some(field => /^(?:actual_)?(?:kationen|anionen)_/.test(String(field.name || ''))));
     normalizedFields.forEach((field, index) => {
         const fieldName = String(field.name || '');
