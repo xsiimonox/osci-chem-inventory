@@ -261,8 +261,9 @@
 
     let holderViewer = null;
     let holderTriangles = null;
-    function readHolderTriangles() {
-        const encoded = window.PHYTO_HOLDER_PREVIEW_DATA;
+    let holderModel = null;
+    let holderModelDimensions = null;
+    function decodeHolderTriangles(encoded) {
         if (!encoded) return [];
         const binary = atob(encoded);
         const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
@@ -275,6 +276,193 @@
         return triangles;
     }
 
+    function readHolderTriangles() {
+        return decodeHolderTriangles(window.PHYTO_HOLDER_PREVIEW_DATA);
+    }
+
+    function triangleBounds(triangles) {
+        const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+        triangles.forEach(triangle => triangle.forEach(point => point.forEach((value, axis) => {
+            min[axis] = Math.min(min[axis], value);
+            max[axis] = Math.max(max[axis], value);
+        })));
+        return { min, max };
+    }
+
+    function buildHolderModel(count) {
+        if (!holderTriangles) holderTriangles = readHolderTriangles();
+        if (!holderTriangles.length) return { triangles: [], dimensions: [0, 0, 0] };
+        if (count === 1) return { triangles: holderTriangles, dimensions: meshDimensions(holderTriangles) };
+        const sampleData = window.PHYTO_HOLDER_PREVIEW_SAMPLES?.[count];
+        if (sampleData) {
+            const sample = normalizeHolderMesh(decodeHolderTriangles(sampleData));
+            return { triangles: sample, dimensions: meshDimensions(sample) };
+        }
+        return buildRadialHolderModel(count);
+    }
+
+    function meshDimensions(triangles) {
+        const bounds = triangleBounds(triangles);
+        return bounds.max.map((value, axis) => value - bounds.min[axis]);
+    }
+
+    function normalizeHolderMesh(triangles) {
+        const bounds = triangleBounds(triangles);
+        return triangles.map(triangle => triangle.map(point => point.map((value, axis) => value - bounds.min[axis])));
+    }
+
+    function roundedRectangleOutline(xMin, xMax, yMin, yMax, radius, stepsPerCorner = 8) {
+        const corners = [
+            [xMax - radius, yMin + radius, -Math.PI / 2],
+            [xMax - radius, yMax - radius, 0],
+            [xMin + radius, yMax - radius, Math.PI / 2],
+            [xMin + radius, yMin + radius, Math.PI]
+        ];
+        const points = [];
+        for (const [cx, cy, start] of corners) {
+            for (let step = 0; step < stepsPerCorner; step++) {
+                const angle = start + step / stepsPerCorner * Math.PI / 2;
+                points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+            }
+        }
+        return points;
+    }
+
+    function sampleArc(centerX, centerY, radius, startAngle, endAngle, segments = 16) {
+        const points = [];
+        for (let step = 0; step <= segments; step++) {
+            const angle = startAngle + (endAngle - startAngle) * step / segments;
+            points.push([centerX + radius * Math.cos(angle), centerY + radius * Math.sin(angle)]);
+        }
+        return points;
+    }
+
+    function resampleOutline(points, sampleCount) {
+        const clean = points.filter((point, index) => index === 0
+            || Math.hypot(point[0] - points[index - 1][0], point[1] - points[index - 1][1]) > 1e-7);
+        const lengths = clean.map((point, index) => {
+            const next = clean[(index + 1) % clean.length];
+            return Math.hypot(next[0] - point[0], next[1] - point[1]);
+        });
+        const perimeter = lengths.reduce((sum, length) => sum + length, 0);
+        const sampled = [];
+        let edge = 0, edgeStart = 0;
+        for (let index = 0; index < sampleCount; index++) {
+            const distance = perimeter * index / sampleCount;
+            while (edge < lengths.length - 1 && edgeStart + lengths[edge] < distance) {
+                edgeStart += lengths[edge++];
+            }
+            const ratio = lengths[edge] ? (distance - edgeStart) / lengths[edge] : 0;
+            const start = clean[edge], end = clean[(edge + 1) % clean.length];
+            sampled.push([start[0] + (end[0] - start[0]) * ratio, start[1] + (end[1] - start[1]) * ratio]);
+        }
+        return sampled;
+    }
+
+    function roundedShoulderedTabOutline(outerRingRadius, xMax, yMin, yMax, shoulderRadius = 6, tipSegments = 16) {
+        // A true circular fillet tangent to the ring's outer circle and the arm's
+        // straight side. This gives the requested 6 mm radius on both shoulders.
+        const totalRadius = outerRingRadius + shoulderRadius;
+        const upperCenterY = yMax + shoulderRadius;
+        const lowerCenterY = yMin - shoulderRadius;
+        const upperCenterX = Math.sqrt(totalRadius ** 2 - upperCenterY ** 2);
+        const lowerCenterX = Math.sqrt(totalRadius ** 2 - lowerCenterY ** 2);
+        const upperTipRadius = xMax - upperCenterX;
+        const lowerTipRadius = xMax - lowerCenterX;
+        const upperTangent = [outerRingRadius * upperCenterX / totalRadius, outerRingRadius * upperCenterY / totalRadius];
+        const lowerTangent = [outerRingRadius * lowerCenterX / totalRadius, outerRingRadius * lowerCenterY / totalRadius];
+        const upperShoulderStart = Math.atan2(upperTangent[1] - upperCenterY, upperTangent[0] - upperCenterX);
+        const lowerShoulderStart = Math.atan2(lowerTangent[1] - lowerCenterY, lowerTangent[0] - lowerCenterX);
+        const points = [
+            ...sampleArc(lowerCenterX, yMin + lowerTipRadius, lowerTipRadius, -Math.PI / 2, 0, tipSegments),
+            [xMax, yMax - upperTipRadius],
+            ...sampleArc(upperCenterX, yMax - upperTipRadius, upperTipRadius, 0, Math.PI / 2, tipSegments),
+            ...sampleArc(upperCenterX, upperCenterY, shoulderRadius, -Math.PI / 2, upperShoulderStart, tipSegments),
+            lowerTangent,
+            ...sampleArc(lowerCenterX, lowerCenterY, shoulderRadius, lowerShoulderStart, Math.PI / 2, tipSegments)
+        ];
+        return points;
+    }
+
+    function addExtrudedFrame(triangles, outer, inner, angle, zBottom = 0, zTop = 4) {
+        const cosine = Math.cos(angle), sine = Math.sin(angle);
+        const transform = ([x, y], z) => [x * cosine - y * sine, x * sine + y * cosine, z];
+        const outerBottom = outer.map(point => transform(point, zBottom));
+        const outerTop = outer.map(point => transform(point, zTop));
+        const innerBottom = inner.map(point => transform(point, zBottom));
+        const innerTop = inner.map(point => transform(point, zTop));
+        for (let i = 0; i < outer.length; i++) {
+            const next = (i + 1) % outer.length;
+            const ob0 = outerBottom[i], ob1 = outerBottom[next], ot0 = outerTop[i], ot1 = outerTop[next];
+            const ib0 = innerBottom[i], ib1 = innerBottom[next], it0 = innerTop[i], it1 = innerTop[next];
+            triangles.push([ot0, ot1, it1], [ot0, it1, it0]);
+            triangles.push([ob0, ib1, ob1], [ob0, ib0, ib1]);
+            triangles.push([ob0, ob1, ot1], [ob0, ot1, ot0]);
+            triangles.push([ib1, ib0, it0], [ib1, it0, it1]);
+        }
+    }
+
+    function addAnnularRing(triangles, innerRadius, outerRadius, segments = 128) {
+        const bottom = 0, top = 4;
+        const point = (radius, angle, z) => [radius * Math.cos(angle), radius * Math.sin(angle), z];
+        for (let i = 0; i < segments; i++) {
+            const a0 = i * Math.PI * 2 / segments, a1 = (i + 1) * Math.PI * 2 / segments;
+            const ob0 = point(outerRadius, a0, bottom), ob1 = point(outerRadius, a1, bottom);
+            const ot0 = point(outerRadius, a0, top), ot1 = point(outerRadius, a1, top);
+            const ib0 = point(innerRadius, a0, bottom), ib1 = point(innerRadius, a1, bottom);
+            const it0 = point(innerRadius, a0, top), it1 = point(innerRadius, a1, top);
+            triangles.push([ot0, ot1, it1], [ot0, it1, it0]);
+            triangles.push([ob0, ib1, ob1], [ob0, ib0, ib1]);
+            triangles.push([ob0, ob1, ot1], [ob0, ot1, ot0]);
+            triangles.push([ib1, ib0, it0], [ib1, it0, it1]);
+        }
+    }
+
+    function buildRadialHolderModel(count) {
+        const triangles = [];
+        addAnnularRing(triangles, 26.8, 28.8);
+        // Match the reference STLs: 6 mm shoulder fillets on both sides of every
+        // arm, plus the rounded outer tip and the slightly offset slot.
+        const outerTab = resampleOutline(roundedShoulderedTabOutline(28.8, 35.626, -5.1, 5.5, 6.0), 96);
+        const slot = resampleOutline(roundedRectangleOutline(30.126, 33.626, -3, 3.5, 0.25, 16), 96);
+        const startAngle = Math.PI / 2;
+        for (let i = 0; i < count; i++) {
+            addExtrudedFrame(triangles, outerTab, slot, startAngle + i * Math.PI * 2 / count);
+        }
+        const normalized = normalizeHolderMesh(triangles);
+        return { triangles: normalized, dimensions: meshDimensions(normalized) };
+    }
+
+    function updateHolder() {
+        const input = document.getElementById('phytoHolderCount');
+        const dimensions = document.getElementById('phytoHolderDimensions');
+        const fileInfo = document.getElementById('phytoHolderFileInfo');
+        const download = document.getElementById('phytoHolderDownload');
+        const canvas = document.getElementById('phytoHolderCanvas');
+        const fallback = document.getElementById('phytoHolder3dFallback');
+        if (!input || !dimensions || !download) return;
+        const count = Number(input.value);
+        const valid = Number.isInteger(count) && count >= 1 && count <= 9;
+        input.setCustomValidity(valid ? '' : 'Bitte eine ganze Zahl zwischen 1 und 9 wählen.');
+        download.disabled = !valid;
+        if (!valid) {
+            dimensions.textContent = '1 bis 9 Plätze wählen';
+            if (fileInfo) fileInfo.textContent = 'Bitte eine gültige Anzahl wählen.';
+            return;
+        }
+
+        holderModel = buildHolderModel(count);
+        holderModelDimensions = holderModel.dimensions;
+        dimensions.textContent = `${fmt(holderModel.dimensions[0], 1)} × ${fmt(holderModel.dimensions[1], 1)} × ${fmt(holderModel.dimensions[2], 1)} mm`;
+        if (fileInfo) fileInfo.textContent = `${count} ${count === 1 ? 'Löffelplatz' : 'Löffelplätze'} · STL · ${fmt((84 + holderModel.triangles.length * 50) / 1024, 0)} KB`;
+        if (canvas && fallback) {
+            if (!holderViewer) holderViewer = createScoopViewer(canvas, null, fallback);
+            if (holderViewer) holderViewer.setModel(holderModel.triangles);
+            else fallback.hidden = false;
+        }
+        download.onclick = () => downloadHolderStl(count, holderModel.triangles, holderModelDimensions);
+    }
+
     function renderPreview(calc) {
         const canvas = document.getElementById('phytoScoopCanvas');
         const fallback = document.getElementById('phytoScoop3dFallback');
@@ -282,15 +470,7 @@
         if (!scoopViewer) scoopViewer = createScoopViewer(canvas, document.getElementById('phytoScoopResetView'), fallback);
         if (scoopViewer) scoopViewer.setModel(makeMesh(calc), calc);
         else fallback.hidden = false;
-        const holderCanvas = document.getElementById('phytoHolderCanvas');
-        const holderFallback = document.getElementById('phytoHolder3dFallback');
-        if (holderCanvas && holderFallback) {
-            if (!holderViewer) holderViewer = createScoopViewer(holderCanvas, null, holderFallback);
-            if (holderViewer) {
-                if (!holderTriangles) holderTriangles = readHolderTriangles();
-                holderViewer.setModel(holderTriangles);
-            } else holderFallback.hidden = false;
-        }
+        updateHolder();
     }
 
     function update() {
@@ -308,7 +488,7 @@
         }
         const calc = calculate(liters);
         const scoopPhrase = calc.scoopCount === 1 ? '1 vollen PhytoDose-Löffel' : `${fmt(calc.scoopCount, 0)} volle PhytoDose-Löffel`;
-        const splits = `<div class="phyto-scoop-split ${calc.scoopCount > 1 ? 'phyto-scoop-split--multiple' : ''}" role="status" aria-live="polite"><span class="phyto-scoop-split-count">${fmt(calc.scoopCount, 0)}×</span><span><strong>Du brauchst ${scoopPhrase}</strong><small>pro Anwendung · alle Löffel haben dieselbe Größe</small></span></div>`;
+        const splits = `<div class="phyto-scoop-split ${calc.scoopCount > 1 ? 'phyto-scoop-split--multiple' : ''}" role="status" aria-live="polite"><span class="phyto-scoop-split-count">${fmt(calc.scoopCount, 0)}×</span><span><strong>Du brauchst ${scoopPhrase}</strong><small>pro Anwendung</small></span></div>`;
         const adjustedDiameter = calc.innerRadiusMm * 2;
         const diameterNote = adjustedDiameter < innerDiameterMm - 0.01 ? ` · Innen-Ø ${fmt(adjustedDiameter, 1)} mm (für mind. 5 mm Füllhöhe angepasst)` : ` · Innen-Ø ${fmt(innerDiameterMm, 1)} mm`;
         result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>PhytoCoral gesamt</span><strong>${fmt(calc.massG, 3)} g</strong></div><div><span>Gesamtvolumen</span><strong>${fmt(calc.totalMl, 3)} ml</strong></div></div>${splits}<p class="phyto-scoop-detail">Je Löffel: ${fmt(calc.perScoopG, 3)} g · ${fmt(calc.perScoopMl, 3)} ml · Becherhöhe ${fmt(calc.outerCupHeight, 1)} mm${diameterNote}</p>`;
@@ -412,10 +592,36 @@
         setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
+    function downloadHolderStl(count, triangles, dimensions) {
+        if (!triangles.length) return;
+        const buffer = new ArrayBuffer(84 + triangles.length * 50);
+        const view = new DataView(buffer);
+        const header = `PhytoDose holder ${count} slots | ${dimensions.map(value => fmt(value, 1)).join(' x ')} mm`;
+        for (let i = 0; i < 80; i++) view.setUint8(i, i < header.length ? header.charCodeAt(i) : 0);
+        view.setUint32(80, triangles.length, true);
+        let offset = 84;
+        for (const [a, b, c] of triangles) {
+            const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+            const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+            let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+            const length = Math.hypot(nx, ny, nz) || 1;
+            nx /= length; ny /= length; nz /= length;
+            [nx, ny, nz, ...a, ...b, ...c].forEach(value => { view.setFloat32(offset, value, true); offset += 4; });
+            view.setUint16(offset, 0, true); offset += 2;
+        }
+        const url = URL.createObjectURL(new Blob([buffer], { type: 'model/stl' }));
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `phytodose-loeffelhalter-${count}-plaetze.stl`;
+        document.body.append(anchor); anchor.click(); anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         const input = document.getElementById('phytoScoopLiters');
         if (!input) return;
         input.addEventListener('input', update);
+        document.getElementById('phytoHolderCount')?.addEventListener('input', updateHolder);
         update();
     });
 })();

@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release">
-    <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.25-release">
+    <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.30-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -1425,13 +1425,14 @@
                                     <footer class="phyto-preview-footer"><span><kbd>↔</kbd> Ziehen zum Drehen</span><span><kbd>⌕</kbd> Mausrad oder Pinch zum Zoomen</span><span>3D-Maße in mm</span></footer>
                                 </section>
                                 <section class="phyto-holder-addon" aria-labelledby="phytoHolderTitle">
-                                    <div class="phyto-holder-heading"><div><span class="workflow-eyebrow">Optionales Add-on</span><h4 id="phytoHolderTitle">Passender Löffelhalter</h4></div><span class="phyto-holder-dimensions">64,4 × 57,6 × 4 mm</span></div>
+                                    <div class="phyto-holder-heading"><div><span class="workflow-eyebrow">Optionales Add-on</span><h4 id="phytoHolderTitle">Passender Löffelhalter</h4></div><span class="phyto-holder-dimensions" id="phytoHolderDimensions">64,4 × 57,6 × 4 mm</span></div>
+                                    <div class="phyto-holder-config"><label for="phytoHolderCount">Löffelplätze</label><div class="phyto-scoop-input-wrap"><input id="phytoHolderCount" type="number" min="1" max="9" step="1" value="1" inputmode="numeric" aria-describedby="phytoHolderCountHint"><span>Stück</span></div><small id="phytoHolderCountHint">Wähle 1 bis 9 Plätze. Ab zwei Löffeln sitzen die Steckplätze radial auf einem gemeinsamen Ring.</small></div>
                                     <div class="phyto-holder-preview" role="group" aria-label="Interaktive 3D-Vorschau des Löffelhalters">
                                         <canvas id="phytoHolderCanvas" aria-label="3D-Modell des Löffelhalters. Mit Maus oder Finger drehen, mit Mausrad oder zwei Fingern zoomen."></canvas>
                                         <div class="phyto-preview-bed-label"><span aria-hidden="true">▱</span> Druckbett-Auflage · STL-Modell</div>
                                         <div id="phytoHolder3dFallback" class="phyto-preview-fallback" hidden>Die 3D-Ansicht wird von diesem Browser nicht unterstützt.</div>
                                     </div>
-                                    <div class="phyto-holder-footer"><span>Separat druckbar · STL · 79 KB</span><a class="btn-secondary btn-animated" href="assets/models/PhytoCoral_SpoolHolder.stl" download="PhytoCoral_SpoolHolder.stl">Löffelhalter-STL herunterladen</a></div>
+                                    <div class="phyto-holder-footer"><span id="phytoHolderFileInfo">Separat druckbar · STL</span><button type="button" class="btn-secondary btn-animated" id="phytoHolderDownload">Löffelhalter-STL herunterladen</button></div>
                                 </section>
                                 <p class="phyto-scoop-note">Die Rechnung verwendet deine Kalibrierung: 2,45 ml Pulver entsprechen 1,5 g. Pulver locker einfüllen und nicht verdichten. Druckmaß und tatsächliche Füllmenge können je nach Drucker und Pulver variieren.</p>
                             </div>
@@ -2895,7 +2896,7 @@
     <script src="assets/js/sangokai-calculations.js?v=3.6.17-release"></script>
     <script src="assets/js/app.js?v=3.6.26-release"></script>
     <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
-    <script src="assets/js/phyto-scoop.js?v=3.6.25-release"></script>
+    <script src="assets/js/phyto-scoop.js?v=3.6.31-release"></script>
     <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
