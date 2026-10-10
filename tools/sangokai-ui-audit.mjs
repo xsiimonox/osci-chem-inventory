@@ -33,6 +33,16 @@ try {
         tracker.forms.kh = { ...(tracker.forms.kh || {}), product: 'kh', value: '', targetValue: '7.5', targetDays: '10', maxChangePercent: '20', mode: 'gradual' };
         tracker.form = tracker.forms.kh;
         initSangokaiDoseTracker();
+        delete tracker.defaults.ca;
+        tracker.forms.ca = { product: 'ca', value: '', doseMlPerDay: '', at: formatDateTimeLocal() };
+        document.getElementById('sangokaiDoseElement').value = 'ca';
+        changeSangokaiDoseProduct('ca');
+        window.sangokaiDoseDefaultsAudit = {
+            targetDays: document.getElementById('sangokaiDoseTargetDays').value,
+            maxChangePercent: document.getElementById('sangokaiDoseMaxChange').value
+        };
+        document.getElementById('sangokaiDoseElement').value = 'kh';
+        changeSangokaiDoseProduct('kh');
     });
 
     const results = [];
@@ -44,7 +54,11 @@ try {
             const svg = card?.querySelector('.sangokai-dose-trend svg');
             const points = card?.querySelectorAll('.sangokai-dose-trend-point').length || 0;
             const target = card?.querySelector('.sangokai-dose-target-line');
+            const doseFields = card?.querySelectorAll('.sangokai-dose-primary-grid > .input-group');
             const axisFontSize = svg ? getComputedStyle(svg.querySelector('.sangokai-dose-axis-label')).fontSize : '0px';
+            const secondRowY = doseFields?.[3]?.getBoundingClientRect().top;
+            const modeRowY = doseFields?.[4]?.getBoundingClientRect().top;
+            const doseFieldRects = [...(doseFields || [])].map(field => field.getBoundingClientRect());
             return {
                 width: innerWidth,
                 gridWidth: grid?.clientWidth || 0,
@@ -53,6 +67,11 @@ try {
                 chartExists: Boolean(svg),
                 chartPointCount: points,
                 targetLine: Boolean(target),
+                primaryFieldCount: card?.querySelectorAll('.sangokai-dose-primary-grid .input-group').length || 0,
+                finalFieldColumn: doseFields?.[4] ? getComputedStyle(doseFields[4]).gridColumn : '',
+                secondRowAligned: Number.isFinite(secondRowY) && Number.isFinite(modeRowY) && Math.abs(secondRowY - modeRowY) <= 1,
+                mobileFieldsAligned: doseFieldRects.length === 5 && doseFieldRects.every(rect => Math.abs(rect.x - doseFieldRects[0].x) < 1 && Math.abs(rect.width - doseFieldRects[0].width) < 1),
+                advancedOptionsClosed: card ? !card.querySelector('.sangokai-dose-options')?.open : false,
                 axisFontSize: Number.parseFloat(axisFontSize),
                 invalidSvg: /NaN|undefined/.test(svg?.outerHTML || '')
             };
@@ -73,9 +92,12 @@ try {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const reducedMotionDuration = await page.locator('.sangokai-dose-trend-line').evaluate(element => getComputedStyle(element).animationDuration);
     const ok = errors.length === 0
-        && results.every(item => item.cardFillsGrid && item.noPageOverflow && item.chartExists && item.chartPointCount === 3 && item.targetLine && !item.invalidSvg && item.openedWithOneClick && item.closedWithOneClick && (item.width <= 480 ? item.axisFontSize >= 24 : item.axisFontSize < 24))
+        && results.every(item => item.cardFillsGrid && item.noPageOverflow && item.chartExists && item.chartPointCount === 3 && item.targetLine && item.primaryFieldCount === 5 && item.advancedOptionsClosed && !item.invalidSvg && item.openedWithOneClick && item.closedWithOneClick && (item.width <= 480 ? item.axisFontSize >= 24 : item.axisFontSize < 24))
+        && results.filter(item => item.width >= 1400).every(item => item.finalFieldColumn === 'span 3' && item.secondRowAligned)
+        && results.filter(item => item.width <= 390).every(item => item.mobileFieldsAligned)
+        && (await page.evaluate(() => window.sangokaiDoseDefaultsAudit.targetDays === '10' && window.sangokaiDoseDefaultsAudit.maxChangePercent === '10'))
         && reducedMotionDuration === '0s';
-    console.log(JSON.stringify({ ok, results, reducedMotionDuration, errors }, null, 2));
+    console.log(JSON.stringify({ ok, results, doseDefaults: await page.evaluate(() => window.sangokaiDoseDefaultsAudit), reducedMotionDuration, errors }, null, 2));
     if (!ok) process.exitCode = 1;
 } finally {
     await browser.close();

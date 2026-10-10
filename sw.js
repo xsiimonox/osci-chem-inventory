@@ -1,11 +1,15 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v3613-release';
+const CACHE_NAME = 'reef-storage-tools-cache-v3625-release';
 const CORE_ASSETS = [
   './',
   './index.html',
   './assets/css/style.css',
   './assets/css/workspace-ui.css',
   './assets/css/design-system.css',
+  './assets/css/phyto-scoop.css',
   './assets/js/app.js',
+  './assets/js/phyto-holder-preview-data.js',
+  './assets/js/phyto-scoop.js',
+  './assets/models/PhytoCoral_SpoolHolder.stl',
   './assets/js/workspace-ui.js',
   './assets/js/theme.js',
   './assets/js/lighting-sim.js',

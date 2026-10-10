@@ -93,6 +93,11 @@ const traceCalculatorRules = {
     osmoseDensityGPerMl: 1
 };
 
+const HANS_WERNER_MACRO_RECIPE_ELEMENTS = {
+    'Hans-Werner Balling KH': 'KH',
+    'Hans-Werner Balling Ca': 'Ca'
+};
+
 const macroRecipes = {
     'KH-Tag': [
         { label: 'Osmosewasser (RO-Wasser)', amount: 977, unit: 'ml', stock: false },
@@ -115,6 +120,14 @@ const macroRecipes = {
         { item: 'Magnesiumchlorid (MgCl2)', amount: 99.5, unit: 'ml' },
         { item: 'Kaliumbromid (KBr)', amount: 10.4, unit: 'ml' },
         { item: 'Kaliumsulfat (K2SO4)', amount: 80, unit: 'ml' }
+    ],
+    'Hans-Werner Balling KH': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 1, unit: 'L', stock: false },
+        { label: 'Natriumhydrogencarbonat (NaHCO₃)', amount: 84, unit: 'g', stock: false }
+    ],
+    'Hans-Werner Balling Ca': [
+        { label: 'Osmosewasser (RO-Wasser)', amount: 1, unit: 'L', stock: false },
+        { label: 'Calciumchlorid (Hydratform laut Produktangabe prüfen)', amount: 71.6, unit: 'g', stock: false }
     ]
 };
 
@@ -1324,9 +1337,10 @@ const HIDDEN_LOGBOOK_FEATURES_KEY = 'reeftools_hidden_logbook_features_v1';
 const TOOL_SECTION_DEFINITIONS = [
     { id: 'dosieren-und-messwerte', label: 'Dosierung, Verbrauch & Messen', hint: 'KH/Ca, Testabgleich, Nährstoffe und tägliche Dosierung' },
     { id: 'salinitaet-und-wasserwechsel', label: 'Salinität & Wasserwechsel', hint: 'Salzgehalt, Nettovolumen, Wasserwechsel und Adsorber' },
-    { id: 'c-und-r-und-mischen', label: 'Mischen & Rezepte', hint: 'Meerwasser, C&R-Lösungen, Natriumchlorid und Makro-Elemente', osciOnly: true },
+    { id: 'c-und-r-und-mischen', label: 'Mischen & Rezepte', hint: 'OSCI-Rezepte und eigene Balling-Pulverlösungen' },
     { id: 'sangokai-mengen-und-mischen', label: 'Sangokai: Mengen & Mischen', hint: 'Reine Mengen- und Verdünnungsberechnungen ohne Anwendungsempfehlung' },
-    { id: 'community-und-hilfe', label: 'Hilfe & Quellen', hint: 'Anleitung, OSCI Motion Links, Meerwasser-Lexikon und Buchtipps' }
+    { id: 'community-und-hilfe', label: 'Hilfe & Quellen', hint: 'Anleitung, OSCI Motion Links, Meerwasser-Lexikon und Buchtipps' },
+    { id: '3d-druck-und-werkstatt', label: '3D-Druck & Werkstatt', hint: 'Individuelle Messlöffel und Werkstattwerkzeuge' }
 ];
 const TAB_LABELS = {
     uebersicht: 'Übersicht',
@@ -1378,7 +1392,7 @@ const TOOL_SEARCH_KEYWORDS = {
     'adsorber-durchfluss': 'adsorber phosphat po4 aktivkohle eisen aluminium durchfluss filter',
     'meerwasser-aus-c-und-r-anmischen': 'meerwasser salzwasser ansetzen mischen rezept c und r cr osmose',
     'c-und-r-natriumchlorid-aus-nacl-pulver': 'nacl natriumchlorid salz pulver lösung ansetzen mischen',
-    'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen',
+    'makro-elemente-anmischen': 'makro kh tag kh nacht calcium magnesium rezept lösung mischen hans werner balling natriumhydrogencarbonat calciumchlorid osmosewasser dokumentation',
     'sangokai-mengen-und-mischen': 'sangokai balance kh calcium ca-1 ca-2 mischung verdünnung mengenrechnung konzentrat lager produkt',
     'hilfreiche-quellen': 'hilfe anleitung quellen links wissen buch ratgeber osci'
 };
@@ -1401,9 +1415,10 @@ const TOOL_DEFINITIONS = [
     { id: 'adsorber-durchfluss', label: 'Adsorber Durchfluss', sectionId: 'salinitaet-und-wasserwechsel' },
     { id: 'meerwasser-aus-c-und-r-anmischen', label: 'Meerwasser aus C&R anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
     { id: 'c-und-r-natriumchlorid-aus-nacl-pulver', label: 'C&R Natriumchlorid aus NaCl Pulver', sectionId: 'c-und-r-und-mischen', osciOnly: true },
-    { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', sectionId: 'c-und-r-und-mischen', osciOnly: true },
+    { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', sectionId: 'c-und-r-und-mischen' },
     { id: 'sangokai-mengen-und-mischen', label: 'Sangokai Mengen & Mischen', sectionId: 'sangokai-mengen-und-mischen' },
-    { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen', sectionId: 'community-und-hilfe' }
+    { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen', sectionId: 'community-und-hilfe' },
+    { id: 'phytocoral-loeffel-generator', label: 'PhytoDose Messlöffel-Rechner', sectionId: '3d-druck-und-werkstatt' }
 ];
 const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
 const OSCI_ONLY_TOOL_IDS = new Set(TOOL_DEFINITIONS.filter(tool => tool.osciOnly).map(tool => tool.id));
@@ -4749,6 +4764,7 @@ function createWarehouseData(source = {}) {
         shopLinks: source.shopLinks || {},
         productPrices: source.productPrices || {},
         productPresets: source.productPresets || {},
+        ballingMixingHistory: Array.isArray(source.ballingMixingHistory) ? source.ballingMixingHistory : [],
         crSeaWaterPresets: source.crSeaWaterPresets || {},
         customSeaTracePresets: source.customSeaTracePresets || {},
         favoriteProducts: source.favoriteProducts || {},
@@ -12955,6 +12971,7 @@ function updateSupplyProfileSelection(group, id, enabled) {
     profile.filtersConfigured = true;
     saveDB();
     refreshFeatureVisibility();
+    refreshMacroRecipeOptions();
     renderSupplyProfileSettings();
 }
 
@@ -13015,13 +13032,19 @@ function getSangokaiDoseTrackerState() {
     if (!state.doseTracker.defaults[product]) {
         state.doseTracker.defaults[product] = {
             targetValue: activeForm.targetValue ?? '',
-            targetDays: activeForm.targetDays ?? '',
-            maxChangePercent: activeForm.maxChangePercent ?? '',
+            targetDays: activeForm.targetDays || '10',
+            maxChangePercent: activeForm.maxChangePercent || '10',
             mode: activeForm.mode || 'gradual'
         };
     }
+    const defaults = state.doseTracker.defaults[product];
+    defaults.targetDays = defaults.targetDays || activeForm.targetDays || '10';
+    defaults.maxChangePercent = defaults.maxChangePercent || activeForm.maxChangePercent || '10';
+    defaults.mode = defaults.mode || activeForm.mode || 'gradual';
     ['targetValue', 'targetDays', 'maxChangePercent', 'mode'].forEach(key => {
-        if (activeForm[key] === undefined) activeForm[key] = state.doseTracker.defaults[product][key] ?? '';
+        if (activeForm[key] === undefined || (key !== 'targetValue' && activeForm[key] === '')) {
+            activeForm[key] = defaults[key] ?? '';
+        }
     });
     state.doseTracker.form = activeForm;
     state.doseTracker.forms[product] = activeForm;
@@ -13132,8 +13155,10 @@ function updateSangokaiDoseTracker(persist = true) {
     const targetLabel = document.getElementById('sangokaiDoseTargetLabel');
     const productSelect = document.getElementById('sangokaiDoseElement');
     if (valueLabel) valueLabel.textContent = isKh ? 'Gemessene KH (°dKH)' : 'Gemessenes Calcium (mg/L)';
-    if (doseLabel) doseLabel.textContent = isKh ? 'KH-Gebrauchslösung im Messzeitraum (ml/Tag)' : 'Ca-1-Gebrauchslösung im Messzeitraum (ml/Tag; Ca-2 gleich dosiert)';
-    if (targetLabel) targetLabel.textContent = isKh ? 'Dein KH-Zielwert (°dKH)' : 'Dein Calcium-Zielwert (mg/L)';
+    if (doseLabel) doseLabel.textContent = isKh ? 'KH-Tagesdosis im Messzeitraum (ml/Tag)' : 'Ca-1-Tagesdosis im Messzeitraum (ml/Tag; Ca-2 gleich dosiert)';
+    if (targetLabel) targetLabel.textContent = isKh ? 'Dein KH-Sollwert (°dKH)' : 'Dein Calcium-Sollwert (mg/L)';
+    const optionsSummary = document.getElementById('sangokaiDoseOptionsSummary');
+    if (optionsSummary) optionsSummary.textContent = `Messzeitpunkt · Annäherung ${String(form.targetDays ?? '').trim() || '10'} Tage · Dosislimit ±${String(form.maxChangePercent ?? '').trim() || '10'} %`;
     if (productSelect) productSelect.disabled = Boolean(form.editingId);
     const saveButton = document.getElementById('sangokaiDoseSaveButton');
     if (saveButton) saveButton.textContent = form.editingId ? 'Messung aktualisieren' : 'Messung speichern';
@@ -13190,18 +13215,24 @@ function updateSangokaiDoseTracker(persist = true) {
 function changeSangokaiDoseProduct(product) {
     const tracker = getSangokaiDoseTrackerState();
     const currentForm = readSangokaiDoseTrackerForm();
-    tracker.forms[currentForm.product] = currentForm;
+    const previousProduct = tracker.form?.product || currentForm.product;
+    tracker.forms[previousProduct] = { ...currentForm, product: previousProduct };
+    const defaults = {
+        targetDays: '10',
+        maxChangePercent: '10',
+        mode: 'gradual',
+        ...(tracker.defaults[product] || {})
+    };
     const nextForm = tracker.forms[product] || {
         product,
         at: formatDateTimeLocal(),
         value: '',
         doseMlPerDay: '',
-        mode: 'gradual',
+        mode: defaults.mode,
         targetValue: '',
-        targetDays: '',
-        maxChangePercent: ''
+        targetDays: defaults.targetDays,
+        maxChangePercent: defaults.maxChangePercent
     };
-    const defaults = tracker.defaults[product] || {};
     ['targetValue', 'targetDays', 'maxChangePercent', 'mode'].forEach(key => {
         if (nextForm[key] === undefined || nextForm[key] === '') nextForm[key] = defaults[key] ?? '';
     });
@@ -18929,12 +18960,7 @@ function initToolSection(sectionId, force = false) {
 
     if (sectionId === 'c-und-r-und-mischen') {
         runToolInit('Makro-Rezeptauswahl', () => {
-            const select = document.getElementById('macroRecipeSelect');
-            if (select && select.options.length === 0) {
-                select.innerHTML = Object.keys(macroRecipes)
-                    .map(name => `<option value="${name}">${name}</option>`)
-                    .join('');
-            }
+            refreshMacroRecipeOptions();
         });
         runToolInit('Makro-Rezept', renderMacroRecipe);
         runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
@@ -19076,6 +19102,7 @@ function isToolHidden(toolId) {
     const profile = getActiveSupplyProfile();
     const providerHidden = (toolId === 'fauna-marin-traces' && !profile.providers.includes('fauna-marin'))
         || (toolId === 'sangokai-mengen-und-mischen' && (!profile.providers.includes('sangokai') || !profile.sangokaiModules.includes('balance')))
+        || (toolId === 'makro-elemente-anmischen' && !profile.providers.some(id => ['osci', 'own-powder'].includes(id)))
         || (tool?.osciOnly && !profile.providers.includes('osci'));
     return providerHidden
         || getHiddenToolIds().includes(toolId)
@@ -19282,9 +19309,9 @@ const toolInfoTexts = {
         note: 'Pulver vollständig lösen und Lösung eindeutig beschriften.'
     },
     'makro-elemente-anmischen': {
-        summary: 'Skaliert Rezepte für Makro-Elemente wie KH-Tag, KH-Nacht, Calcium und Magnesium.',
-        details: 'Du wählst Rezept und Zielmenge. Lagergeführte C&R Bestandteile können anschließend direkt ausgelagert werden.',
-        note: 'Beim Anmischen sauber arbeiten und Kanister eindeutig markieren.'
+        summary: 'Skaliert OSCI-Makro-Rezepte und dokumentiert Hans-Werner-Balling-Ansätze für KH und Calcium.',
+        details: 'Wähle ein Rezept, gib die Zielmenge ein und prüfe die berechneten Zutaten. Hans-Werner KH und Ca basieren auf 420 g bzw. 358 g je 5 L Osmosewasser; dokumentierte Chargen bleiben hier abrufbar.',
+        note: 'Die 5 L beziehen sich auf das Osmosewasser vor Zugabe des Pulvers, nicht auf ein garantiertes Endvolumen. Beim Calciumchlorid die passende Hydratform anhand der Produktangabe prüfen.'
     }
 };
 
@@ -20400,6 +20427,67 @@ const ballingPowderSalts = {
         { id: 'mgso4-7h2o', name: 'Magnesiumsulfat-Heptahydrat (MgSO₄·7H₂O)', molarMass: 246.47, elementFraction: 24.305 / 246.47 }
     ]
 };
+
+const HANS_WERNER_BALLING_RECIPES = {
+    KH: {
+        name: 'Natriumhydrogencarbonat (NaHCO₃)',
+        gramsPerFiveLiters: 420,
+        sourceUrl: 'http://www.zoanthus.fr/66-balling-2-hydrog%C3%A9nocarbonate-de-sodium'
+    },
+    Ca: {
+        name: 'Calciumchlorid',
+        gramsPerFiveLiters: 358,
+        sourceUrl: 'http://www.zoanthus.fr/65-balling-1-chlorure-de-calcium'
+    }
+};
+
+function calculateHansWernerBallingBatch(element, waterLiters) {
+    const recipe = HANS_WERNER_BALLING_RECIPES[element];
+    const liters = Number(waterLiters);
+    if (!recipe || !Number.isFinite(liters) || liters <= 0) return null;
+    return { ...recipe, element, waterLiters: liters, powderGrams: recipe.gramsPerFiveLiters * liters / 5 };
+}
+
+function renderBallingMixingHistory() {
+    const entries = Array.isArray(db.ballingMixingHistory) ? db.ballingMixingHistory.slice(0, 20) : [];
+    if (!entries.length) return '<p class="field-help">Noch keine Mischungen dokumentiert.</p>';
+    return `<details class="balling-mix-history"><summary>Dokumentierte Ansätze (${entries.length})</summary><div class="balling-mix-history-list">${entries.map(entry => {
+        const recipe = HANS_WERNER_BALLING_RECIPES[entry.element];
+        if (!recipe || !entry.id) return '';
+        return `<div class="balling-mix-history-row"><span><strong>${escapeHtml(entry.element === 'KH' ? 'Hans-Werner-Balling KH' : 'Hans-Werner-Balling Ca')}</strong><small>${escapeHtml(formatWarehouseDate(entry.at))} · ${Number(entry.waterLiters).toLocaleString('de-DE', { maximumFractionDigits: 1 })} L Osmosewasser + ${Number(entry.powderGrams).toLocaleString('de-DE', { maximumFractionDigits: 1 })} g ${escapeHtml(recipe.name)}</small></span><button type="button" class="btn-danger" onclick='deleteBallingMixingBatch(${jsArg(entry.id)})'>Entfernen</button></div>`;
+    }).join('')}</div></details>`;
+}
+
+function saveBallingMixingBatch() {
+    const recipeName = document.getElementById('macroRecipeSelect')?.value;
+    const element = HANS_WERNER_MACRO_RECIPE_ELEMENTS[recipeName];
+    const waterLiters = document.getElementById('macroRecipeLiters')?.value;
+    const batch = calculateHansWernerBallingBatch(element, waterLiters);
+    if (!batch) {
+        showToast('Bitte eine gültige Wassermenge und KH oder Calcium auswählen.', 'warning');
+        return;
+    }
+    if (!Array.isArray(db.ballingMixingHistory)) db.ballingMixingHistory = [];
+    db.ballingMixingHistory.unshift({
+        id: `balling-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        element: batch.element,
+        waterLiters: batch.waterLiters,
+        powderGrams: batch.powderGrams,
+        at: new Date().toISOString()
+    });
+    db.ballingMixingHistory = db.ballingMixingHistory.slice(0, 100);
+    saveDB();
+    renderMacroRecipe();
+    showToast('Mischung wurde dokumentiert.', 'success');
+}
+
+function deleteBallingMixingBatch(id) {
+    const entry = (db.ballingMixingHistory || []).find(item => item.id === id);
+    if (!entry || !window.confirm('Diesen dokumentierten Balling-Ansatz entfernen?')) return;
+    db.ballingMixingHistory = db.ballingMixingHistory.filter(item => item.id !== id);
+    saveDB();
+    renderMacroRecipe();
+}
 
 const faunaBallingLightEffects = {
     'KH': { increase: 0.5, unit: 'dKH' },
@@ -23381,13 +23469,61 @@ function resolveRecipeItem(entry) {
     return null;
 }
 
+function getVisibleMacroRecipeNames() {
+    const profile = getActiveSupplyProfile();
+    return Object.keys(macroRecipes).filter(name => {
+        if (HANS_WERNER_MACRO_RECIPE_ELEMENTS[name]) return profile.providers.includes('own-powder');
+        return profile.providers.includes('osci') && isOsciFeaturesEnabled();
+    });
+}
+
+function refreshMacroRecipeOptions() {
+    const select = document.getElementById('macroRecipeSelect');
+    if (!select) return;
+    const previous = select.value;
+    const previousRecipe = select.dataset.previousRecipe || previous;
+    const names = getVisibleMacroRecipeNames();
+    select.innerHTML = names.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+    if (names.includes(previous)) select.value = previous;
+    const isHansRecipe = Boolean(HANS_WERNER_MACRO_RECIPE_ELEMENTS[select.value]);
+    const wasHansRecipe = Boolean(HANS_WERNER_MACRO_RECIPE_ELEMENTS[previousRecipe]);
+    const litersInput = document.getElementById('macroRecipeLiters');
+    const litersLabel = document.getElementById('macroRecipeLitersLabel');
+    if (litersLabel) litersLabel.textContent = isHansRecipe ? 'Osmosewasser (L):' : 'Zielmenge in Liter:';
+    if (litersInput && previousRecipe && wasHansRecipe !== isHansRecipe) litersInput.value = isHansRecipe ? '5' : '1';
+    select.dataset.previousRecipe = select.value;
+    renderMacroRecipe();
+}
+
+function changeMacroRecipe() {
+    const select = document.getElementById('macroRecipeSelect');
+    if (!select) return;
+    const previousRecipe = select.dataset.previousRecipe || '';
+    const isHansRecipe = Boolean(HANS_WERNER_MACRO_RECIPE_ELEMENTS[select.value]);
+    const wasHansRecipe = Boolean(HANS_WERNER_MACRO_RECIPE_ELEMENTS[previousRecipe]);
+    if (previousRecipe && wasHansRecipe !== isHansRecipe) {
+        const litersInput = document.getElementById('macroRecipeLiters');
+        if (litersInput) litersInput.value = isHansRecipe ? '5' : '1';
+    }
+    select.dataset.previousRecipe = select.value;
+    renderMacroRecipe();
+}
+
 function renderMacroRecipe() {
     const select = document.getElementById('macroRecipeSelect');
     const litersEl = document.getElementById('macroRecipeLiters');
     const result = document.getElementById('macroRecipeResult');
     if (!select || !litersEl || !result) return;
-    const recipe = macroRecipes[select.value] || [];
+    const selectedName = select.value;
+    const hansWernerElement = HANS_WERNER_MACRO_RECIPE_ELEMENTS[selectedName];
+    const recipe = macroRecipes[selectedName] || [];
     const liters = Math.max(0.1, parseFloat(litersEl.value) || 1);
+    const litersLabel = document.getElementById('macroRecipeLitersLabel');
+    if (litersLabel) litersLabel.textContent = hansWernerElement ? 'Osmosewasser (L):' : 'Zielmenge in Liter:';
+    if (!recipe.length) {
+        result.innerHTML = '<p class="hint">Aktiviere in den Versorgungseinstellungen OSCI Motion oder Eigene Pulver / Rezepte, um passende Mischrezepte zu sehen.</p>';
+        return;
+    }
     const rows = recipe.map(entry => {
         const amount = entry.amount * liters;
         const resolved = resolveRecipeItem(entry);
@@ -23395,20 +23531,38 @@ function renderMacroRecipe() {
         const missing = resolved && stock < amount;
         const density = entry.item ? (densityFactors[entry.item] || 1) : 1;
         const grams = amount * density;
+        const amountText = hansWernerElement
+            ? amount.toLocaleString('de-DE', { maximumFractionDigits: 1 })
+            : amount.toFixed(1);
         const amountLabel = entry.unit === 'ml' && entry.item
-            ? `${amount.toFixed(1)} ml · ${grams.toFixed(1)} g`
-            : `${amount.toFixed(1)} ${entry.unit}`;
+            ? `${amountText} ml · ${grams.toFixed(1)} g`
+            : `${amountText} ${entry.unit}`;
         return `
             <div class="tool-row ${missing ? 'missing' : ''}">
                 <span>
                     <strong>${entry.item || entry.label}</strong>
-                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)}${entry.unit === 'ml' && entry.item ? ` · Dichte ${density.toFixed(3)} g/ml` : ''}` : 'nicht lagergeführt'}</small>
+                    <small>${resolved ? `${missing ? 'Bestand reicht nicht · ' : ''}Bestand: ${formatItemAmount(resolved.item, stock)}${entry.unit === 'ml' && entry.item ? ` · Dichte ${density.toFixed(3)} g/ml` : ''}` : entry.item ? 'nicht lagergeführt' : 'Rezeptangabe'}</small>
                 </span>
                 <span>${amountLabel}</span>
             </div>
         `;
     }).join('');
-    const recommendations = renderMacroRecipeSourceRecommendations(select.value);
+    if (hansWernerElement) {
+        const source = HANS_WERNER_BALLING_RECIPES[hansWernerElement];
+        result.innerHTML = `
+            <div class="tool-result">${rows}</div>
+            <div class="balling-preparation">
+                <p class="field-help">Die Rezeptbasis ist ${source.gramsPerFiveLiters} g auf 5 L Osmosewasser. Die Angabe oben skaliert die Wassermenge, nicht das fertige Lösungsvolumen.</p>
+                <a class="resource-inline-link" href="${escapeHtml(source.sourceUrl)}" target="_blank" rel="noopener noreferrer">Produktangabe öffnen</a>
+            </div>
+            <div class="tool-action-row calculator-actions">
+                <button type="button" class="btn-primary btn-animated" onclick="saveBallingMixingBatch()">Mischung dokumentieren</button>
+            </div>
+            ${renderBallingMixingHistory()}
+        `;
+        return;
+    }
+    const recommendations = renderMacroRecipeSourceRecommendations(selectedName);
     result.innerHTML = `
         <div class="tool-result">${rows}</div>
         ${recommendations}

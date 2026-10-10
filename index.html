@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#101719">
     <title>ReefTools</title>
-    <script src="assets/js/theme.js?v=3.6.13-release"></script>
+    <script src="assets/js/theme.js?v=3.6.17-release"></script>
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.6.13-release">
-    <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.13-release">
-    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.13-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
+    <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
+    <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release">
+    <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.25-release">
 </head>
 <body>
     <a class="skip-link" href="#app">Zum Inhalt springen</a>
@@ -31,7 +32,7 @@
             <div class="header-title-block">
                 <div class="header-title-container">
                     <h1>ReefTools</h1>
-                    <span class="version-badge">v3.6.13</span>
+                    <span class="version-badge">v3.6.17</span>
                     <button type="button" class="demo-mode-badge" onclick="openDemoProfileSettings()" aria-label="Demo-Profil Einstellungen öffnen">DEMO</button>
                 </div>
                 <div class="community-project-badge" role="note">Unabhängiges Community-Projekt ·<br class="community-project-break">nicht von OSCI Motion</div>
@@ -579,7 +580,7 @@
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed balling-powder-card">
                             <h3>Balling &amp; Pulver</h3>
-                            <p class="hint">Fauna Marin Gebrauchslösung oder eigene Salze berechnen. Herstellerrezept und eigene Rezeptur bleiben getrennt.</p>
+                            <p class="hint">Fauna Marin Gebrauchslösungen, eigene Pulver und Hans-Werner-Balling-Ansätze berechnen und Mischchargen dokumentieren.</p>
                             <div class="tool-grid calculator-input-grid">
                                 <div class="input-group">
                                     <label for="ballingCalcMode">System</label>
@@ -1235,13 +1236,13 @@
 
                         <div class="card tool-compact-card tool-tile-card tool-tile-collapsed">
                             <h3>Makro-Elemente anmischen <button type="button" class="tool-inline-fav" data-tool-id="makro-elemente-anmischen">☆ Fav</button></h3>
-                            <p class="hint">Rezept und Zielmenge wählen. Lagergeführte C&amp;R-Produkte können direkt ausgelagert werden.</p>
+                            <p class="hint">OSCI-Makro-Rezepte und flüssige Hans-Werner-Balling-Lösungen skalieren, prüfen und dokumentieren.</p>
                             <div class="input-group">
                                 <label>Rezept:</label>
-                                <select id="macroRecipeSelect" onchange="renderMacroRecipe()"></select>
+                                <select id="macroRecipeSelect" onchange="changeMacroRecipe()"></select>
                             </div>
                             <div class="input-group">
-                                <label>Zielmenge in Liter:</label>
+                                <label id="macroRecipeLitersLabel">Zielmenge in Liter:</label>
                                 <input type="number" id="macroRecipeLiters" min="0.1" step="0.1" value="1" oninput="renderMacroRecipe()">
                             </div>
                             <div id="macroRecipeResult"></div>
@@ -1305,22 +1306,27 @@
                                 </div>
                             </details>
                             <details class="sangokai-submenu" data-sangokai-submenu="dose-history">
-                                <summary><span><strong>BALANCE Messverlauf &amp; Tagesdosis</strong><small>Messwerte erfassen, Verbrauch berechnen und Dosismodus wählen</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
+                                <summary><span><strong>BALANCE Messverlauf &amp; Tagesdosis</strong><small>Messwert erfassen, Tagesdosis berechnen und Verlauf speichern</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
                                 <div class="sangokai-submenu-content">
                             <section class="sangokai-calculator-panel sangokai-dose-tracker" aria-labelledby="sangokaiDoseTrackerTitle">
                                 <h4 id="sangokaiDoseTrackerTitle">BALANCE Messverlauf &amp; Tagesdosis</h4>
-                                <p class="hint">Erfasse Messwert und die Tagesdosis, die während des Zeitraums seit der vorherigen Messung lief. Ab zwei Messungen wird der Verbrauch berechnet. Zielwert, Zeitraum und maximale Dosisänderung bestimmst du selbst.</p>
-                                <div class="tool-grid">
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseElement">Messwert</label><details class="field-info"><summary aria-label="Info zum Messwert" title="Info zum Messwert">i</summary><p>Wähle, ob du KH oder Calcium erfassen möchtest. Die Messreihen und Berechnungen werden getrennt geführt.</p></details></div><select id="sangokaiDoseElement" onchange="changeSangokaiDoseProduct(this.value)"><option value="kh">KH (°dKH)</option><option value="ca">Calcium (mg/L)</option></select></div>
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseDate">Messdatum und Uhrzeit</label><details class="field-info"><summary aria-label="Info zu Messdatum und Uhrzeit" title="Info zu Messdatum und Uhrzeit">i</summary><p>Zeitpunkt, an dem du den Messwert ermittelt hast. Zusammen mit der vorherigen Messung bestimmt er die Länge des Messintervalls.</p></details></div><input type="datetime-local" id="sangokaiDoseDate" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseValueLabel" for="sangokaiDoseValue">Gemessene KH (°dKH)</label><details class="field-info"><summary aria-label="Info zum Messwert" title="Info zum Messwert">i</summary><p>Trage hier das Testergebnis zum ausgewählten Zeitpunkt ein. Ab zwei Messungen kann ReefTools die Veränderung pro Tag ermitteln.</p></details></div><input type="number" id="sangokaiDoseValue" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseIntervalLabel" for="sangokaiDoseIntervalMl">KH-Gebrauchslösung im Messzeitraum (ml/Tag)</label><details class="field-info"><summary aria-label="Info zur Tagesdosis" title="Info zur Tagesdosis">i</summary><p>Die durchschnittliche Menge pro Tag, die zwischen der vorherigen und dieser Messung tatsächlich dosiert wurde. Sie dient dazu, den Verbrauch aus der Messwertänderung herauszurechnen.</p></details></div><input type="number" id="sangokaiDoseIntervalMl" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMode">Vorgehen zum Sollwert</label><details class="field-info"><summary aria-label="Info zum Vorgehen" title="Info zum Vorgehen">i</summary><p>„Nur Dosierung angleichen“ verändert die laufende Tagesdosis schrittweise. „Sofortausgleich + stabilisieren“ berechnet zusätzlich eine einmalige Ausgleichsmenge und weist die laufende Verbrauchsdosis separat aus.</p></details></div><select id="sangokaiDoseMode" onchange="updateSangokaiDoseTracker(true)"><option value="gradual">Nur Dosierung angleichen</option><option value="immediate-stabilize">Sofortausgleich + stabilisieren</option></select></div>
-                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseTargetLabel" for="sangokaiDoseTarget">Dein KH-Zielwert (°dKH)</label><details class="field-info"><summary aria-label="Info zum Zielwert" title="Info zum Zielwert">i</summary><p>Der von dir festgelegte Wert, auf den sich die Berechnung bezieht. ReefTools bewertet nicht, ob dieser Zielwert für dein Aquarium passend ist.</p></details></div><input type="number" id="sangokaiDoseTarget" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseTargetDays">Zeitraum bis zum Ziel (Tage)</label><details class="field-info"><summary aria-label="Info zum Zeitraum" title="Info zum Zeitraum">i</summary><p>Legt fest, über wie viele Tage die Tagesdosis den Messwert rechnerisch an den Zielwert annähern soll. Gilt nur für „Nur Dosierung angleichen“, nicht für die Einmalmenge.</p></details></div><input type="number" id="sangokaiDoseTargetDays" min="1" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
-                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMaxChange">Maximale Dosisänderung je Schritt (%)</label><details class="field-info"><summary aria-label="Info zum Dosislimit" title="Info zum Dosislimit">i</summary><p>Begrenzt, um wie viel Prozent die berechnete laufende Tagesdosis gegenüber der zuletzt erfassten Dosis steigen oder sinken darf. Das Limit gilt nicht für den einmaligen Sofortausgleich.</p></details></div><input type="number" id="sangokaiDoseMaxChange" min="0" max="100" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
+                                <p class="hint">Einfach den Messwert und die durchschnittliche Tagesdosis seit der letzten Messung eintragen. Datum und Rechenparameter sind bereits vorbelegt. Ab zwei Messungen berechnet ReefTools den Verlauf.</p>
+                                <div class="tool-grid sangokai-dose-primary-grid">
+                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseElement">Wert</label><details class="field-info"><summary aria-label="Info zur Messreihe" title="Info zur Messreihe">i</summary><p>KH und Calcium werden getrennt erfasst und ausgewertet.</p></details></div><select id="sangokaiDoseElement" onchange="changeSangokaiDoseProduct(this.value)"><option value="kh">KH (°dKH)</option><option value="ca">Calcium (mg/L)</option></select></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseValueLabel" for="sangokaiDoseValue">Gemessene KH (°dKH)</label><details class="field-info"><summary aria-label="Info zum Messwert" title="Info zum Messwert">i</summary><p>Trage hier den aktuell gemessenen Wert ein. Für einen Verbrauchsvergleich werden mindestens zwei Messungen benötigt.</p></details></div><input type="number" id="sangokaiDoseValue" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseIntervalLabel" for="sangokaiDoseIntervalMl">Tagesdosis im Messzeitraum (ml/Tag)</label><details class="field-info"><summary aria-label="Info zur Tagesdosis" title="Info zur Tagesdosis">i</summary><p>Durchschnittliche tägliche Menge, die seit der vorherigen Messung tatsächlich dosiert wurde. So wird die Zufuhr beim Verbrauchsvergleich berücksichtigt.</p></details></div><input type="number" id="sangokaiDoseIntervalMl" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label id="sangokaiDoseTargetLabel" for="sangokaiDoseTarget">Dein KH-Sollwert (°dKH)</label><details class="field-info"><summary aria-label="Info zum Sollwert" title="Info zum Sollwert">i</summary><p>Dein selbst gewählter Zielwert. Er wird für die Berechnung gespeichert; ReefTools gibt keine Empfehlung für einen passenden Wert.</p></details></div><input type="number" id="sangokaiDoseTarget" min="0" step="any" inputmode="decimal" oninput="updateSangokaiDoseTracker(true)"></div>
+                                    <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMode">Berechnung</label><details class="field-info"><summary aria-label="Info zur Berechnung" title="Info zur Berechnung">i</summary><p>Schrittweise angleichen passt die laufende Tagesdosis rechnerisch an. Sofortausgleich berechnet zusätzlich die Einmalmenge bis zum Sollwert.</p></details></div><select id="sangokaiDoseMode" onchange="updateSangokaiDoseTracker(true)"><option value="gradual">Dosis schrittweise angleichen</option><option value="immediate-stabilize">Sofortausgleich + stabilisieren</option></select></div>
                                 </div>
-                                <p class="field-help">„Nur Dosierung angleichen“ verändert ausschließlich die Tagesdosis schrittweise. „Sofortausgleich + stabilisieren“ weist zusätzlich eine einmalige Ausgleichsmenge aus. Der Zeitraum gilt nur für die schrittweise Annäherung.</p>
+                                <details class="sangokai-dose-options">
+                                    <summary><span><strong>Weitere Einstellungen</strong><small id="sangokaiDoseOptionsSummary">Messzeitpunkt · Annäherung 10 Tage · Dosislimit ±10 %</small></span><span class="settings-accordion-hint" aria-hidden="true"></span></summary>
+                                    <div class="tool-grid">
+                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseDate">Messdatum und Uhrzeit</label><details class="field-info"><summary aria-label="Info zum Messzeitpunkt" title="Info zum Messzeitpunkt">i</summary><p>Wird automatisch auf jetzt gesetzt. Ändere den Zeitpunkt, wenn du eine frühere Messung nachträgst.</p></details></div><input type="datetime-local" id="sangokaiDoseDate" oninput="updateSangokaiDoseTracker(true)"></div>
+                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseTargetDays">Annäherungszeitraum (Tage)</label><details class="field-info"><summary aria-label="Info zum Annäherungszeitraum" title="Info zum Annäherungszeitraum">i</summary><p>Systemvorgabe sind 10 Tage. Der Wert bestimmt nur den Rechenzeitraum für die schrittweise Annäherung.</p></details></div><input type="number" id="sangokaiDoseTargetDays" min="1" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
+                                        <div class="input-group"><div class="field-label-row"><label for="sangokaiDoseMaxChange">Maximale Dosisänderung je Schritt (%)</label><details class="field-info"><summary aria-label="Info zum Dosislimit" title="Info zum Dosislimit">i</summary><p>Systemvorgabe sind 10 %. Das begrenzt die rechnerische Änderung zwischen den erfassten Tagesdosen.</p></details></div><input type="number" id="sangokaiDoseMaxChange" min="0" max="100" step="1" inputmode="numeric" oninput="updateSangokaiDoseTracker(true)"></div>
+                                    </div>
+                                    <p class="field-help">Vorgabe: 10 Tage und höchstens 10 % Änderung je Berechnungsschritt. Du kannst beides hier anpassen. Das begrenzt nur den Rechenwert und ist keine Dosierempfehlung.</p>
+                                </details>
                                 <input type="hidden" id="sangokaiDoseEditingId">
                                 <div class="btn-group calculator-actions"><button type="button" class="btn-primary btn-animated" id="sangokaiDoseSaveButton" onclick="saveSangokaiDoseMeasurement()">Messung speichern</button><button type="button" class="btn-secondary btn-animated" id="sangokaiDoseCancelEditButton" onclick="cancelSangokaiDoseMeasurementEdit()" hidden>Bearbeitung abbrechen</button></div>
                                 <div id="sangokaiDoseTrackerResult" class="tool-result" aria-live="polite"></div>
@@ -1375,6 +1381,50 @@
                         </div>
                     </div>
                 </details>
+                <details class="tool-section" data-section-id="3d-druck-und-werkstatt" open>
+                    <summary class="tool-section-summary">
+                        <span><strong>3D-Druck &amp; Werkstatt</strong><small>PhytoDose · individueller Dosierlöffel für dein Aquarium</small></span>
+                        <span class="settings-accordion-hint" aria-hidden="true"></span>
+                    </summary>
+                    <div class="tool-card-grid">
+                        <section class="card tool-compact-card phyto-scoop-card" data-tool-id="phytocoral-loeffel-generator" aria-labelledby="phytoScoopTitle">
+                            <div class="phyto-scoop-header">
+                                <div><span class="workflow-eyebrow">PhytoDose · 3D-Messlöffel-Rechner</span><h3 id="phytoScoopTitle">PhytoDose</h3>
+                                <p class="hint">Deine PhytoCoral-Dosierung, passgenau für dein Aquarium. Volumen eingeben, individuellen Messlöffel berechnen und als STL herunterladen.</p></div>
+                                <span class="phyto-scoop-badge">Algova · PhytoCoral</span>
+                            </div>
+                            <div class="phyto-scoop-layout">
+                                <div class="phyto-scoop-controls">
+                                    <div class="input-group phyto-scoop-volume-input"><label for="phytoScoopLiters">Aquariumvolumen</label><div class="phyto-scoop-input-wrap"><input id="phytoScoopLiters" type="number" min="0.1" step="any" value="770" inputmode="decimal" aria-describedby="phytoScoopVolumeHint"><span>Liter</span></div><small id="phytoScoopVolumeHint">Nettovolumen deines Aquariums</small></div>
+                                    <div id="phytoScoopResult" class="phyto-scoop-result" aria-live="polite"></div>
+                                    <div class="phyto-scoop-specs"><strong>Feste Maße &amp; Druckform</strong><span>Innen-Ø 17,5 mm · Wand 1,5 mm · Innenbodenradius bis 1,5 mm</span><span>Stiel 50 × 6 × 3 mm · rundes Griffende</span><span>Becherhöhe maximal 20 mm · Stiel und Boden liegen plan auf</span><span>Das Rundungsvolumen wird bei der Berechnung berücksichtigt.</span></div>
+                                    <button type="button" class="btn-primary btn-animated phyto-scoop-download" id="phytoScoopDownload">STL herunterladen</button>
+                                </div>
+                                <section class="phyto-scoop-preview-wrap" aria-label="Interaktive 3D-Vorschau">
+                                    <header class="phyto-preview-toolbar"><div><span class="phyto-preview-kicker">LIVE 3D · INTERAKTIV</span><strong>Dein PhytoDose-Messlöffel</strong></div><button type="button" id="phytoScoopResetView" class="phyto-preview-reset" aria-label="3D-Ansicht zurücksetzen" title="Ansicht zurücksetzen">⟳</button></header>
+                                    <div id="phytoScoopPreview" class="phyto-scoop-preview" role="group" aria-label="Interaktive Vorschau des PhytoDose-Messlöffels">
+                                        <canvas id="phytoScoopCanvas" aria-label="3D-Modell des PhytoDose-Messlöffels. Mit Maus oder einem Finger ziehen zum Drehen, mit Mausrad oder zwei Fingern zoomen."></canvas>
+                                        <div class="phyto-preview-bed-label"><span aria-hidden="true">▱</span> Flache Druckbett-Auflage · z = 0</div>
+                                        <div id="phytoScoop3dFallback" class="phyto-preview-fallback" hidden>Die 3D-Ansicht wird von diesem Browser nicht unterstützt. Der STL-Download bleibt verfügbar.</div>
+                                        <div class="phyto-preview-legend"><span><i></i> Becher mit gerundetem Innenboden</span><span><i></i> Plan aufliegender Stiel mit Rundgriff</span></div>
+                                    </div>
+                                    <footer class="phyto-preview-footer"><span><kbd>↔</kbd> Ziehen zum Drehen</span><span><kbd>⌕</kbd> Mausrad oder Pinch zum Zoomen</span><span>3D-Maße in mm</span></footer>
+                                </section>
+                                <section class="phyto-holder-addon" aria-labelledby="phytoHolderTitle">
+                                    <div class="phyto-holder-heading"><div><span class="workflow-eyebrow">Optionales Add-on</span><h4 id="phytoHolderTitle">Passender Löffelhalter</h4></div><span class="phyto-holder-dimensions">64,4 × 57,6 × 4 mm</span></div>
+                                    <div class="phyto-holder-preview" role="group" aria-label="Interaktive 3D-Vorschau des Löffelhalters">
+                                        <canvas id="phytoHolderCanvas" aria-label="3D-Modell des Löffelhalters. Mit Maus oder Finger drehen, mit Mausrad oder zwei Fingern zoomen."></canvas>
+                                        <div class="phyto-preview-bed-label"><span aria-hidden="true">▱</span> Druckbett-Auflage · STL-Modell</div>
+                                        <div id="phytoHolder3dFallback" class="phyto-preview-fallback" hidden>Die 3D-Ansicht wird von diesem Browser nicht unterstützt.</div>
+                                    </div>
+                                    <div class="phyto-holder-footer"><span>Separat druckbar · STL · 79 KB</span><a class="btn-secondary btn-animated" href="assets/models/PhytoCoral_SpoolHolder.stl" download="PhytoCoral_SpoolHolder.stl">Löffelhalter-STL herunterladen</a></div>
+                                </section>
+                                <p class="phyto-scoop-note">Die Rechnung verwendet deine Kalibrierung: 2,45 ml Pulver entsprechen 1,5 g. Pulver locker einfüllen und nicht verdichten. Druckmaß und tatsächliche Füllmenge können je nach Drucker und Pulver variieren.</p>
+                            </div>
+                        </section>
+                    </div>
+                </details>
+
             </div>
         </div>
 
@@ -2826,11 +2876,13 @@
         <button type="button" onclick="toggleMenu()" data-tab="mehr"><span>☰</span>Mehr</button>
     </nav>
 
-    <script src="assets/js/lighting-sim.js?v=3.6.13-release"></script>
-    <script src="assets/js/sangokai-product-catalog.js?v=3.6.13-release"></script>
-    <script src="assets/js/sangokai-calculations.js?v=3.6.13-release"></script>
-    <script src="assets/js/app.js?v=3.6.13-release"></script>
-    <script src="assets/js/workspace-ui.js?v=3.6.13-release"></script>
+    <script src="assets/js/lighting-sim.js?v=3.6.17-release"></script>
+    <script src="assets/js/sangokai-product-catalog.js?v=3.6.17-release"></script>
+    <script src="assets/js/sangokai-calculations.js?v=3.6.17-release"></script>
+    <script src="assets/js/app.js?v=3.6.23-release"></script>
+    <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
+    <script src="assets/js/phyto-scoop.js?v=3.6.23-release"></script>
+    <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

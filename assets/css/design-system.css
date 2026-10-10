@@ -657,6 +657,13 @@ tbody tr:nth-child(even) { background: color-mix(in srgb, var(--surface-raised) 
 #app #tools .balling-preparation ul { margin: 0; padding-left: 1.25rem; color: var(--text-secondary); }
 #app #tools .balling-preparation li + li { margin-top: var(--space-1); }
 #app #tools .balling-preparation .field-help { margin-top: var(--space-2); }
+#app #tools .balling-mix-history { margin-top: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+#app #tools .balling-mix-history > summary { padding: var(--space-3); color: var(--text-primary); cursor: pointer; }
+#app #tools .balling-mix-history-list { padding: 0 var(--space-3) var(--space-2); }
+#app #tools .balling-mix-history-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--border-color); }
+#app #tools .balling-mix-history-row > span { display: grid; gap: var(--space-1); min-width: 0; }
+#app #tools .balling-mix-history-row small { color: var(--text-secondary); overflow-wrap: anywhere; }
+#app #tools .balling-mix-history-row button { flex: 0 0 auto; }
 .settings-group-nav button.active { color: var(--accent); background: var(--surface-raised); }
 .settings-control-center { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; margin-bottom: 8px; }
 .settings-search-field { background: var(--app-bg); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0 12px; }
@@ -768,7 +775,8 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
 .supply-profile-option input { accent-color: var(--accent); }
 .supply-profile-aquarium { margin-bottom: var(--space-3); }
 .sangokai-balance-calculators { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-#tools .tool-card-grid > .tool-compact-card[data-tool-id="sangokai-mengen-und-mischen"] { grid-column: 1 / -1; width: 100%; max-width: none; min-width: 0; }
+#tools .tool-card-grid > .tool-compact-card[data-tool-id="sangokai-mengen-und-mischen"] { grid-column: 1 / -1; width: 100%; max-width: none; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; container: sangokai / inline-size; }
+.tool-compact-card[data-tool-id="sangokai-mengen-und-mischen"] > .workflow-eyebrow { display: block; margin: 0 var(--space-1) var(--space-3); color: var(--accent); font-size: var(--font-caption); font-weight: 700; }
 .sangokai-submenu { margin-top: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-raised); overflow: hidden; }
 .sangokai-submenu > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-4); cursor: pointer; touch-action: manipulation; user-select: none; list-style: none; }
 .sangokai-submenu > summary::-webkit-details-marker { display: none; }
@@ -781,7 +789,9 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
 .sangokai-submenu-content > .sangokai-calculator-panel:first-child { margin-top: 0; }
 .sangokai-calculator-panel { min-width: 0; padding: var(--space-4); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-raised); }
 .sangokai-calculator-panel h4 { margin: 0 0 var(--space-3); }
-.sangokai-calculator-panel .tool-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+#tools .sangokai-calculator-panel .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: end; }
+#tools .sangokai-calculator-panel .tool-grid > .input-group:last-child { grid-column: 1 / -1; }
+#tools .sangokai-dilution-panel .tool-grid > .input-group:last-child { grid-column: auto; }
 .sangokai-calculator-panel .tool-result { min-height: 52px; margin-block: var(--space-3); }
 .sangokai-calculator-panel .tool-result small { display: block; margin-top: var(--space-1); color: var(--text-secondary); }
 .field-label-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; margin-bottom: 6px; }
@@ -795,6 +805,21 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
 .field-info > p { position: absolute; bottom: calc(100% + 6px); right: 0; z-index: 8; width: min(280px, calc(100vw - 56px)); margin: 0; padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); color: var(--text-primary); box-shadow: var(--shadow-raised, 0 8px 24px rgb(0 0 0 / 28%)); font-size: var(--font-caption); font-weight: 400; line-height: 1.5; }
 .sangokai-dilution-panel { margin-top: var(--space-4); }
 .sangokai-dose-tracker { margin-top: var(--space-4); }
+#tools .tool-grid.sangokai-dose-primary-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: end; }
+#tools .sangokai-dose-primary-grid > .input-group:nth-child(-n+3) { grid-column: span 2; }
+#tools .sangokai-dose-primary-grid > .input-group:nth-child(n+4) { grid-column: span 3; }
+#tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group:last-child { grid-column: span 3; }
+.sangokai-calculator-panel .tool-result { max-width: none; }
+.tool-compact-card[data-tool-id="sangokai-mengen-und-mischen"] .sangokai-submenu { margin-top: var(--space-3); }
+.sangokai-dose-options { margin-top: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-card); background: var(--surface-card); }
+.sangokai-dose-options > summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-3); cursor: pointer; list-style: none; }
+.sangokai-dose-options > summary::-webkit-details-marker { display: none; }
+.sangokai-dose-options > summary > span:first-child { display: grid; gap: var(--space-1); min-width: 0; }
+.sangokai-dose-options > summary strong { font-size: var(--font-body); font-weight: 600; }
+.sangokai-dose-options > summary small { color: var(--text-secondary); font-size: var(--font-small); line-height: 1.4; overflow-wrap: anywhere; }
+.sangokai-dose-options .tool-grid { padding: 0 var(--space-3); }
+.sangokai-dose-options > .field-help { margin: 0; padding: 0 var(--space-3) var(--space-3); }
+.sangokai-dose-options[open] > summary { border-bottom: 1px solid var(--border-color); }
 .sangokai-dose-history { margin-top: var(--space-4); }
 .sangokai-dose-history h5 { margin: 0 0 var(--space-2); }
 .sangokai-dose-history-list { display: grid; }
@@ -832,4 +857,16 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
     .sangokai-dose-history-row { align-items: stretch; flex-direction: column; gap: var(--space-2); }
     .sangokai-dose-history-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .sangokai-dose-history-actions button { min-width: 0; width: 100%; }
+}
+@container sangokai (max-width: 900px) {
+    .sangokai-balance-calculators { grid-template-columns: minmax(0, 1fr); }
+    #tools .tool-grid.sangokai-dose-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group { grid-column: span 1; }
+    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group:last-child { grid-column: 1 / -1; }
+}
+@container sangokai (max-width: 520px) {
+    #tools .tool-grid.sangokai-dose-primary-grid,
+    #tools .sangokai-calculator-panel .tool-grid { grid-template-columns: minmax(0, 1fr); }
+    #tools .sangokai-calculator-panel .tool-grid.sangokai-dose-primary-grid > .input-group { grid-column: auto; }
+    #tools .sangokai-calculator-panel .tool-grid > .input-group:last-child { grid-column: auto; }
 }
