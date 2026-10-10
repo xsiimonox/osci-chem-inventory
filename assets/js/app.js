@@ -1333,6 +1333,7 @@ const MENU_ORDER_KEY = 'osci_menu_order_v1';
 const MOBILE_QUICK_TABS_KEY = 'osci_mobile_quick_tabs_v1';
 const HIDDEN_MENU_TABS_KEY = 'osci_hidden_menu_tabs_v1';
 const OVERVIEW_ENABLED_KEY = 'reeftools_overview_enabled_v1';
+const HOME_OVERVIEW_MIGRATION_KEY = 'reeftools_home_overview_migration_v1';
 const OSCI_FEATURES_ENABLED_KEY = 'reeftools_osci_features_enabled_v1';
 const HIDDEN_LOGBOOK_FEATURES_KEY = 'reeftools_hidden_logbook_features_v1';
 const TOOL_SECTION_DEFINITIONS = [
@@ -4346,7 +4347,7 @@ function getDefaultMobileQuickTabs() {
 function getHiddenMenuTabs() {
     try {
         const parsed = JSON.parse(localStorage.getItem(HIDDEN_MENU_TABS_KEY) || '[]');
-        const valid = Array.isArray(parsed) ? parsed.filter(id => DEFAULT_MENU_ORDER.includes(id) && !ALWAYS_VISIBLE_TABS.has(id)) : [];
+        const valid = Array.isArray(parsed) ? parsed.filter(id => id !== 'uebersicht' && DEFAULT_MENU_ORDER.includes(id) && !ALWAYS_VISIBLE_TABS.has(id)) : [];
         return [...new Set(valid)];
     } catch (err) {
         return [];
@@ -4365,11 +4366,7 @@ function isUserMenuTabHidden(tabId) {
 }
 
 function isOverviewEnabled() {
-    try {
-        return localStorage.getItem(OVERVIEW_ENABLED_KEY) === 'true';
-    } catch (err) {
-        return false;
-    }
+    return true;
 }
 
 function isOsciFeaturesEnabled() {
@@ -4428,9 +4425,13 @@ function refreshFeatureVisibility() {
 }
 
 function setOverviewEnabled(enabled) {
-    localStorage.setItem(OVERVIEW_ENABLED_KEY, String(Boolean(enabled)));
+    try { localStorage.setItem(OVERVIEW_ENABLED_KEY, 'true'); } catch (err) {}
+    if (!enabled) {
+        showToast('Die Übersicht bleibt als Startseite immer verfügbar.', 'info');
+        return;
+    }
     refreshFeatureVisibility();
-    showToast(enabled ? 'Übersichtsseite eingeblendet' : 'Übersichtsseite ausgeblendet', 'info');
+    showToast('Übersicht geöffnet.', 'info');
 }
 
 function setOsciFeaturesEnabled(enabled) {
@@ -4647,7 +4648,7 @@ function isMenuVisibilityControlled(tabId) {
 
 function getMenuVisibilityLabel(tabId) {
     if (ALWAYS_VISIBLE_TABS.has(tabId)) return 'Immer sichtbar';
-    if (tabId === 'uebersicht') return isOverviewEnabled() ? 'Über den Übersichts-Schalter aktiviert' : 'In den Einstellungen deaktiviert';
+    if (tabId === 'uebersicht') return 'Startseite · immer sichtbar';
     if (OSCI_ONLY_TAB_IDS.has(tabId) && !isOsciFeaturesEnabled()) return 'Durch OSCI-Schalter ausgeblendet';
     return isMenuTabHidden(tabId) ? 'Ausgeblendet' : 'Sichtbar';
 }
@@ -4657,13 +4658,7 @@ function renderFeatureVisibilitySettings() {
     if (!container) return;
     container.innerHTML = `
         <div class="feature-visibility-settings">
-            <label class="settings-toggle-row">
-                <input type="checkbox" id="overviewEnabledToggle" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
-                <span>
-                    <span class="settings-toggle-title">Übersichtsseite anzeigen</span>
-                    <small>Standardmäßig aus. Aktiviert das frei konfigurierbare Dashboard als eigenen Menüpunkt.</small>
-                </span>
-            </label>
+            <p class="settings-inline-note">Die Übersicht ist deine Startseite und bleibt immer verfügbar.</p>
             <label class="settings-toggle-row">
                 <input type="checkbox" id="osciFeaturesToggle" ${isOsciFeaturesEnabled() ? 'checked' : ''} onchange="setOsciFeaturesEnabled(this.checked)">
                 <span>
@@ -7102,14 +7097,6 @@ function renderDashboardSettingsPanel() {
     const pinnedCount = pinned.size;
     container.innerHTML = `
         <div class="dashboard-settings-panel">
-            <label class="settings-toggle-row dashboard-overview-toggle">
-                <input type="checkbox" ${isOverviewEnabled() ? 'checked' : ''} onchange="setOverviewEnabled(this.checked)">
-                <span>
-                    <span class="settings-toggle-title">Übersicht im Menü anzeigen</span>
-                    <small>Wenn aktiv, erscheint die Startübersicht als eigener Menüpunkt.</small>
-                </span>
-            </label>
-
             <div class="dashboard-settings-block">
                 <div class="dashboard-settings-head">
                     <strong>Kacheln auf der Übersicht</strong>
@@ -7342,7 +7329,7 @@ function createDashboardMeasurementChart(summary) {
     `;
 }
 
-function renderDashboard() {
+function renderDashboardExpanded() {
     const container = document.getElementById('uebersicht');
     if (!container) return;
     const warehouse = getActiveWarehouse();
@@ -7564,6 +7551,175 @@ function renderDashboard() {
         </section>` : ''}
     `;
     renderAquariumWorkspacePanels();
+}
+
+function renderDashboard() {
+    const container = document.getElementById('uebersicht');
+    if (!container) return;
+
+    renderDashboardExpanded();
+
+    const aquarium = getActiveAquarium();
+    const warehouse = getActiveWarehouse();
+    const aquariumList = Object.values(appState?.aquariums || {});
+    const settings = getDashboardRenderSettings();
+    const isEditing = Boolean(dashboardEditDraft);
+    const alerts = getStockAlerts();
+    const dueTodos = (db.aquariumTodos || []).filter(todo => !todo.done && todo.dueAt && new Date(todo.dueAt).getTime() <= Date.now());
+    const recentLog = getRecentLogBookEntry();
+    const lastLog = (db.logs || []).slice().reverse()[0];
+    const aquariumVolume = Number(aquarium?.data?.volumeLiters);
+    const aquariumOptions = aquariumList.length
+        ? aquariumList.map(entry => `<option value="${escapeHtml(entry.id)}" ${entry.id === activeAquariumId ? 'selected' : ''}>${escapeHtml(entry.name || 'Aquarium')}</option>`).join('')
+        : '<option value="" selected>Kein Aquarium angelegt</option>';
+
+    const metricCards = ['KH', 'CA', 'MG'].map(typeId => {
+        const entry = getMeasurementEntries()
+            .filter(item => item.typeId === typeId && item.value !== null && item.value !== undefined && Number.isFinite(Number(item.value)))
+            .sort((a, b) => new Date(b.at) - new Date(a.at))[0];
+        const labels = { KH: 'KH', CA: 'Calcium', MG: 'Magnesium' };
+        const value = entry ? formatMeasurementEntryValue(entry) : 'Noch kein Wert';
+        const date = entry ? formatWarehouseDate(entry.at) : 'Messung im Logbuch erfassen';
+        return `
+            <button type="button" class="dashboard-home-metric" onclick="openDashboardDestination('${entry ? 'measurement-list' : 'measurement'}', '${typeId}')" aria-label="${labels[typeId]}: ${escapeHtml(value)}. ${escapeHtml(date)}">
+                <span class="dashboard-home-metric-label"><i></i>${labels[typeId]}</span>
+                <strong>${escapeHtml(value)}</strong>
+                <small>${escapeHtml(date)}</small>
+            </button>
+        `;
+    }).join('');
+
+    const catalogProducts = Object.entries(catalog).flatMap(([cat, items]) => Object.keys(items)
+        .filter(item => shouldShowCatalogProduct(cat, item))
+        .map(item => ({ cat, item, stock: Number(db.inventory?.[cat]?.[item]) || 0 })));
+    const productByName = new Map(catalogProducts.map(product => [product.item, product]));
+    const preferredProducts = ['Calcium', 'KH Tag', 'KH Nacht', 'Magnesium', 'Natriumhydrogencarbonat (NaHCO₃)', 'Natriumcarbonat (Na₂CO₃)', 'Calciumchlorid-Dihydrat (CaCl₂·2H₂O)', 'Phosphor (P)', 'Lanthan (La)', 'Stickstoff (N)'];
+    const preferredStock = preferredProducts.map(name => productByName.get(name)).filter(Boolean);
+    const fallbackStock = [...preferredStock, ...catalogProducts.filter(product => !preferredProducts.includes(product.item))].slice(0, 3);
+    const stockRows = (alerts.length
+        ? alerts.slice(0, 3).map(alert => ({ ...alert, stock: Number(alert.stock) || 0, isAlert: true }))
+        : fallbackStock.map(product => ({ ...product, isAlert: false })))
+        .map(product => {
+            const symbol = extractIcpSymbol(product.item) || ({ Calcium: 'Ca', 'KH Tag': 'KH', 'KH Nacht': 'KH', Magnesium: 'Mg' }[product.item] || '•');
+            const isEmpty = product.stock <= 0;
+            const status = product.isAlert ? (isEmpty ? 'Leer' : 'Knapp') : (isEmpty ? 'Leer' : product.cat);
+            const statusClass = product.isAlert ? 'is-warning' : (isEmpty ? 'is-empty' : '');
+            return `
+                <button type="button" class="dashboard-home-stock-row" onclick="selectTab('lager'); setTimeout(() => focusProductInLager(${jsArg(product.item)}), 80)">
+                    <span class="dashboard-home-stock-symbol">${escapeHtml(symbol)}</span>
+                    <span class="dashboard-home-stock-name"><strong>${escapeHtml(product.item)}</strong><small>${escapeHtml(product.cat)}</small></span>
+                    <span class="dashboard-home-stock-amount ${statusClass}"><strong>${escapeHtml(formatItemAmount(product.item, product.stock))}</strong><small>${escapeHtml(status)}</small></span>
+                    <span class="dashboard-home-stock-chevron" aria-hidden="true">›</span>
+                </button>
+            `;
+        }).join('');
+
+    const quickLinks = [
+        { tab: 'trace-export', label: 'OSCI Trace', hint: 'Trace berechnen' },
+        { tab: 'icp', label: 'ICP', hint: 'Messwerte & Analysen' },
+        { tab: 'tools', label: 'Rechner & Mischen', hint: 'Werkzeuge öffnen' },
+        { tab: 'logbuch', label: 'Logbuch', hint: 'Eintrag dokumentieren' },
+        { tab: 'cr-export', label: 'OSCI C&R', hint: 'Liste prüfen & buchen' },
+        { tab: 'statistik', label: 'Statistik', hint: 'Verbrauch ansehen' }
+    ].filter(item => !isMenuTabHidden(item.tab)).slice(0, 4);
+
+    const recentActivity = recentLog
+        ? { title: recentLog.title || recentLog.category || 'Logbucheintrag', detail: formatWarehouseDate(recentLog.at || recentLog.createdAt), kind: 'Logbuch' }
+        : lastLog
+            ? { title: `${lastLog.action === 'out' ? 'Ausgelagert' : 'Eingelagert'}: ${lastLog.item}`, detail: `${formatItemAmount(lastLog.item, lastLog.amount)} · ${formatWarehouseDate(getLogTime(lastLog))}`, kind: 'Lager' }
+            : null;
+
+    const retainedSections = [
+        '.dashboard-config',
+        '.dashboard-panels',
+        '.dashboard-measurements-grid',
+        '.dashboard-backup-reminder'
+    ].flatMap(selector => [...container.querySelectorAll(`:scope > ${selector}`)]);
+
+    container.innerHTML = `
+        <div class="dashboard-home">
+            <section class="dashboard-home-heading">
+                <div>
+                    <span class="section-eyebrow">Übersicht</span>
+                    <h2>Dein Überblick</h2>
+                    <p>${escapeHtml(warehouse?.name || 'Lager')} · Werte, Bestand und Dokumentation an einem Ort.</p>
+                </div>
+                <div class="dashboard-home-heading-actions">
+                    <button type="button" class="btn btn-secondary" onclick="triggerRefresh()" aria-label="Übersicht aktualisieren">Aktualisieren</button>
+                    <button type="button" class="btn btn-secondary" onclick="startDashboardEdit()" ${isEditing ? 'disabled' : ''}>Anpassen</button>
+                </div>
+            </section>
+
+            <section class="dashboard-home-aquarium" aria-label="Aktives Aquarium">
+                <div class="dashboard-home-aquarium-copy">
+                    <span>Aktives Aquarium</span>
+                    <strong>${escapeHtml(aquarium?.name || 'Kein Aquarium angelegt')}</strong>
+                    <small>${aquarium ? (Number.isFinite(aquariumVolume) && aquariumVolume > 0 ? `${escapeHtml(String(aquariumVolume))} L Nettovolumen` : 'Aquariumvolumen noch nicht hinterlegt') : 'ReefTools lässt sich auch ohne Aquarium nutzen.'}</small>
+                </div>
+                <div class="dashboard-home-aquarium-controls">
+                    ${aquariumList.length ? `<select id="dashboardAquariumSelect" onchange="switchAquarium(this.value)" aria-label="Aquarium wechseln">${aquariumOptions}</select>` : '<button type="button" class="btn btn-secondary" onclick="createAquarium()">Aquarium anlegen</button>'}
+                    ${aquarium ? `<button type="button" class="dashboard-home-aquarium-manage" onclick="selectTab('einstellungen')" aria-label="Aquarium verwalten" title="Aquarium verwalten">${getTabIconMarkup('einstellungen')}</button>` : ''}
+                </div>
+            </section>
+
+            ${(alerts.length || dueTodos.length) ? `
+                <section class="dashboard-home-attention" aria-label="Benötigt Aufmerksamkeit">
+                    <strong>Im Blick behalten</strong>
+                    ${alerts.length ? `<button type="button" onclick="selectTab('lager')">${alerts.length} Bestandswarnung(en)</button>` : ''}
+                    ${dueTodos.length ? `<button type="button" onclick="openDashboardDestination('todos')">${dueTodos.length} fällige Aufgabe(n)</button>` : ''}
+                </section>
+            ` : ''}
+
+            ${settings.widgets.tests ? `
+                <section class="dashboard-home-section" aria-labelledby="dashboardHomeWaterTitle">
+                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeWaterTitle">Wasserwerte</h3><button type="button" class="dashboard-home-link" onclick="selectTab('logbuch')">Messverlauf&nbsp; ›</button></div>
+                    <div class="dashboard-home-metrics">${metricCards}</div>
+                </section>
+            ` : ''}
+
+            ${settings.widgets.stock ? `
+                <section class="dashboard-home-section" aria-labelledby="dashboardHomeStockTitle">
+                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeStockTitle">Lager im Blick</h3><button type="button" class="dashboard-home-link" onclick="selectTab('lager')">Zum Lager&nbsp; ›</button></div>
+                    <div class="dashboard-home-stock">
+                        <div class="dashboard-home-stock-head"><strong>Bestandsübersicht</strong><span>${alerts.length ? `${alerts.length} Hinweis(e)` : `${catalogProducts.length} Produkte sichtbar`}</span></div>
+                        ${stockRows || '<p class="dashboard-home-empty">Für das aktive System sind noch keine Lagerprodukte sichtbar.</p>'}
+                    </div>
+                </section>
+            ` : ''}
+
+            <section class="dashboard-home-section" aria-labelledby="dashboardHomeQuickTitle">
+                <div class="dashboard-home-section-head"><h3 id="dashboardHomeQuickTitle">Schnellzugriff</h3></div>
+                <div class="dashboard-home-quick-grid">
+                    ${quickLinks.map(item => `
+                        <button type="button" class="dashboard-home-quick" onclick="selectTab('${item.tab}')">
+                            <span class="dashboard-home-quick-icon">${getTabIconMarkup(item.tab)}</span>
+                            <span class="dashboard-home-quick-copy"><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.hint)}</small></span>
+                            <span class="dashboard-home-stock-chevron" aria-hidden="true">›</span>
+                        </button>
+                    `).join('')}
+                </div>
+            </section>
+
+            ${settings.widgets.logs ? `
+                <section class="dashboard-home-section" aria-labelledby="dashboardHomeRecentTitle">
+                    <div class="dashboard-home-section-head"><h3 id="dashboardHomeRecentTitle">Zuletzt dokumentiert</h3><button type="button" class="dashboard-home-link" onclick="selectTab('${recentActivity?.kind === 'Lager' ? 'log' : 'logbuch'}')">Alle Einträge&nbsp; ›</button></div>
+                    <button type="button" class="dashboard-home-recent" onclick="selectTab('${recentActivity?.kind === 'Lager' ? 'log' : 'logbuch'}')">
+                        <span class="dashboard-home-recent-icon">${getTabIconMarkup(recentActivity?.kind === 'Lager' ? 'lager' : 'logbuch')}</span>
+                        <span><strong>${escapeHtml(recentActivity?.title || 'Noch keine Einträge')}</strong><small>${escapeHtml(recentActivity?.detail || 'Messungen, Pflege und Buchungen werden hier zusammengefasst.')}</small></span>
+                        <span class="dashboard-home-recent-kind">${escapeHtml(recentActivity?.kind || 'Logbuch')}</span>
+                    </button>
+                </section>
+            ` : ''}
+
+            <details class="dashboard-home-more" ${isEditing ? 'open' : ''}>
+                <summary><span><strong>Weitere Einblicke</strong><small>Aufgaben, Trends, Korallen und zusätzliche Dashboard-Kacheln</small></span></summary>
+                <div class="dashboard-home-more-content"></div>
+            </details>
+        </div>
+    `;
+
+    const moreContent = container.querySelector('.dashboard-home-more-content');
+    retainedSections.forEach(section => moreContent?.appendChild(section));
 }
 
 function formatDashboardDateParts(value) {
@@ -30517,16 +30673,23 @@ async function bootstrapApplication() {
     await initDB();
     renderLegacyDomainBanner();
     document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
-    let startupTab = db.lastTab || 'uebersicht';
-    try { startupTab = localStorage.getItem(LAST_TAB_KEY) || startupTab; } catch(e) {}
-    if (window.location.hash) {
+    let overviewMigrationPending = false;
+    try { overviewMigrationPending = localStorage.getItem(HOME_OVERVIEW_MIGRATION_KEY) !== 'done'; } catch (err) {}
+    let startupTab = 'uebersicht';
+    if (!overviewMigrationPending && window.location.hash) {
         const route = getRouteFromHash();
         if (APP_TAB_IDS.includes(route.tabId)) startupTab = route.tabId;
     }
-    if (pendingStartupTab && APP_TAB_IDS.includes(pendingStartupTab)) startupTab = pendingStartupTab;
+    if (!overviewMigrationPending && pendingStartupTab && APP_TAB_IDS.includes(pendingStartupTab)) startupTab = pendingStartupTab;
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     appBootstrapComplete = true;
     showTab(startupTab);
+    if (overviewMigrationPending) {
+        try {
+            localStorage.setItem(OVERVIEW_ENABLED_KEY, 'true');
+            localStorage.setItem(HOME_OVERVIEW_MIGRATION_KEY, 'done');
+        } catch (err) {}
+    }
     pendingStartupTab = '';
     runPostBootstrapDomSetup();
     initCustomCursor();

@@ -912,3 +912,168 @@ body.menu-open .mobile-bottom-nav { visibility: hidden; pointer-events: none; }
     #app #cr-export .cr-waterchange-dose { align-items: flex-start; }
 }
 @media (prefers-reduced-motion: reduce) { #app #cr-export .cr-waterchange-summary-action { transition: none; } }
+
+/* Compact, data-backed mobile-first dashboard. */
+#app #uebersicht .dashboard-home {
+    width: min(100%, 920px);
+    margin: 0 auto;
+    padding: 4px 0 28px;
+    display: grid;
+    gap: 18px;
+}
+#app #uebersicht .dashboard-home-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+}
+#app #uebersicht .dashboard-home-heading h2 { margin: 3px 0 4px; font-size: 1.65rem; }
+#app #uebersicht .dashboard-home-heading p { margin: 0; color: var(--text-secondary); }
+#app #uebersicht .dashboard-home-heading-actions { display: flex; gap: 8px; }
+#app #uebersicht .dashboard-home-heading-actions .btn { min-height: 40px; }
+#app #uebersicht .dashboard-home-aquarium,
+#app #uebersicht .dashboard-home-stock,
+#app #uebersicht .dashboard-home-recent,
+#app #uebersicht .dashboard-home-more {
+    min-width: 0;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+}
+#app #uebersicht .dashboard-home-aquarium {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+}
+#app #uebersicht .dashboard-home-aquarium-copy { display: grid; min-width: 0; gap: 2px; }
+#app #uebersicht .dashboard-home-aquarium-copy > span { color: var(--text-secondary); font-size: var(--font-caption); text-transform: uppercase; }
+#app #uebersicht .dashboard-home-aquarium-copy > strong { font-size: 1rem; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-aquarium-copy > small { color: var(--text-secondary); }
+#app #uebersicht .dashboard-home-aquarium-controls { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#app #uebersicht .dashboard-home-aquarium-controls select { min-width: 130px; max-width: 220px; min-height: 40px; padding-block: 7px; }
+#app #uebersicht .dashboard-home-aquarium-manage { display: grid; place-items: center; width: 40px; height: 40px; min-height: 40px; padding: 8px; }
+#app #uebersicht .dashboard-home-aquarium-manage .nav-icon { width: 18px; height: 18px; }
+#app #uebersicht .dashboard-home-attention {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    padding: 11px 14px;
+    border: 1px solid color-mix(in srgb, var(--status-warning) 38%, var(--border-color));
+    border-radius: var(--radius-card);
+    background: color-mix(in srgb, var(--status-warning) 7%, var(--surface-card));
+}
+#app #uebersicht .dashboard-home-attention > strong { color: var(--status-warning); margin-right: auto; }
+#app #uebersicht .dashboard-home-attention button,
+#app #uebersicht .dashboard-home-link { border: 0; background: transparent; color: var(--accent); padding: 4px; min-height: 32px; }
+#app #uebersicht .dashboard-home-section { min-width: 0; }
+#app #uebersicht .dashboard-home-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 1px 9px; }
+#app #uebersicht .dashboard-home-section-head h3 { margin: 0; font-size: 1rem; }
+#app #uebersicht .dashboard-home-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+#app #uebersicht .dashboard-home-metric {
+    display: grid;
+    align-content: start;
+    gap: 5px;
+    min-width: 0;
+    min-height: 94px;
+    padding: 12px 11px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+}
+#app #uebersicht .dashboard-home-metric:hover,
+#app #uebersicht .dashboard-home-quick:hover,
+#app #uebersicht .dashboard-home-stock-row:hover,
+#app #uebersicht .dashboard-home-recent:hover { border-color: var(--accent); }
+#app #uebersicht .dashboard-home-metric-label { display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: var(--font-caption); }
+#app #uebersicht .dashboard-home-metric-label i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+#app #uebersicht .dashboard-home-metric strong { min-width: 0; font-size: 1.12rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-metric small { color: var(--text-secondary); font-size: 0.7rem; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-stock { overflow: hidden; }
+#app #uebersicht .dashboard-home-stock-head { display: flex; justify-content: space-between; gap: 8px; padding: 12px 14px; }
+#app #uebersicht .dashboard-home-stock-head strong { font-size: var(--font-body); }
+#app #uebersicht .dashboard-home-stock-head span { color: var(--text-secondary); font-size: var(--font-caption); text-align: right; }
+#app #uebersicht .dashboard-home-stock-row {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) max-content 14px;
+    align-items: center;
+    gap: 9px;
+    width: 100%;
+    min-width: 0;
+    min-height: 58px;
+    padding: 9px 14px;
+    text-align: left;
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    border-radius: 0;
+    background: transparent;
+}
+#app #uebersicht .dashboard-home-stock-symbol { color: var(--accent); font-size: var(--font-small); font-weight: 600; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-stock-name,
+#app #uebersicht .dashboard-home-stock-amount { display: grid; gap: 2px; min-width: 0; }
+#app #uebersicht .dashboard-home-stock-name strong { font-size: var(--font-small); font-weight: 550; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-stock-name small,
+#app #uebersicht .dashboard-home-stock-amount small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-stock-amount { text-align: right; white-space: nowrap; }
+#app #uebersicht .dashboard-home-stock-amount strong { font-size: var(--font-small); font-variant-numeric: tabular-nums; }
+#app #uebersicht .dashboard-home-stock-amount.is-warning small,
+#app #uebersicht .dashboard-home-stock-amount.is-warning strong,
+#app #uebersicht .dashboard-home-stock-amount.is-empty small { color: var(--status-warning); }
+#app #uebersicht .dashboard-home-stock-chevron { color: var(--text-secondary); font-size: 1.25rem; text-align: right; }
+#app #uebersicht .dashboard-home-empty { padding: 8px 14px 14px; margin: 0; color: var(--text-secondary); }
+#app #uebersicht .dashboard-home-quick-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+#app #uebersicht .dashboard-home-quick {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    min-height: 70px;
+    padding: 11px;
+    text-align: left;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-card);
+    background: var(--surface-card);
+}
+#app #uebersicht .dashboard-home-quick-icon,
+#app #uebersicht .dashboard-home-recent-icon { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; border-radius: var(--radius-md); background: var(--surface-raised); color: var(--accent); }
+#app #uebersicht .dashboard-home-quick-icon .nav-icon,
+#app #uebersicht .dashboard-home-recent-icon .nav-icon { width: 19px; height: 19px; }
+#app #uebersicht .dashboard-home-quick-copy { display: grid; gap: 2px; min-width: 0; }
+#app #uebersicht .dashboard-home-quick-copy strong { font-size: var(--font-small); line-height: 1.25; overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-quick-copy small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-recent { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 66px; padding: 12px; text-align: left; }
+#app #uebersicht .dashboard-home-recent > span:nth-child(2) { display: grid; gap: 3px; min-width: 0; flex: 1; }
+#app #uebersicht .dashboard-home-recent strong { font-size: var(--font-small); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-recent small { color: var(--text-secondary); font-size: var(--font-caption); overflow-wrap: anywhere; }
+#app #uebersicht .dashboard-home-recent-kind { flex: 0 0 auto; color: var(--accent); font-size: var(--font-caption); }
+#app #uebersicht .dashboard-home-more > summary { display: flex; align-items: center; min-height: 58px; padding: 12px 14px; }
+#app #uebersicht .dashboard-home-more > summary span { display: grid; gap: 3px; min-width: 0; }
+#app #uebersicht .dashboard-home-more > summary strong { font-size: var(--font-body); }
+#app #uebersicht .dashboard-home-more > summary small { color: var(--text-secondary); font-size: var(--font-caption); }
+#app #uebersicht .dashboard-home-more-content { display: grid; gap: 14px; padding: 0 14px 14px; }
+#app #uebersicht .dashboard-home-more-content > :last-child { margin-bottom: 0; }
+@media (max-width: 520px) {
+    #app #uebersicht .dashboard-home { gap: 15px; }
+    #app #uebersicht .dashboard-home-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+    #app #uebersicht .dashboard-home-heading-actions { width: 100%; }
+    #app #uebersicht .dashboard-home-heading-actions .btn { flex: 1; }
+    #app #uebersicht .dashboard-home-aquarium { align-items: flex-start; padding: 12px; }
+    #app #uebersicht .dashboard-home-aquarium-controls { max-width: 54%; }
+    #app #uebersicht .dashboard-home-aquarium-controls select { min-width: 0; max-width: 100%; }
+    #app #uebersicht .dashboard-home-metrics { gap: 6px; }
+    #app #uebersicht .dashboard-home-metric { padding: 10px 8px; min-height: 88px; }
+    #app #uebersicht .dashboard-home-metric strong { font-size: 1rem; }
+    #app #uebersicht .dashboard-home-stock-row { grid-template-columns: 32px minmax(0, 1fr) max-content 10px; gap: 7px; padding-inline: 10px; }
+    #app #uebersicht .dashboard-home-quick-grid { gap: 7px; }
+    #app #uebersicht .dashboard-home-quick { gap: 7px; padding: 9px; }
+    #app #uebersicht .dashboard-home-quick-icon { flex-basis: 30px; width: 30px; height: 30px; }
+    #app #uebersicht .dashboard-home-quick-icon .nav-icon { width: 17px; height: 17px; }
+}
+@media (max-width: 350px) {
+    #app #uebersicht .dashboard-home-metric-label { font-size: 0.68rem; }
+    #app #uebersicht .dashboard-home-metric strong { font-size: 0.94rem; }
+    #app #uebersicht .dashboard-home-quick-grid { grid-template-columns: minmax(0, 1fr); }
+}

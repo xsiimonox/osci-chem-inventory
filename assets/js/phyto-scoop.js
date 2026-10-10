@@ -668,7 +668,7 @@
         if (customLabel) addLine(customLabel, -3.95);
     }
 
-    function makeMesh(calc, capacityLabel = null, customLabel = '') {
+    function makeMesh(calc, capacityLabel = null, customLabel = '', requestedHandleLengthMm = handleLengthMm) {
         const triangles = [];
         const n = 96;
         const filletSteps = 16;
@@ -721,7 +721,11 @@
         const liquidTextWidth = text => Math.max(0, text.length * 6 - 1);
         const labelWidth = capacityLabel ? liquidTextWidth(capacityLabel) : 0;
         const nameWidth = customLabel ? liquidTextWidth(customLabel) : 0;
-        const liquidHandleLength = capacityLabel ? Math.max(handleLengthMm, Math.max(labelWidth, nameWidth) + 20) : handleLengthMm;
+        // Keep the engraving clear of both the flared cup transition and the
+        // rounded grip end so no character protrudes past the handle outline.
+        const labelClearanceMm = 10;
+        const minimumLabelLength = Math.max(labelWidth, nameWidth) + labelClearanceMm;
+        const liquidHandleLength = capacityLabel ? Math.max(requestedHandleLengthMm, minimumLabelLength) : handleLengthMm;
         const activeHandleWidth = capacityLabel ? 18 : handleWidthMm;
         // Start the wider handle inside the cup's 1.5 mm wall, not inside the
         // liquid cavity, then flare gradually out to the full grip width.
@@ -776,37 +780,44 @@
 
     function updateLiquidScoop() {
         const input = document.getElementById('liquidScoopMl');
+        const handleLengthInput = document.getElementById('liquidScoopHandleLength');
         const nameInput = document.getElementById('liquidScoopName');
         const result = document.getElementById('liquidScoopResult');
         const download = document.getElementById('liquidScoopDownload');
         if (!input || !result || !download) return;
         const capacityMl = Number(input.value);
         const valid = Number.isFinite(capacityMl) && capacityMl >= 0.1 && capacityMl <= Number.MAX_SAFE_INTEGER / 1000;
+        const requestedHandleLengthMm = Number(handleLengthInput?.value ?? handleLengthMm);
+        const handleLengthValid = Number.isFinite(requestedHandleLengthMm) && requestedHandleLengthMm >= 33 && requestedHandleLengthMm <= 200;
         input.setCustomValidity(valid ? '' : 'Bitte eine Füllmenge ab 0,1 ml eingeben.');
-        download.disabled = !valid;
-        if (!valid) {
-            result.innerHTML = '<p class="phyto-scoop-error">Bitte gib eine gültige Füllmenge von mindestens 0,1 ml ein.</p>';
+        handleLengthInput?.setCustomValidity(handleLengthValid ? '' : 'Bitte eine Stiellänge zwischen 33 und 200 mm eingeben.');
+        download.disabled = !valid || !handleLengthValid;
+        if (!valid || !handleLengthValid) {
+            result.innerHTML = `<p class="phyto-scoop-error">${!valid ? 'Bitte gib eine gültige Füllmenge von mindestens 0,1 ml ein.' : 'Bitte wähle eine Stiellänge zwischen 33 und 200 mm.'}</p>`;
             return;
         }
 
         const calc = calculateLiquidScoop(capacityMl);
         const label = `${fmt(capacityMl, 3)} ml`;
         const customLabel = (nameInput?.value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('de-DE').replace(/ß/g, 'ss').replace(/[^a-z0-9,. _-]/g, '').trim().slice(0, 24);
+        const labelWidth = Math.max(0, label.length * 6 - 1);
+        const nameWidth = Math.max(0, customLabel.length * 6 - 1);
+        const actualHandleLengthMm = Math.max(requestedHandleLengthMm, Math.max(labelWidth, nameWidth) + 10);
         const visibleName = nameInput?.value.trim() || '';
-        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>Nennfüllmenge bis zum Ausgießer</span><strong>${fmt(capacityMl, 3)} ml</strong></div><div><span>Becherhöhe</span><strong>${fmt(calc.outerCupHeight, 1)} mm</strong></div></div><p class="phyto-scoop-detail">Innen-Ø ${fmt(calc.innerRadiusMm * 2, 1)} mm · Fülltiefe bis zur Lippe ${fmt(calc.fillDepthAtSpout, 1)} mm · Beschriftung „${label}“${visibleName ? ` · Name „${visibleName.replace(/[&<>"']/g, '')}“` : ''}</p>`;
+        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>Nennfüllmenge bis zum Ausgießer</span><strong>${fmt(capacityMl, 3)} ml</strong></div><div><span>Stiellänge</span><strong>${fmt(actualHandleLengthMm, 0)} mm</strong></div></div><p class="phyto-scoop-detail">Innen-Ø ${fmt(calc.innerRadiusMm * 2, 1)} mm · Fülltiefe bis zur Lippe ${fmt(calc.fillDepthAtSpout, 1)} mm · Beschriftung „${label}“${visibleName ? ` · Name „${visibleName.replace(/[&<>"']/g, '')}“` : ''}${actualHandleLengthMm > requestedHandleLengthMm ? ` · Griff für Beschriftung auf ${fmt(actualHandleLengthMm, 0)} mm verlängert` : ''}</p>`;
 
         const canvas = document.getElementById('liquidScoopCanvas');
         const fallback = document.getElementById('liquidScoop3dFallback');
         if (canvas && fallback) {
             if (!liquidScoopViewer) liquidScoopViewer = createScoopViewer(canvas, document.getElementById('liquidScoopResetView'), fallback);
-            if (liquidScoopViewer) liquidScoopViewer.setModel(makeMesh(calc, label, customLabel));
+            if (liquidScoopViewer) liquidScoopViewer.setModel(makeMesh(calc, label, customLabel, requestedHandleLengthMm));
             else fallback.hidden = false;
         }
-        download.onclick = () => downloadLiquidScoopStl(calc, label, customLabel);
+        download.onclick = () => downloadLiquidScoopStl(calc, label, customLabel, requestedHandleLengthMm);
     }
 
-    function downloadLiquidScoopStl(calc, label, customLabel) {
-        const triangles = makeMesh(calc, label, customLabel);
+    function downloadLiquidScoopStl(calc, label, customLabel, requestedHandleLengthMm) {
+        const triangles = makeMesh(calc, label, customLabel, requestedHandleLengthMm);
         const buffer = new ArrayBuffer(84 + triangles.length * 50);
         const view = new DataView(buffer);
         const header = `LiquidDose ${label}${customLabel ? ` | ${customLabel}` : ''} | cup ${fmt(calc.outerCupHeight, 2)} mm`;
@@ -886,6 +897,7 @@
         input.addEventListener('input', update);
         document.getElementById('phytoHolderCount')?.addEventListener('input', updateHolder);
         document.getElementById('liquidScoopMl')?.addEventListener('input', updateLiquidScoop);
+        document.getElementById('liquidScoopHandleLength')?.addEventListener('input', updateLiquidScoop);
         document.getElementById('liquidScoopName')?.addEventListener('input', updateLiquidScoop);
         update();
         updateLiquidScoop();
