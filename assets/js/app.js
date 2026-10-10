@@ -19624,7 +19624,7 @@ function openToolById(toolId, options = {}) {
         try { history.replaceState(null, '', getToolRouteHash(toolId)); } catch(e) {}
     }
     card.classList.remove('tool-deeplink-highlight');
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.scrollIntoView({ behavior: 'smooth', block: toolId === 'phytocoral-loeffel-generator' ? 'start' : 'center' });
     if (options.highlight) {
         window.requestAnimationFrame(() => {
             card.classList.add('tool-deeplink-highlight');

@@ -1,4 +1,5 @@
 .phyto-scoop-card {
+    scroll-margin-top: calc(var(--header-height, 72px) + 16px);
     grid-column:1 / -1;
     position:relative;
     overflow:hidden;
