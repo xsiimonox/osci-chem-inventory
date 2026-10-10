@@ -11,17 +11,15 @@
     const handleWidthMm = 6;
     const handleHeightMm = 3;
     const innerRadiusMm = innerDiameterMm / 2;
-    const innerAreaMm2 = Math.PI * innerRadiusMm ** 2;
-
     const fmt = (value, digits = 2) => new Intl.NumberFormat('de-DE', { maximumFractionDigits: digits }).format(value);
 
-    function roundedFloorVolume(heightMm, radiusMm) {
+    function roundedFloorVolume(heightMm, radiusMm, bowlRadiusMm) {
         const height = Math.max(0, Math.min(heightMm, radiusMm));
         if (!height) return 0;
         const steps = 64;
         const step = height / steps;
         const areaAt = y => {
-            const curvedRadius = innerRadiusMm - radiusMm
+            const curvedRadius = bowlRadiusMm - radiusMm
                 + Math.sqrt(Math.max(0, radiusMm ** 2 - (y - radiusMm) ** 2));
             return Math.PI * curvedRadius ** 2;
         };
@@ -30,18 +28,20 @@
         return sum * step / 3;
     }
 
-    function volumeAtFillHeight(heightMm) {
-        if (heightMm <= innerCornerRadiusMm) return roundedFloorVolume(heightMm, heightMm);
-        return roundedFloorVolume(innerCornerRadiusMm, innerCornerRadiusMm) + innerAreaMm2 * (heightMm - innerCornerRadiusMm);
+    function volumeAtFillHeight(heightMm, bowlRadiusMm = innerRadiusMm) {
+        const cornerRadius = Math.min(innerCornerRadiusMm, bowlRadiusMm);
+        if (heightMm <= cornerRadius) return roundedFloorVolume(heightMm, heightMm, bowlRadiusMm);
+        return roundedFloorVolume(cornerRadius, cornerRadius, bowlRadiusMm)
+            + Math.PI * bowlRadiusMm ** 2 * (heightMm - cornerRadius);
     }
 
     const maxVolumePerScoopMm3 = volumeAtFillHeight(maxFillHeightMm);
 
-    function fillHeightForVolume(volumeMm3) {
+    function fillHeightForVolume(volumeMm3, bowlRadiusMm = innerRadiusMm) {
         let low = 0, high = maxFillHeightMm;
         for (let i = 0; i < 52; i++) {
             const mid = (low + high) / 2;
-            if (volumeAtFillHeight(mid) < volumeMm3) low = mid;
+            if (volumeAtFillHeight(mid, bowlRadiusMm) < volumeMm3) low = mid;
             else high = mid;
         }
         return (low + high) / 2;
@@ -54,8 +54,21 @@
         let scoopCount = Math.max(1, Math.ceil(totalVolumeMm3 / maxVolumePerScoopMm3));
         while (scoopCount * maxVolumePerScoopMm3 < totalVolumeMm3) scoopCount++;
         const perScoopVolumeMm3 = totalVolumeMm3 / scoopCount;
-        const fillHeight = fillHeightForVolume(perScoopVolumeMm3);
-        return { liters, massG, totalMl, scoopCount, fillHeight, cornerRadiusMm: Math.min(innerCornerRadiusMm, fillHeight), outerCupHeight: fillHeight + floorMm, perScoopMl: totalMl / scoopCount, perScoopG: massG / scoopCount };
+        let scoopInnerRadiusMm = innerRadiusMm;
+        let fillHeight = fillHeightForVolume(perScoopVolumeMm3, scoopInnerRadiusMm);
+        if (fillHeight < 5) {
+            // Narrow the bowl while preserving the exact dose volume, so even small doses
+            // fill to a readable and practical minimum depth.
+            let low = 0, high = innerRadiusMm;
+            for (let i = 0; i < 52; i++) {
+                const mid = (low + high) / 2;
+                if (volumeAtFillHeight(5, mid) < perScoopVolumeMm3) low = mid;
+                else high = mid;
+            }
+            scoopInnerRadiusMm = (low + high) / 2;
+            fillHeight = fillHeightForVolume(perScoopVolumeMm3, scoopInnerRadiusMm);
+        }
+        return { liters, massG, totalMl, scoopCount, fillHeight, innerRadiusMm: scoopInnerRadiusMm, cornerRadiusMm: Math.min(innerCornerRadiusMm, scoopInnerRadiusMm, fillHeight), outerCupHeight: fillHeight + floorMm, perScoopMl: totalMl / scoopCount, perScoopG: massG / scoopCount };
     }
 
     let scoopViewer = null;
@@ -286,17 +299,19 @@
         const download = document.getElementById('phytoScoopDownload');
         if (!input || !result || !download) return;
         const liters = Number(input.value);
-        const valid = Number.isFinite(liters) && liters > 0 && liters <= Number.MAX_SAFE_INTEGER;
-        input.setCustomValidity(valid ? '' : 'Bitte ein Aquariumvolumen größer als 0 Liter eingeben.');
+        const valid = Number.isFinite(liters) && liters >= 50 && liters <= Number.MAX_SAFE_INTEGER;
+        input.setCustomValidity(valid ? '' : 'Bitte mindestens 50 Liter Aquariumvolumen eingeben.');
         download.disabled = !valid;
         if (!valid) {
-            result.innerHTML = '<p class="phyto-scoop-error">Bitte ein Aquariumvolumen größer als 0 Liter eingeben.</p>';
+            result.innerHTML = '<p class="phyto-scoop-error">Der PhytoDose-Rechner ist für Aquarien ab 50 Litern ausgelegt. Bitte gib mindestens 50 Liter ein.</p>';
             return;
         }
         const calc = calculate(liters);
         const scoopPhrase = calc.scoopCount === 1 ? '1 vollen PhytoDose-Löffel' : `${fmt(calc.scoopCount, 0)} volle PhytoDose-Löffel`;
         const splits = `<div class="phyto-scoop-split ${calc.scoopCount > 1 ? 'phyto-scoop-split--multiple' : ''}" role="status" aria-live="polite"><span class="phyto-scoop-split-count">${fmt(calc.scoopCount, 0)}×</span><span><strong>Du brauchst ${scoopPhrase}</strong><small>pro Anwendung · alle Löffel haben dieselbe Größe</small></span></div>`;
-        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>PhytoCoral gesamt</span><strong>${fmt(calc.massG, 3)} g</strong></div><div><span>Gesamtvolumen</span><strong>${fmt(calc.totalMl, 3)} ml</strong></div></div>${splits}<p class="phyto-scoop-detail">Je Löffel: ${fmt(calc.perScoopG, 3)} g · ${fmt(calc.perScoopMl, 3)} ml · Becherhöhe ${fmt(calc.outerCupHeight, 1)} mm · Innenradius ${fmt(calc.cornerRadiusMm, 2)} mm</p>`;
+        const adjustedDiameter = calc.innerRadiusMm * 2;
+        const diameterNote = adjustedDiameter < innerDiameterMm - 0.01 ? ` · Innen-Ø ${fmt(adjustedDiameter, 1)} mm (für mind. 5 mm Füllhöhe angepasst)` : ` · Innen-Ø ${fmt(innerDiameterMm, 1)} mm`;
+        result.innerHTML = `<div class="phyto-scoop-metrics"><div><span>PhytoCoral gesamt</span><strong>${fmt(calc.massG, 3)} g</strong></div><div><span>Gesamtvolumen</span><strong>${fmt(calc.totalMl, 3)} ml</strong></div></div>${splits}<p class="phyto-scoop-detail">Je Löffel: ${fmt(calc.perScoopG, 3)} g · ${fmt(calc.perScoopMl, 3)} ml · Becherhöhe ${fmt(calc.outerCupHeight, 1)} mm${diameterNote}</p>`;
         renderPreview(calc);
         download.onclick = () => downloadStl(calc);
     }
@@ -305,8 +320,8 @@
         const triangles = [];
         const n = 96;
         const filletSteps = 16;
-        const ro = innerDiameterMm / 2 + wallMm;
-        const ri = innerRadiusMm;
+        const ri = calc.innerRadiusMm;
+        const ro = ri + wallMm;
         const cornerRadius = calc.cornerRadiusMm;
         const floorRadius = ri - cornerRadius;
         const zTop = calc.outerCupHeight;
