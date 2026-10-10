@@ -1419,7 +1419,8 @@ const TOOL_DEFINITIONS = [
     { id: 'makro-elemente-anmischen', label: 'Makro-Elemente anmischen', sectionId: 'c-und-r-und-mischen' },
     { id: 'sangokai-mengen-und-mischen', label: 'Sangokai Mengen & Mischen', sectionId: 'sangokai-mengen-und-mischen' },
     { id: 'hilfreiche-quellen', label: 'Hilfreiche Quellen', sectionId: 'community-und-hilfe' },
-    { id: 'phytocoral-loeffel-generator', label: 'PhytoDose Messlöffel-Rechner', sectionId: '3d-druck-und-werkstatt' }
+    { id: 'phytocoral-loeffel-generator', label: 'PhytoDose Messlöffel-Rechner', sectionId: '3d-druck-und-werkstatt' },
+    { id: 'fluessigkeits-messloeffel-generator', label: 'Flüssigkeits-Messlöffel-Rechner', sectionId: '3d-druck-und-werkstatt' }
 ];
 const OSCI_ONLY_TAB_IDS = new Set(['cr-export', 'trace-export']);
 const OSCI_ONLY_TOOL_IDS = new Set(TOOL_DEFINITIONS.filter(tool => tool.osciOnly).map(tool => tool.id));
