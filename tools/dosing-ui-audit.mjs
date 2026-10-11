@@ -27,12 +27,206 @@ const server = createServer(async (request, response) => {
 const checks = [];
 const errors = [];
 const output = path.join(os.tmpdir(), 'reeftools-dosing-audit');
+
+async function auditDoseEdgeCases(browser, url) {
+    const context = await browser.newContext({ viewport: { width: 390, height: 900 }, serviceWorkers: 'block' });
+    const page = await context.newPage();
+    const checks = [];
+    const failures = [];
+    page.on('pageerror', error => failures.push(error.message));
+    const check = async (label, run) => {
+        try { await run(); checks.push(label); }
+        catch (error) { failures.push(`${label}: ${error.message}`); }
+    };
+    try {
+        await page.goto(url, { waitUntil: 'domcontentloaded' });
+        await page.waitForFunction(() => typeof appBootstrapComplete !== 'undefined' && appBootstrapComplete);
+        await page.evaluate(() => {
+            const aquarium = createAquariumRecord('Randfall-Testaquarium', createAquariumData({ volumeLiters: 100 }));
+            appState.aquariums[aquarium.id] = aquarium;
+            switchAquarium(aquarium.id);
+            selectTab('tools');
+            openToolFavorite('kh-ca-korrektur');
+        });
+        await check('A fresh correction calculator starts with KH, not an inferred Calcium selection', async () => {
+            assert.equal(await page.locator('#majorCorrectionPreset').inputValue(), 'osci-kh-tag');
+        });
+        await page.locator('#majorCorrectionPreset').selectOption('osci-kh-tag');
+        await check('Clearing correction volume stays blank and cannot calculate using the old volume', async () => {
+            await page.locator('#majorCorrectionLiters').fill('');
+            assert.equal(await page.locator('#majorCorrectionLiters').inputValue(), '');
+            assert.doesNotMatch(await page.locator('#majorCorrectionResult').innerText(), /Dosiermenge/);
+        });
+        await page.locator('#majorCorrectionLiters').fill('100');
+        await check('Negative measurements and a zero or blank distribution period cannot produce a correction', async () => {
+            for (const [field, invalid, valid] of [
+                ['majorCorrectionCurrent', '-1', '7'], ['majorCorrectionTarget', '-1', '7.5'],
+                ['majorCorrectionDays', '0', '3'], ['majorCorrectionDays', '', '3']
+            ]) {
+                await page.locator(`#${field}`).fill(invalid);
+                assert.doesNotMatch(await page.locator('#majorCorrectionResult').innerText(), /Dosiermenge/);
+                await page.locator(`#${field}`).fill(valid);
+            }
+        });
+        await check('SANGOKAI correction clearly shows the separate amount for Ca-1 and Ca-2', async () => {
+            await page.locator('#majorCorrectionPreset').selectOption('sangokai-ca');
+            const result = await page.locator('#majorCorrectionResult').innerText();
+            assert.match(result, /50[.,]00 ml Ca-1/);
+            assert.match(result, /50[.,]00 ml Ca-2/);
+        });
+        await page.locator('#majorCorrectionPreset').selectOption('osci-kh-tag');
+        await page.locator('#majorCorrectionCurrent').fill('6.8');
+        await page.locator('#majorCorrectionTarget').fill('7.8');
+        await page.locator('#majorCorrectionDays').fill('5');
+        await check('Same-element product changes preserve entered correction values', async () => {
+            await page.locator('#majorCorrectionPreset').selectOption('osci-kh-nacht');
+            assert.equal(await page.locator('#majorCorrectionCurrent').inputValue(), '6.8');
+            assert.equal(await page.locator('#majorCorrectionTarget').inputValue(), '7.8');
+        });
+        await check('A Calcium product created in another tool cannot use KH measurement values', async () => {
+            await page.evaluate(() => storeCustomDoseProduct(buildCustomDoseProduct({
+                name: 'Randfall Calcium', element: 'Ca', method: 'reference', referenceMl: 10, referenceLiters: 100, increase: 5
+            })));
+            assert.equal(await page.locator('#majorCorrectionCurrent').inputValue(), '400');
+            assert.equal(await page.locator('#majorCorrectionTarget').inputValue(), '420');
+        });
+        await check('KH and Ca correction drafts survive product switches and reload', async () => {
+            await page.locator('#majorCorrectionCurrent').fill('410');
+            await page.locator('#majorCorrectionTarget').fill('430');
+            await page.locator('#majorCorrectionPreset').selectOption('osci-kh-tag');
+            assert.equal(await page.locator('#majorCorrectionCurrent').inputValue(), '6.8');
+            assert.equal(await page.locator('#majorCorrectionTarget').inputValue(), '7.8');
+            await page.locator('#majorCorrectionPreset').selectOption('osci-calcium');
+            assert.equal(await page.locator('#majorCorrectionCurrent').inputValue(), '410');
+            assert.equal(await page.locator('#majorCorrectionTarget').inputValue(), '430');
+            await page.evaluate(() => flushPendingPersistence('edge-case-correction', false));
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await page.waitForFunction(() => typeof appBootstrapComplete !== 'undefined' && appBootstrapComplete);
+            await page.evaluate(() => { selectTab('tools'); openToolFavorite('kh-ca-korrektur'); });
+            assert.equal(await page.locator('#majorCorrectionCurrent').inputValue(), '410');
+            assert.equal(await page.locator('#majorCorrectionTarget').inputValue(), '430');
+            assert.equal(await page.locator('#majorCorrectionDays').inputValue(), '5');
+        });
+        await check('Paired correction amounts and fields fit mobile, tablet and desktop layouts', async () => {
+            await page.locator('#majorCorrectionPreset').selectOption('sangokai-ca');
+            for (const theme of ['default', 'light']) {
+                await page.evaluate(value => applyTheme(value), theme);
+                for (const width of [319, 390, 768, 1440]) {
+                    await page.setViewportSize({ width, height: 900 });
+                    const card = page.locator('.tool-compact-card').filter({ has: page.locator('#majorCorrectionPreset') });
+                    const layout = await card.evaluate(card => ({
+                        pageWidth: document.documentElement.scrollWidth,
+                        buttonHeights: [...card.querySelectorAll('.calculator-actions button')].map(node => node.getBoundingClientRect().height),
+                        overflow: [...card.querySelectorAll('.tool-row, .input-group, label, .field-help')]
+                            .filter(node => node.getClientRects().length && node.scrollWidth > node.clientWidth + 1)
+                            .map(node => node.className || node.tagName),
+                        outside: [...card.querySelectorAll('input, select, button')].some(node => {
+                            const rect = node.getBoundingClientRect();
+                            return rect.width > 0 && (rect.left < -1 || rect.right > innerWidth + 1);
+                        })
+                    }));
+                    assert.ok(layout.pageWidth <= width + 1, JSON.stringify(layout));
+                    assert.deepEqual(layout.overflow, [], JSON.stringify(layout));
+                    assert.equal(layout.outside, false, JSON.stringify(layout));
+                    assert.ok(layout.buttonHeights.every(height => height >= 44 && height <= 60), JSON.stringify(layout));
+                    await card.screenshot({ path: path.join(output, `correction-${theme}-${width}.png`), animations: 'disabled',
+                        style: '#appHeader, .mobile-bottom-nav { visibility: hidden !important; }' });
+                }
+            }
+            await page.setViewportSize({ width: 390, height: 900 });
+        });
+        await page.evaluate(() => openToolFavorite('tagesdosierung-wirkung'));
+        await check('Negative or missing daily dose does not silently become zero', async () => {
+            for (const invalid of ['-5', '']) {
+                await page.locator('#doseImpactDailyMl').fill(invalid);
+                assert.doesNotMatch(await page.locator('#doseImpactResult').innerText(), /Zufuhr pro Tag/);
+            }
+            await page.locator('#doseImpactDailyMl').fill('0');
+            assert.match(await page.locator('#doseImpactResult').innerText(), /Zufuhr pro Tag/);
+        });
+        await page.evaluate(() => {
+            openToolFavorite('kh-ca-messverlauf-tagesdosis');
+            const tracker = getDoseTrackerState();
+            tracker.form = { product: 'kh', solutionId: 'osci-kh-nacht', at: '2026-10-10T12:00',
+                value: '7.1', doseMlPerDay: '20', targetValue: '7.5', targetDays: '10', maxChangePercent: '10' };
+            tracker.forms.kh = tracker.form;
+            const solution = cloneSerializable(doseImpactBuiltInPresets.find(preset => preset.id === 'osci-kh-tag'));
+            tracker.measurements = [{ id: 'edge-old', product: 'kh', solution, value: 7,
+                doseMlPerDay: 10, at: '2026-10-01T12:00:00Z', volumeLiters: 100 }];
+            initDoseTracker();
+            saveDB();
+        });
+        const draft = await page.evaluate(() => readDoseTrackerForm());
+        await check('Cancelling a history edit restores the current draft including solution and dose', async () => {
+            await page.locator('.dose-history-row').first().getByRole('button', { name: /bearbeiten/ }).click();
+            await page.locator('#doseValue').fill('6.9');
+            await page.locator('#doseCancelEditButton').click();
+            assert.deepEqual(await page.evaluate(() => readDoseTrackerForm()), draft);
+        });
+        await check('Saving or deleting an old measurement cannot replace the active draft or solution', async () => {
+            await page.locator('.dose-history-row').first().getByRole('button', { name: /bearbeiten/ }).click();
+            await page.locator('#doseValue').fill('6.9');
+            await page.locator('#doseSaveButton').click();
+            assert.deepEqual(await page.evaluate(() => readDoseTrackerForm()), draft);
+            assert.equal(await page.evaluate(() => getDoseTrackerState().measurements[0].value), 6.9);
+            await page.locator('.dose-history-row').first().getByRole('button', { name: /bearbeiten/ }).click();
+            await page.locator('.dose-history-row').first().getByRole('button', { name: /löschen/ }).click();
+            await page.locator('#appDialogConfirm').click();
+            await page.waitForFunction(() => getDoseTrackerState().measurements.length === 0);
+            assert.deepEqual(await page.evaluate(() => readDoseTrackerForm()), draft);
+        });
+        await check('A tiny unfinished C&R ingredient cannot round a batch to 100 percent', async () => {
+            const progress = await page.evaluate(() => {
+                selectTab('cr-export');
+                db.logs = [
+                    { id: 'edge-cr-large', item: 'Natriumchlorid (NaCl)', cat: 'C&R Produkte', action: 'out', amount: 5000,
+                        timestamp: Date.now(), mixingBatchId: 'edge-cr', mixingBatchType: 'cr', mixingRequiredAmount: 5000, mixingDone: true },
+                    { id: 'edge-cr-small', item: 'Bor (B)', cat: 'C&R Produkte', action: 'out', amount: 1,
+                        timestamp: Date.now(), mixingBatchId: 'edge-cr', mixingBatchType: 'cr', mixingRequiredAmount: 1, mixingDone: false }
+                ];
+                renderCRMixingOverview();
+                const batch = document.querySelector('.cr-mixing-batch');
+                const incomplete = { percent: Number(batch.querySelector('[role="progressbar"]').getAttribute('aria-valuenow')),
+                    complete: batch.classList.contains('is-complete') };
+                db.logs[1].mixingDone = true;
+                renderCRMixingOverview();
+                return { incomplete, finished: Number(document.querySelector('.cr-mixing-batch [role="progressbar"]').getAttribute('aria-valuenow')) };
+            });
+            assert.ok(progress.incomplete.percent < 100);
+            assert.equal(progress.incomplete.complete, false);
+            assert.equal(progress.finished, 100);
+        });
+        await check('Custom product creation without an aquarium cannot report an unsaved success', async () => {
+            const rejected = await page.evaluate(() => {
+                appState.aquariums = {};
+                activeAquariumId = null;
+                appState.activeAquariumId = null;
+                overlayActiveAquariumData();
+                selectTab('tools');
+                openToolFavorite('kh-ca-messverlauf-tagesdosis');
+                try {
+                    storeCustomDoseProduct(buildCustomDoseProduct({ name: 'Ohne Aquarium', element: 'KH',
+                        method: 'reference', referenceMl: 10, referenceLiters: 100, increase: 0.5 }));
+                    return false;
+                } catch (error) { return /Aquarium/.test(error.message); }
+            });
+            assert.equal(rejected, true);
+            await page.locator('#doseAddProductButton').click();
+            assert.equal(await page.locator('#appDialog').isVisible(), false);
+            assert.equal(await page.evaluate(() => getDoseImpactSettings().customPresets.length), 0);
+        });
+    } finally { await context.close(); }
+    assert.deepEqual(failures, [], `Reproduced faults:\n${failures.join('\n')}`);
+    return checks;
+}
+
 let browser;
 try {
     await mkdir(output, { recursive: true });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const url = process.argv[2] || `http://127.0.0.1:${server.address().port}/index.html`;
     browser = await chromium.launch({ headless: true });
+    checks.push(...await auditDoseEdgeCases(browser, url));
     const context = await browser.newContext({ viewport: { width: 390, height: 900 }, serviceWorkers: 'block' });
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(error.message));
@@ -250,7 +444,7 @@ try {
     await page.locator('#appDialogConfirm').click();
     await page.waitForFunction(() => getDoseImpactSettings().customPresets[0].configuration.method === 'powder');
     assert.equal(await page.locator('#majorCorrectionPreset').inputValue(), ownKhId);
-    assert.ok(Math.abs(await page.evaluate(() => getMajorCorrectionStrengthFromPreset(getMajorCorrectionPreset())) - 1 / 35.7) < 1e-9);
+    assert.ok(Math.abs(await page.evaluate(() => DosingCalculations.solutionStrength(getMajorCorrectionPreset(), 'kh')) - 1 / 35.7) < 1e-9);
     checks.push('Own KH products remain available with every provider disabled; the correction calculator edits the same product without duplication');
     await page.evaluate(() => switchAquarium(dosingFixtureIds[0]));
     await page.evaluate(() => openToolFavorite('kh-ca-messverlauf-tagesdosis'));
@@ -387,7 +581,7 @@ try {
     });
     await offlinePage.waitForFunction(async () => {
         if (!navigator.serviceWorker.controller) return false;
-        const cacheName = (await caches.keys()).find(name => name.includes('launcher-dosing-products-v2'));
+        const cacheName = (await caches.keys()).find(name => name.includes('launcher-dosing-products-v3'));
         if (!cacheName) return false;
         const cache = await caches.open(cacheName);
         return Boolean(await cache.match('./assets/js/dosing-calculations.js', { ignoreSearch: true }));

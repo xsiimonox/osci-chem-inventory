@@ -5,6 +5,11 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 671, height: 853 } });
 const errors = [], checks = {};
 page.on('pageerror', error => errors.push(error.message));
+const openBooking = async () => {
+    if (!(await page.locator('#inventoryQuickBooking').evaluate(element => element.open))) {
+        await page.locator('#inventoryQuickBooking > summary').click();
+    }
+};
 try {
     await page.goto(process.argv[2] || 'http://127.0.0.1:8202/index.html', { waitUntil: 'networkidle' });
     await page.evaluate(() => selectTab('lager'));
@@ -21,6 +26,7 @@ try {
     await page.locator('#categoryFilter').selectOption(cat);
     checks.category = await page.locator('#lager-container .inventory-card').count() === 1;
     const product = JSON.stringify([cat, name]);
+    await openBooking();
     await page.locator('#inventoryBookingProduct').selectOption(product);
     await page.locator('[data-book="in"]').click();
     checks.correctProduct = await page.evaluate(([cat, item]) => currentAction.cat === cat && currentAction.item === item && currentAction.action === 'in', [cat, name]);
@@ -34,6 +40,7 @@ try {
     await page.evaluate(() => selectTab('lager'));
     checks.bookingPersisted = await page.evaluate(([cat, item, before]) => db.inventory[cat][item] === before + 10, [cat, name, before]);
     checks.selectionPersisted = await page.locator('#inventoryBookingProduct').inputValue() === product;
+    await openBooking();
     await page.locator('[data-book="out"]').click();
     checks.correctOutAction = await page.evaluate(() => currentAction.action === 'out');
     await page.evaluate(() => closeModal());
@@ -59,6 +66,8 @@ try {
     await page.waitForTimeout(300);
     await page.evaluate(() => persistSequence);
     await page.reload({ waitUntil: 'networkidle' });
+    await page.evaluate(() => selectTab('lager'));
+    await openBooking();
     await page.locator('#inventorySort').selectOption('fill-low');
     const low = await page.locator('#lager-container meter').first().getAttribute('max');
     await page.locator('#inventorySort').selectOption('fill-high');

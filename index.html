@@ -23,7 +23,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="icon" type="image/png" href="assets/img/icon.png">
     <link rel="apple-touch-icon" href="assets/img/icon.png">
-    <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release">
+    <link rel="stylesheet" href="assets/css/style.css?v=3.6.17-release&amp;calc=dosing-products-v3">
     <link rel="stylesheet" href="assets/css/workspace-ui.css?v=3.6.17-release">
     <link rel="stylesheet" href="assets/css/design-system.css?v=3.6.17-release&amp;ui=launcher-v1&amp;calc=dosing-products-v2">
     <link rel="stylesheet" href="assets/css/phyto-scoop.css?v=3.6.38-release">
@@ -640,11 +640,11 @@
                                 </div>
                                 <div class="input-group">
                                     <label>Aktueller Wert:</label>
-                                    <input type="number" id="majorCorrectionCurrent" step="0.1" value="7.5" oninput="renderMajorCorrectionCalculator()">
+                                    <input type="number" id="majorCorrectionCurrent" min="0" step="0.1" value="7.5" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                                 <div class="input-group">
                                     <label>Zielwert:</label>
-                                    <input type="number" id="majorCorrectionTarget" step="0.1" value="8.0" oninput="renderMajorCorrectionCalculator()">
+                                    <input type="number" id="majorCorrectionTarget" min="0" step="0.1" value="8.0" oninput="renderMajorCorrectionCalculator()">
                                 </div>
                                 <div class="input-group">
                                     <label>Aufteilen auf Tage:</label>
@@ -659,7 +659,7 @@
                             <div id="majorCorrectionResult"></div>
                         </div>
 
-                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed balling-powder-card">
+                        <div class="card tool-compact-card tool-tile-card tool-tile-collapsed balling-powder-card" data-tool-id="balling-pulver-rechner">
                             <h3>Balling &amp; Pulver</h3>
                             <p class="hint">Fauna Marin Gebrauchslösungen, eigene Pulver und Hans-Werner-Balling-Ansätze berechnen und Mischchargen dokumentieren.</p>
                             <div class="tool-grid calculator-input-grid">
@@ -2961,12 +2961,12 @@
 
     <script src="assets/js/lighting-sim.js?v=3.6.17-release"></script>
     <script src="assets/js/sangokai-product-catalog.js?v=3.6.17-release"></script>
-    <script src="assets/js/dosing-calculations.js?v=dosing-products-v2"></script>
+    <script src="assets/js/dosing-calculations.js?v=dosing-products-v3"></script>
     <script src="assets/js/sangokai-calculations.js?v=3.6.17-release&amp;calc=dosing-products-v2"></script>
-    <script src="assets/js/app.js?v=3.6.19-release&amp;ui=launcher-v1&amp;calc=dosing-products-v2"></script>
+    <script src="assets/js/app.js?v=3.6.19-release&amp;ui=launcher-v1&amp;calc=dosing-products-v3&amp;backup=device-v1"></script>
     <script src="assets/js/phyto-holder-preview-data.js?v=3.6.23-release"></script>
     <script src="assets/js/phyto-scoop.js?v=3.6.38-release"></script>
-    <script src="assets/js/workspace-ui.js?v=3.6.17-release"></script>
+    <script src="assets/js/workspace-ui.js?v=3.6.17-release&amp;backup=device-v1"></script>
     <script>
         if ('serviceWorker' in navigator && ['http:', 'https:'].includes(window.location.protocol)) {
             navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })

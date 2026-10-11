@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { calculateDoseAdjustment, calculateConcentrationSolution, calculatePowderSolution, solutionStrength } = require('../assets/js/dosing-calculations.js');
+const { calculateDoseAdjustment, calculateConcentrationSolution, calculatePowderSolution, calculateCorrectionQuantity, calculateDoseImpact, solutionStrength } = require('../assets/js/dosing-calculations.js');
 
 const kh = { id: 'kh', element: 'KH', name: 'KH-Lösung', referenceMl: 10, referenceLiters: 100, increase: 0.5 };
 const ca = { id: 'ca', element: 'Ca', name: 'Ca-Lösung', referenceMl: 10, referenceLiters: 100, increase: 11 };
@@ -11,6 +11,38 @@ const calculate = (overrides = {}) => calculateDoseAdjustment({
     targetValue: 7.5, targetDays: 10, maxChangePercent: 10, ...overrides
 });
 const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} != ${expected}`);
+
+test('Korrektur und Dosierwirkung verwenden dieselbe validierte Produktkonzentration', () => {
+    const correction = calculateCorrectionQuantity({ solution: kh, volumeLiters: 770,
+        currentValue: 7, targetValue: 7.5, days: 5 });
+    near(correction.totalMl, 77);
+    near(correction.dailyMl, 15.4);
+    const impact = calculateDoseImpact({ solution: kh, volumeLiters: 770, dailyMl: 15.4 });
+    near(impact.dailyIncrease, 0.1);
+    near(impact.weeklyIncrease, 0.7);
+    near(calculateDoseImpact({ solution: ca, volumeLiters: 100, dailyMl: 0 }).dailyIncrease, 0);
+});
+
+test('Zweiteilige Calciumkorrektur gibt Mengen je Produkt statt einer unklaren Gesamtmenge an', () => {
+    const solution = { ...ca, referenceMl: 2.5, increase: 1, pairedProductName: 'Ca-2' };
+    const result = calculateCorrectionQuantity({ solution, volumeLiters: 100, currentValue: 400, targetValue: 420, days: 2 });
+    near(result.totalMl, 50);
+    near(result.pairedTotalMl, 50);
+    near(result.dailyMl, 25);
+    assert.equal(calculateCorrectionQuantity({ solution: ca, volumeLiters: 100, currentValue: 420, targetValue: 400, days: 2 }).totalMl, 0);
+});
+
+test('Korrektur und Dosierwirkung lehnen fehlende, negative und nicht endliche Eingaben ab', () => {
+    const input = { solution: kh, volumeLiters: 100, currentValue: 7, targetValue: 7.5, days: 3 };
+    for (const key of ['volumeLiters', 'currentValue', 'targetValue', 'days']) {
+        for (const value of ['', -1, Infinity, 'invalid']) assert.throws(() => calculateCorrectionQuantity({ ...input, [key]: value }));
+    }
+    assert.throws(() => calculateCorrectionQuantity({ ...input, volumeLiters: 0 }));
+    assert.throws(() => calculateCorrectionQuantity({ ...input, days: 0 }));
+    for (const dailyMl of ['', -1, Infinity]) assert.throws(() => calculateDoseImpact({ solution: kh, volumeLiters: 100, dailyMl }));
+    assert.throws(() => solutionStrength({ ...ca, increase: 1e308, referenceLiters: 1e308 }, 'ca'));
+    assert.throws(() => solutionStrength(ca, 'mg'));
+});
 
 test('Verbrauch berücksichtigt laufende Dosierung; der nächste Wert bleibt im Prozentlimit', () => {
     const result = calculate();

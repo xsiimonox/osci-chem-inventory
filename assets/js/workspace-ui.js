@@ -4,6 +4,10 @@
     let preferences;
     try { preferences = JSON.parse(localStorage.getItem(prefKey) || '{}'); } catch { preferences = {}; }
     if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {};
+    document.addEventListener('reeftools-portable-preferences-restored', () => {
+        try { preferences = JSON.parse(localStorage.getItem(prefKey) || '{}'); } catch { preferences = {}; }
+        if (!preferences || typeof preferences !== 'object' || Array.isArray(preferences)) preferences = {};
+    });
     const labels = { empty: 'Leer', critical: 'Kritisch', warning: 'Knapp', optimal: 'Ausreichend' };
     const productColorByFormula = {
         B: 'blue', CACL2: 'blue', SRCL2: 'blue',
@@ -26,7 +30,11 @@
         return categoryProductColors[cat] || 'neutral';
     }
     function persist() {
-        try { localStorage.setItem(prefKey, JSON.stringify(preferences)); return true; }
+        try {
+            localStorage.setItem(prefKey, JSON.stringify(preferences));
+            window.persistPortablePreferences?.();
+            return true;
+        }
         catch { showToast('Ansicht konnte nicht lokal gespeichert werden.', 'warning'); return false; }
     }
     function context() { return `${activeWarehouseId || 'default'}:${activeAquariumId || 'default'}`; }
@@ -98,9 +106,9 @@
             sort = field.querySelector('select');
             sort.setAttribute('aria-label', 'Lagerbestand sortieren');
             sort.title = 'Füllstand relativ zur hinterlegten Kapazität; Produkte ohne Kapazität zuletzt';
-            sort.value = preferences.sort || 'category';
             sort.onchange = () => { preferences.sort = sort.value; persist(); filterLager(); };
         }
+        sort.value = [...sort.options].some(option => option.value === preferences.sort) ? preferences.sort : 'category';
         const cards = [...root.querySelectorAll('.inventory-card')];
         if (sort.value !== 'category') {
             const fill = card => {

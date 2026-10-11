@@ -49,6 +49,12 @@ function inspectView(selector = '.tab-content.active') {
     }).map(label);
     const summaries = [...root.querySelectorAll('details > summary')].filter(visible).filter(element => !element.closest('.product-history[data-lazy-stock-details]'));
     const unframedHeadings = summaries.filter(element => {
+        // List management and outer recipe sections are intentionally unframed.
+        if (element.matches('#lager .warehouse-manager > summary, #lager .warehouse-quick-filters > summary, #lager #stock-alerts .alert-title, #cr-export .cr-mixing-overview-summary')) return false;
+        const parentStyle = getComputedStyle(element.parentElement);
+        const parentFramed = parentStyle.borderTopLeftRadius === '8px'
+            && ['Top','Right','Bottom','Left'].every(side => parseFloat(parentStyle[`border${side}Width`]) >= 1);
+        if (parentFramed) return false;
         const style = getComputedStyle(element);
         return style.borderTopLeftRadius !== '8px' || ['Top','Right','Bottom','Left'].some(side => parseFloat(style[`border${side}Width`]) < 1) || style.backgroundColor === 'rgba(0, 0, 0, 0)';
     }).map(label);
@@ -123,7 +129,10 @@ try {
         for (const state of ['normal','hover','pressed']) {
             if (state !== 'normal') await contrastProbe.hover(); else await page.mouse.move(0, 0);
             if (state === 'pressed') await page.mouse.down();
-            await page.waitForTimeout(200);
+            await contrastProbe.evaluate(async element => {
+                // Measure the selected state, not an intermediate theme transition.
+                await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => {})));
+            });
             const result = await contrastProbe.evaluate(element => {
                 const canvas = document.createElement('canvas');
                 canvas.width = canvas.height = 1;

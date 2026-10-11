@@ -1,4 +1,4 @@
-const CACHE_NAME = 'reef-storage-tools-cache-v3644-launcher-dosing-products-v2';
+const CACHE_NAME = 'reef-storage-tools-cache-v3644-launcher-dosing-products-v3-device-backup-v1';
 const CORE_ASSETS = [
   './',
   './index.html',

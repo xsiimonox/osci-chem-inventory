@@ -96,11 +96,70 @@ Zeile zeigt Produktname, Formel, Bestand und Status. Ein Pfeil oeffnet die
 Buchungsaktionen und laedt Verlauf/Prognose erst fuer dieses Produkt. Ein- und
 Auslagerung bleibt im geschlossenen Produkt ausgeblendet. Die Produktauswahl
 fuer schnelle Buchungen folgt Suche, Kategorie und Schnellfilter und verwendet
-die vorhandenen Buchungsdialoge. Sortierung und Produktauswahl bleiben lokal gespeichert.
+die vorhandenen Buchungsdialoge. Sortierung und Produktauswahl werden lokal und
+im Projektbackup gespeichert.
 Fuellstandsortierung nutzt den Anteil an der individuell hinterlegten Kapazitaet;
 Produkte ohne Kapazitaet stehen zuletzt, statt unterschiedliche Einheiten zu
 vergleichen. Die zuvor globale Kompakt-/Detailumschaltung entfaellt; Details
 werden pro Produkt geoeffnet.
+
+## KH/Ca-Messverlauf und Tagesdosis
+
+Der neutrale Rechner `kh-ca-messverlauf-tagesdosis` liegt unter Tools,
+Dosieren & Messwerte. Er verwendet dieselben Loesungs-Presets wie KH/Ca-Korrektur
+und Dosierwirkung. OSCI, Fauna Marin, SANGOKAI und eigene Loesungen werden nach
+dem Versorgungsprofil angeboten; eigene Presets bleiben systemunabhaengig.
+Die bestehende SANGOKAI-Kachel enthaelt nur Mengen- und Ansatzrechner.
+
+`assets/js/dosing-calculations.js` kapselt die reine Berechnung. Pro Messung
+werden Loesungswirkung, Aquariumvolumen, mittlere Tagesdosis und optionale
+Einmalzugaben fuer das Intervall seit der vorherigen Messung gespeichert.
+Der Verbrauch wird aus zugefuehrter Menge minus gemessener Nettoveraenderung
+ermittelt und zeitgewichtet. Die Prozentgrenze verwendet eine auf die aktuell
+gewaehlte Loesung umgerechnete Dosierungsbasis. Einmaliger Sofortausgleich und
+langsame Sollwert-Annaeherung bleiben getrennte Berechnungsmodi.
+
+Historische Loesungswirkungen werden bei Preset-Aenderungen nicht ersetzt.
+Bei Hans-Werner-Ansatzrezepten (420/358 g plus 5 L Wasser) sind das tatsaechliche
+Endvolumen und bei Calcium die Hydratform erforderlich. Das separate
+Calcium-Dihydrat-Standardpreset wurde entfernt. Verwaiste Produktauswahlen
+verlangen eine neue Auswahl, statt still auf eine andere Konzentration zu wechseln;
+historische Messungen behalten ihren Loesungs-Snapshot.
+
+Eigene KH-/Ca-Dosierprodukte werden im gemeinsamen App-Dialog direkt aus dem
+Messverlauf, der Korrektur oder der Dosierwirkung angelegt. Eine zentrale
+Validierung und Speicherung unter `doseImpactSettings.customPresets` versorgt
+alle drei Rechner und das bestehende Aquarium-/Projektbackup. Die Eingabe erfolgt
+wahlweise als bekannte Referenzwirkung, als Wirkstoffkonzentration (mg Calcium/ml
+oder mmol Alkalinitaets-Ladung/ml) oder als Pulveransatz mit Salzform, Reinheit und
+fertigem Endvolumen. Die Pulverrechnung gilt fuer die angegebenen Einzelsalze,
+nicht fuer unbekannte Markenmischungen. Beim Bearbeiten bleibt die Produkt-ID
+stabil; alte Messungen werden nicht nachtraeglich umgerechnet.
+
+Korrektur und Dosierwirkung nutzen ebenfalls den zentralen Berechnungskern.
+Leere und negative Eingaben werden nicht durch alte Werte oder Null ersetzt.
+Ist-/Sollwerte der Korrektur bleiben getrennt fuer KH und Ca erhalten; Tageszahl
+und Eingaben werden automatisch im Aquariumprofil gespeichert. Beim Bearbeiten
+alter Messungen wird der aktuelle Messentwurf separat gesichert und danach
+wiederhergestellt. Zweiteilige Calciumprodukte weisen die Mengen je Teil aus.
+In der C&R-Checkliste sind 100 % vollstaendig abgehakten Chargen ohne Fehlbestand
+vorbehalten; eine kleine offene Zutat darf nicht auf 100 % aufgerundet werden.
+Ohne Aquarium bleiben manuelle Berechnungen moeglich; das Speichern eigener
+Dosierprodukte und Korrekturwerte verlangt ein Aquariumprofil und meldet andernfalls
+keinen vermeintlichen Speichererfolg.
+Mobile Rechner-/Workflow-Aktionen haben eine inhaltsbasierte Flex-Hoehe:
+die Desktop-Breite von 150 px darf bei Spaltenlayout nicht zur Buttonhoehe werden.
+
+Alte SANGOKAI-Verlaeufe werden einmalig nach
+`supplyProfile.calculators.dosing` uebernommen. Alte Datensaetze hatten kein
+gespeichertes Nettovolumen; die Anzeige kennzeichnet den Rueckgriff auf das
+aktuelle Aquariumvolumen. Formulare, Sollwerte und Messungen bleiben pro Aquarium
+im vorhandenen lokalen Speicher und vollstaendigen Projektbackup enthalten.
+
+Die Karte nutzt gemeinsame Tokens, Field-Info-Controls und Container Queries:
+drei Spalten auf breiten Flaechen, zwei auf mittleren und eine auf schmalen.
+Messwertgrafiken zeigen echte Messpunkte und den Sollwert, keine Prognose.
+Reduzierte Bewegung deaktiviert die Diagramm-Animation.
 
 ## Bereinigung
 
@@ -141,7 +200,14 @@ node tools/workspace-ui-audit.mjs
 node tools/inventory-overview-audit.mjs
 node tools/data-link-audit.mjs
 node tools/calculation-audit.mjs
+node --test tools/dosing-calculations.test.cjs tools/sangokai-calculations.test.cjs
+node tools/dosing-ui-audit.mjs
 ```
+
+Der Dosier-Audit startet ohne URL-Argument selbst einen temporaeren lokalen Server.
+Er prueft Migration, Formularaktionen, Preset-Snapshots, Aquarium-Wechsel,
+Neuladen, Backup-Roundtrip sowie helle/dunkle Layouts bei 319 bis 1440 px.
+Er fuehrt auch die SANGOKAI-Mengen-/Ansatz-Regression aus.
 
 Die Tests benoetigen Playwright/Chromium und verwenden isolierte Browserprofile.
 Der Design-Audit prueft 13 Bereiche bei 320, 390, 671, 768 und 1440 px, geoeffnete
@@ -161,7 +227,63 @@ mit isolierten Demo-Daten. Es greift nicht auf das echte Browserprofil zu.
 
 Automatisierte Layout-/Funktionstests und Screenshot-Kontrolle ersetzen keinen
 Test auf jedem physischen iOS-/Android-Geraet. Google-Login und Cloud-Sync wurden
-dabei nicht mit einem echten Konto ausgefuehrt; deren Business-Logik ist unveraendert.
+dabei nicht mit einem echten Konto ausgefuehrt.
+
+## Geraetewechsel und Speicherung
+
+`appState` bleibt der gemeinsame Datenstand fuer IndexedDB, lokale
+Wiederherstellungspunkte, Datei-Export und Google-Drive-Projektbackup.
+Projektbackups ab Version 3 enthalten zusaetzlich `portablePreferences`:
+
+- Menue-Reihenfolge, mobile Schnellzugriffe und ausgeblendete Bereiche.
+- Design-Modus und eigene Designfarben ohne alte Farbspiegel des Zielgeraets.
+- OSCI-Sichtbarkeit und Sichtbarkeit von Osmosetank/Vorratsbehaeltern.
+- Lagerkapazitaeten, Sortierung und schnelle Produktauswahl.
+- C&R-Eingabeentwuerfe und Fortschritt der C&R-/Trace-Wizards.
+- Bisher reine Formularwerte der eigenstaendigen Rechner, inklusive
+  PhytoDose/LiquidDose und ICP-Importentwurf, je Aquarium und Lager getrennt.
+- Auto-Sync- und Wiederverbindungs-Erinnerung als Benutzereinstellungen.
+
+Die bestehenden strukturierten Dosier-, SANGOKAI-, Trace- und Korrektur-Daten
+bleiben in ihren bisherigen Modellen. Die Formular-Sicherung darf keine
+historischen Loesungswirkungen oder Messungen ueberschreiben. Eingaben und
+Ansichtseinstellungen loesen denselben lokalen und Cloud-Speicherpfad aus wie
+normale App-Aenderungen. IndexedDB bestaetigt erst die abgeschlossene Transaktion.
+Die LocalStorage-Schluessel dienen weiterhin als kompatible UI-Spiegel.
+
+Beim Ausblenden/Verlassen der Seite wird zusaetzlich ein synchroner Notfallstand
+geschrieben (bestehendes Limit: 4 MB). Ist dessen Zeitstempel neuer als IndexedDB,
+wird er beim Start uebernommen. Ein aelterer noch laufender Schreibvorgang darf
+diesen neueren Stand nicht loeschen. Grosse Projekte werden weiterhin regulaer
+in IndexedDB und im Cloud-Backup gespeichert; der begrenzte Fallback ist kein
+Ersatz fuer das Cloud-Backup.
+
+Beim Wiederherstellen werden die UI-Spiegel und privaten Workspace-Praeferenzen
+vor der ersten Speicherung ersetzt. Rechner werden nach ihrer Lazy-Initialisierung
+erneut mit den passenden Formularwerten berechnet. Alte ICP-Recovery-Spiegel des
+Zielgeraets duerfen den wiederhergestellten Projektstand nicht veraendern.
+Geplante Cloud-Transfers werden beim Projektwechsel abgebrochen; ein wiederhergestelltes
+deaktiviertes Auto-Sync darf keinen zuvor geplanten Upload ausloesen.
+Backups ohne `portablePreferences` bleiben lesbar und behalten die vorhandenen
+Browser-Praeferenzen. Auch ein Projekt ohne Aquarium ist uebertragbar.
+
+Nicht uebertragen werden OAuth-Tokens, Anmeldungen, Cloud-Kontoverknuepfungen,
+Browser-Berechtigungen, Sicherheitsfreigaben, Cache, Scrollposition oder offene
+Dialoge/Abschnitte. Auf dem neuen Geraet muss Google Drive erneut verbunden
+werden. Automatische Uploads benoetigen aktiviertes Auto-Sync und eine gueltige
+Google-Sitzung; ein lokales Speichern allein bestaetigt keinen Cloud-Upload.
+
+```sh
+node tools/device-backup-audit.mjs
+```
+
+Dieser Audit startet einen temporaeren Server und isolierte Browserprofile.
+Er prueft Autosave, Reload, Migration alter Einstellungen, Google-Upload und
+-Restore mit abgefangenem Transport, einen frischen zweiten Browser,
+Aquarium-Wechsel, Projekte ohne Aquarium, lokale Snapshots und Dateiimporte.
+Auch der Auto-Sync-Timer und ein unterbrochener IndexedDB-Schreibvorgang werden
+geprueft. Gespeicherte Fotos und Mischhaken bleiben im Projekt enthalten.
+Es werden keine echten Cloud-Konten oder Nutzerdaten verwendet.
 
 ## Release
 

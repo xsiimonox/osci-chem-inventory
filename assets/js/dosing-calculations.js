@@ -13,12 +13,40 @@
     }
 
     function solutionStrength(solution, product) {
+        if (!['kh', 'ca'].includes(product)) throw new Error('Unbekannter Messwert.');
         if (!solution || solution.element !== (product === 'kh' ? 'KH' : 'Ca')) {
             throw new Error('Die Lösung passt nicht zum Messwert.');
         }
-        return positive(solution.increase, 'Produktwirkung')
+        const strength = positive(solution.increase, 'Produktwirkung')
             / positive(solution.referenceMl, 'Referenzmenge')
             * positive(solution.referenceLiters, 'Referenzvolumen') / 100;
+        return positive(strength, 'Produktwirkung');
+    }
+
+    function calculateDoseImpact({ solution, volumeLiters, dailyMl }) {
+        const product = solution?.element === 'KH' ? 'kh' : solution?.element === 'Ca' ? 'ca' : null;
+        const strength = solutionStrength(solution, product);
+        const volume = positive(volumeLiters, 'Aquariumvolumen');
+        const dose = number(dailyMl, 'Tagesdosis');
+        const effectPerMl = positive(strength * 100 / volume, 'Produktwirkung im Aquarium');
+        const dailyIncrease = number(dose * effectPerMl, 'Tägliche Zufuhr');
+        return { strength, volumeLiters: volume, dailyMl: dose, dailyIncrease,
+            weeklyIncrease: number(dailyIncrease * 7, 'Wöchentliche Zufuhr'),
+            mlForOneUnit: positive(1 / effectPerMl, 'Dosiermenge') };
+    }
+
+    function calculateCorrectionQuantity({ solution, volumeLiters, currentValue, targetValue, days }) {
+        const product = solution?.element === 'KH' ? 'kh' : solution?.element === 'Ca' ? 'ca' : null;
+        const strength = solutionStrength(solution, product);
+        const volume = positive(volumeLiters, 'Aquariumvolumen');
+        const current = number(currentValue, 'Aktueller Messwert');
+        const target = number(targetValue, 'Zielwert');
+        const period = positive(days, 'Aufteilungszeitraum');
+        const difference = target - current;
+        const totalMl = number(Math.max(0, difference) / strength * (volume / 100), 'Dosiermenge');
+        return { strength, volumeLiters: volume, currentValue: current, targetValue: target,
+            days: period, difference, totalMl, dailyMl: number(totalMl / period, 'Tagesmenge'),
+            pairedTotalMl: solution.pairedProductName ? totalMl : null };
     }
 
     function calculateConcentrationSolution({ product, concentration }) {
@@ -113,7 +141,8 @@
         };
     }
 
-    const api = { solutionStrength, calculateConcentrationSolution, calculatePowderSolution, calculateDoseAdjustment };
+    const api = { solutionStrength, calculateDoseImpact, calculateCorrectionQuantity,
+        calculateConcentrationSolution, calculatePowderSolution, calculateDoseAdjustment };
     root.DosingCalculations = api;
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

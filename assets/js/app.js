@@ -1336,6 +1336,13 @@ const OVERVIEW_ENABLED_KEY = 'reeftools_overview_enabled_v1';
 const HOME_OVERVIEW_MIGRATION_KEY = 'reeftools_home_overview_migration_v1';
 const OSCI_FEATURES_ENABLED_KEY = 'reeftools_osci_features_enabled_v1';
 const HIDDEN_LOGBOOK_FEATURES_KEY = 'reeftools_hidden_logbook_features_v1';
+const PORTABLE_LOCAL_PREFERENCE_KEYS = [
+    MENU_ORDER_KEY, MOBILE_QUICK_TABS_KEY, HIDDEN_MENU_TABS_KEY,
+    OSCI_FEATURES_ENABLED_KEY, HIDDEN_LOGBOOK_FEATURES_KEY, 'reeftools.workspace-ui.v1',
+    'reeftools_theme_v1', 'reeftools_custom_theme_colors_v1'
+];
+let restoringPortablePreferences = false;
+let portablePreferencesNeedRefresh = false;
 const TOOL_SECTION_DEFINITIONS = [
     { id: 'dosieren-und-messwerte', label: 'Dosierung, Verbrauch & Messen', hint: 'KH/Ca, Testabgleich, Nährstoffe und tägliche Dosierung' },
     { id: 'salinitaet-und-wasserwechsel', label: 'Salinität & Wasserwechsel', hint: 'Salzgehalt, Nettovolumen, Wasserwechsel und Adsorber' },
@@ -1600,6 +1607,159 @@ function deepClone(value) {
     return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
 }
 
+function readPortableBrowserPreferences() {
+    const localSettings = {};
+    PORTABLE_LOCAL_PREFERENCE_KEYS.forEach(key => {
+        try { localSettings[key] = localStorage.getItem(key); }
+        catch { localSettings[key] = null; }
+    });
+    const cloud = getGoogleDriveSyncSettings();
+    return { version: 1, localSettings,
+        cloudSettings: { autoSync: cloud.autoSync, remindReconnect: cloud.remindReconnect }, toolDrafts: {} };
+}
+
+function normalizePortablePreferences(source) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return readPortableBrowserPreferences();
+    const localSettings = Object.fromEntries(PORTABLE_LOCAL_PREFERENCE_KEYS.map(key =>
+        [key, typeof source.localSettings?.[key] === 'string' ? source.localSettings[key] : null]));
+    const toolDrafts = {};
+    Object.entries(source.toolDrafts || {}).forEach(([context, fields]) => {
+        if (!fields || typeof fields !== 'object' || Array.isArray(fields) || ['__proto__', 'constructor', 'prototype'].includes(context)) return;
+        toolDrafts[context] = Object.fromEntries(Object.entries(fields)
+            .filter(([id, field]) => /^[a-z][a-z0-9_-]*$/i.test(id) && !['constructor', 'prototype'].includes(id)
+                && field && typeof field === 'object' && typeof field.value === 'string')
+            .map(([id, field]) => [id, { value: field.value, checked: field.checked === true }]));
+    });
+    return { version: 1, localSettings, toolDrafts,
+        cloudSettings: { autoSync: source.cloudSettings?.autoSync === true, remindReconnect: source.cloudSettings?.remindReconnect !== false } };
+}
+
+function getPortablePreferences() {
+    if (!appState) return readPortableBrowserPreferences();
+    if (!appState.portablePreferences) appState.portablePreferences = readPortableBrowserPreferences();
+    return appState.portablePreferences;
+}
+
+function capturePortableBrowserPreferences() {
+    const preferences = getPortablePreferences();
+    const browser = readPortableBrowserPreferences();
+    preferences.localSettings = browser.localSettings;
+    preferences.cloudSettings = browser.cloudSettings;
+    return preferences;
+}
+
+function persistPortablePreferences() {
+    if (!appState || !appBootstrapComplete || restoringPortablePreferences) return;
+    capturePortableBrowserPreferences();
+    saveDB();
+}
+
+function applyPortablePreferencesFromProject({ replaceProject = false } = {}) {
+    const preferences = normalizePortablePreferences(appState?.portablePreferences);
+    appState.portablePreferences = preferences;
+    PORTABLE_LOCAL_PREFERENCE_KEYS.forEach(key => {
+        try {
+            const value = preferences.localSettings[key];
+            if (value === null) localStorage.removeItem(key);
+            else localStorage.setItem(key, value);
+        } catch (error) { console.warn('Preference mirror failed:', key, error); }
+    });
+    storeGoogleDriveSyncSettings(preferences.cloudSettings);
+    if (replaceProject || !preferences.cloudSettings.autoSync) {
+        clearTimeout(googleDriveSyncTimer);
+        clearTimeout(googleDriveRemoteWatchTimer);
+    }
+    if (replaceProject) {
+        setDemoProfileActive(appState.demoProfile === true);
+        // Recovery mirrors belong to the previous project, not the restored backup.
+        [TRACE_ICP_ASSIGNMENTS_KEY, APP_STORAGE_IMMEDIATE_TRACE_KEY, APP_STORAGE_EMERGENCY_KEY, 'reef-tools-pending-trace-icp-assignment']
+            .forEach(key => { try { localStorage.removeItem(key); } catch {} });
+    }
+    portablePreferencesNeedRefresh = true;
+    document.dispatchEvent(new Event('reeftools-portable-preferences-restored'));
+}
+
+function getPortableToolDraftContext() {
+    return `${activeWarehouseId || 'default'}:${activeAquariumId || 'no-aquarium'}`;
+}
+
+function isPortableToolInput(input) {
+    if (!input?.id || !input.matches?.('input, select, textarea') || input.readOnly
+        || ['password', 'file', 'hidden', 'submit', 'reset', 'button', 'image'].includes(input.type)) return false;
+    if (['icpImportText', 'icpReportName', 'icpReportDate'].includes(input.id)) return true;
+    // These calculators already save their own structured state and historical snapshots.
+    if (/^(dose|majorCorrection|sangokai|customCr|trace|testCorrection|osmoseTank|feedNutrient)/i.test(input.id)) return false;
+    return Boolean(input.closest('#tools .tool-compact-card'));
+}
+
+function capturePortableToolInputs(root) {
+    const preferences = getPortablePreferences();
+    const context = getPortableToolDraftContext();
+    preferences.toolDrafts ||= {};
+    const fields = preferences.toolDrafts[context] ||= {};
+    root.querySelectorAll('input[id], select[id], textarea[id]').forEach(input => {
+        if (isPortableToolInput(input)) fields[input.id] = { value: input.value, checked: input.checked === true };
+    });
+}
+
+function restorePortableToolInputs(root = document, reset = false) {
+    const fields = getPortablePreferences().toolDrafts?.[getPortableToolDraftContext()] || {};
+    const wasRestoring = restoringPortablePreferences;
+    restoringPortablePreferences = true;
+    try {
+        const inputs = [...root.querySelectorAll('input[id], select[id], textarea[id]')];
+        // Selects can rebuild dependent fields; restore their values first.
+        inputs.sort((a, b) => Number(b.tagName === 'SELECT') - Number(a.tagName === 'SELECT')).forEach(input => {
+            if (!isPortableToolInput(input) || (!reset && !fields[input.id])) return;
+            const field = fields[input.id];
+            const defaultValue = input.tagName === 'SELECT'
+                ? (input.querySelector('option[selected]') || input.options[0])?.value || '' : input.defaultValue;
+            const value = field?.value ?? defaultValue;
+            if (input.tagName === 'SELECT' && ![...input.options].some(option => option.value === value)) return;
+            input.value = value;
+            if (['checkbox', 'radio'].includes(input.type)) input.checked = field?.checked ?? input.defaultChecked;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            if (input.id === 'icpReportDate') input.dataset.userEdited = field?.value ? 'true' : '';
+        });
+    } finally { restoringPortablePreferences = wasRestoring; }
+}
+
+function refreshPortablePreferencesUI() {
+    if (!portablePreferencesNeedRefresh || !appBootstrapComplete) return;
+    portablePreferencesNeedRefresh = false;
+    const openSections = new Set([...document.querySelectorAll('#tools .tool-section[open]')].map(section => section.dataset.sectionId));
+    initializedToolSections.clear();
+    document.body.classList.toggle('osci-features-hidden', !isOsciFeaturesEnabled());
+    applyMenuOrder();
+    applyToolVisibility();
+    applyLogbookFeatureVisibility();
+    renderFeatureVisibilitySettings();
+    renderMenuOrderSettings();
+    renderToolVisibilitySettings();
+    document.dispatchEvent(new Event('reeftools-context-change'));
+    document.querySelectorAll('#tools .tool-section').forEach(section => {
+        if (openSections.has(section.dataset.sectionId) && !section.classList.contains('tool-section-user-hidden')) {
+            section.open = true;
+            initToolSection(section.dataset.sectionId);
+        }
+    });
+    restorePortableToolInputs();
+}
+
+function initPortableInputPersistence() {
+    const capture = event => {
+        if (restoringPortablePreferences || !appBootstrapComplete || !isPortableToolInput(event.target)) return;
+        capturePortableToolInputs(event.target.closest('.tool-compact-card, .icp-import-card') || event.target.parentElement);
+        persistPortablePreferences();
+    };
+    document.addEventListener('input', capture);
+    document.addEventListener('change', capture);
+    document.addEventListener('reeftools-context-change', () => {
+        if (appBootstrapComplete) restorePortableToolInputs(document, true);
+    });
+}
+
 function canUseIndexedDb() {
     return typeof window !== 'undefined' && 'indexedDB' in window;
 }
@@ -1822,8 +1982,10 @@ async function idbPut(storeName, key, value) {
         const tx = idb.transaction(storeName, 'readwrite');
         const store = tx.objectStore(storeName);
         const request = key === undefined ? store.put(value) : store.put(value, key);
-        request.onsuccess = () => resolve(true);
         request.onerror = () => reject(request.error || new Error(`IndexedDB put failed for ${storeName}`));
+        tx.oncomplete = () => resolve(true);
+        tx.onabort = () => reject(tx.error || new Error(`IndexedDB transaction aborted for ${storeName}`));
+        tx.onerror = () => reject(tx.error || new Error(`IndexedDB transaction failed for ${storeName}`));
     }).catch(err => {
         console.error(err);
         return false;
@@ -1918,13 +2080,20 @@ async function removeLegacyLocalDbCopies() {
 
 async function loadPersistedAppState() {
     const indexedValue = await idbGet(APP_STORAGE_STATE_STORE, APP_STORAGE_STATE_KEY);
+    const emergencyValue = getEmergencyStateFallback();
+    const emergencyTime = new Date(emergencyValue?.savedAt || 0).getTime();
+    const indexedTime = new Date(indexedValue?.savedAt || indexedValue?.updatedAt || 0).getTime();
+    if (emergencyValue?.payload && (!indexedValue?.payload || emergencyTime > indexedTime)) {
+        latestPersistAt = emergencyValue.savedAt || emergencyValue.updatedAt || null;
+        startupStorageRecoveryCandidate = null;
+        return emergencyValue.payload;
+    }
     if (indexedValue && typeof indexedValue === 'object') {
         latestPersistAt = indexedValue.savedAt || indexedValue.updatedAt || null;
         let immediate = null;
         try { immediate = JSON.parse(localStorage.getItem(APP_STORAGE_IMMEDIATE_TRACE_KEY) || 'null'); } catch (err) {}
         return applyImmediateTraceState(indexedValue.payload || null, { ...immediate, indexedSavedAt: indexedValue.savedAt || indexedValue.updatedAt });
     }
-    const emergencyValue = getEmergencyStateFallback();
     if (emergencyValue?.payload) {
         latestPersistAt = emergencyValue.savedAt || emergencyValue.updatedAt || null;
         startupStorageRecoveryCandidate = null;
@@ -2038,7 +2207,10 @@ async function persistAppStateNow(reason = 'autosave', createSnapshot = false) {
     clearPersistenceFailure();
     storeStorageSentinel(savedAt, reason);
     try { localStorage.removeItem(APP_STORAGE_IMMEDIATE_TRACE_KEY); } catch (err) {}
-    try { localStorage.removeItem(APP_STORAGE_EMERGENCY_KEY); } catch (err) {}
+    const emergency = getEmergencyStateFallback();
+    if (!emergency || new Date(emergency.savedAt || 0).getTime() <= new Date(savedAt).getTime()) {
+        try { localStorage.removeItem(APP_STORAGE_EMERGENCY_KEY); } catch (err) {}
+    }
     await idbPut(APP_STORAGE_STATE_STORE, APP_STORAGE_META_KEY, {
         key: APP_STORAGE_META_KEY,
         lastSavedAt: savedAt,
@@ -2457,6 +2629,7 @@ function setGoogleDriveReconnectReminder(enabled) {
         remindReconnect: enabled !== false,
         lastPromptAt: enabled === false ? new Date().toISOString() : null
     });
+    persistPortablePreferences();
     renderGoogleDriveSyncCard(enabled === false ? 'Automatische Login-Erinnerung deaktiviert.' : 'Automatische Login-Erinnerung aktiviert.');
 }
 
@@ -2734,7 +2907,7 @@ function buildProjectBackupPayload() {
     if (warehouse) warehouse.lastExportAt = exportedAt;
     return {
         type: 'osci_project_backup',
-        version: 2,
+        version: 3,
         app: 'ReefTools',
         schema: APP_STORAGE_DB_VERSION,
         activeWarehouseId,
@@ -3217,6 +3390,7 @@ async function loadDemoProfile() {
     activeAquariumId = appState.activeAquariumId;
     db = normalizeWarehouseData(getActiveWarehouse()?.data || {});
     overlayActiveAquariumData();
+    applyPortablePreferencesFromProject({ replaceProject: true });
     setDemoProfileActive(true);
     await persistAppStateNow('demo-profile', false);
     applyTheme(db.theme || 'default', false);
@@ -3242,6 +3416,7 @@ async function restoreOwnProfileFromDemo() {
     });
     if (!confirmed) return;
     appState = migrateToWarehouseState(returnRecord.payload);
+    applyPortablePreferencesFromProject({ replaceProject: true });
     activeWarehouseId = appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
     activeAquariumId = appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
     appState.activeWarehouseId = activeWarehouseId;
@@ -3619,6 +3794,7 @@ async function restoreProjectBackupFromGoogleDrive() {
         }
         appState = migrateToWarehouseState(parsed.data);
         setDemoProfileActive(false);
+        applyPortablePreferencesFromProject({ replaceProject: true });
         await idbDelete(APP_STORAGE_STATE_STORE, DEMO_PROFILE_RETURN_STATE_KEY);
         activeWarehouseId = parsed.activeWarehouseId || appState.activeWarehouseId || Object.keys(appState.warehouses || {})[0] || 'main';
         activeAquariumId = appState.aquariums[parsed.activeAquariumId] ? parsed.activeAquariumId : appState.aquariums[appState.activeAquariumId] ? appState.activeAquariumId : Object.keys(appState.aquariums || {})[0] || null;
@@ -3781,11 +3957,13 @@ async function disconnectGoogleDriveSync() {
 
 function toggleGoogleDriveAutoSync(enabled) {
     storeGoogleDriveSyncSettings({ autoSync: enabled === true });
+    persistPortablePreferences();
     renderGoogleDriveSyncCard(enabled ? 'Auto-Sync aktiviert.' : 'Auto-Sync deaktiviert.');
     if (enabled) {
         scheduleGoogleDriveAutoSync();
         scheduleGoogleDriveRemoteWatch(4000);
     } else {
+        clearTimeout(googleDriveSyncTimer);
         clearTimeout(googleDriveRemoteWatchTimer);
     }
 }
@@ -4053,6 +4231,7 @@ async function restoreLocalSnapshot(snapshotId, ask = true) {
     const active = getActiveWarehouse();
     if (active) db = normalizeWarehouseData(active.data);
     overlayActiveAquariumData();
+    applyPortablePreferencesFromProject({ replaceProject: true });
     const persisted = await persistAppStateNow('restore-snapshot', false);
     if (!persisted) {
         await appAlert('Der Wiederherstellungspunkt wurde geladen, konnte aber lokal nicht sicher gespeichert werden. Bitte erstelle sofort ein Backup oder lade den Stand in die Cloud.', {
@@ -4413,6 +4592,7 @@ function setLogbookFeatureVisible(featureId, visible) {
         ? hidden.filter(id => id !== featureId)
         : [...new Set([...hidden, featureId])];
     localStorage.setItem(HIDDEN_LOGBOOK_FEATURES_KEY, JSON.stringify(next));
+    persistPortablePreferences();
     refreshFeatureVisibility();
     const label = featureId === 'osmoseTank' ? 'Osmosetank' : 'Vorratsbehälter';
     showToast(`${label} ${visible ? 'eingeblendet' : 'ausgeblendet'}. Daten bleiben erhalten.`, 'info');
@@ -4450,6 +4630,7 @@ function setOverviewEnabled(enabled) {
 
 function setOsciFeaturesEnabled(enabled) {
     localStorage.setItem(OSCI_FEATURES_ENABLED_KEY, String(Boolean(enabled)));
+    persistPortablePreferences();
     refreshFeatureVisibility();
     showToast(
         enabled
@@ -4515,6 +4696,7 @@ function saveMobileQuickTabs(tabs) {
         if (!unique.includes(id) && unique.length < 4 && !isMenuTabHidden(id)) unique.push(id);
     });
     localStorage.setItem(MOBILE_QUICK_TABS_KEY, JSON.stringify(unique.slice(0, 4)));
+    persistPortablePreferences();
     renderMobileBottomNav();
     renderMenuOrderSettings();
 }
@@ -4534,6 +4716,7 @@ function updateMobileQuickTab(slotIndex, tabId) {
 
 function resetMobileQuickTabs() {
     localStorage.removeItem(MOBILE_QUICK_TABS_KEY);
+    persistPortablePreferences();
     renderMobileBottomNav();
     renderMenuOrderSettings();
 }
@@ -4542,6 +4725,7 @@ function saveMenuOrder(order) {
     const valid = Array.isArray(order) ? order.filter(id => DEFAULT_MENU_ORDER.includes(id)) : DEFAULT_MENU_ORDER;
     const normalized = normalizeMenuOrder(valid);
     localStorage.setItem(MENU_ORDER_KEY, JSON.stringify(normalized));
+    persistPortablePreferences();
     applyMenuOrder();
     renderMenuOrderSettings();
 }
@@ -4557,6 +4741,7 @@ function moveMenuItem(tabId, direction) {
 
 function resetMenuOrder() {
     localStorage.removeItem(MENU_ORDER_KEY);
+    persistPortablePreferences();
     applyMenuOrder();
     renderMenuOrderSettings();
 }
@@ -4854,6 +5039,7 @@ function createPersistableWarehouseData(data = {}) {
 }
 
 function prepareAppStateForStorage(state = appState) {
+    if (state === appState) capturePortableBrowserPreferences();
     const sanitized = cloneSerializable(state || {});
     if (sanitized.warehouses && typeof sanitized.warehouses === 'object') {
         Object.values(sanitized.warehouses).forEach(warehouse => {
@@ -5401,6 +5587,7 @@ async function initDB() {
     normalizeWarehouseData(warehouse.data);
     overlayActiveAquariumData();
     warehouse.data = createPersistableWarehouseData(db);
+    applyPortablePreferencesFromProject();
     
     // Geladenes Design direkt beim Start anwenden
     applyTheme(db.theme, false);
@@ -6978,6 +7165,7 @@ function renderCurrentWarehouseViews() {
     safeRender('Benachrichtigungen', updateNotificationStatus);
     safeRender('Tab-Rechte', updateTabAccessState);
     safeRender('C&R Import', clearCRPdfImport);
+    safeRender('Übertragbare Einstellungen', refreshPortablePreferencesUI);
 }
 
 function getDashboardNextTodo() {
@@ -13437,7 +13625,9 @@ function updateDoseTracker(persist = true) {
         .filter(entry => entry.product === form.product)
         .slice()
         .sort((a, b) => new Date(a.at) - new Date(b.at));
-    if (solutionError) {
+    if (form.editingId) {
+        result.innerHTML = '<p class="field-help">Du bearbeitest eine historische Messung mit ihrer damaligen Lösung. Der aktuelle Messentwurf und die Tagesdosis-Berechnung werden danach wieder angezeigt.</p>';
+    } else if (solutionError) {
         result.innerHTML = `<p class="field-help">${escapeHtml(solutionError)}</p>`;
     } else if (measurements.length < 2) {
         result.innerHTML = `<p class="field-help">Noch ${2 - measurements.length} weitere Messung(en) für einen Verbrauchs- und Dosierabgleich erfassen.</p>`;
@@ -13544,16 +13734,11 @@ function saveDoseMeasurement() {
         volumeLiters: existing?.volumeLiters || volumeLiters };
     if (existing) Object.assign(existing, measurement);
     else tracker.measurements.push({ id: createWarehouseId(), ...measurement });
-    const valueInput = document.getElementById('doseValue');
-    if (valueInput) valueInput.value = '';
-    const editingInput = document.getElementById('doseEditingId');
-    if (editingInput) editingInput.value = '';
-    const dateInput = document.getElementById('doseDate');
-    if (dateInput) dateInput.value = formatDateTimeLocal();
-    const correctionInput = document.getElementById('doseCorrectionMl');
-    if (correctionInput) correctionInput.value = '0';
-    tracker.form = readDoseTrackerForm();
-    tracker.forms[form.product] = tracker.form;
+    if (existing) restoreDoseMeasurementDraft(tracker);
+    else {
+        tracker.form = { ...form, editingId: '', value: '', at: formatDateTimeLocal(), correctionMl: '0' };
+        tracker.forms[form.product] = tracker.form;
+    }
     initDoseTracker();
     saveDB();
     showToast(existing ? 'Messung aktualisiert.' : 'Messung im Aquariumprofil gespeichert.', 'success');
@@ -13563,6 +13748,7 @@ function editDoseMeasurement(id) {
     const tracker = getDoseTrackerState();
     const entry = tracker.measurements.find(item => String(item.id) === String(id));
     if (!entry) return;
+    if (!readDoseTrackerForm().editingId) tracker.editingDraft = cloneSerializable(readDoseTrackerForm());
     const form = {
         ...(tracker.forms[entry.product] || {}),
         product: entry.product,
@@ -13582,26 +13768,19 @@ function editDoseMeasurement(id) {
     document.getElementById('doseValue')?.focus();
 }
 
+function restoreDoseMeasurementDraft(tracker) {
+    const form = tracker.editingDraft ? cloneSerializable(tracker.editingDraft)
+        : { ...tracker.form, at: formatDateTimeLocal(), value: '', correctionMl: '0' };
+    form.editingId = '';
+    tracker.form = form;
+    tracker.forms[form.product] = form;
+    delete tracker.editingDraft;
+}
+
 function cancelDoseMeasurementEdit() {
     const tracker = getDoseTrackerState();
     if (!document.getElementById('doseEditingId')?.value) return;
-    const product = document.getElementById('doseElement')?.value || 'kh';
-    const previous = tracker.forms[product] || tracker.form;
-    const defaults = tracker.defaults[product] || {};
-    const form = {
-        ...previous,
-        product,
-        at: formatDateTimeLocal(),
-        value: '',
-        doseMlPerDay: previous.doseMlPerDay ?? '',
-        correctionMl: '0',
-        targetValue: defaults.targetValue ?? previous.targetValue ?? '',
-        targetDays: defaults.targetDays ?? previous.targetDays ?? '',
-        maxChangePercent: defaults.maxChangePercent ?? previous.maxChangePercent ?? '',
-        editingId: ''
-    };
-    tracker.form = form;
-    tracker.forms[form.product] = form;
+    restoreDoseMeasurementDraft(tracker);
     initDoseTracker();
     saveDB();
 }
@@ -13620,17 +13799,10 @@ async function deleteDoseMeasurement(id) {
     tracker.measurements = tracker.measurements.filter(entry => String(entry.id) !== String(id));
     const editingId = document.getElementById('doseEditingId');
     if (editingId?.value && String(editingId.value) === String(id)) {
-        const form = readDoseTrackerForm();
-        form.editingId = '';
-        form.at = formatDateTimeLocal();
-        if (editingId) editingId.value = '';
-        const dateInput = document.getElementById('doseDate');
-        if (dateInput) dateInput.value = form.at;
-        tracker.form = form;
-        tracker.forms[form.product] = form;
+        restoreDoseMeasurementDraft(tracker);
     }
-    saveDB();
     initDoseTracker();
+    saveDB();
 }
 
 function openDosePresetBuilder(event, edit = false) {
@@ -13680,6 +13852,7 @@ function buildCustomDoseProduct(values) {
 }
 
 function storeCustomDoseProduct(preset, { presetId = null, source = 'tracker' } = {}) {
+    if (!getActiveAquarium()) throw new Error('Bitte zuerst ein Aquarium anlegen, damit eigene Dosierprodukte dauerhaft gespeichert werden können.');
     const settings = getDoseImpactSettings();
     const index = settings.customPresets.findIndex(entry => entry.id === presetId);
     if (presetId && index < 0) throw new Error('Das eigene Produkt ist nicht mehr vorhanden.');
@@ -13711,6 +13884,7 @@ function storeCustomDoseProduct(preset, { presetId = null, source = 'tracker' } 
 async function openCustomDoseProductBuilder(event, { source = 'tracker', presetId = null } = {}) {
     event?.preventDefault();
     event?.stopPropagation();
+    if (!getActiveAquarium()) return showToast('Eigene Dosierprodukte werden im Aquariumprofil gespeichert. Bitte zuerst ein Aquarium anlegen.', 'warning');
     if (source === 'tracker' && document.getElementById('doseEditingId')?.value) return;
     const existing = presetId ? getDoseImpactSettings().customPresets.find(entry => entry.id === presetId) : null;
     if (presetId && !existing) return showToast('Nur eigene Produkte können bearbeitet werden.', 'warning');
@@ -19372,64 +19546,68 @@ function initToolSection(sectionId, force = false) {
     if (!sectionId) return;
     if (!force && initializedToolSections.has(sectionId)) return;
     initializedToolSections.add(sectionId);
+    try {
+        if (sectionId === 'dosieren-und-messwerte') {
+            runToolInit('Fauna Marin Trace', initFaunaTraceCalculator);
+            runToolInit('Nutrition Rechner', renderNutritionCalculator);
+            runToolInit('Dosierwirkung', initDoseImpactCalculator);
+            runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
+            runToolInit('KH/Ca Messverlauf & Tagesdosis', initDoseTracker);
+            runToolInit('Balling & Pulver', renderBallingPowderCalculator);
+            runToolInit('Verbrauch', renderConsumptionCalculator);
+            runToolInit('Testkorrektur', renderTestCorrectionTool);
+            runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
+            runToolInit('Salifert Auswahl', populateSalifertSyringeSelect);
+            runToolInit('Salifert Rechner', renderSalifertConverter);
+            return;
+        }
 
-    if (sectionId === 'dosieren-und-messwerte') {
-        runToolInit('Fauna Marin Trace', initFaunaTraceCalculator);
-        runToolInit('Nutrition Rechner', renderNutritionCalculator);
-        runToolInit('Dosierwirkung', initDoseImpactCalculator);
-        runToolInit('KH/Ca Korrektur', initMajorCorrectionCalculator);
-        runToolInit('KH/Ca Messverlauf & Tagesdosis', initDoseTracker);
-        runToolInit('Balling & Pulver', renderBallingPowderCalculator);
-        runToolInit('Verbrauch', renderConsumptionCalculator);
-        runToolInit('Testkorrektur', renderTestCorrectionTool);
-        runToolInit('Hanna Phosphor', renderHannaPhosphorusConverter);
-        runToolInit('Salifert Auswahl', populateSalifertSyringeSelect);
-        runToolInit('Salifert Rechner', renderSalifertConverter);
-        return;
-    }
+        if (sectionId === 'salinitaet-und-wasserwechsel') {
+            runToolInit('Wasserwechsel', renderWaterChangeCalculator);
+            runToolInit('Adsorber Durchfluss', renderAdsorberFlowCalculator);
+            runToolInit('Salzkorrektur', renderSaltCorrectionCalculator);
+            runToolInit('Nettovolumen', renderSalinityVolumeEstimator);
+            runToolInit('Salinität', updateSalinityCalculator);
+            runToolInit('Salinität Umrechner', updateSimpleSalinityConverter);
+            return;
+        }
 
-    if (sectionId === 'salinitaet-und-wasserwechsel') {
-        runToolInit('Wasserwechsel', renderWaterChangeCalculator);
-        runToolInit('Adsorber Durchfluss', renderAdsorberFlowCalculator);
-        runToolInit('Salzkorrektur', renderSaltCorrectionCalculator);
-        runToolInit('Nettovolumen', renderSalinityVolumeEstimator);
-        runToolInit('Salinität', updateSalinityCalculator);
-        runToolInit('Salinität Umrechner', updateSimpleSalinityConverter);
-        return;
-    }
+        if (sectionId === 'c-und-r-und-mischen') {
+            runToolInit('Makro-Rezeptauswahl', () => {
+                refreshMacroRecipeOptions();
+            });
+            runToolInit('Makro-Rezept', renderMacroRecipe);
+            runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
+            runToolInit('Meerwasser Mischung', renderSeaWaterMix);
+            runToolInit('Meerwasser PSU-Prüfung', renderSeaWaterRecipePsuCheck);
+            runToolInit('C&R Sperre', syncCustomCRLockUI);
+            runToolInit('C&R Rechner', () => {
+                if (!isCustomCRUnlocked()) return;
+                renderCustomCrLimitsMatrix();
+                renderCustomCrPlannerMatrix();
+                renderCustomCRPlanner();
+                renderSavedCustomCrPlans();
+            });
+            runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
+            return;
+        }
 
-    if (sectionId === 'c-und-r-und-mischen') {
-        runToolInit('Makro-Rezeptauswahl', () => {
-            refreshMacroRecipeOptions();
-        });
-        runToolInit('Makro-Rezept', renderMacroRecipe);
-        runToolInit('Meerwasser Presets', renderSeaWaterPresetSelect);
-        runToolInit('Meerwasser Mischung', renderSeaWaterMix);
-        runToolInit('Meerwasser PSU-Prüfung', renderSeaWaterRecipePsuCheck);
-        runToolInit('C&R Sperre', syncCustomCRLockUI);
-        runToolInit('C&R Rechner', () => {
-            if (!isCustomCRUnlocked()) return;
-            renderCustomCrLimitsMatrix();
-            renderCustomCrPlannerMatrix();
-            renderCustomCRPlanner();
-            renderSavedCustomCrPlans();
-        });
-        runToolInit('NaCl Lösung', renderNaclSolutionCalculator);
-        return;
-    }
+        if (sectionId === 'sangokai-mengen-und-mischen') {
+            runToolInit('Sangokai Mengen & Mischen', initSangokaiQuantityTools);
+            return;
+        }
 
-    if (sectionId === 'sangokai-mengen-und-mischen') {
-        runToolInit('Sangokai Mengen & Mischen', initSangokaiQuantityTools);
-        return;
-    }
-
-    if (sectionId === 'community-und-hilfe') {
-        runToolInit('Futter Nährstoffe', renderFeedNutrientLog);
-        runToolInit('Strömung', renderFlowCalculator);
-        runToolInit('Osmosetank', renderOsmoseTank);
-        runToolInit('Vorratsbehälter', renderDosingContainers);
-        runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
-        runToolInit('Umsetzungsprotokoll', renderImplementationLog);
+        if (sectionId === 'community-und-hilfe') {
+            runToolInit('Futter Nährstoffe', renderFeedNutrientLog);
+            runToolInit('Strömung', renderFlowCalculator);
+            runToolInit('Osmosetank', renderOsmoseTank);
+            runToolInit('Vorratsbehälter', renderDosingContainers);
+            runToolInit('PSU Korrektur', renderPsuCorrectionSettings);
+            runToolInit('Umsetzungsprotokoll', renderImplementationLog);
+        }
+    } finally {
+        const section = document.querySelector(`#tools .tool-section[data-section-id="${sectionId}"]`);
+        if (section) restorePortableToolInputs(section);
     }
 }
 
@@ -21041,12 +21219,11 @@ function getMajorCorrectionUnit(element) {
 
 function getMajorCorrectionSettings() {
     if (!db.majorCorrectionSettings) db.majorCorrectionSettings = { ...JSON.parse(JSON.stringify(majorCorrectionDefaultSettings)), tankLiters: getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters) };
-    if (!db.majorCorrectionSettings.tankLiters) db.majorCorrectionSettings.tankLiters = getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters);
+    if (db.majorCorrectionSettings.tankLiters === undefined) db.majorCorrectionSettings.tankLiters = getActiveAquariumVolumeLiters(majorCorrectionDefaultSettings.tankLiters);
     if (db.majorCorrectionSettings.selectedPresetId === undefined) {
-        const legacyStrengths = db.majorCorrectionSettings.strengths || {};
-        if (legacyStrengths.Ca === 1 && legacyStrengths.KH !== 0.1) db.majorCorrectionSettings.selectedPresetId = 'osci-calcium';
-        else db.majorCorrectionSettings.selectedPresetId = majorCorrectionDefaultSettings.selectedPresetId;
+        db.majorCorrectionSettings.selectedPresetId = majorCorrectionDefaultSettings.selectedPresetId;
     }
+    if (!db.majorCorrectionSettings.forms || typeof db.majorCorrectionSettings.forms !== 'object') db.majorCorrectionSettings.forms = {};
     return db.majorCorrectionSettings;
 }
 
@@ -21054,11 +21231,6 @@ function getMajorCorrectionPreset() {
     const settings = getMajorCorrectionSettings();
     const presets = getDoseImpactPresets();
     return presets.find(preset => preset.id === settings.selectedPresetId) || null;
-}
-
-function getMajorCorrectionStrengthFromPreset(preset) {
-    if (!preset || !preset.referenceMl || !preset.referenceLiters) return 0;
-    return (preset.increase / preset.referenceMl) * (preset.referenceLiters / 100);
 }
 
 function getMajorCorrectionElementLabel(element) {
@@ -21087,23 +21259,29 @@ function syncMajorCorrectionInputsFromSettings(force = false) {
     const preset = getMajorCorrectionPreset();
     const litersEl = document.getElementById('majorCorrectionLiters');
     const elementDisplay = document.getElementById('majorCorrectionElementDisplay');
-    if (litersEl && (force || !litersEl.value)) {
+    if (litersEl && force) {
         litersEl.value = settings.tankLiters;
     }
-    if (elementDisplay) elementDisplay.value = getMajorCorrectionElementLabel(preset?.element || 'KH');
-    if (force && preset) {
-        const currentEl = document.getElementById('majorCorrectionCurrent');
-        const targetEl = document.getElementById('majorCorrectionTarget');
+    if (elementDisplay) elementDisplay.value = preset ? getMajorCorrectionElementLabel(preset.element) : '';
+    const currentEl = document.getElementById('majorCorrectionCurrent');
+    const targetEl = document.getElementById('majorCorrectionTarget');
+    if (preset && (force || currentEl?.dataset.correctionElement !== preset.element)) {
+        const saved = settings.forms[preset.element] || {};
         const defaults = preset.element === 'Ca' ? { current: 400, target: 420 } : { current: 7, target: 7.5 };
-        if (currentEl) currentEl.value = Number.isFinite(Number(preset.currentValue)) ? preset.currentValue : defaults.current;
-        if (targetEl) targetEl.value = Number.isFinite(Number(preset.targetValue)) ? preset.targetValue : defaults.target;
+        if (currentEl) {
+            currentEl.value = saved.currentValue ?? preset.currentValue ?? defaults.current;
+            currentEl.dataset.correctionElement = preset.element;
+        }
+        if (targetEl) targetEl.value = saved.targetValue ?? preset.targetValue ?? defaults.target;
     }
+    const daysEl = document.getElementById('majorCorrectionDays');
+    if (daysEl && force) daysEl.value = settings.days ?? '3';
 }
 
 function initMajorCorrectionCalculator() {
     populateMajorCorrectionPresetSelect();
     syncMajorCorrectionInputsFromSettings(true);
-    renderMajorCorrectionCalculator();
+    renderMajorCorrectionCalculator(false);
 }
 
 function selectMajorCorrectionPreset() {
@@ -21111,8 +21289,8 @@ function selectMajorCorrectionPreset() {
     settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value ?? '';
     populateMajorCorrectionPresetSelect();
     syncMajorCorrectionInputsFromSettings(true);
-    saveDB(false);
-    renderMajorCorrectionCalculator();
+    renderMajorCorrectionCalculator(false);
+    saveDB();
 }
 
 function selectMajorCorrectionElement() {
@@ -21120,12 +21298,8 @@ function selectMajorCorrectionElement() {
 }
 
 function saveMajorCorrectionDefaults() {
-    const tankLiters = Math.max(1, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || majorCorrectionDefaultSettings.tankLiters);
-    const settings = getMajorCorrectionSettings();
-    settings.tankLiters = tankLiters;
-    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || settings.selectedPresetId;
-    saveDB();
-    renderMajorCorrectionCalculator();
+    if (!getActiveAquarium()) return showToast('Zum dauerhaften Speichern der Korrekturwerte bitte zuerst ein Aquarium anlegen.', 'warning');
+    if (!renderMajorCorrectionCalculator()) return showToast('Bitte gültige Korrekturwerte eintragen.', 'warning');
     showToast('Korrektur-Auswahl gespeichert', 'success');
 }
 
@@ -21136,28 +21310,39 @@ function resetMajorCorrectionDefaults() {
     initMajorCorrectionCalculator();
 }
 
-function renderMajorCorrectionCalculator() {
+function renderMajorCorrectionCalculator(persist = true) {
     const result = document.getElementById('majorCorrectionResult');
     if (!result) return;
     syncMajorCorrectionInputsFromSettings();
     const settings = getMajorCorrectionSettings();
-    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value || settings.selectedPresetId;
+    settings.selectedPresetId = document.getElementById('majorCorrectionPreset')?.value ?? settings.selectedPresetId;
     const preset = getMajorCorrectionPreset();
     const element = preset?.element || 'KH';
-    const liters = Math.max(0, parseFloat(document.getElementById('majorCorrectionLiters')?.value) || 0);
-    const current = parseFloat(document.getElementById('majorCorrectionCurrent')?.value);
-    const target = parseFloat(document.getElementById('majorCorrectionTarget')?.value);
-    const strength = getMajorCorrectionStrengthFromPreset(preset);
-    const days = Math.max(1, parseInt(document.getElementById('majorCorrectionDays')?.value, 10) || 1);
+    const fields = {
+        volumeLiters: document.getElementById('majorCorrectionLiters')?.value ?? '',
+        currentValue: document.getElementById('majorCorrectionCurrent')?.value ?? '',
+        targetValue: document.getElementById('majorCorrectionTarget')?.value ?? '',
+        days: document.getElementById('majorCorrectionDays')?.value ?? ''
+    };
     const unit = getMajorCorrectionUnit(element);
-    settings.tankLiters = liters || settings.tankLiters;
-    if (!liters || Number.isNaN(current) || Number.isNaN(target) || !strength) {
+    settings.tankLiters = fields.volumeLiters;
+    settings.days = fields.days;
+    if (preset) settings.forms[element] = { currentValue: fields.currentValue, targetValue: fields.targetValue };
+    if (persist) saveDB();
+    if (!preset) {
         result.innerHTML = '<p class="hint">Bitte Beckenvolumen, Werte und ein Produktpreset eintragen.</p>';
-        return;
+        return false;
     }
-    const diff = target - current;
-    const totalMl = diff > 0 ? (diff / strength) * (liters / 100) : 0;
-    const dailyMl = totalMl / days;
+    let calculation;
+    try {
+        if (!window.DosingCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+        calculation = window.DosingCalculations.calculateCorrectionQuantity({ solution: preset, ...fields });
+    } catch (error) {
+        result.innerHTML = `<p class="hint">${escapeHtml(error.message)}</p>`;
+        return false;
+    }
+    const { difference: diff, currentValue: current, targetValue: target, strength, days, totalMl, dailyMl } = calculation;
+    const paired = calculation.pairedTotalMl !== null;
     result.innerHTML = `
         <div class="tool-result">
             <div class="tool-row">
@@ -21166,14 +21351,16 @@ function renderMajorCorrectionCalculator() {
             </div>
             <div class="tool-row ${diff <= 0 ? 'missing' : ''}">
                 <span><strong>Dosiermenge</strong><small>${escapeHtml(preset.name)}: ${strength.toFixed(element === 'KH' ? 4 : 3)} ${unit} pro 1 ml / 100 L</small></span>
-                <span>${diff > 0 ? totalMl.toFixed(2) + ' ml' : 'keine Erhöhung nötig'}</span>
+                <span>${diff > 0 ? paired ? `${totalMl.toFixed(2)} ml Ca-1 + ${totalMl.toFixed(2)} ml Ca-2` : totalMl.toFixed(2) + ' ml' : 'keine Erhöhung nötig'}</span>
             </div>
             <div class="tool-row">
                 <span><strong>Schonend aufteilen</strong><small>${days} Tag(e)</small></span>
-                <span>${diff > 0 ? dailyMl.toFixed(2) + ' ml/Tag' : '-'}</span>
+                <span>${diff > 0 ? paired ? `Je ${dailyMl.toFixed(2)} ml/Tag Ca-1 und Ca-2` : dailyMl.toFixed(2) + ' ml/Tag' : '-'}</span>
             </div>
+            ${paired ? '<p class="field-help">Die Calciumwirkung bezieht sich auf Ca-1. Ca-2 wird in gleicher Menge separat erfasst und nicht als zusätzliche Calciumzufuhr gerechnet.</p>' : ''}
         </div>
     `;
+    return true;
 }
 
 function renderConsumptionCalculator() {
@@ -21225,7 +21412,7 @@ function getDoseImpactSettings() {
     }
     if (!Array.isArray(db.doseImpactSettings.customPresets)) db.doseImpactSettings.customPresets = [];
     if (db.doseImpactSettings.selectedPresetId === undefined) db.doseImpactSettings.selectedPresetId = 'osci-kh-tag';
-    if (!db.doseImpactSettings.tankLiters) db.doseImpactSettings.tankLiters = getActiveAquariumVolumeLiters(100);
+    if (db.doseImpactSettings.tankLiters === undefined) db.doseImpactSettings.tankLiters = getActiveAquariumVolumeLiters(100);
     if (db.doseImpactSettings.dailyMl === undefined) db.doseImpactSettings.dailyMl = 10;
     return db.doseImpactSettings;
 }
@@ -21275,7 +21462,7 @@ function applyDoseImpactPresetToInputs(preset) {
 function initDoseImpactCalculator() {
     populateDoseImpactPresetSelect();
     applyDoseImpactPresetToInputs(getSelectedDoseImpactPreset());
-    renderDoseImpactCalculator();
+    renderDoseImpactCalculator(false);
 }
 
 function selectDoseImpactPreset() {
@@ -21283,7 +21470,7 @@ function selectDoseImpactPreset() {
     settings.selectedPresetId = document.getElementById('doseImpactPreset')?.value ?? '';
     applyDoseImpactPresetToInputs(getSelectedDoseImpactPreset());
     saveDB();
-    renderDoseImpactCalculator();
+    renderDoseImpactCalculator(false);
 }
 
 function readDoseImpactForm() {
@@ -21291,38 +21478,41 @@ function readDoseImpactForm() {
     return {
         element,
         name: (document.getElementById('doseImpactPresetName')?.value || 'Eigenes Preset').trim() || 'Eigenes Preset',
-        tankLiters: Math.max(0, parseFloat(document.getElementById('doseImpactTankLiters')?.value) || 0),
-        dailyMl: Math.max(0, parseFloat(document.getElementById('doseImpactDailyMl')?.value) || 0),
-        referenceMl: Math.max(0, parseFloat(document.getElementById('doseImpactReferenceMl')?.value) || 0),
-        referenceLiters: Math.max(0, parseFloat(document.getElementById('doseImpactReferenceLiters')?.value) || 0),
-        increase: Math.max(0, parseFloat(document.getElementById('doseImpactIncrease')?.value) || 0),
+        tankLiters: document.getElementById('doseImpactTankLiters')?.value ?? '',
+        dailyMl: document.getElementById('doseImpactDailyMl')?.value ?? '',
+        referenceMl: document.getElementById('doseImpactReferenceMl')?.value ?? '',
+        referenceLiters: document.getElementById('doseImpactReferenceLiters')?.value ?? '',
+        increase: document.getElementById('doseImpactIncrease')?.value ?? '',
         unit: getDoseImpactUnit(element)
     };
 }
 
-function renderDoseImpactCalculator() {
+function renderDoseImpactCalculator(persist = true) {
     const result = document.getElementById('doseImpactResult');
     if (!result) return;
     const settings = getDoseImpactSettings();
     const form = readDoseImpactForm();
-    settings.tankLiters = form.tankLiters || settings.tankLiters;
+    settings.tankLiters = form.tankLiters;
     settings.dailyMl = form.dailyMl;
+    if (persist) saveDB();
     const label = document.getElementById('doseImpactIncreaseLabel');
     if (label) label.innerText = `Erhöhung (${form.unit}):`;
-    if (!form.tankLiters || !form.referenceMl || !form.referenceLiters || !form.increase) {
-        result.innerHTML = '<p class="hint">Bitte Aquariumvolumen, Tagesdosierung und Produktwirkung eintragen.</p>';
+    let calculation;
+    try {
+        if (!window.DosingCalculations) throw new Error('Der Rechner konnte nicht geladen werden.');
+        calculation = window.DosingCalculations.calculateDoseImpact({ solution: form,
+            volumeLiters: form.tankLiters, dailyMl: form.dailyMl });
+    } catch (error) {
+        result.innerHTML = `<p class="hint">${escapeHtml(error.message)}</p>`;
         return;
     }
-    const increasePerMlPer100L = form.increase / form.referenceMl * (form.referenceLiters / 100);
-    const dailyIncrease = form.dailyMl * increasePerMlPer100L * (100 / form.tankLiters);
-    const weeklyIncrease = dailyIncrease * 7;
-    const mlForOneUnit = increasePerMlPer100L ? (1 / increasePerMlPer100L) * (form.tankLiters / 100) : 0;
+    const { strength: increasePerMlPer100L, dailyIncrease, weeklyIncrease, mlForOneUnit, dailyMl, volumeLiters } = calculation;
     const preset = getSelectedDoseImpactPreset();
     const presetNote = preset?.locked ? 'Produkt-Standardpreset' : 'Eigenes gespeichertes Preset';
     result.innerHTML = `
         <div class="tool-result">
             <div class="tool-row">
-                <span><strong>${form.element} Zufuhr pro Tag</strong><small>${form.dailyMl.toFixed(2)} ml/Tag auf ${form.tankLiters.toFixed(0)} L</small></span>
+                <span><strong>${form.element} Zufuhr pro Tag</strong><small>${dailyMl.toFixed(2)} ml/Tag auf ${volumeLiters.toFixed(0)} L</small></span>
                 <span>+${dailyIncrease.toFixed(form.element === 'KH' ? 3 : 2)} ${form.unit}/Tag</span>
             </div>
             <div class="tool-row">
@@ -21330,13 +21520,14 @@ function renderDoseImpactCalculator() {
                 <span>+${weeklyIncrease.toFixed(form.element === 'KH' ? 3 : 2)} ${form.unit}/Woche</span>
             </div>
             <div class="tool-row">
-                <span><strong>Produktwirkung</strong><small>${form.referenceMl.toFixed(2)} ml auf ${form.referenceLiters.toFixed(0)} L = +${form.increase} ${form.unit}</small></span>
+                <span><strong>Produktwirkung</strong><small>${Number(form.referenceMl).toFixed(2)} ml auf ${Number(form.referenceLiters).toFixed(0)} L = +${escapeHtml(form.increase)} ${form.unit}</small></span>
                 <span>${increasePerMlPer100L.toFixed(form.element === 'KH' ? 4 : 3)} ${form.unit} je 1 ml/100 L</span>
             </div>
             <div class="tool-row">
                 <span><strong>Dosierung für +1 ${form.unit}</strong><small>${presetNote}</small></span>
                 <span>${mlForOneUnit.toFixed(2)} ml</span>
             </div>
+            ${preset?.pairedProductName && preset.element === form.element ? '<p class="field-help">Tagesdosierung als Ca-1-Menge eingeben. Ca-2 wird in derselben Menge separat zugegeben, ohne die berechnete Calciumwirkung zu verdoppeln.</p>' : ''}
         </div>
     `;
 }
@@ -24874,6 +25065,9 @@ function clearIcpImportForm() {
     }
     if (text) text.value = '';
     if (preview) preview.innerHTML = '';
+    const fields = getPortablePreferences().toolDrafts?.[getPortableToolDraftContext()];
+    if (fields) ['icpReportName', 'icpReportDate', 'icpImportText'].forEach(id => { delete fields[id]; });
+    persistPortablePreferences();
 }
 
 function getIcpReportDateKey(dateValue = '') {
@@ -27905,7 +28099,10 @@ function renderCRMixingOverview() {
             batch.requiredAmount = batch.ingredients.reduce((sum, ingredient) => sum + ingredient.requiredAmount, 0);
             batch.mixedAmount = batch.ingredients.reduce((sum, ingredient) => sum + (ingredient.logs.every(log => log.mixingDone === true) ? ingredient.amount : 0), 0);
             batch.missingAmount = batch.ingredients.reduce((sum, ingredient) => sum + ingredient.missingAmount, 0);
-            batch.progress = batch.requiredAmount > 0 ? Math.min(100, Math.round(batch.mixedAmount / batch.requiredAmount * 100)) : 0;
+            batch.complete = batch.ingredients.every(ingredient => ingredient.logs.every(log => log.mixingDone === true))
+                && batch.missingAmount <= 0.0001;
+            batch.progress = batch.complete ? 100 : batch.requiredAmount > 0
+                ? Math.min(99, Math.round(batch.mixedAmount / batch.requiredAmount * 100)) : 0;
             return batch;
         })
         .sort((a, b) => b.timestamp - a.timestamp)
@@ -27916,7 +28113,7 @@ function renderCRMixingOverview() {
         return;
     }
     container.innerHTML = `<div class="cr-mixing-batches">${batches.map((batch, index) => {
-        const complete = batch.progress === 100 && batch.missingAmount <= 0.0001;
+        const complete = batch.complete;
         const rows = batch.ingredients.map(ingredient => {
             const checked = ingredient.logs.every(log => log.mixingDone === true);
             const unavailable = ingredient.amount <= 0 && ingredient.missingAmount > 0;
@@ -28983,6 +29180,7 @@ function resetLagerSingle() { if(confirm("Lager nullen?")) { for(let c in db.inv
 
 function clearResetLocalPreferences() {
     [
+        ...PORTABLE_LOCAL_PREFERENCE_KEYS,
         LAST_TAB_KEY,
         MENU_ORDER_KEY,
         MOBILE_QUICK_TABS_KEY,
@@ -28993,7 +29191,8 @@ function clearResetLocalPreferences() {
         GOOGLE_DRIVE_SETTINGS_KEY,
         CUSTOM_CR_UNLOCK_KEY,
         APP_STORAGE_EMERGENCY_KEY,
-        'reeftools_theme_v1'
+        'reeftools_theme_v1',
+        CUSTOM_THEME_COLORS_KEY
     ].forEach(key => {
         try { localStorage.removeItem(key); } catch (err) {}
     });
@@ -29066,6 +29265,7 @@ async function resetEntireSystem() {
     db = normalizeWarehouseData(appState.warehouses.main.data);
     overlayActiveAquariumData();
     appState.warehouses.main.data = createPersistableWarehouseData(db);
+    applyPortablePreferencesFromProject({ replaceProject: true });
     applyTheme('default', false);
     setDemoProfileActive(false);
     initializedToolSections.clear();
@@ -29379,6 +29579,7 @@ function importData() {
                 const active = getActiveWarehouse();
                 if (active) db = normalizeWarehouseData(active.data);
                 overlayActiveAquariumData();
+                applyPortablePreferencesFromProject({ replaceProject: true });
                 await persistSequence.catch(() => {});
                 const persisted = await persistAppStateNow('import-project', true);
                 if (!persisted) {
@@ -30922,6 +31123,7 @@ async function bootstrapApplication() {
     if (!overviewMigrationPending && pendingStartupTab && APP_TAB_IDS.includes(pendingStartupTab)) startupTab = pendingStartupTab;
     if (isMenuTabHidden(startupTab)) startupTab = getFirstVisibleTab();
     appBootstrapComplete = true;
+    initPortableInputPersistence();
     showTab(startupTab);
     if (overviewMigrationPending) {
         try {
@@ -30931,6 +31133,7 @@ async function bootstrapApplication() {
     }
     pendingStartupTab = '';
     runPostBootstrapDomSetup();
+    refreshPortablePreferencesUI();
     initCustomCursor();
     initTextFitGuard();
     initGlobalSearch();
@@ -31021,16 +31224,20 @@ window.addEventListener('pageshow', () => {
     }
 });
 
-window.addEventListener('pagehide', () => {
+function persistBeforePageSuspends(reason) {
     if (!appBootstrapComplete) return;
     saveDB(false);
-    flushPendingPersistence('pagehide', false);
-});
+    // A browser can terminate asynchronous IndexedDB writes during navigation.
+    tryStoreEmergencyStateFallback({ key: APP_STORAGE_STATE_KEY, savedAt: new Date().toISOString(),
+        reason, payload: prepareAppStateForStorage(appState) });
+    flushPendingPersistence(reason, false);
+}
+
+window.addEventListener('pagehide', () => persistBeforePageSuspends('pagehide'));
 
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'hidden' || !appBootstrapComplete) return;
-    saveDB(false);
-    flushPendingPersistence('visibility-hidden', false);
+    persistBeforePageSuspends('visibility-hidden');
 });
 
 // Initialize Light Mode if saved
